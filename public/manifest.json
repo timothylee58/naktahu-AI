@@ -1,0 +1,21 @@
+{
+  "name": "NakTahu AI",
+  "short_name": "NakTahu",
+  "description": "Tanya soalan berkaitan perkhidmatan kerajaan Malaysia dengan NakTahu AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0F1E",
+  "theme_color": "#2563EB",
+  "orientation": "portrait-primary",
+  "lang": "ms",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["productivity", "utilities"]
+}
