@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-web:
+    name: Deploy web to Vercel
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Deploy to Vercel (production)
+        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  deploy-api:
+    name: Trigger Railway API redeploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway webhook
+        run: |
+          curl -s -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            --fail

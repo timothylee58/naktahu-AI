@@ -1,36 +1,165 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NakTahu AI
 
-## Getting Started
+> **Ilmu tempatan, jawapan seketika.**
 
-First, run the development server:
+NakTahu AI is a Malaysian-focused bilingual AI answer engine that delivers cited, government-sourced answers in Bahasa Malaysia and English.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          User (Browser)                         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ HTTPS
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  apps/web  (Next.js 15, Vercel)                 │
+│                                                                 │
+│   SearchBar → useSSEStream hook → CitationChip × 1–3           │
+│   Navbar (language toggle) ← i18n (bm.json / en.json)         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ SSE  /api/v1/query
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  apps/api  (FastAPI, Railway)                   │
+│                                                                 │
+│   ┌──────────┐    ┌─────────┐    ┌───────────┐    ┌─────────┐ │
+│   │  router  │───▶│  rag   │───▶│  analyst  │───▶│synth   │ │
+│   │  _node   │    │  _node  │    │  _node    │    │iser    │ │
+│   │ (Haiku)  │    │pgvector │    │confidence │    │(Sonnet)│ │
+│   └──────────┘    └────┬────┘    └───────────┘    └────┬───┘ │
+│                        │                                │       │
+│                   Redis cache                      SSE stream   │
+└────────────────────────┼────────────────────────────────┼───────┘
+                         │                                │
+              ┌──────────▼──────────┐         ┌──────────▼──────────┐
+              │  Supabase + pgvector│         │   Browser via SSE   │
+              │  (document_chunks)  │         │  event: token/done  │
+              └─────────────────────┘         └─────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Monorepo layout
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+naktahu-ai/
+├── apps/
+│   ├── web/          — Next.js 15 App Router frontend (Vercel)
+│   └── api/          — FastAPI backend with LangGraph agent (Railway)
+├── packages/
+│   └── shared-types/ — Shared TypeScript interfaces
+├── scripts/
+│   └── ingest/       — Document ingestion pipeline
+├── infra/
+│   └── docker-compose.yml
+└── .github/
+    └── workflows/
+        ├── ci.yml    — typecheck + pytest on PR
+        └── deploy.yml — Vercel + Railway on main merge
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Quick start
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Prerequisites
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Node.js 22+
+- Python 3.11+
+- Docker & Docker Compose
 
-## Deploy on Vercel
+### 1. Clone and install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+git clone https://github.com/timothylee58/tanya-chatbot-my.git
+cd tanya-chatbot-my
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Frontend
+npm install --workspace=apps/web --legacy-peer-deps
+
+# Backend
+cd apps/api
+pip install -e ".[dev]"
+```
+
+### 2. Configure environment variables
+
+```bash
+# Web
+cp apps/web/.env.local.example apps/web/.env.local
+# Edit apps/web/.env.local with your values
+
+# API
+cp apps/api/.env.example apps/api/.env
+# Edit apps/api/.env with your values
+```
+
+### 3. Run with Docker Compose
+
+```bash
+docker compose -f infra/docker-compose.yml up
+```
+
+This starts:
+- **API** at `http://localhost:8000`
+- **Redis** at `localhost:6379`
+
+### 4. Run the frontend
+
+```bash
+cd apps/web
+npm run dev
+```
+
+Frontend available at `http://localhost:3000`.
+
+---
+
+## Environment variable reference
+
+### Web (`apps/web/.env.local`)
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Base URL of the FastAPI backend |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous public key |
+
+### API (`apps/api/.env`)
+
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude models |
+| `OPENAI_API_KEY` | OpenAI API key for embeddings |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, never expose) |
+| `REDIS_URL` | Redis connection URL (e.g. `redis://localhost:6379`) |
+| `JWT_SECRET` | Secret for validating Supabase JWTs |
+| `LANGSMITH_API_KEY` | LangSmith API key for tracing |
+| `LANGSMITH_PROJECT` | LangSmith project name (`naktahu-ai`) |
+
+---
+
+## CI/CD
+
+| Trigger | Action |
+|---|---|
+| PR to `main` | `tsc --noEmit` + `pytest` |
+| Push to `main` | Deploy `apps/web` → Vercel, trigger Railway webhook for `apps/api` |
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15, TypeScript strict, Tailwind CSS, shadcn/ui, Framer Motion |
+| Backend | Python 3.11, FastAPI, LangGraph 0.2+, LangChain Core |
+| LLM | `claude-sonnet-4-20250514` (generation), Claude Haiku (routing) |
+| Embeddings | `text-embedding-3-small` (OpenAI) |
+| Vector DB | Supabase pgvector |
+| Cache | Redis (Railway) |
+| Auth | Supabase Auth (email + Google OAuth) |
