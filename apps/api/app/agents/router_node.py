@@ -19,7 +19,7 @@ _SYSTEM_PROMPT = (
 )
 
 _VALID_DOMAINS = {"government", "education", "legal", "finance", "health", "culture"}
-_JSON_RE = re.compile(r"\{.*?\}", re.DOTALL)
+_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
 async def router_node(state: AgentState) -> dict:
@@ -44,10 +44,14 @@ async def router_node(state: AgentState) -> dict:
         parsed = {}
 
     language = parsed.get("language", "en")
+    if isinstance(language, str):
+        language = language.strip().lower()
     if language not in {"bm", "en"}:
         language = "en"
 
     domain = parsed.get("domain", "government")
+    if isinstance(domain, str):
+        domain = domain.strip().lower()
     if domain not in _VALID_DOMAINS:
         domain = "government"
 
