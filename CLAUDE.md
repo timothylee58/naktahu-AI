@@ -20,12 +20,12 @@ infra/
 |---|---|
 | Frontend | Next.js 15 App Router, TypeScript strict, Tailwind CSS, shadcn/ui, Framer Motion |
 | Backend | Python 3.11+, FastAPI, LangGraph 0.2+, LangChain Core |
-| LLM | `claude-sonnet-4-20250514` via Anthropic SDK (`streaming=True`) |
-| Embeddings | `text-embedding-3-small` via OpenAI SDK |
+| LLM | ILMU API (primary, OpenAI-compatible) + `claude-sonnet-4-20250514` (synthesis fallback) |
+| Embeddings | ILMU API (`ilmu-embedding` model, OpenAI-compatible SDK) |
 | Vector DB | Supabase with pgvector extension |
-| Cache | Redis (Railway) via redis-py asyncio |
+| Cache | Redis (Render) via redis-py asyncio |
 | Auth | Supabase Auth — email + Google OAuth, JWT validated in FastAPI middleware |
-| Deploy | Vercel (web), Railway (api + redis), Supabase cloud |
+| Deploy | Vercel (web), Render (api + redis), Supabase cloud |
 | CI/CD | GitHub Actions — lint + typecheck + pytest on PR, deploy on main merge |
 
 ## Environment variables
@@ -42,18 +42,23 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 **API (`.env`):**
 ```
 ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
+ILMU_API_KEY=
+ILMU_BASE_URL=
+ILMU_CHAT_MODEL=
+ILMU_EMBEDDING_MODEL=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 REDIS_URL=
 JWT_SECRET=
+SENTRY_DSN=
 LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=naktahu-ai
 ```
 
 ## Naming conventions
 
-- **Files:** kebab-case everywhere (e.g. `router-node.py`, `citation-chip.tsx`)
+- **Python files:** snake_case (e.g. `router_node.py`, `vector_store.py`)
+- **TypeScript files:** kebab-case (e.g. `citation-chip.tsx`, `use-sse-stream.ts`)
 - **Python:** snake_case functions and variables, PascalCase classes
 - **TypeScript:** camelCase variables/functions, PascalCase components and types
 - **Database tables:** snake_case (e.g. `document_chunks`, `user_sessions`)
@@ -75,10 +80,10 @@ LANGSMITH_PROJECT=naktahu-ai
 
 The pipeline is a `StateGraph` with 4 nodes and conditional edges. Execution order:
 
-1. **`router_node`** — classifies intent, domain (`government`/`education`/`legal`/`finance`/`health`/`culture`), and language (`bm`/`en`). Uses a fast Claude Haiku call with structured JSON output.
+1. **`router_node`** — classifies intent, domain (`government`/`education`/`legal`/`finance`/`health`/`culture`), and language (`bm`/`en`). Uses ILMU chat model with structured JSON output.
 2. **`rag_node`** — hybrid search on Supabase pgvector (cosine 0.7 + BM25 0.3). Returns top 5 chunks with source metadata. Checks Redis cache first with `sha256(query+language+domain)` key.
 3. **`analyst_node`** — scores citation relevance (0.0–1.0), maps `source_url` from chunk metadata, sets `confidence_score` on state. If confidence < 0.4, sets `needs_clarification` flag.
-4. **`synthesiser_node`** — calls `claude-sonnet-4-20250514` with `streaming=True`. System prompt enforces bilingual output matching query language. Streams tokens via `AsyncGenerator` back to SSE endpoint.
+4. **`synthesiser_node`** — calls ILMU primary (Anthropic fallback) with streaming. System prompt enforces bilingual output matching query language. Streams tokens via `AsyncGenerator` back to SSE endpoint.
 
 **State `TypedDict` fields:**
 `query`, `language`, `domain`, `session_id`, `user_id`, `retrieved_chunks`, `citations`, `confidence_score`, `needs_clarification`, `streaming_token_buffer`, `error`
@@ -144,7 +149,7 @@ Source URLs must be real `gov.my` or related official Malaysian government domai
 
 ## Do not do these things
 
-- Never use any LLM other than `claude-sonnet-4-20250514` for generation. Use a fast `claude-haiku` call only for `router_node` intent classification.
+- Do not change provider order without an explicit architecture decision: ILMU is primary for router/rag/synthesis, and `claude-sonnet-4-20250514` is fallback for synthesis only.
 - Never expose `SUPABASE_SERVICE_ROLE_KEY` to the frontend under any circumstances.
 - Never use `fetch()` in agent nodes — use the official Anthropic Python SDK and `supabase-py`.
 - Never store raw query text in Redis keys — always hash first.
