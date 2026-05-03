@@ -1,0 +1,52 @@
+services:
+  # ── FastAPI backend ─────────────────────────────────────────────────────
+  - type: web
+    name: naktahu-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    region: singapore
+    plan: starter
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENV
+        value: production
+      - key: CORS_ORIGINS
+        fromService:
+          name: naktahu-web
+          type: web
+          property: host
+      - key: REDIS_URL
+        fromService:
+          name: naktahu-redis
+          type: redis
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ILMU_API_KEY
+        sync: false
+      - key: ILMU_BASE_URL
+        sync: false
+      - key: ILMU_CHAT_MODEL
+        sync: false
+      - key: ILMU_EMBEDDING_MODEL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_PROJECT
+        value: naktahu-ai
+
+  # ── Managed Redis ────────────────────────────────────────────────────────
+  - type: redis
+    name: naktahu-redis
+    region: singapore
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
