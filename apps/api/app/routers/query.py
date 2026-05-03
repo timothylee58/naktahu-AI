@@ -105,7 +105,7 @@ async def _sse_generator(
 
     except Exception as exc:
         log.error("sse_pipeline_error", error=str(exc), query=query[:80])
-        yield _sse("error", {"message": str(exc)})
+        yield _sse("error", {"message": "An error occurred. Please try again."})
 
 
 @router.post("/query")
