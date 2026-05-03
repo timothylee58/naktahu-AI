@@ -35,8 +35,7 @@ def _build_context(state: AgentState) -> str:
     query = state.get("query", "")
     parts = [f"Query: {query}\n\nContext documents:"]
     for i, chunk in enumerate(chunks, 1):
-        snippet = chunk.content[:400].replace("\n", " ")
-        parts.append(f"[{i}] {chunk.source_title}\n{snippet}")
+        parts.append(f"[{i}] {chunk.source_title}\n{chunk.content}")
     return "\n\n".join(parts)
 
 
@@ -73,13 +72,18 @@ async def _stream_anthropic(context: str) -> AsyncGenerator[str, None]:
 async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     """Public async generator for direct use by the SSE endpoint.
 
-    Tries ILMU first; falls back to Anthropic on any error.
+    Tries ILMU first; falls back to Anthropic only if no tokens were emitted yet.
     """
     context = _build_context(state)
+    emitted = False
     try:
         async for token in _stream_ilmu(context):
+            emitted = True
             yield token
     except Exception as exc:
+        if emitted:
+            log.error("ilmu_failed_mid_stream", error=str(exc))
+            return
         log.warning("ilmu_fallback_triggered", error=str(exc))
         async for token in _stream_anthropic(context):
             yield token
