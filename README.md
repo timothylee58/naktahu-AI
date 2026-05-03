@@ -23,14 +23,14 @@ NakTahu AI is a Malaysian-focused bilingual AI answer engine that delivers cited
                              │ SSE  /api/v1/query
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  apps/api  (FastAPI, Railway)                   │
+│                  apps/api  (FastAPI, Render)                    │
 │                                                                 │
 │   ┌──────────┐    ┌─────────┐    ┌───────────┐    ┌─────────┐ │
 │   │  router  │───▶│  rag   │───▶│  analyst  │───▶│synth   │ │
 │   │  _node   │    │  _node  │    │  _node    │    │iser    │ │
-│   │ (Haiku)  │    │pgvector │    │confidence │    │(Sonnet)│ │
-│   └──────────┘    └────┬────┘    └───────────┘    └────┬───┘ │
-│                        │                                │       │
+│   │  (ILMU)  │    │pgvector │    │confidence │    │(ILMU+  │ │
+│   └──────────┘    └────┬────┘    └───────────┘    │fallbk) │ │
+│                        │                           └────┬───┘ │
 │                   Redis cache                      SSE stream   │
 └────────────────────────┼────────────────────────────────┼───────┘
                          │                                │
@@ -45,10 +45,10 @@ NakTahu AI is a Malaysian-focused bilingual AI answer engine that delivers cited
 ## Monorepo layout
 
 ```
-naktahu-ai/
+naktahu-AI/
 ├── apps/
 │   ├── web/          — Next.js 15 App Router frontend (Vercel)
-│   └── api/          — FastAPI backend with LangGraph agent (Railway)
+│   └── api/          — FastAPI backend with LangGraph agent (Render)
 ├── packages/
 │   └── shared-types/ — Shared TypeScript interfaces
 ├── scripts/
@@ -58,7 +58,7 @@ naktahu-ai/
 └── .github/
     └── workflows/
         ├── ci.yml    — typecheck + pytest on PR
-        └── deploy.yml — Vercel + Railway on main merge
+        └── deploy.yml — Vercel + Render on main merge
 ```
 
 ---
@@ -74,15 +74,14 @@ naktahu-ai/
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/timothylee58/tanya-chatbot-my.git
-cd tanya-chatbot-my
+git clone https://github.com/timothylee58/naktahu-AI.git
+cd naktahu-AI
 
 # Frontend
 npm install --workspace=apps/web --legacy-peer-deps
 
 # Backend
-cd apps/api
-pip install -e ".[dev]"
+(cd apps/api && pip install -e ".[dev]")
 ```
 
 ### 2. Configure environment variables
@@ -132,12 +131,16 @@ Frontend available at `http://localhost:3000`.
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude models |
-| `OPENAI_API_KEY` | OpenAI API key for embeddings |
+| `ANTHROPIC_API_KEY` | Anthropic API key (synthesis fallback) |
+| `ILMU_API_KEY` | ILMU API key (primary LLM + embeddings) |
+| `ILMU_BASE_URL` | ILMU API base URL |
+| `ILMU_CHAT_MODEL` | ILMU chat model name |
+| `ILMU_EMBEDDING_MODEL` | ILMU embedding model name |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, never expose) |
 | `REDIS_URL` | Redis connection URL (e.g. `redis://localhost:6379`) |
 | `JWT_SECRET` | Secret for validating Supabase JWTs |
+| `SENTRY_DSN` | Sentry DSN for error tracking (optional) |
 | `LANGSMITH_API_KEY` | LangSmith API key for tracing |
 | `LANGSMITH_PROJECT` | LangSmith project name (`naktahu-ai`) |
 
@@ -148,7 +151,7 @@ Frontend available at `http://localhost:3000`.
 | Trigger | Action |
 |---|---|
 | PR to `main` | `tsc --noEmit` + `pytest` |
-| Push to `main` | Deploy `apps/web` → Vercel, trigger Railway webhook for `apps/api` |
+| Push to `main` | Deploy `apps/web` → Vercel, trigger Render deploy hook for `apps/api` |
 
 ---
 
@@ -158,8 +161,8 @@ Frontend available at `http://localhost:3000`.
 |---|---|
 | Frontend | Next.js 15, TypeScript strict, Tailwind CSS, shadcn/ui, Framer Motion |
 | Backend | Python 3.11, FastAPI, LangGraph 0.2+, LangChain Core |
-| LLM | `claude-sonnet-4-20250514` (generation), Claude Haiku (routing) |
-| Embeddings | `text-embedding-3-small` (OpenAI) |
+| LLM | ILMU API (primary) + `claude-sonnet-4-20250514` (synthesis fallback) |
+| Embeddings | ILMU API (`ilmu-embedding`) |
 | Vector DB | Supabase pgvector |
-| Cache | Redis (Railway) |
+| Cache | Redis (Render) |
 | Auth | Supabase Auth (email + Google OAuth) |
