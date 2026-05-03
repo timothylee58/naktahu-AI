@@ -11,7 +11,7 @@ from app.services.vector_store import ChunkResult
 log = structlog.get_logger(__name__)
 
 _GOV_DOMAIN_RE = re.compile(
-    r"https?://(?:www\.)?[\w\-]+\.(?:gov\.my|edu\.my|org\.my)",
+    r"https?://(?:[\w\-]+\.)*(?:gov\.my|edu\.my|org\.my)(?:/|$)",
     re.IGNORECASE,
 )
 
