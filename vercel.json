@@ -1,9 +1,4 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm ci --legacy-peer-deps",
-  "rootDirectory": "apps/web",
   "rewrites": [
     {
       "source": "/api/v1/:path*",
