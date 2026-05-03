@@ -12,10 +12,7 @@ services:
       - key: ENV
         value: production
       - key: CORS_ORIGINS
-        fromService:
-          name: naktahu-web
-          type: web
-          property: host
+        sync: false
       - key: REDIS_URL
         fromService:
           name: naktahu-redis
