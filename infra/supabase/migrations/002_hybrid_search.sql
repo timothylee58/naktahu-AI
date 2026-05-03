@@ -34,11 +34,12 @@ BEGIN
         SELECT
             dc.id,
             ts_rank_cd(
-                to_tsvector('english', dc.content),
-                plainto_tsquery('english', query_text)
+                to_tsvector('simple', dc.content),
+                plainto_tsquery('simple', query_text)
             ) AS bm25_rank
         FROM document_chunks dc
-        WHERE domain_filter IS NULL OR dc.domain = domain_filter
+        WHERE (domain_filter IS NULL OR dc.domain = domain_filter)
+          AND to_tsvector('simple', dc.content) @@ plainto_tsquery('simple', query_text)
     ),
     combined AS (
         SELECT
