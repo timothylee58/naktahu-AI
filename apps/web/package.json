@@ -21,6 +21,7 @@
     "use-sound": "^4.0.4"
   },
   "devDependencies": {
+    "@sentry/nextjs": "^8.55.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
