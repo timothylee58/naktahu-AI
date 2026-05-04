@@ -66,6 +66,62 @@ def test_get_history_401_without_auth(client):
     assert res.status_code == 401
 
 
+def test_get_history_returns_entries_for_authenticated_user(client):
+    import json as _json
+
+    c, redis_client, sb, _ = client
+    entry = {
+        "query": "What is income tax?",
+        "language": "en",
+        "domain": "tax",
+        "response_summary": "Income tax is levied on earnings.",
+        "citations": [],
+        "ts": 1000,
+    }
+    redis_client.lrange = AsyncMock(return_value=[_json.dumps(entry)])
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data) == 1
+    assert data[0]["query"] == "What is income tax?"
+
+
+def test_get_history_returns_empty_list_when_no_history(client):
+    c, redis_client, *_ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    assert res.json() == []
+
+
+def test_post_history_validates_response_summary_max_length(client):
+    c, *_ = client
+    body = {
+        "query": "test",
+        "language": "en",
+        "domain": "general",
+        "response_summary": "x" * 151,  # exceeds max_length=150
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_post_history_401_without_auth(client):
+    c, *_ = client
+    body = {
+        "query": "test",
+        "language": "en",
+        "domain": "general",
+        "response_summary": "answer",
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body)
+    assert res.status_code == 401
+
+
 def test_post_history_persists_redis_and_supabase(client):
     c, redis_client, sb, insert_mock = client
     stored = json.dumps(
