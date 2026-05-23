@@ -1,0 +1,15 @@
+{
+  "nav": {
+    "title": "NakTahu AI",
+    "search_placeholder": "Ask anything about Malaysia..."
+  },
+  "chat": {
+    "thinking": "Thinking...",
+    "error": "Something went wrong. Please try again.",
+    "citation_label": "Sources"
+  },
+  "history": {
+    "title": "History",
+    "empty": "No conversations yet. Ask your first question!"
+  }
+}

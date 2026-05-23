@@ -1,0 +1,23 @@
+# Development override — mounts source code for hot-reload.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      # Override the prod CMD to use --reload
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
+    volumes:
+      - ../apps/api/app:/app/app
+    environment:
+      - ENV=development
+      - PYTHONUNBUFFERED=1
+    # No restart policy in dev — let it crash and let you see why
+    restart: "no"

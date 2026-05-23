@@ -1,0 +1,40 @@
+# Netlify build configuration for NakTahu AI (apps/web)
+
+[build]
+  base    = "apps/web"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Set these in Netlify dashboard → Site → Environment variables:
+  # NEXT_PUBLIC_SUPABASE_URL
+  # NEXT_PUBLIC_SUPABASE_ANON_KEY
+  # NEXT_PUBLIC_API_URL   (e.g. https://naktahu-api.onrender.com)
+
+# SSR support via Netlify Next.js plugin
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# API proxy — forwards /api/v1/* to the Render backend
+[[redirects]]
+  from   = "/api/v1/*"
+  to     = "https://naktahu-api.onrender.com/api/v1/:splat"
+  status = 200
+
+# Security headers
+[[headers]]
+  for = "/*"
+
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options        = "DENY"
+    X-XSS-Protection       = "1; mode=block"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Permissions-Policy     = "camera=(), microphone=(self), geolocation=()"
+
+[[headers]]
+  for = "/api/v1/*"
+
+  [headers.values]
+    Cache-Control = "no-store"
