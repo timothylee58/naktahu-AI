@@ -1,13 +1,16 @@
-"""Fetch sample documents from real Malaysian government sources.
+"""Fetch documents from real Malaysian government sources.
 
 Outputs raw text files to scripts/ingest/data/raw/ using the naming
 convention:  {domain}_{slug}.txt
 
 Run:
     python scripts/ingest/fetch_gov_docs.py
+    python scripts/ingest/fetch_gov_docs.py --domain tax        # single domain
+    python scripts/ingest/fetch_gov_docs.py --dry-run           # list URLs only
 """
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 import time
@@ -23,12 +26,14 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (compatible; NakTahuBot/1.0; "
-        "+https://github.com/timothylee58/tanya-chatbot-my)"
+        "+https://github.com/timothylee58/naktahu-AI)"
     ),
     "Accept-Language": "ms,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
 TIMEOUT = httpx.Timeout(30.0)
+POLITE_DELAY = 2.0  # seconds between requests
 
 
 class Source(NamedTuple):
@@ -36,115 +41,398 @@ class Source(NamedTuple):
     slug: str
     url: str
     ministry: str
-    selectors: list[str]  # CSS selectors to extract body text
+    selectors: list[str]
 
 
 SOURCES: list[Source] = [
-    # ---------- FINANCE : LHDN (Inland Revenue Board) ----------
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: tax  (Cukai & LHDN)
+    # ─────────────────────────────────────────────────────────────────
     Source(
-        domain="finance",
-        slug="lhdn_individual_tax_faq",
+        domain="tax",
+        slug="lhdn_individual_tax_rate",
+        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-rate/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", ".entry-content", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_personal_tax_relief",
+        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-relief/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", ".entry-content", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_filing_programme",
+        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/file-return-form/return-form-filing-programme/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_efiling_guide",
+        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/file-return-form/how-to-file-tax-return/e-filing/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_rpgt",
+        url="https://www.hasil.gov.my/en/other-taxes/real-property-gains-tax/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_stamp_duty",
+        url="https://www.hasil.gov.my/en/stamp-duty/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_corporate_tax",
+        url="https://www.hasil.gov.my/en/company/company-life-cycle/how-to-declare-income/tax-rate/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="sst_registration",
+        url="https://mysst.customs.gov.my/",
+        ministry="Jabatan Kastam Diraja Malaysia",
+        selectors=["main", ".content", "#mainContent", "article", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_pcb_mtd",
+        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/monthly-tax-deduction/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+    Source(
+        domain="tax",
+        slug="lhdn_faq_individual",
         url="https://www.hasil.gov.my/en/individual/individual-faq/",
         ministry="Lembaga Hasil Dalam Negeri Malaysia",
-        selectors=["main", "article", ".content", "#content", "body"],
+        selectors=["main", "article", ".content-area", ".faq-content", "#content", "body"],
     ),
+
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: epf  (KWSP / EPF)
+    # ─────────────────────────────────────────────────────────────────
     Source(
-        domain="finance",
-        slug="lhdn_efiling_guide",
-        url="https://www.hasil.gov.my/en/individual/income-tax-individual/",
-        ministry="Lembaga Hasil Dalam Negeri Malaysia",
-        selectors=["main", "article", ".content", "#content", "body"],
-    ),
-    # ---------- FINANCE : EPF (KWSP) ----------
-    Source(
-        domain="finance",
-        slug="epf_withdrawal_overview",
-        url="https://www.kwsp.gov.my/en/member/withdrawal",
-        ministry="Kumpulan Wang Simpanan Pekerja",
-        selectors=["main", "article", ".page-content", ".content-area", "body"],
-    ),
-    Source(
-        domain="finance",
-        slug="epf_contribution_rates",
+        domain="epf",
+        slug="kwsp_contribution_rates",
         url="https://www.kwsp.gov.my/en/employer/contribution/contribution-rate",
         ministry="Kumpulan Wang Simpanan Pekerja",
-        selectors=["main", "article", ".page-content", ".content-area", "body"],
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
     ),
-    # ---------- GOVERNMENT : SSM ----------
     Source(
-        domain="government",
+        domain="epf",
+        slug="kwsp_withdrawal_overview",
+        url="https://www.kwsp.gov.my/en/member/withdrawal",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
+    ),
+    Source(
+        domain="epf",
+        slug="kwsp_housing_withdrawal",
+        url="https://www.kwsp.gov.my/en/member/withdrawal/housing",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
+    ),
+    Source(
+        domain="epf",
+        slug="kwsp_education_withdrawal",
+        url="https://www.kwsp.gov.my/en/member/withdrawal/education",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
+    ),
+    Source(
+        domain="epf",
+        slug="kwsp_health_withdrawal",
+        url="https://www.kwsp.gov.my/en/member/withdrawal/health",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
+    ),
+    Source(
+        domain="epf",
+        slug="kwsp_account_restructuring",
+        url="https://www.kwsp.gov.my/en/member/about-epf/epf-account-restructuring",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
+    ),
+    Source(
+        domain="epf",
+        slug="kwsp_i_invest",
+        url="https://www.kwsp.gov.my/en/member/grow-your-savings/i-invest",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".content-area", "body"],
+    ),
+    Source(
+        domain="epf",
+        slug="kwsp_member_faq",
+        url="https://www.kwsp.gov.my/en/member/faq",
+        ministry="Kumpulan Wang Simpanan Pekerja",
+        selectors=["main", ".page-content", "article", ".faq", "body"],
+    ),
+
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: business  (Perniagaan & SSM)
+    # ─────────────────────────────────────────────────────────────────
+    Source(
+        domain="business",
         slug="ssm_business_registration",
         url="https://www.ssm.com.my/Pages/Quick_Reference/Business_Registration.aspx",
         ministry="Suruhanjaya Syarikat Malaysia",
         selectors=["main", ".ms-rtestate-field", ".content", "article", "body"],
     ),
     Source(
-        domain="government",
+        domain="business",
         slug="ssm_company_registration",
         url="https://www.ssm.com.my/Pages/Quick_Reference/Company_Registration.aspx",
         ministry="Suruhanjaya Syarikat Malaysia",
         selectors=["main", ".ms-rtestate-field", ".content", "article", "body"],
     ),
-    # ---------- HEALTH : MOH ----------
+    Source(
+        domain="business",
+        slug="ssm_annual_return",
+        url="https://www.ssm.com.my/Pages/Services/Electronic_Submissions/MBRS.aspx",
+        ministry="Suruhanjaya Syarikat Malaysia",
+        selectors=["main", ".ms-rtestate-field", ".content", "article", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="smecorp_grants",
+        url="https://www.smecorp.gov.my/index.php/en/programmes/2015-12-21-08-36-44/grant",
+        ministry="Perbadanan Perusahaan Kecil dan Sederhana Malaysia",
+        selectors=["main", ".itemFullText", ".content", "article", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="mida_investment_guide",
+        url="https://www.mida.gov.my/investor-s-guide/",
+        ministry="Malaysian Investment Development Authority",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="mdec_digital_grants",
+        url="https://mdec.my/programmes/",
+        ministry="Malaysia Digital Economy Corporation",
+        selectors=["main", ".content", "article", ".programme-list", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="miti_licences",
+        url="https://www.miti.gov.my/index.php/pages/view/2",
+        ministry="Kementerian Pelaburan, Perdagangan dan Industri",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="hasil_business_income_tax",
+        url="https://www.hasil.gov.my/en/company/",
+        ministry="Lembaga Hasil Dalam Negeri Malaysia",
+        selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: education  (Pendidikan & SPM)
+    # ─────────────────────────────────────────────────────────────────
+    Source(
+        domain="education",
+        slug="moe_spm_info",
+        url="https://www.moe.gov.my/en/pelajaran/peperiksaan/spm",
+        ministry="Kementerian Pendidikan Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="mpm_stpm",
+        url="https://www.mpm.edu.my/en/stpm/about-stpm",
+        ministry="Majlis Peperiksaan Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="jpa_scholarship",
+        url="https://www.jpa.gov.my/en/perkhidmatan/biasiswa",
+        ministry="Jabatan Perkhidmatan Awam Malaysia",
+        selectors=["main", ".content", "article", "#content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="ptptn_loan",
+        url="https://www.ptptn.gov.my/",
+        ministry="Perbadanan Tabung Pendidikan Tinggi Nasional",
+        selectors=["main", ".content", "article", ".homepage-content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="upu_application",
+        url="https://upu.mohe.gov.my/",
+        ministry="Kementerian Pengajian Tinggi Malaysia",
+        selectors=["main", ".content", "article", "#content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="mara_mrsm",
+        url="https://www.mara.gov.my/en/education/mrsm/",
+        ministry="Majlis Amanah Rakyat",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="lppkn_education_loan",
+        url="https://www.lppkn.gov.my/",
+        ministry="Lembaga Penduduk dan Pembangunan Keluarga Negara",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="education",
+        slug="mohe_private_universities",
+        url="https://www.mohe.gov.my/en/students/private-higher-education",
+        ministry="Kementerian Pengajian Tinggi Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: health  (Kesihatan)
+    # ─────────────────────────────────────────────────────────────────
     Source(
         domain="health",
-        slug="moh_public_health_services",
+        slug="moh_public_health",
         url="https://www.moh.gov.my/index.php/pages/view/43",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
         domain="health",
-        slug="moh_hospital_services",
+        slug="moh_hospital_list",
         url="https://www.moh.gov.my/index.php/pages/view/2",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
-    # ---------- EDUCATION : KPM ----------
     Source(
-        domain="education",
-        slug="kpm_education_system",
-        url="https://www.moe.gov.my/en/dasar/dasar-pendidikan-kebangsaan",
-        ministry="Kementerian Pendidikan Malaysia",
+        domain="health",
+        slug="moh_immunisation",
+        url="https://www.moh.gov.my/index.php/pages/view/43",
+        ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="education",
-        slug="jpa_scholarship_guide",
-        url="https://www.jpa.gov.my/en/perkhidmatan/biasiswa",
-        ministry="Jabatan Perkhidmatan Awam",
-        selectors=["main", ".content", "article", "#content", "body"],
-    ),
-    # ---------- LEGAL : KPKT / JPJ ----------
-    Source(
-        domain="legal",
-        slug="jpj_road_tax_renewal",
-        url="https://www.jpj.gov.my/en/web/main-site/cukai-jalan",
-        ministry="Jabatan Pengangkutan Jalan",
-        selectors=["main", ".content", "article", "#content", "body"],
+        domain="health",
+        slug="kkm_chronic_disease",
+        url="https://www.moh.gov.my/index.php/pages/view/3629",
+        ministry="Kementerian Kesihatan Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="government",
-        slug="myeg_government_services",
-        url="https://www.myeg.com.my/services",
-        ministry="Malaysia e-Government Services",
-        selectors=["main", ".content", "article", ".services-list", "body"],
+        domain="health",
+        slug="mysejahtera",
+        url="https://mysejahtera.malaysia.gov.my/",
+        ministry="Kementerian Kesihatan Malaysia",
+        selectors=["main", ".content", "article", ".hero", "body"],
+    ),
+    Source(
+        domain="health",
+        slug="moh_mental_health",
+        url="https://www.moh.gov.my/index.php/pages/view/286",
+        ministry="Kementerian Kesihatan Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="health",
+        slug="oku_jkm",
+        url="https://www.jkm.gov.my/jkm/index.php?r=portal/content&id=2&lang=en",
+        ministry="Jabatan Kebajikan Masyarakat",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="health",
+        slug="moh_maternal_health",
+        url="https://www.moh.gov.my/index.php/pages/view/170",
+        ministry="Kementerian Kesihatan Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: immigration  (Imigresen)
+    # ─────────────────────────────────────────────────────────────────
+    Source(
+        domain="immigration",
+        slug="imi_passport",
+        url="https://www.imi.gov.my/index.php/en/main-services/passport",
+        ministry="Jabatan Imigresen Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="imi_visa_types",
+        url="https://www.imi.gov.my/index.php/en/main-services/visa",
+        ministry="Jabatan Imigresen Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="imi_permanent_resident",
+        url="https://www.imi.gov.my/index.php/en/main-services/permanent-resident",
+        ministry="Jabatan Imigresen Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="imi_employment_pass",
+        url="https://esd.imi.gov.my/",
+        ministry="Jabatan Imigresen Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="imi_student_pass",
+        url="https://www.imi.gov.my/index.php/en/main-services/student-pass",
+        ministry="Jabatan Imigresen Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="mm2h",
+        url="https://www.mm2h.gov.my/",
+        ministry="Kementerian Pelancongan dan Kebudayaan Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="jpn_mykad",
+        url="https://www.jpn.gov.my/en/perkhidmatan/kad-pengenalan/",
+        ministry="Jabatan Pendaftaran Negara Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="immigration",
+        slug="imi_renunciation",
+        url="https://www.imi.gov.my/index.php/en/main-services/citizenship",
+        ministry="Jabatan Imigresen Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
     ),
 ]
 
 
 def _extract_text(html: str, selectors: list[str]) -> str:
-    """Return clean text from the first matching CSS selector."""
     soup = BeautifulSoup(html, "lxml")
 
-    # Remove navigation, headers, footers, scripts, styles
-    for tag in soup(["nav", "header", "footer", "script", "style", "noscript"]):
+    for tag in soup(["nav", "header", "footer", "script", "style", "noscript", "aside"]):
         tag.decompose()
 
     for selector in selectors:
         el = soup.select_one(selector)
         if el:
-            return _clean(el.get_text(separator="\n"))
+            text = el.get_text(separator="\n")
+            if len(text.strip()) > 200:
+                return _clean(text)
 
     return _clean(soup.get_text(separator="\n"))
 
@@ -163,10 +451,9 @@ def fetch_source(client: httpx.Client, source: Source) -> bool:
         text = _extract_text(resp.text, source.selectors)
 
         if len(text) < 200:
-            print(f"  [WARN] {source.slug}: extracted text too short ({len(text)} chars), skipping")
+            print(f"  [WARN] {source.slug}: text too short ({len(text)} chars)")
             return False
 
-        # Prepend metadata header so the chunker can recover it
         header = (
             f"SOURCE_TITLE: {source.slug.replace('_', ' ').title()}\n"
             f"SOURCE_URL: {source.url}\n"
@@ -175,7 +462,7 @@ def fetch_source(client: httpx.Client, source: Source) -> bool:
             "---\n"
         )
         out_path.write_text(header + text, encoding="utf-8")
-        print(f"  [OK]   {source.slug} → {out_path.name} ({len(text):,} chars)")
+        print(f"  [OK]   {source.slug} ({len(text):,} chars)")
         return True
 
     except Exception as exc:
@@ -184,17 +471,51 @@ def fetch_source(client: httpx.Client, source: Source) -> bool:
 
 
 def main() -> None:
-    print(f"Fetching {len(SOURCES)} Malaysian government sources…\n")
-    ok = 0
-    with httpx.Client(headers=HEADERS, timeout=TIMEOUT) as client:
-        for source in SOURCES:
-            print(f"→ {source.url}")
-            if fetch_source(client, source):
-                ok += 1
-            time.sleep(1.5)  # polite delay
+    parser = argparse.ArgumentParser(description="Fetch Malaysian government source documents")
+    parser.add_argument(
+        "--domain",
+        choices=["tax", "epf", "business", "education", "health", "immigration"],
+        help="Fetch only a specific domain",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="List URLs without fetching")
+    args = parser.parse_args()
 
-    print(f"\nDone: {ok}/{len(SOURCES)} sources saved to {RAW_DIR}")
-    if ok == 0:
+    sources = SOURCES
+    if args.domain:
+        sources = [s for s in SOURCES if s.domain == args.domain]
+    if not sources:
+        print("No matching sources found.")
+        sys.exit(1)
+
+    if args.dry_run:
+        for s in sources:
+            print(f"[{s.domain:12}] {s.url}")
+        print(f"\nTotal: {len(sources)} sources")
+        return
+
+    domain_counts: dict[str, tuple[int, int]] = {}
+    print(f"Fetching {len(sources)} sources…\n")
+
+    with httpx.Client(headers=HEADERS, timeout=TIMEOUT) as client:
+        for i, source in enumerate(sources):
+            print(f"[{i + 1}/{len(sources)}] {source.domain}/{source.slug}")
+            ok = fetch_source(client, source)
+            domain_counts.setdefault(source.domain, (0, 0))
+            prev = domain_counts[source.domain]
+            domain_counts[source.domain] = (prev[0] + (1 if ok else 0), prev[1] + 1)
+            if i < len(sources) - 1:
+                time.sleep(POLITE_DELAY)
+
+    print("\n─── Summary ───────────────────────────────")
+    total_ok = total = 0
+    for domain, (ok, n) in sorted(domain_counts.items()):
+        print(f"  {domain:12} {ok}/{n}")
+        total_ok += ok
+        total += n
+    print(f"  {'TOTAL':12} {total_ok}/{total}")
+    print(f"  Raw files: {RAW_DIR}")
+
+    if total_ok == 0:
         sys.exit(1)
 
 
