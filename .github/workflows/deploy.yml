@@ -6,9 +6,9 @@ on:
       - main
 
 jobs:
-  # ── Deploy Next.js frontend to Vercel ────────────────────────────────────
+  # ── Deploy Next.js frontend to Netlify ───────────────────────────────────
   deploy-web:
-    name: Deploy web → Vercel
+    name: Deploy web → Netlify
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,17 +22,26 @@ jobs:
           cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Deploy to Vercel (production)
-        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+      - name: Build Next.js app
+        run: npm run build
         env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+
+      - name: Deploy to Netlify (production)
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: apps/web/.next
+          production-branch: main
+          production-deploy: true
+          netlify-config-path: netlify.toml
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
   # ── Deploy FastAPI + Redis to Render ─────────────────────────────────────
   deploy-api:
@@ -44,5 +53,4 @@ jobs:
         run: |
           curl --silent --show-error --fail \
             -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-        # RENDER_DEPLOY_HOOK_URL is the webhook URL from Render's dashboard
-        # Dashboard → Service → Settings → Deploy Hook
+        # RENDER_DEPLOY_HOOK_URL — from Render dashboard → Service → Settings → Deploy Hook
