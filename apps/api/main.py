@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import redis.asyncio as redis_ai
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -11,6 +12,7 @@ from supabase import create_client
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter
 from middleware.user_context import UserContextMiddleware
+from routes import query as rag_query
 from routers import history, query
 
 structlog.configure(
@@ -52,6 +54,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Naktahu API", lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.state.limiter = anonymous_limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -60,6 +70,7 @@ app.add_middleware(UserContextMiddleware)
 
 app.include_router(query.router)
 app.include_router(history.router)
+app.include_router(rag_query.router, prefix="/rag")
 
 
 @app.get("/health")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from typing import Annotated, Any, AsyncIterator, Optional
 
@@ -17,6 +18,8 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1", tags=["query"])
 
+_rag_available = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+
 
 @dataclass
 class AgentState:
@@ -30,6 +33,7 @@ class QueryBody(BaseModel):
     query: str = Field(..., min_length=1)
     language: str = "en"
     domain: str = "general"
+    session_id: Optional[str] = None
 
 
 @router.post("/query")
@@ -48,13 +52,39 @@ async def query_sse(
     )
 
     async def event_stream() -> AsyncIterator[str]:
-        parts: list[str] = [f"Answer for [{state.domain}]: ", state.query]
-        full_response = "".join(parts)
-        for part in parts:
-            payload = json.dumps({"text": part})
-            yield f"event: token\ndata: {payload}\n\n"
         citations: list[Any] = []
-        yield f"event: done\ndata: {json.dumps({'ok': True, 'citations': citations})}\n\n"
+        full_response = ""
+
+        if _rag_available:
+            try:
+                from rag.pipeline import run_query
+
+                result = await run_query(question=state.query, language=state.language)
+                full_response = result["answer"]
+                citations = result.get("sources", [])
+                confidence = result.get("confidence", 1.0)
+
+                # Stream the answer word-by-word for UX
+                words = full_response.split(" ")
+                for i, word in enumerate(words):
+                    chunk = word if i == 0 else f" {word}"
+                    yield f"event: token\ndata: {json.dumps({'text': chunk})}\n\n"
+
+                yield (
+                    f"event: done\ndata: {json.dumps({'ok': True, 'citations': citations, 'metadata': {'confidence': confidence}})}\n\n"
+                )
+            except Exception as exc:
+                logger.exception("rag_pipeline_failed", error=str(exc))
+                yield f"event: error\ndata: {json.dumps({'message': 'RAG pipeline failed'})}\n\n"
+                return
+        else:
+            # Stub: no OpenAI key configured
+            stub_parts = [f"[Demo] Answer for [{state.domain}]: ", state.query]
+            full_response = "".join(stub_parts)
+            for part in stub_parts:
+                yield f"event: token\ndata: {json.dumps({'text': part})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'ok': True, 'citations': citations})}\n\n"
+
         if uid:
             try:
                 await persist_session_entry(
