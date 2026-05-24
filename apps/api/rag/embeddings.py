@@ -6,5 +6,5 @@ from langchain_openai import OpenAIEmbeddings
 
 embeddings = OpenAIEmbeddings(
     model="text-embedding-3-small",
-    openai_api_key=os.environ["OPENAI_API_KEY"],
+    openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
 )

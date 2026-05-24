@@ -3,9 +3,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from langchain.chains import RetrievalQA
-from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
 
