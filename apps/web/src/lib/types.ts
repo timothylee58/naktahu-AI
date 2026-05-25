@@ -21,4 +21,4 @@ export interface Message {
   isStreaming: boolean;
 }
 
-export type UILocale = 'en' | 'ms';
+export type UILocale = 'en' | 'ms' | 'zh';

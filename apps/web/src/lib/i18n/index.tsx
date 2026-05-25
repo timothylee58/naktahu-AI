@@ -28,7 +28,7 @@ const MS: Translations = {
   'header.subtitle': 'Soal tentang kerajaan',
   'header.lang_toggle': 'EN',
   'header.history': 'Sejarah',
-  'header.sign_in': 'Daftar Masuk',
+  'header.sign_in': 'Daftar / Masuk',
   'header.sign_out': 'Keluar',
 
   /* ── history ── */
@@ -90,7 +90,7 @@ const EN: Translations = {
   'header.subtitle': 'Ask about government',
   'header.lang_toggle': 'BM',
   'header.history': 'History',
-  'header.sign_in': 'Sign In',
+  'header.sign_in': 'Register / Login',
   'header.sign_out': 'Sign Out',
 
   /* ── history ── */
@@ -136,7 +136,62 @@ const EN: Translations = {
     'Speech recognition is not supported in this browser.',
 };
 
-const DICTS: Record<UILocale, Translations> = { ms: MS, en: EN };
+const ZH: Translations = {
+  /* ── chat ── */
+  'chat.placeholder': '在此输入您的问题…',
+  'chat.send': '发送',
+  'chat.mic': '语音输入',
+  'chat.thinking': '思考中…',
+  'chat.warning.low_confidence': '答案可能不准确 / Answer may be inaccurate',
+  'chat.language_indicator': '中文',
+  'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
+
+  /* ── header ── */
+  'header.title': 'NakTahu',
+  'header.subtitle': '询问政府事务',
+  'header.lang_toggle': 'BM',
+  'header.history': '历史记录',
+  'header.sign_in': '注册 / 登录',
+  'header.sign_out': '退出',
+
+  /* ── history ── */
+  'history.title': '查询历史',
+  'history.empty': '暂无历史记录。',
+  'history.sign_in_prompt': '登录以保存您的查询历史。',
+  'history.group.today': '今天',
+  'history.group.yesterday': '昨天',
+  'history.group.earlier': '更早',
+
+  /* ── landing ── */
+  'landing.hero.headline': '随时询问有关马来西亚的问题。',
+  'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
+  'landing.hero.cta': '开始提问',
+  'landing.features.title': '为什么选择 NakTahu？',
+  'landing.features.bilingual.title': '多语言支持',
+  'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
+  'landing.features.cited.title': '经过验证的来源',
+  'landing.features.cited.desc': '每个答案都链接到官方政府文件。',
+  'landing.features.voice.title': '语音输入',
+  'landing.features.voice.desc': '说出您的问题，内置语音识别功能。',
+  'landing.domains.title': '知识领域',
+  'landing.footer.tagline': '政府信息，触手可及。',
+  'landing.footer.disclaimer': 'NakTahu AI 是一个作品集项目，不代表官方政府建议。',
+  'landing.footer.github': 'GitHub',
+
+  /* ── domains ── */
+  'domain.tax': '税务与国内税收局',
+  'domain.epf': '雇员公积金',
+  'domain.business': '商业与公司委员会',
+  'domain.education': '教育与大马教育文凭',
+  'domain.health': '医疗卫生',
+  'domain.immigration': '移民事务',
+
+  /* ── errors ── */
+  'error.stream': '获取答案时出错，请重试。',
+  'error.voice_unsupported': '此浏览器不支持语音识别。',
+};
+
+const DICTS: Record<UILocale, Translations> = { ms: MS, en: EN, zh: ZH };
 
 interface I18nContextValue {
   locale: UILocale;
