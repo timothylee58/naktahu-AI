@@ -10,9 +10,6 @@ jobs:
   deploy-web:
     name: Deploy web → Netlify
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -20,12 +17,13 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps --include=optional
 
       - name: Build Next.js app
+        working-directory: apps/web
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -43,14 +41,19 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
-  # ── Deploy FastAPI + Redis to Render ─────────────────────────────────────
+  # ── Deploy FastAPI + Redis to Railway ────────────────────────────────────
   deploy-api:
-    name: Deploy API → Render
+    name: Deploy API → Railway
     runs-on: ubuntu-latest
     needs: deploy-web
     steps:
-      - name: Trigger Render deploy hook
-        run: |
-          curl --silent --show-error --fail \
-            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-        # RENDER_DEPLOY_HOOK_URL — from Render dashboard → Service → Settings → Deploy Hook
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service naktahu-api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # RAILWAY_TOKEN — from Railway dashboard → Account Settings → Tokens

@@ -10,16 +10,16 @@
   # Set these in Netlify dashboard → Site → Environment variables:
   # NEXT_PUBLIC_SUPABASE_URL
   # NEXT_PUBLIC_SUPABASE_ANON_KEY
-  # NEXT_PUBLIC_API_URL   (e.g. https://naktahu-api.onrender.com)
+  # NEXT_PUBLIC_API_URL   (e.g. https://naktahu-api.up.railway.app)
 
 # SSR support via Netlify Next.js plugin
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# API proxy — forwards /api/v1/* to the Render backend
+# API proxy — forwards /api/v1/* to the Railway backend
 [[redirects]]
   from   = "/api/v1/*"
-  to     = "https://naktahu-api.onrender.com/api/v1/:splat"
+  to     = "https://naktahu-api.up.railway.app/api/v1/:splat"
   status = 200
 
 # Security headers
