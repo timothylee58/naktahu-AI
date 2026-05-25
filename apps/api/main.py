@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         logger.info("supabase_status", ok=True, detail="client ready")
     except Exception as exc:
         logger.error("supabase_status", ok=False, error=str(exc))
-        raise
+        app.state.supabase = None  # degraded mode — history/session features disabled
 
     yield
 
