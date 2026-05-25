@@ -12,7 +12,7 @@ from supabase import create_client
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter
 from middleware.user_context import UserContextMiddleware
-from routes import query as rag_query
+from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
 from routers import history, query
 
 structlog.configure(

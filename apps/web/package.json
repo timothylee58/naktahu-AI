@@ -18,6 +18,7 @@
     "next-pwa": "^5.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "swr": "^2.3.0",
     "use-sound": "^4.0.4"
   },
   "devDependencies": {
