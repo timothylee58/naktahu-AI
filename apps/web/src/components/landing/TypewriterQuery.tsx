@@ -16,8 +16,15 @@ const QUERIES_EN = [
   'SPM 2025 entry requirements',
 ];
 
+const QUERIES_ZH = [
+  '如何向SSM注册新公司？',
+  '如何提交LHDN电子报税表？',
+  '公积金账户一提款条件',
+  '2025年大马教育文凭报名要求',
+];
+
 interface TypewriterQueryProps {
-  locale?: 'ms' | 'en';
+  locale?: 'ms' | 'en' | 'zh';
 }
 
 const CHAR_DELAY = 50;
@@ -26,7 +33,7 @@ const PAUSE_AFTER_TYPE = 2000;
 const PAUSE_BEFORE_TYPE = 500;
 
 export function TypewriterQuery({ locale = 'ms' }: TypewriterQueryProps) {
-  const queries = locale === 'ms' ? QUERIES_MS : QUERIES_EN;
+  const queries = locale === 'zh' ? QUERIES_ZH : locale === 'ms' ? QUERIES_MS : QUERIES_EN;
   const [displayText, setDisplayText] = useState('');
   const [queryIdx, setQueryIdx] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
