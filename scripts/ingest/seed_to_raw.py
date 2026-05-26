@@ -17,12 +17,13 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 # Map seed CSV filename prefix → domain + expiry_aware flag
 CSV_DOMAIN_MAP = {
-    "lhdn_tax":      ("tax",         False),
-    "kwsp_epf":      ("epf",         False),
-    "ssm_business":  ("business",    False),
-    "kpm_education": ("education",   False),
-    "moh_health":    ("healthcare",  True),
+    "lhdn_tax":        ("tax",         False),
+    "kwsp_epf":        ("epf",         False),
+    "ssm_business":    ("business",    False),
+    "kpm_education":   ("education",   False),
+    "moh_health":      ("healthcare",  True),
     "imi_immigration": ("immigration", True),
+    "dosm_statistics": ("business",    False),  # DOSM macro stats — GDP/trade/labour map to business
 }
 
 
