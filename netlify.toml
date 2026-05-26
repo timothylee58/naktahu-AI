@@ -3,24 +3,20 @@
 [build]
   base    = "apps/web"
   command = "npm run build"
-  publish = ".next"
+  publish = "apps/web/.next"
 
 [build.environment]
-  NODE_VERSION = "22"
-  # Set these in Netlify dashboard → Site → Environment variables:
-  # NEXT_PUBLIC_SUPABASE_URL
-  # NEXT_PUBLIC_SUPABASE_ANON_KEY
-  # NEXT_PUBLIC_API_URL   (e.g. https://naktahu-api.up.railway.app)
+  NEXT_TELEMETRY_DISABLED = "1"
+  NODE_VERSION            = "20"
 
-# SSR support via Netlify Next.js plugin
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# API proxy — forwards /api/v1/* to the Railway backend
-[[redirects]]
-  from   = "/api/v1/*"
-  to     = "https://naktahu-api.up.railway.app/api/v1/:splat"
-  status = 200
+[context.production.environment]
+  NEXT_PUBLIC_API_URL = "https://naktahu-api.up.railway.app"
+
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_API_URL = "https://naktahu-api.up.railway.app"
 
 # Security headers
 [[headers]]
@@ -32,9 +28,3 @@
     X-XSS-Protection       = "1; mode=block"
     Referrer-Policy        = "strict-origin-when-cross-origin"
     Permissions-Policy     = "camera=(), microphone=(self), geolocation=()"
-
-[[headers]]
-  for = "/api/v1/*"
-
-  [headers.values]
-    Cache-Control = "no-store"
