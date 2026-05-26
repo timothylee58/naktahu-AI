@@ -37,7 +37,10 @@ app = FastAPI(
 # ── Middleware (outermost → innermost) ──────────────────────────────────────
 
 # 1. CORS
-_cors_origins_raw = os.environ.get("CORS_ORIGINS", "http://localhost:3000")
+_cors_origins_raw = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:3000,https://naktahu.netlify.app",
+)
 _cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
 
 app.add_middleware(
