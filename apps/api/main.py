@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis_ai
@@ -54,9 +55,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Naktahu API", lifespan=lifespan)
 
+_raw_origins = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:3000,https://naktahu.netlify.app",
+)
+_allow_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
