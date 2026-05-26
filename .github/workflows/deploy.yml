@@ -53,6 +53,7 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
+        working-directory: apps/api
         run: railway up --service naktahu-api --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
