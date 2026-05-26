@@ -1,7 +1,7 @@
 """Upload embedded chunks to Supabase document_chunks table.
 
 Reads  : scripts/ingest/data/processed/chunks.jsonl
-Inserts: Supabase document_chunks (upserts on id to be idempotent)
+Upserts: Supabase document_chunks on content_hash (idempotent reruns)
 
 Run:
     python scripts/ingest/upload_to_supabase.py
@@ -25,6 +25,13 @@ TABLE = "document_chunks"
 
 log = structlog.get_logger(__name__)
 
+# Columns accepted by the document_chunks table
+_ALLOWED_COLS = {
+    "id", "content", "content_hash", "language", "domain",
+    "source_title", "source_url", "ministry", "embedding",
+    "expiry_aware", "source_date",
+}
+
 
 def load_chunks() -> list[dict]:
     if not CHUNKS_FILE.exists():
@@ -40,27 +47,34 @@ def load_chunks() -> list[dict]:
     return chunks
 
 
+def _prepare_row(chunk: dict) -> dict:
+    row = {k: v for k, v in chunk.items() if k in _ALLOWED_COLS}
+    if isinstance(row.get("embedding"), list):
+        row["embedding"] = "[" + ",".join(str(v) for v in row["embedding"]) + "]"
+    # Ensure booleans are correct type
+    row["expiry_aware"] = bool(row.get("expiry_aware", False))
+    # source_date: keep as ISO string or None — Supabase accepts both
+    if not row.get("source_date"):
+        row["source_date"] = None
+    return row
+
+
 def upload(client: Client, chunks: list[dict]) -> tuple[int, int]:
     inserted = 0
     errors = 0
 
     for i in range(0, len(chunks), BATCH_SIZE):
-        batch = chunks[i : i + BATCH_SIZE]
-        # Convert embedding list to pgvector-compatible string representation
-        for chunk in batch:
-            if isinstance(chunk.get("embedding"), list):
-                chunk["embedding"] = "[" + ",".join(str(v) for v in chunk["embedding"]) + "]"
-
+        batch = [_prepare_row(c) for c in chunks[i : i + BATCH_SIZE]]
         try:
             result = (
                 client.table(TABLE)
-                .upsert(batch, on_conflict="id")
+                .upsert(batch, on_conflict="content_hash")
                 .execute()
             )
             count = len(result.data) if result.data else len(batch)
             inserted += count
             log.info(
-                "batch_inserted",
+                "batch_upserted",
                 batch_num=i // BATCH_SIZE + 1,
                 count=count,
                 total_so_far=inserted,
@@ -68,7 +82,7 @@ def upload(client: Client, chunks: list[dict]) -> tuple[int, int]:
         except Exception as exc:
             errors += len(batch)
             log.error(
-                "batch_insert_failed",
+                "batch_upsert_failed",
                 batch_num=i // BATCH_SIZE + 1,
                 error=str(exc),
             )
@@ -87,14 +101,14 @@ def main() -> None:
     chunks = load_chunks()
     log.info("loaded_chunks", count=len(chunks))
 
-    inserted, errors = upload(client, chunks)
+    # Summary before upload
+    from collections import Counter
+    domain_counts = Counter(c.get("domain", "unknown") for c in chunks)
+    expiry_count = sum(1 for c in chunks if c.get("expiry_aware"))
+    log.info("chunk_summary", by_domain=dict(domain_counts), expiry_aware=expiry_count)
 
-    log.info(
-        "upload_complete",
-        inserted=inserted,
-        errors=errors,
-        total=len(chunks),
-    )
+    inserted, errors = upload(client, chunks)
+    log.info("upload_complete", inserted=inserted, errors=errors, total=len(chunks))
 
     if errors > 0:
         sys.exit(1)
