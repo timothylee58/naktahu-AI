@@ -6,7 +6,8 @@ import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from rag.pipeline import run_query
+import importlib
+import os
 
 logger = structlog.get_logger()
 
@@ -36,8 +37,11 @@ class QueryResponse(BaseModel):
 
 @router.post("", response_model=QueryResponse)
 async def query_endpoint(body: QueryRequest) -> QueryResponse:
+    if not os.environ.get("OPENAI_API_KEY", "").strip():
+        raise HTTPException(status_code=503, detail="RAG pipeline not configured")
     try:
-        result = await run_query(question=body.question, language=body.language)
+        pipeline = importlib.import_module("rag.pipeline")
+        result = await pipeline.run_query(question=body.question, language=body.language)
         return QueryResponse(
             answer=result["answer"],
             sources=[SourceItem(**s) for s in result["sources"]],

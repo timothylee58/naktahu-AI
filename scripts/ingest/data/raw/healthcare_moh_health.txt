@@ -1,0 +1,48 @@
+SOURCE_TITLE: Klinik Kesihatan Government Health Clinics
+SOURCE_URL: https://www.moh.gov.my/
+MINISTRY: Kementerian Kesihatan Malaysia
+DOMAIN: healthcare
+SOURCE_DATE: 
+EXPIRY_AWARE: true
+---
+## Klinik Kesihatan Services
+Klinik Kesihatan kerajaan menyediakan perkhidmatan penjagaan kesihatan primer percuma atau berharga rendah untuk rakyat Malaysia. Perkhidmatan yang ditawarkan: rawatan penyakit biasa, kawalan penyakit kronik (kencing manis, darah tinggi), imunisasi kanak-kanak, kesihatan ibu dan anak, antenatal, perancangan keluarga, kesihatan pergigian asas. Cari klinik terdekat di sini: klik.moh.gov.my
+
+## Klinik Kesihatan Services
+Government Klinik Kesihatan (health clinics) provide primary healthcare services that are free or low-cost for Malaysians. Services include: treatment of common illnesses, management of chronic diseases (diabetes, hypertension), childhood immunisation, maternal and child health, antenatal care, family planning, and basic dental care. Find your nearest clinic at klik.moh.gov.my.
+
+## National Immunisation Programme
+Program Imunisasi Kebangsaan (PIK) Malaysia memberikan vaksin percuma kepada semua kanak-kanak Malaysia. Jadual vaksinasi: BCG (lahir), Hepatitis B (lahir, 1 bulan, 5 bulan), DTaP-IPV-Hib (2, 3, 5 bulan), MMR (12 bulan, 7 tahun), Varicella (12 bulan, 7 tahun), HPV (13 tahun – perempuan), Td (Form 2 dan Form 5). Vaksin boleh didapatkan di Klinik Kesihatan.
+
+Malaysia's National Immunisation Programme (NIP) provides free vaccines to all Malaysian children. Schedule includes: BCG (birth), Hepatitis B (birth, 1 month, 5 months), DTaP-IPV-Hib (2, 3, 5 months), MMR (12 months, 7 years), Varicella (12 months, 7 years), HPV for girls (13 years), Td booster (Form 2 and Form 5). All vaccines available at government Klinik Kesihatan.
+
+## Public Hospital Structure
+Hospital awam di Malaysia dibahagikan kepada: Hospital Tertiari (Hospital Kuala Lumpur, HUKM, Hospital Putrajaya) — perkhidmatan pakar penuh. Hospital Negeri — perkhidmatan pakar umum. Hospital Daerah — pesakit dalam dan pakar tertentu. Klinik Kesihatan — penjagaan primer. Pesakit luar di hospital awam dikenakan yuran RM1 (warganegara) atau RM30 (bukan warganegara). Pesakit dalam dikenakan RM3 sehari (warganegara).
+
+## Public Hospital Structure
+Malaysian public hospitals are categorised as: Tertiary (e.g., Hospital Kuala Lumpur, PPUKM, Hospital Putrajaya) — full specialist services. State Hospitals — general specialist services. District Hospitals — inpatient and selected specialists. Klinik Kesihatan — primary care. Outpatient fees at public hospitals: RM1 per visit for citizens, RM30 for non-citizens. Inpatient ward: RM3 per day for citizens.
+
+## MySejahtera Health App
+MySejahtera ialah aplikasi kesihatan digital kerajaan Malaysia. Fungsi semasa: rakam sejarah kesihatan, semak status vaksinasi COVID-19, semak rekod imunisasi kanak-kanak (MyVaksin), tempah temujanji klinik kerajaan secara dalam talian, semak keputusan ujian makmal, akses kad kesihatan digital. Muat turun melalui App Store atau Google Play.
+
+## MySejahtera Health App
+MySejahtera is Malaysia's official digital health platform. Current functions: record health history, check COVID-19 vaccination status, view children's immunisation records (MyVaksin), book government clinic appointments online, view laboratory test results, and access digital health cards. Download from App Store or Google Play Store.
+
+Klinik 1Malaysia (Klinik Komuniti) menyediakan perkhidmatan rawatan asas kepada masyarakat berpendapatan rendah. Dikendalikan oleh doktor dan jururawat. Perkhidmatan termasuk: rawatan penyakit biasa dan kecederaan, ubat-ubatan asas. Pesakit bayar RM1 setiap kunjungan. Terdapat lebih 300 klinik di seluruh Malaysia, terutama di kawasan bandar miskin dan luar bandar.
+
+Klinik Komuniti (formerly Klinik 1Malaysia) provides basic treatment services to low-income communities. Operated by doctors and nurses. Services include: treatment of common illnesses and minor injuries, basic medications. Fee: RM1 per visit. There are over 300 such clinics nationwide, located mainly in urban poor and rural areas.
+
+## OKU Health Benefits
+Skim Perlindungan Kesihatan (SPK) atau Kad OKU kesihatan memberi manfaat perubatan tambahan kepada orang kurang upaya (OKU) yang berdaftar dengan JKM. OKU berdaftar mendapat rawatan percuma di hospital dan klinik kerajaan. Permohonan pendaftaran OKU boleh dibuat di pejabat JKM daerah atau secara dalam talian.
+
+## OKU Health Benefits
+Registered persons with disabilities (OKU) in Malaysia receive free medical treatment at government hospitals and clinics. OKU registration (Kad OKU) can be applied through the Department of Social Welfare (JKM) at district offices or online at the OKU Info system. Categories of disability include physical, visual, hearing, speech, learning, mental health, and multiple disabilities.
+
+## Healthcare Transformation
+Pelan Transformasi Kesihatan Malaysia: KKM sedang melaksanakan transformasi sistem kesihatan melalui pelan MyHEALTH. Inisiatif utama: pengukuhan penjagaan primer (Klinik Kesihatan), peningkatan kapasiti hospital, digitalisasi rekod perubatan (Electronic Medical Records/EMR), pengukuhan Skim Takaful Kesihatan Negara untuk meningkatkan akses kepada penjagaan kesihatan.
+
+## Healthcare Transformation
+KKM (Ministry of Health Malaysia) is implementing a health system transformation under the MyHEALTH plan. Key initiatives: strengthening primary care at Klinik Kesihatan, increasing hospital capacity, digitising medical records (Electronic Medical Records/EMR), and developing a National Health Protection Scheme to improve healthcare access for all Malaysians.
+
+## Chronic Disease Statistics Malaysia
+Penyakit kritikal utama di Malaysia (2023): Penyakit jantung dan strok adalah punca kematian utama. Kanser dalam kalangan 3 punca kematian teratas. Kencing manis menjejaskan 18.3% penduduk dewasa Malaysia. Darah tinggi menjejaskan 29.9% penduduk dewasa. Program Kawalan Penyakit Kronik tersedia percuma di Klinik Kesihatan.

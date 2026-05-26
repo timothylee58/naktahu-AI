@@ -1,0 +1,15 @@
+{
+  "nav": {
+    "title": "NakTahu AI",
+    "search_placeholder": "Tanya apa sahaja tentang Malaysia..."
+  },
+  "chat": {
+    "thinking": "Sedang berfikir...",
+    "error": "Sesuatu telah berlaku. Sila cuba lagi.",
+    "citation_label": "Sumber"
+  },
+  "history": {
+    "title": "Sejarah",
+    "empty": "Tiada perbualan lagi. Tanya soalan pertama anda!"
+  }
+}

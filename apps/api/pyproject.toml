@@ -1,42 +1,57 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["core", "routers", "routes", "services", "middleware", "rag"]
-py-modules = ["main"]
 
 [project]
 name = "naktahu-api"
 version = "0.1.0"
-description = "Naktahu query API with SSE, auth, and history"
+description = "NakTahu AI — FastAPI backend"
 requires-python = ">=3.11"
 dependencies = [
-  "fastapi>=0.115.0",
-  "uvicorn[standard]>=0.32.0",
-  "python-jose[cryptography]>=3.3.0",
-  "PyJWT[crypto]>=2.9.0",
-  "redis>=5.2.0",
-  "supabase>=2.10.0",
-  "slowapi>=0.1.9",
-  "structlog>=24.4.0",
-  "pydantic-settings>=2.6.0",
-  "httpx>=0.27.0",
-  "langchain>=0.3.0",
-  "langchain-openai>=0.2.0",
-  "langchain-community>=0.3.0",
-  "openai>=1.40.0",
-  "pandas>=2.2.0",
-  "python-dotenv>=1.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.6.0",
+    "anthropic>=0.40.0",
+    "openai>=1.50.0",
+    "supabase>=2.10.0",
+    "redis>=5.2.0",
+    "langchain-core>=0.3.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-community>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langgraph>=0.2.0",
+    "slowapi>=0.1.9",
+    "python-jose[cryptography]>=3.3.0",
+    "PyJWT[crypto]>=2.9.0",
+    "structlog>=24.4.0",
+    "sentry-sdk[fastapi]>=2.0.0",
+    "httpx>=0.27.0",
+    "pandas>=2.2.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.3.0",
-  "pytest-asyncio>=0.24.0",
-  "httpx>=0.27.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+    "anyio[trio]>=4.0.0",
+]
+ingest = [
+    "beautifulsoup4>=4.12.0",
+    "httpx>=0.27.0",
+    "langchain-text-splitters>=0.3.0",
+    "lxml>=5.0.0",
+    "pycld2>=0.41",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "core*", "routers*", "routes*", "services*", "middleware*", "rag*", "scripts*"]

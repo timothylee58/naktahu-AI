@@ -1,0 +1,54 @@
+SOURCE_TITLE: SPM Examination Information
+SOURCE_URL: https://www.moe.gov.my/en/pelajaran/peperiksaan/spm
+MINISTRY: Kementerian Pendidikan Malaysia
+DOMAIN: education
+SOURCE_DATE: 
+EXPIRY_AWARE: false
+---
+## SPM Examination Guide
+Sijil Pelajaran Malaysia (SPM) ialah peperiksaan awam bagi pelajar Tingkatan 5. Mata pelajaran wajib SPM: Bahasa Malaysia (wajib lulus), Bahasa Inggeris, Sejarah (wajib lulus), Matematik, Pendidikan Islam/Pendidikan Moral. Pelajar perlu menduduki sekurang-kurangnya Bahasa Malaysia dan Sejarah. Peperiksaan SPM diadakan setiap November/Disember. Keputusan diumumkan Mac tahun berikutnya.
+
+## SPM Examination Guide
+SPM (Sijil Pelajaran Malaysia) is the public examination for Form 5 students. Compulsory subjects: Bahasa Malaysia (must pass), English, History (must pass), Mathematics, and Islamic Education/Moral Education. Students must sit for Bahasa Malaysia and Sejarah at minimum. SPM is held every November/December, with results announced in March the following year.
+
+## SPM Grading System
+Sistem Gred SPM: Gred A+ (markah 90–100), A (80–89), A- (75–79), B+ (70–74), B (65–69), C+ (60–64), C (55–59), D (40–54), E (20–39), G (di bawah 20). Gred A, A+, dan A- dikira dalam pengiraan purata gred (GPA). Pelajar perlu lulus Bahasa Malaysia dan Sejarah untuk sijil SPM.
+
+## SPM Grading System
+SPM grading system: A+ (90–100), A (80–89), A- (75–79), B+ (70–74), B (65–69), C+ (60–64), C (55–59), D (40–54), E (20–39), G (below 20). Grades A, A+, and A- count towards GPA calculation. Students must pass Bahasa Malaysia and Sejarah (History) to receive the SPM certificate.
+
+## STPM Examination
+Sijil Tinggi Persekolahan Malaysia (STPM) adalah peperiksaan pra-universiti setara A-Level. STPM diajar dalam 3 semester (18 bulan). Penilaian terdiri daripada peperiksaan akhir semester dan kerja kursus (pentaksiran berasaskan sekolah). Gred STPM: A (markah 80–100), A- (70–79), B+ (65–69), B (60–64), B- (55–59), C+ (50–54), C (45–49), C- (40–44), D+ (35–39), D (30–34), F (di bawah 30).
+
+## STPM Examination
+STPM (Sijil Tinggi Persekolahan Malaysia) is a pre-university qualification equivalent to A-Levels. STPM spans 3 semesters (18 months). Assessment combines final semester exams and coursework. Grades range from A (80–100) to F (below 30). STPM is administered by the Malaysian Examinations Council (MPM/Majlis Peperiksaan Malaysia).
+
+## JPA Scholarship
+Biasiswa JPA (Jabatan Perkhidmatan Awam) ditawarkan kepada pelajar cemerlang untuk pengajian di luar negara dan tempatan. Jenis biasiswa: 1. Program Khas (luar negara) — 150 biasiswa setahun. 2. Program Separuh Biasiswa. Syarat umum: Warganegara Malaysia, tawaran universiti yang diluluskan, pencapaian akademik cemerlang (SPM/STPM). Permohonan dibuka pada bulan Februari–Mac setiap tahun.
+
+## JPA Scholarship
+JPA (Public Service Department) scholarships are offered to outstanding students for studies overseas and locally. Types: 1. Special Programme (overseas) — approximately 150 scholarships per year. 2. Half Scholarship programme. General criteria: Malaysian citizen, offer letter from approved university, excellent academic results. Applications open February–March each year at biasiswa.jpa.gov.my.
+
+## PTPTN Education Loan
+PTPTN (Perbadanan Tabung Pendidikan Tinggi Nasional) menyediakan pinjaman pendidikan kepada pelajar pengajian tinggi. Kadar pinjaman bergantung kepada institusi dan program: RM1,000–RM10,000 setiap semester. Pelajar perlu memulangkan pinjaman selepas tamat pengajian dan mendapat pekerjaan. Potongan automatik gaji (Auto Debit) tersedia. Pelajar dengan CGPA 3.00 ke atas mendapat rebat 20%.
+
+## PTPTN Education Loan
+PTPTN (National Higher Education Fund Corporation) provides education loans to tertiary students. Loan amounts depend on institution and programme type: RM1,000–RM10,000 per semester. Repayment begins after graduation and employment. Auto debit from salary is available. Students who achieve CGPA 3.00 and above receive a 20% rebate on the loan amount.
+
+## MRSM Application
+MRSM (Maktab Rendah Sains MARA) adalah sekolah berasrama penuh yang dikelola oleh MARA untuk pelajar bumiputera yang cemerlang. Terdapat lebih 50 MRSM di seluruh Malaysia. Kemasukan ke MRSM Tingkatan 1 dan 4 berdasarkan keputusan PT3 (Tingkatan 3) atau UPSR (Tingkatan 1). Permohonan dibuat melalui portal MARA di mara.gov.my.
+
+## MRSM Application
+MRSM (MARA Junior Science College) is a residential school managed by MARA for outstanding Bumiputera students. There are over 50 MRSMs nationwide. Admission to Form 1 is based on UPSR results; Form 4 admission is based on PT3 results. Applications are made through the MARA portal at mara.gov.my. Selection is competitive and merit-based.
+
+## SBP Boarding School
+Sekolah Berasrama Penuh (SBP) adalah sekolah menengah berasrama yang dikelola oleh Kementerian Pendidikan Malaysia (KPM). SBP menerima pelajar Tingkatan 1 dan Tingkatan 4 berdasarkan keputusan peperiksaan. Terdapat 37 SBP di seluruh Malaysia. Pelajar dari pelbagai kaum boleh memohon. Permohonan melalui portal KPM.
+
+## SBP Boarding School
+Sekolah Berasrama Penuh (SBP/Fully Residential Schools) are boarding secondary schools managed by the Ministry of Education Malaysia. SBPs accept Form 1 (based on UPSR) and Form 4 (based on PT3) students. There are 37 SBPs nationwide, open to students of all races. Applications are made through the MOE portal.
+
+## PT3 Assessment
+Penilaian Menengah Rendah (PT3) ialah penilaian bagi pelajar Tingkatan 3 yang dijalankan oleh Lembaga Peperiksaan Malaysia (LPM). PT3 dinilai melalui gabungan peperiksaan bertulis, pentaksiran sekolah, dan ujian lisan (Bahasa Malaysia/Inggeris). Keputusan PT3 digunakan untuk kemasukan ke SBP, MRSM, dan sekolah vokasional.
+
+## Public University Admission
+Universiti awam (UA) di Malaysia termasuk Universiti Malaya (UM), UKM, UPM, UTM, USM, UiTM (bumiputera), UPSI, UMS, UNIMAS, dan lain-lain. Kemasukan ke UA melalui UPU (Unit Pusat Universiti) berasaskan keputusan STPM, matrikulasi, atau diploma. Permohonan UPU dibuat di upu.mohe.gov.my biasanya pada bulan Mac–April.

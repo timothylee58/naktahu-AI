@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis_ai
@@ -12,7 +13,7 @@ from supabase import create_client
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter
 from middleware.user_context import UserContextMiddleware
-from routes import query as rag_query
+from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
 from routers import history, query
 
 structlog.configure(
@@ -45,7 +46,7 @@ async def lifespan(app: FastAPI):
         logger.info("supabase_status", ok=True, detail="client ready")
     except Exception as exc:
         logger.error("supabase_status", ok=False, error=str(exc))
-        raise
+        app.state.supabase = None  # degraded mode — history/session features disabled
 
     yield
 
@@ -54,9 +55,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Naktahu API", lifespan=lifespan)
 
+_raw_origins = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:3000,https://naktahu.netlify.app",
+)
+_allow_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
