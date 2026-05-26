@@ -1,0 +1,35 @@
+"""LLM provider abstraction.
+
+ILMU (OpenAI-compatible) is the primary provider for both chat and embeddings.
+Anthropic claude-sonnet-4-20250514 is the fallback for the synthesiser only.
+OpenAI is used for embeddings when ILMU_API_KEY is absent/inactive and
+OPENAI_API_KEY is available.
+"""
+from __future__ import annotations
+
+import os
+
+import anthropic
+from openai import AsyncOpenAI
+
+# ILMU client — OpenAI SDK pointed at ILMU base URL
+ilmu_client = AsyncOpenAI(
+    api_key=os.environ.get("ILMU_API_KEY", "placeholder"),
+    base_url=os.environ.get("ILMU_BASE_URL", "https://api.ilmu.gov.my/v1"),
+)
+
+# OpenAI client — used for embeddings when ILMU is unavailable
+_openai_key = os.environ.get("OPENAI_API_KEY", "")
+openai_client: AsyncOpenAI | None = AsyncOpenAI(api_key=_openai_key) if _openai_key else None
+
+# Anthropic client — fallback for synthesiser when ILMU fails or confidence < 0.4
+anthropic_client = anthropic.AsyncAnthropic(
+    api_key=os.environ.get("ANTHROPIC_API_KEY", "placeholder"),
+)
+
+ILMU_CHAT_MODEL: str = os.environ.get("ILMU_CHAT_MODEL", "ilmu-chat")
+ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "ilmu-embedding")
+OPENAI_EMBEDDING_MODEL: str = (
+    os.environ.get("OPENAI_EMBEDDING_MODEL", "").strip() or "text-embedding-3-small"
+)
+FALLBACK_MODEL: str = "claude-sonnet-4-20250514"
