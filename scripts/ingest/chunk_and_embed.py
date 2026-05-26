@@ -52,12 +52,12 @@ EMBED_BATCH = 50
 
 
 HEADER_RE = re.compile(
-    r"SOURCE_TITLE:\s*(.+)\n"
-    r"SOURCE_URL:\s*(.+)\n"
-    r"MINISTRY:\s*(.+)\n"
-    r"DOMAIN:\s*(.+)\n"
-    r"(?:SOURCE_DATE:\s*(.+)\n)?"
-    r"(?:EXPIRY_AWARE:\s*(.+)\n)?"
+    r"SOURCE_TITLE:[ \t]*(.+)\n"
+    r"SOURCE_URL:[ \t]*(.+)\n"
+    r"MINISTRY:[ \t]*(.+)\n"
+    r"DOMAIN:[ \t]*(.+)\n"
+    r"(?:SOURCE_DATE:[ \t]*([^\n]*)\n)?"
+    r"(?:EXPIRY_AWARE:[ \t]*([^\n]*)\n)?"
     r"---\n",
 )
 
