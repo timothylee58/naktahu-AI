@@ -92,7 +92,11 @@ def detect_language(text: str) -> str:
 
 
 def embed_batch(client: OpenAI, texts: list[str]) -> list[list[float]]:
-    model = os.getenv("OPENAI_EMBEDDING_MODEL") or os.getenv("ILMU_EMBEDDING_MODEL") or "text-embedding-3-small"
+    model = (
+        os.getenv("OPENAI_EMBEDDING_MODEL")
+        or os.getenv("ILMU_EMBEDDING_MODEL")
+        or "text-embedding-3-small"
+    ).strip() or "text-embedding-3-small"
     resp = client.embeddings.create(model=model, input=texts)
     return [item.embedding for item in resp.data]
 
