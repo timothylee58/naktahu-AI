@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 import structlog
 
@@ -16,6 +17,17 @@ _GOV_DOMAIN_RE = re.compile(
 )
 
 _CLARIFICATION_THRESHOLD = 0.4
+_STALE_DAYS = 90
+
+
+def _is_stale(chunk: ChunkResult) -> bool:
+    if not chunk.expiry_aware or not chunk.source_date:
+        return False
+    try:
+        source_dt = date.fromisoformat(chunk.source_date)
+        return (date.today() - source_dt).days > _STALE_DAYS
+    except ValueError:
+        return False
 
 
 def _score_chunk(chunk: ChunkResult, query: str) -> float:
@@ -66,6 +78,7 @@ async def analyst_node(state: AgentState) -> dict:
             ministry=chunk.ministry,
             url=chunk.source_url,
             confidence=score,
+            stale_disclaimer=_is_stale(chunk),
         )
         for score, chunk in top3
         if chunk.source_url  # omit fabricated / empty URLs per CLAUDE.md

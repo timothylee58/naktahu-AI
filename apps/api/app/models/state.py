@@ -11,6 +11,7 @@ class Citation(TypedDict):
     ministry: str
     url: str
     confidence: float
+    stale_disclaimer: bool  # True when expiry_aware chunk is >90 days old
 
 
 class AgentState(TypedDict, total=False):
