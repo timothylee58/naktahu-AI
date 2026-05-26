@@ -52,12 +52,12 @@ EMBED_BATCH = 50
 
 
 HEADER_RE = re.compile(
-    r"SOURCE_TITLE:\s*(.+)\n"
-    r"SOURCE_URL:\s*(.+)\n"
-    r"MINISTRY:\s*(.+)\n"
-    r"DOMAIN:\s*(.+)\n"
-    r"(?:SOURCE_DATE:\s*(.+)\n)?"
-    r"(?:EXPIRY_AWARE:\s*(.+)\n)?"
+    r"SOURCE_TITLE:[ \t]*(.+)\n"
+    r"SOURCE_URL:[ \t]*(.+)\n"
+    r"MINISTRY:[ \t]*(.+)\n"
+    r"DOMAIN:[ \t]*(.+)\n"
+    r"(?:SOURCE_DATE:[ \t]*([^\n]*)\n)?"
+    r"(?:EXPIRY_AWARE:[ \t]*([^\n]*)\n)?"
     r"---\n",
 )
 
@@ -92,7 +92,11 @@ def detect_language(text: str) -> str:
 
 
 def embed_batch(client: OpenAI, texts: list[str]) -> list[list[float]]:
-    model = os.getenv("ILMU_EMBEDDING_MODEL", "text-embedding-3-small")
+    model = (
+        os.getenv("OPENAI_EMBEDDING_MODEL")
+        or os.getenv("ILMU_EMBEDDING_MODEL")
+        or "text-embedding-3-small"
+    ).strip() or "text-embedding-3-small"
     resp = client.embeddings.create(model=model, input=texts)
     return [item.embedding for item in resp.data]
 
@@ -150,10 +154,11 @@ def main() -> None:
     parser.add_argument("--domain", help="Process only this domain")
     args = parser.parse_args()
 
-    api_key = os.getenv("ILMU_API_KEY") or os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("ILMU_BASE_URL")
+    api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ILMU_API_KEY")
+    # Only use ILMU base URL if falling back to ILMU key
+    base_url = None if os.getenv("OPENAI_API_KEY") else os.getenv("ILMU_BASE_URL")
     if not api_key:
-        print("ERROR: ILMU_API_KEY (or OPENAI_API_KEY) not set", file=sys.stderr)
+        print("ERROR: OPENAI_API_KEY (or ILMU_API_KEY) not set", file=sys.stderr)
         sys.exit(1)
 
     client = OpenAI(api_key=api_key, base_url=base_url if base_url else None)
