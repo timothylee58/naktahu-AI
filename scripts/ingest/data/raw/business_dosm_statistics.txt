@@ -1,0 +1,108 @@
+SOURCE_TITLE: Demographic Statistics Malaysia
+SOURCE_URL: https://www.dosm.gov.my/v2/index.php?r=column/cone&menu_id=dDM2enNvN0Rz
+MINISTRY: Jabatan Perangkaan Malaysia
+DOMAIN: business
+SOURCE_DATE: 
+EXPIRY_AWARE: false
+---
+## Population Malaysia 2023
+Penduduk Malaysia pada 2023 dianggarkan 33.4 juta orang. Ini termasuk 30.4 juta warganegara Malaysia dan 3.0 juta bukan warganegara. Pecahan mengikut kumpulan etnik: Bumiputera 69.6%, Cina 22.6%, India 6.8%, lain-lain 1.0%.
+
+## Population Malaysia 2023
+Malaysia's population in 2023 is estimated at 33.4 million, comprising 30.4 million citizens and 3.0 million non-citizens. Ethnic composition: Bumiputera 69.6%, Chinese 22.6%, Indian 6.8%, others 1.0%.
+
+## Fertility Rate Malaysia 2023
+Kadar fertiliti total (TFR) Malaysia 2023 ialah 1.6 kelahiran bagi setiap wanita, di bawah paras penggantian 2.1. Ini adalah rekod terendah dalam sejarah Malaysia. Negeri dengan TFR tertinggi ialah Sabah (2.4) dan Sarawak (2.2).
+
+## Fertility Rate Malaysia 2023
+Malaysia's total fertility rate (TFR) in 2023 was 1.6 births per woman, below the replacement level of 2.1 — a historic low. States with highest TFR: Sabah (2.4) and Sarawak (2.2).
+
+## GDP Malaysia 2023
+KDNK Malaysia 2023 mencecah RM1.79 trilion pada harga semasa, dengan pertumbuhan sebenar 3.7%. Sektor perkhidmatan menyumbang 58.6% kepada KDNK, diikuti pembuatan 22.5%, pembinaan 4.2%, pertanian 6.3% dan perlombongan 8.4%.
+
+## GDP Malaysia 2023
+Malaysia's GDP in 2023 reached RM1.79 trillion at current prices, with real growth of 3.7%. Services contributed 58.6% to GDP, followed by manufacturing 22.5%, construction 4.2%, agriculture 6.3%, and mining 8.4%.
+
+## CPI Malaysia 2023
+Indeks Harga Pengguna (CPI) Malaysia 2023 mencatat purata tahunan 2.5%. Kumpulan dengan kenaikan tertinggi: Makanan & Minuman Bukan Alkohol (4.2%), Perumahan & Utiliti (2.1%), dan Pengangkutan (1.8%). Sabah mencatat inflasi tertinggi di Malaysia pada 3.1%.
+
+## CPI Malaysia 2023
+Malaysia's Consumer Price Index (CPI) averaged 2.5% annual inflation in 2023. Highest increases: Food & Non-Alcoholic Beverages (4.2%), Housing & Utilities (2.1%), and Transport (1.8%). Sabah recorded the highest state inflation at 3.1%.
+
+## Labour Force Malaysia 2023
+Kadar pengangguran Malaysia pada 2023 ialah 3.4%, bersamaan 567,400 penganggur. Kadar pengangguran belia (15–24 tahun) ialah 11.8%. Kadar penyertaan tenaga buruh ialah 70.1% dengan jumlah guna tenaga 16.2 juta.
+
+## Labour Force Malaysia 2023
+Malaysia's unemployment rate in 2023 was 3.4%, equivalent to 567,400 unemployed persons. Youth unemployment (ages 15–24) stood at 11.8%. Labour force participation rate was 70.1% with total employment of 16.2 million.
+
+## Household Income Malaysia 2022
+Pendapatan median isi rumah Malaysia 2022 ialah RM5,889 sebulan, meningkat 6.1% berbanding 2019 (RM5,873). Pendapatan min isi rumah ialah RM8,479. WP Kuala Lumpur mencatat median tertinggi RM10,549, manakala Kelantan terendah RM3,268.
+
+## Household Income Malaysia 2022
+Malaysia's median household income in 2022 was RM5,889/month, up 6.1% from 2019 (RM5,873). Mean household income was RM8,479. WP Kuala Lumpur had the highest median at RM10,549; Kelantan the lowest at RM3,268.
+
+## Poverty Rate Malaysia 2022
+Kadar kemiskinan mutlak Malaysia 2022 ialah 6.2% (2019: 5.6%). Ini bersamaan 514,900 isi rumah miskin. Kadar kemiskinan tegar ialah 0.4%. Sabah mencatat kadar kemiskinan tertinggi (19.9%), diikuti Kelantan (15.0%) dan Terengganu (9.1%).
+
+## Poverty Rate Malaysia 2022
+Malaysia's absolute poverty rate in 2022 was 6.2% (2019: 5.6%), representing 514,900 poor households. Hardcore poverty rate was 0.4%. Sabah had the highest poverty rate (19.9%), followed by Kelantan (15.0%) and Terengganu (9.1%).
+
+## Trade Statistics Malaysia 2023
+Eksport Malaysia 2023 berjumlah RM1.43 trilion, manakala import RM1.29 trilion, menghasilkan lebihan dagangan RM138.2 bilion. Rakan dagangan utama: China (17.1%), Singapura (14.9%), Amerika Syarikat (11.0%), Jepun (6.3%) dan Hong Kong (5.8%).
+
+## Trade Statistics Malaysia 2023
+Malaysia's exports in 2023 totalled RM1.43 trillion; imports RM1.29 trillion, yielding a trade surplus of RM138.2 billion. Top trading partners: China (17.1%), Singapore (14.9%), USA (11.0%), Japan (6.3%), Hong Kong (5.8%).
+
+## Industrial Production Index 2023
+Indeks Pengeluaran Perindustrian (IPI) Malaysia 2023 mencatat pertumbuhan 1.2%. Sektor pembuatan menyumbang paling besar dengan indeks 117.3. Sub-sektor E&E (elektrik & elektronik) kekal sebagai penyumbang terbesar kepada eksport pembuatan Malaysia.
+
+## Industrial Production Index 2023
+Malaysia's Industrial Production Index (IPI) grew 1.2% in 2023. The manufacturing sector led with an index of 117.3. The E&E (electrical & electronics) sub-sector remains the largest contributor to Malaysia's manufacturing exports.
+
+## Urbanisation Malaysia 2020
+Jumlah penduduk bandar Malaysia 2020 ialah 77.2% daripada jumlah penduduk. Kawasan bandar dengan penduduk tertinggi: Lembah Klang (8.1 juta), Johor Bahru (1.8 juta) dan Georgetown (1.0 juta). Kadar urbanisasi Malaysia dijangka mencapai 82% menjelang 2030.
+
+## Urbanisation Malaysia 2020
+Malaysia's urban population in 2020 was 77.2% of total population. Largest urban areas: Klang Valley (8.1 million), Johor Bahru (1.8 million), Georgetown (1.0 million). Malaysia's urbanisation rate is projected to reach 82% by 2030.
+
+## Marriage and Divorce Statistics 2022
+Statistik perkahwinan Malaysia 2022: jumlah perkahwinan 193,953 pasangan. Kadar perkahwinan 5.7 per 1,000 penduduk. Median umur perkahwinan pertama lelaki 28.3 tahun, perempuan 26.5 tahun. Bilangan perceraian 49,959 kes.
+
+## Marriage and Divorce Statistics 2022
+Malaysia marriage statistics 2022: 193,953 marriages registered. Marriage rate 5.7 per 1,000 population. Median age at first marriage: men 28.3 years, women 26.5 years. Divorces: 49,959 cases.
+
+## Public Sector Employment 2022
+Jumlah pekerja dalam sektor awam Malaysia 2022 ialah 1.71 juta orang. Gaji median kakitangan awam ialah RM3,965 sebulan. Anggaran Kementerian Pendidikan paling ramai (476,400 orang), diikuti Kementerian Kesihatan (140,200 orang).
+
+## Public Sector Employment 2022
+Total public sector employment in Malaysia in 2022 was 1.71 million. Median public sector salary was RM3,965/month. Ministry of Education had the most staff (476,400), followed by Ministry of Health (140,200).
+
+## ICT Statistics Malaysia 2022
+Statistik ICT Malaysia 2022: 97.4% isi rumah mempunyai akses internet, berbanding 89.6% pada 2020. Penggunaan telefon pintar mencapai 94.1%. Penembusan e-dagang dalam kalangan perniagaan: 68.2%. Nilai e-dagang RM2.87 trilion.
+
+## ICT Statistics Malaysia 2022
+Malaysia ICT statistics 2022: 97.4% of households have internet access (up from 89.6% in 2020). Smartphone usage reached 94.1%. E-commerce adoption among businesses: 68.2%. E-commerce value: RM2.87 trillion.
+
+## Paddy Production Malaysia 2022
+Pengeluaran padi Malaysia 2022 ialah 2.62 juta tan metrik daripada kawasan 680,000 hektar. Kadar sara diri beras ialah 64%. Kedah kekal sebagai pengeluar padi terbesar (40% daripada pengeluaran nasional). Harga jaminan padi RM650/MT ditetapkan kerajaan.
+
+## Paddy Production Malaysia 2022
+Malaysia's paddy production in 2022 was 2.62 million metric tons from 680,000 hectares. Rice self-sufficiency rate is 64%. Kedah remains the largest paddy producer (40% of national output). Government guaranteed price: RM650/MT.
+
+## Tourism Statistics Malaysia 2022
+Industri pelancongan Malaysia 2022: ketibaan pelancong antarabangsa 10.1 juta orang, menghasilkan pendapatan RM28.5 bilion. Pelancong terbanyak dari Singapura (4.7 juta), Indonesia (1.3 juta) dan Thailand (0.8 juta). Bilangan hotel bertaraf berbintang 1,172.
+
+## Tourism Statistics Malaysia 2022
+Malaysia tourism 2022: 10.1 million international tourist arrivals generating RM28.5 billion in receipts. Top source markets: Singapore (4.7 million), Indonesia (1.3 million), Thailand (0.8 million). Star-rated hotels: 1,172.
+
+## Crime Statistics Malaysia 2022
+Statistik jenayah Malaysia 2022: jumlah kes jenayah indeks 68,726, turun 3.1% berbanding 2021. Jenayah harta benda 81.3%, jenayah kekerasan 18.7%. Kadar jenayah 196 kes per 100,000 penduduk — antara yang terendah di rantau ASEAN.
+
+## Crime Statistics Malaysia 2022
+Malaysia crime statistics 2022: 68,726 index crime cases, down 3.1% from 2021. Property crimes 81.3%, violent crimes 18.7%. Crime rate: 196 cases per 100,000 population — among the lowest in ASEAN.
+
+## Income Inequality Malaysia 2022
+Gini pekali Malaysia 2022 ialah 0.381, menunjukkan pengurangan ketidaksamaan pendapatan berbanding 2019 (0.407). Malaysia menyasarkan Gini 0.369 menjelang 2025 dalam Rangka Rancangan Jangka Panjang. B40 menyumbang 13.5% kepada jumlah pendapatan isi rumah.
+
+## Income Inequality Malaysia 2022
+Malaysia's Gini coefficient in 2022 was 0.381, reflecting reduced income inequality from 2019 (0.407). Malaysia targets a Gini of 0.369 by 2025 under the Long-Term Plan. The B40 group contributes 13.5% of total household income.

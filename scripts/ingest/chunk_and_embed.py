@@ -1,16 +1,20 @@
-"""Chunk raw text files and generate OpenAI embeddings.
+"""Chunk raw text files and generate embeddings via ILMU API (OpenAI-compatible).
 
 Reads  : scripts/ingest/data/raw/{domain}_{slug}.txt
 Outputs: scripts/ingest/data/processed/chunks.jsonl
 
 Each JSONL line contains:
-  id, content, language, domain, source_title, source_url, ministry, embedding
+  id, content, content_hash, language, domain, source_title, source_url,
+  ministry, embedding, expiry_aware, source_date
 
 Run:
     python scripts/ingest/chunk_and_embed.py
+    python scripts/ingest/chunk_and_embed.py --domain tax
 """
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 import os
 import re
@@ -30,12 +34,21 @@ OUT_DIR = Path(__file__).parent / "data" / "processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 OUT_FILE = OUT_DIR / "chunks.jsonl"
 
-CHUNK_SIZE = 512        # tokens ≈ chars / 4; we use chars directly
 CHUNK_OVERLAP = 64
-CHARS_PER_TOKEN = 4     # rough approximation
+CHARS_PER_TOKEN = 4
 
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBED_BATCH = 50        # OpenAI allows up to 2048 per request
+# Per-domain chunk sizes — matches DOMAIN_CHUNK_SIZES in fetch_gov_docs.py
+DOMAIN_CHUNK_SIZES: dict[str, int] = {
+    "tax": 256,
+    "epf": 512,
+    "business": 512,
+    "education": 512,
+    "healthcare": 256,
+    "immigration": 512,
+}
+DEFAULT_CHUNK_SIZE = 512
+
+EMBED_BATCH = 50
 
 
 HEADER_RE = re.compile(
@@ -43,12 +56,13 @@ HEADER_RE = re.compile(
     r"SOURCE_URL:\s*(.+)\n"
     r"MINISTRY:\s*(.+)\n"
     r"DOMAIN:\s*(.+)\n"
+    r"(?:SOURCE_DATE:\s*(.+)\n)?"
+    r"(?:EXPIRY_AWARE:\s*(.+)\n)?"
     r"---\n",
 )
 
 
 def parse_header(raw: str) -> tuple[dict[str, str], str]:
-    """Split the metadata header from body text."""
     m = HEADER_RE.match(raw)
     if not m:
         raise ValueError("Missing metadata header in file")
@@ -57,98 +71,116 @@ def parse_header(raw: str) -> tuple[dict[str, str], str]:
         "source_url": m.group(2).strip(),
         "ministry": m.group(3).strip(),
         "domain": m.group(4).strip(),
+        "source_date": (m.group(5) or "").strip() or None,
+        "expiry_aware": (m.group(6) or "").strip().lower() == "true",
     }
     body = raw[m.end():]
     return meta, body
 
 
+def content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def detect_language(text: str) -> str:
-    """Return 'bm' for Malay or 'en' for English using pycld2."""
     try:
         _, _, best = pycld2.detect(text[:2000])
-        lang_code = best[0][1]  # ISO 639-1 code
+        lang_code = best[0][1]
         return "bm" if lang_code in ("ms", "id") else "en"
     except Exception:
         return "en"
 
 
 def embed_batch(client: OpenAI, texts: list[str]) -> list[list[float]]:
-    """Call OpenAI embeddings API for a batch of texts."""
-    resp = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=texts,
-    )
+    model = os.getenv("ILMU_EMBEDDING_MODEL", "text-embedding-3-small")
+    resp = client.embeddings.create(model=model, input=texts)
     return [item.embedding for item in resp.data]
 
 
-def chunk_file(path: Path, splitter: RecursiveCharacterTextSplitter) -> list[dict]:
+def chunk_file(path: Path, domain_filter: str | None) -> list[dict]:
     raw = path.read_text(encoding="utf-8")
     try:
         meta, body = parse_header(raw)
     except ValueError:
-        # Fallback: infer domain from filename ({domain}_{slug}.txt)
         parts = path.stem.split("_", 1)
         meta = {
             "source_title": path.stem.replace("_", " ").title(),
             "source_url": "",
             "ministry": "Unknown",
             "domain": parts[0] if parts else "government",
+            "source_date": None,
+            "expiry_aware": False,
         }
         body = raw
 
-    chunks = splitter.split_text(body)
-    records = []
-    for chunk in chunks:
-        chunk = chunk.strip()
-        if len(chunk) < 80:          # skip tiny fragments
-            continue
-        records.append({
-            "id": str(uuid.uuid4()),
-            "content": chunk,
-            "language": detect_language(chunk),
-            "domain": meta["domain"],
-            "source_title": meta["source_title"],
-            "source_url": meta["source_url"],
-            "ministry": meta["ministry"],
-            "embedding": None,       # filled in after batched embedding
-        })
-    return records
+    if domain_filter and meta["domain"] != domain_filter:
+        return []
 
-
-def main() -> None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("ERROR: OPENAI_API_KEY not set", file=sys.stderr)
-        sys.exit(1)
-
-    client = OpenAI(api_key=api_key)
-
+    chunk_size = DOMAIN_CHUNK_SIZES.get(meta["domain"], DEFAULT_CHUNK_SIZE)
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE * CHARS_PER_TOKEN,
+        chunk_size=chunk_size * CHARS_PER_TOKEN,
         chunk_overlap=CHUNK_OVERLAP * CHARS_PER_TOKEN,
         length_function=len,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
+    records = []
+    for chunk in splitter.split_text(body):
+        chunk = chunk.strip()
+        if len(chunk) < 80:
+            continue
+        records.append({
+            "id": str(uuid.uuid4()),
+            "content": chunk,
+            "content_hash": content_hash(chunk),
+            "language": detect_language(chunk),
+            "domain": meta["domain"],
+            "source_title": meta["source_title"],
+            "source_url": meta["source_url"],
+            "ministry": meta["ministry"],
+            "expiry_aware": meta["expiry_aware"],
+            "source_date": meta["source_date"],
+            "embedding": None,
+        })
+    return records
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--domain", help="Process only this domain")
+    args = parser.parse_args()
+
+    api_key = os.getenv("ILMU_API_KEY") or os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("ILMU_BASE_URL")
+    if not api_key:
+        print("ERROR: ILMU_API_KEY (or OPENAI_API_KEY) not set", file=sys.stderr)
+        sys.exit(1)
+
+    client = OpenAI(api_key=api_key, base_url=base_url if base_url else None)
+
     raw_files = sorted(RAW_DIR.glob("*.txt"))
     if not raw_files:
-        print(f"No .txt files found in {RAW_DIR}. Run fetch_gov_docs.py first.")
+        print(f"No .txt files in {RAW_DIR}. Run fetch_gov_docs.py first.")
         sys.exit(1)
 
     all_chunks: list[dict] = []
     for path in raw_files:
-        chunks = chunk_file(path, splitter)
-        print(f"  {path.name}: {len(chunks)} chunks")
+        chunks = chunk_file(path, args.domain)
+        if chunks:
+            print(f"  {path.name}: {len(chunks)} chunks (size={DOMAIN_CHUNK_SIZES.get(chunks[0]['domain'], DEFAULT_CHUNK_SIZE)})")
         all_chunks.extend(chunks)
+
+    if not all_chunks:
+        print("No chunks produced — check --domain filter or raw files.")
+        sys.exit(1)
 
     print(f"\nTotal chunks to embed: {len(all_chunks)}")
 
-    # Batch embed
     texts = [c["content"] for c in all_chunks]
     embeddings: list[list[float]] = []
     for i in range(0, len(texts), EMBED_BATCH):
         batch = texts[i : i + EMBED_BATCH]
-        print(f"  Embedding batch {i // EMBED_BATCH + 1} ({len(batch)} chunks)…")
+        print(f"  Embedding batch {i // EMBED_BATCH + 1}/{-(-len(texts) // EMBED_BATCH)} ({len(batch)} chunks)…")
         embeddings.extend(embed_batch(client, batch))
 
     for chunk, emb in zip(all_chunks, embeddings):
