@@ -16,6 +16,8 @@ class ChunkResult:
     ministry: str
     language: str
     similarity: float
+    expiry_aware: bool = False
+    source_date: str | None = None  # ISO date string e.g. "2024-03-15"
 
 
 async def _get_client() -> AsyncClient:
@@ -57,6 +59,8 @@ async def hybrid_search(
                 ministry=row["ministry"],
                 language=row["language"],
                 similarity=float(row["similarity"]),
+                expiry_aware=bool(row.get("expiry_aware", False)),
+                source_date=row.get("source_date"),
             )
         )
     return results

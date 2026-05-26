@@ -14,8 +14,55 @@ import argparse
 import re
 import sys
 import time
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import NamedTuple
+
+# ── Authoritative domain → URL map (used by ingestion tooling) ───────────────
+DOMAIN_SOURCES: dict[str, list[str]] = {
+    "tax": [
+        "https://www.hasil.gov.my/en/individual/individual-faq/",
+        "https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-relief/",
+        "https://www.lhdn.gov.my/en/penalty-and-offences/",
+    ],
+    "epf": [
+        "https://www.kwsp.gov.my/en/member/withdrawal",
+        "https://www.kwsp.gov.my/en/employer/contribution/contribution-rate",
+        "https://www.kwsp.gov.my/en/member/about-epf/epf-account-restructuring",
+    ],
+    "business": [
+        "https://www.ssm.com.my/Pages/Quick_Reference/Business_Registration.aspx",
+        "https://www.hasil.gov.my/en/e-invoice/",
+        "https://mysst.customs.gov.my/",
+    ],
+    "education": [
+        "https://www.ptptn.gov.my/",
+        "https://www.jpa.gov.my/en/perkhidmatan/biasiswa",
+        "https://www.moe.gov.my/en/dasar/",
+    ],
+    "healthcare": [
+        "https://www.moh.gov.my/index.php/pages/view/43",
+        "https://portal.moh.gov.my/",
+    ],
+    "immigration": [
+        "https://www.imi.gov.my/index.php/en/main-services/visa",
+        "https://www.imi.gov.my/index.php/en/main-services/long-term-pass",
+        "https://www.mm2h.gov.my/",
+    ],
+}
+
+# Chunk size per domain — tax tables and healthcare advisories chunk smaller
+DOMAIN_CHUNK_SIZES: dict[str, int] = {
+    "tax": 256,
+    "epf": 512,
+    "business": 512,
+    "education": 512,
+    "healthcare": 256,
+    "immigration": 512,
+}
+
+# Domains whose content is time-sensitive and should be tagged expiry_aware
+EXPIRY_AWARE_DOMAINS: frozenset[str] = frozenset({"healthcare", "immigration"})
 
 import httpx
 from bs4 import BeautifulSoup
@@ -443,6 +490,17 @@ def _clean(text: str) -> str:
     return text.strip()
 
 
+def _parse_last_modified(resp: httpx.Response) -> str:
+    """Return ISO date string from Last-Modified header, or empty string."""
+    raw = resp.headers.get("last-modified", "")
+    if not raw:
+        return ""
+    try:
+        return parsedate_to_datetime(raw).date().isoformat()
+    except Exception:
+        return ""
+
+
 def fetch_source(client: httpx.Client, source: Source) -> bool:
     out_path = RAW_DIR / f"{source.domain}_{source.slug}.txt"
     try:
@@ -454,15 +512,20 @@ def fetch_source(client: httpx.Client, source: Source) -> bool:
             print(f"  [WARN] {source.slug}: text too short ({len(text)} chars)")
             return False
 
+        source_date = _parse_last_modified(resp)
+        expiry_aware = source.domain in EXPIRY_AWARE_DOMAINS
+
         header = (
             f"SOURCE_TITLE: {source.slug.replace('_', ' ').title()}\n"
             f"SOURCE_URL: {source.url}\n"
             f"MINISTRY: {source.ministry}\n"
             f"DOMAIN: {source.domain}\n"
+            f"SOURCE_DATE: {source_date}\n"
+            f"EXPIRY_AWARE: {str(expiry_aware).lower()}\n"
             "---\n"
         )
         out_path.write_text(header + text, encoding="utf-8")
-        print(f"  [OK]   {source.slug} ({len(text):,} chars)")
+        print(f"  [OK]   {source.slug} ({len(text):,} chars){' [expiry_aware]' if expiry_aware else ''}")
         return True
 
     except Exception as exc:
