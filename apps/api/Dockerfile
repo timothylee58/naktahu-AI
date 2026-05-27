@@ -29,6 +29,9 @@ COPY routers/ ./routers/
 COPY routes/ ./routes/
 COPY services/ ./services/
 
+COPY start.sh ./
+RUN chmod +x start.sh
+
 EXPOSE 8000
 
 ENV PYTHONUNBUFFERED=1 \
@@ -36,4 +39,4 @@ ENV PYTHONUNBUFFERED=1 \
     ENV=production \
     PYTHONPATH=/app
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --no-access-log"]
+CMD ["./start.sh"]
