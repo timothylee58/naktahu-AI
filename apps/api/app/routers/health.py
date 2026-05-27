@@ -10,7 +10,7 @@ from app.services.cache import ping as redis_ping
 
 log = structlog.get_logger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["health"])
+router = APIRouter(tags=["health"])
 
 
 async def _supabase_ping() -> bool:
@@ -30,6 +30,7 @@ async def _supabase_ping() -> bool:
 
 
 @router.get("/health")
+@router.get("/api/v1/health")
 async def health() -> dict:
     redis_ok = await redis_ping()
     supabase_ok = await _supabase_ping()
