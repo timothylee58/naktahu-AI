@@ -21,6 +21,11 @@ anthropic_client = anthropic.AsyncAnthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY", "placeholder"),
 )
 
+# OpenAI client — fallback for embeddings when ILMU embeddings unavailable
+_openai_key = os.environ.get("OPENAI_API_KEY", "")
+openai_client: AsyncOpenAI | None = AsyncOpenAI(api_key=_openai_key) if _openai_key else None
+
 ILMU_CHAT_MODEL: str = os.environ.get("ILMU_CHAT_MODEL", "ilmu-chat")
 ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "ilmu-embedding")
+OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 FALLBACK_MODEL: str = "claude-sonnet-4-20250514"
