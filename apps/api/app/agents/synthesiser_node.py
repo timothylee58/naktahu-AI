@@ -72,19 +72,24 @@ async def _stream_anthropic(context: str) -> AsyncGenerator[str, None]:
 async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     """Public async generator for direct use by the SSE endpoint.
 
-    Tries ILMU first; falls back to Anthropic only if no tokens were emitted yet.
+    Tries ILMU first; falls back to Anthropic if ILMU fails or emits fewer than
+    10 tokens (indicating a truncated/empty response).
     """
     context = _build_context(state)
-    emitted = False
+    emitted_tokens: list[str] = []
+    ilmu_failed = False
     try:
         async for token in _stream_ilmu(context):
-            emitted = True
+            emitted_tokens.append(token)
             yield token
     except Exception as exc:
-        if emitted:
-            log.error("ilmu_failed_mid_stream", error=str(exc))
-            return
+        ilmu_failed = True
         log.warning("ilmu_fallback_triggered", error=str(exc))
+
+    # Fall back to Anthropic if ILMU failed or gave an unusably short response
+    if ilmu_failed or len(emitted_tokens) < 10:
+        if emitted_tokens:
+            log.warning("ilmu_response_too_short_fallback", tokens=len(emitted_tokens))
         async for token in _stream_anthropic(context):
             yield token
 
