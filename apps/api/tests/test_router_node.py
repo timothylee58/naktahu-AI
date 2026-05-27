@@ -89,4 +89,4 @@ async def test_router_node_json_in_markdown_fence() -> None:
         result = await router_node({"query": "Perkhidmatan hospital awam"})
 
     assert result["language"] == "bm"
-    assert result["domain"] == "health"
+    assert result["domain"] == "healthcare"
