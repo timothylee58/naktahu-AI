@@ -272,11 +272,11 @@ export default function ChatPage() {
               key={msg.id}
               role="assistant"
               content={msg.content}
-              tokens={msg.tokens}
-              citations={msg.citations}
+              tokens={msg.tokens ?? []}
+              citations={msg.citations ?? []}
               confidence={msg.confidence}
               isStreaming={msg.isStreaming}
-              isThinking={msg.isStreaming && msg.tokens.length === 0}
+              isThinking={msg.isStreaming && (msg.tokens?.length ?? 0) === 0}
             />
           ),
         )}
