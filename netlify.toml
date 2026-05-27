@@ -13,10 +13,10 @@
   package = "@netlify/plugin-nextjs"
 
 [context.production.environment]
-  NEXT_PUBLIC_API_URL = "https://naktahu-api.up.railway.app"
+  NEXT_PUBLIC_API_URL = "https://naktahu-ai-production.up.railway.app"
 
 [context.deploy-preview.environment]
-  NEXT_PUBLIC_API_URL = "https://naktahu-api.up.railway.app"
+  NEXT_PUBLIC_API_URL = "https://naktahu-ai-production.up.railway.app"
 
 # Security headers
 [[headers]]
