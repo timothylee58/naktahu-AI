@@ -73,7 +73,7 @@ export default function ChatPage() {
 
   // When first token arrives, remove ThinkingIndicator and show streaming bubble
   useEffect(() => {
-    if (tokens.length > 0 && !bubbleCreated.current) {
+    if (tokens?.length > 0 && !bubbleCreated.current) {
       bubbleCreated.current = true;
       if (thinkingId) {
         setMessages((prev) => prev.filter((m) => m.id !== thinkingId));

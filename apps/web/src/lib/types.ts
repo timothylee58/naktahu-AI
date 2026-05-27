@@ -1,7 +1,11 @@
 export interface Citation {
-  source_url: string;
-  source_title: string;
+  source_url?: string;
+  source_title?: string;
   ministry: string;
+  url?: string;
+  title?: string;
+  confidence?: number;
+  stale_disclaimer?: boolean;
 }
 
 export interface SSEMetadata {
