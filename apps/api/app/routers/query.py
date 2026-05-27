@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from typing import AsyncGenerator, Optional
 
 import structlog
@@ -23,14 +24,14 @@ _AUTH_RATE = os.environ.get("AUTH_RATE_LIMIT", "200/hour")
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=1000)
-    session_id: str = Field(..., min_length=1, max_length=128)
+    session_id: Optional[str] = Field(default=None, max_length=128)
     language: Optional[str] = None
 
     @field_validator("session_id")
     @classmethod
-    def session_id_alphanumeric(cls, v: str) -> str:
+    def session_id_alphanumeric(cls, v: Optional[str]) -> Optional[str]:
         import re
-        if not re.match(r"^[\w\-]+$", v):
+        if v is not None and not re.match(r"^[\w\-]+$", v):
             raise ValueError("session_id must contain only alphanumeric, hyphens, or underscores")
         return v
 
@@ -118,11 +119,12 @@ async def query_endpoint(
 
     # Sanitise query text (length already validated by Pydantic)
     clean_query = sanitise_query(body.query)
+    session_id = body.session_id or str(uuid.uuid4())
 
-    log.info("query_received", session_id=body.session_id, user_id=user_id, query_len=len(clean_query))
+    log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
 
     return StreamingResponse(
-        _sse_generator(clean_query, body.session_id, user_id),
+        _sse_generator(clean_query, session_id, user_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
