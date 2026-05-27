@@ -61,6 +61,7 @@ export default function ChatPage() {
   } = useSSEStream({ language: locale, accessToken: accessToken ?? undefined });
 
   const streamingAssistantId = useRef<string | null>(null);
+  const bubbleCreated = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,9 +73,12 @@ export default function ChatPage() {
 
   // When first token arrives, remove ThinkingIndicator and show streaming bubble
   useEffect(() => {
-    if (tokens.length === 1 && thinkingId) {
-      setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
-      setThinkingId(null);
+    if (tokens.length > 0 && !bubbleCreated.current) {
+      bubbleCreated.current = true;
+      if (thinkingId) {
+        setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
+        setThinkingId(null);
+      }
       const assistantId = makeId();
       streamingAssistantId.current = assistantId;
       setMessages((prev) => [
@@ -83,7 +87,7 @@ export default function ChatPage() {
           id: assistantId,
           role: 'assistant',
           content: '',
-          tokens: [tokens[0]],
+          tokens: [...tokens],
           citations: [],
           confidence: null,
           isStreaming: true,
@@ -153,6 +157,7 @@ export default function ChatPage() {
     (query: string) => {
       reset();
       streamingAssistantId.current = null;
+      bubbleCreated.current = false;
 
       const userMsg: Message = {
         id: makeId(),
