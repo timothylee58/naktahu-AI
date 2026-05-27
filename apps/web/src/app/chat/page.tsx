@@ -196,7 +196,7 @@ export default function ChatPage() {
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-zinc-50/50">
       {/* History sidebar */}
       <HistorySidebar
         isOpen={sidebarOpen}
@@ -207,7 +207,7 @@ export default function ChatPage() {
       />
 
       {/* header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-2">
           {/* sidebar toggle */}
           <button
@@ -251,12 +251,17 @@ export default function ChatPage() {
       {/* message list */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scroll-smooth"
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-zinc-400 select-none">
-            <span className="text-4xl">🇲🇾</span>
-            <p className="text-sm max-w-xs">{t('chat.empty')}</p>
+          <div className="flex flex-col items-center justify-center h-full text-center gap-4 text-zinc-400 select-none">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
+              <span className="text-2xl">🇲🇾</span>
+            </div>
+            <div>
+              <p className="text-base font-semibold text-zinc-600">NakTahu AI</p>
+              <p className="text-sm text-zinc-400 max-w-xs mt-1">{t('chat.empty')}</p>
+            </div>
           </div>
         )}
         {messages.map((msg) =>
@@ -279,7 +284,7 @@ export default function ChatPage() {
       </div>
 
       {/* input bar */}
-      <div className="flex-shrink-0 border-t border-zinc-100 bg-white px-4 py-3">
+      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 py-3">
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
