@@ -5,6 +5,7 @@ import re
 from datetime import date
 
 import structlog
+import weave
 
 from app.models.state import AgentState, Citation
 from app.services.vector_store import ChunkResult
@@ -51,6 +52,7 @@ def _score_chunk(chunk: ChunkResult, query: str) -> float:
     return round(min(score, 1.0), 4)
 
 
+@weave.op()
 async def analyst_node(state: AgentState) -> dict:
     """Score retrieved chunks, select top 3 citations, compute confidence."""
     query = state.get("query", "")

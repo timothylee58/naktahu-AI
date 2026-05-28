@@ -5,6 +5,7 @@ import hashlib
 import json
 
 import structlog
+import weave
 
 from app.models.state import AgentState
 from app.services import cache as cache_svc
@@ -68,6 +69,7 @@ async def _embed(query: str) -> list[float]:
         return resp.data[0].embedding
 
 
+@weave.op()
 async def rag_node(state: AgentState) -> dict:
     """Check Redis cache, then fall through to hybrid search on miss."""
     query = state.get("query", "")

@@ -7,6 +7,7 @@ get_stream_writer() so the SSE endpoint receives it like any other token stream.
 from __future__ import annotations
 
 import structlog
+import weave
 from langgraph.config import get_stream_writer
 
 from app.models.state import AgentState
@@ -47,6 +48,7 @@ def _refusal_message(lang: str) -> str:
     )
 
 
+@weave.op()
 async def guard_node(state: AgentState) -> dict:
     """Block off-topic or harmful queries; let valid ones pass through unchanged."""
     domain: str = state.get("domain", "government")
