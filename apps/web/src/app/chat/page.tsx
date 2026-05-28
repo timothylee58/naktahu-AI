@@ -14,6 +14,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { HistorySidebar } from '@/components/history/HistorySidebar';
+import { LangToggle } from '@/components/LangToggle';
 
 let msgCounter = 0;
 function makeId() {
@@ -21,7 +22,7 @@ function makeId() {
 }
 
 export default function ChatPage() {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
   const supabase = useMemo(() => createClient(), []);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -260,12 +261,7 @@ export default function ChatPage() {
 
         <div className="flex items-center gap-2">
           <AuthButton />
-          <button
-            onClick={() => setLocale(locale === 'ms' ? 'en' : 'ms')}
-            className="text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-full px-3 py-1.5 transition-colors"
-          >
-            {t('header.lang_toggle')}
-          </button>
+          <LangToggle variant="light" />
         </div>
       </header>
 
