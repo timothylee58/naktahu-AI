@@ -1,0 +1,96 @@
+SOURCE_TITLE: 马来西亚公共医疗服务指南
+SOURCE_URL: https://www.moh.gov.my/index.php/pages/view/43
+MINISTRY: 马来西亚卫生部（Kementerian Kesihatan Malaysia）
+DOMAIN: healthcare
+SOURCE_DATE:
+EXPIRY_AWARE: false
+---
+## 政府诊所（Klinik Kesihatan）
+
+政府诊所是马来西亚公共基层医疗的主要提供者，遍布全国城镇和乡村。
+
+**服务内容：**
+- 普通门诊（发烧、咳嗽、慢性病跟进等）
+- 母婴健康（产前检查、疫苗接种）
+- 慢性病管理（高血压、糖尿病）
+- 心理健康咨询
+- 戒烟计划（Quitline）
+
+**收费标准（马来西亚公民）：**
+- 一般门诊：**RM1**（含药物）
+- 非公民：按规定收费
+
+通过 [MySejahtera 应用](https://mysejahtera.malaysia.gov.my) 或 [MyDoc](https://www.mydoc.com.my) 可预约部分诊所。
+
+## 政府医院
+
+公立医院提供专科和三级医疗服务，收费远低于私立医院。
+
+**收费（马来西亚公民）：**
+- 门诊挂号费：**RM5**（含专科就诊）
+- 住院费：**RM3/天**（普通病房），含医疗、护理及餐饮
+- 急诊：免费（用于紧急情况）
+
+**主要政府医院：**
+- 吉隆坡中央医院（Hospital Kuala Lumpur，HKL）
+- 国家心脏研究所（IJN，部分服务受补贴）
+- 槟城医院（Hospital Pulau Pinang）
+- 约翰斯巴鲁医院（Hospital Sultan Ismail, JB）
+
+## MySejahtera 数字医疗服务
+
+**MySejahtera** 是卫生部官方健康管理应用，功能包括：
+- 查看接种疫苗记录
+- 预约政府诊所
+- 查看个人健康档案（MyHealth Record）
+- 健康风险评估
+
+下载：App Store / Google Play 搜索 "MySejahtera"
+
+## 全民健康保障（PeKa B40）
+
+**PeKa B40** 计划针对40岁及以上的 B40（低收入群体）提供：
+- 非传染性疾病筛查（糖尿病、高血压、癌症等）
+- 健康检查补贴
+- 医疗器材援助（轮椅、助听器等）
+
+申请条件：持有 MySalam 保险或 eKasih 援助数据库注册者。
+
+## 儿童疫苗接种计划（免费）
+
+马来西亚卫生部为儿童提供以下免费疫苗（国家疫苗接种计划）：
+
+| 年龄 | 疫苗 |
+|---|---|
+| 出生 | 乙型肝炎（第1剂）、卡介苗（BCG）|
+| 1个月 | 乙型肝炎（第2剂）|
+| 3个月 | 五合一（DTaP-IPV-Hib）、肺炎链球菌（PCV）|
+| 5个月 | 五合一（第2剂）、PCV（第2剂）|
+| 12个月 | 麻疹-腮腺炎-风疹（MMR）、乙脑（JE）、水痘 |
+| 18个月 | 五合一（第3剂）、MMR（第2剂）|
+
+疫苗接种可在政府诊所（Klinik Kesihatan）免费进行。
+
+## 精神健康服务
+
+**公共精神健康资源：**
+- **Befrienders 吉隆坡**（危机热线）：03-7956 8145（24小时）
+- **卫生部精神健康热线（Talian Kasih）**：15999（24小时）
+- **政府诊所及医院**：提供精神科转介服务
+- 政府精神科门诊：**免费或低收费**
+
+## 医疗援助计划
+
+| 计划名称 | 受益对象 | 提供方 |
+|---|---|---|
+| 医疗援助基金（MAF） | 无力支付医疗费者 | 卫生部医院 |
+| eKasih 援助 | 极贫困群体 | 国家援助局 |
+| PeKa B40 | B40 群体 | 卫生部 |
+
+## 常用联系方式
+
+- **卫生部官网**：[moh.gov.my](https://www.moh.gov.my)
+- **健康关怀热线（KKM）**：1800-88-1111（8:00-17:00）
+- **危机/24小时热线（Talian Kasih）**：15999
+- **MySejahtera 门户**：[mysejahtera.malaysia.gov.my](https://mysejahtera.malaysia.gov.my)
+- **政府诊所搜索**：[klinik.moh.gov.my](https://klinik.moh.gov.my)

@@ -86,7 +86,11 @@ def detect_language(text: str) -> str:
     try:
         _, _, best = pycld2.detect(text[:2000])
         lang_code = best[0][1]
-        return "bm" if lang_code in ("ms", "id") else "en"
+        if lang_code in ("ms", "id"):
+            return "bm"
+        if lang_code in ("zh", "zh-Hant", "zh-Hans", "zh-TW", "zh-CN"):
+            return "zh"
+        return "en"
     except Exception:
         return "en"
 
