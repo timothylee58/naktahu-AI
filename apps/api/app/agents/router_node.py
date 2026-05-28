@@ -14,7 +14,7 @@ log = structlog.get_logger(__name__)
 
 _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
-    "Return JSON with: language (bm or en), domain (one of: government, education, "
+    "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
     "legal, finance, healthcare, epf, tax, business, immigration, culture), intent (string summary max 10 words). "
     "Detect language from the query text itself, not from any metadata."
 )
@@ -50,7 +50,7 @@ async def router_node(state: AgentState) -> dict:
     language = parsed.get("language", "en")
     if isinstance(language, str):
         language = language.strip().lower()
-    if language not in {"bm", "en"}:
+    if language not in {"bm", "en", "zh"}:
         language = "en"
 
     domain = parsed.get("domain", "government")
