@@ -12,6 +12,7 @@ from app.core.telemetry import configure_telemetry
 from app.middleware.request_id import RequestIDMiddleware
 from app.routers.health import router as health_router
 from app.routers.query import router as query_router
+from app.routers.session import router as session_router
 
 # Initialise Sentry + structlog before the app object is created so that
 # any import-time errors are captured too.
@@ -57,3 +58,4 @@ app.add_middleware(RequestIDMiddleware)
 # ── Routers ─────────────────────────────────────────────────────────────────
 app.include_router(health_router)
 app.include_router(query_router)
+app.include_router(session_router)

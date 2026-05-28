@@ -47,6 +47,17 @@ const MS: Translations = {
   'auth.terms': 'Dengan log masuk, anda bersetuju dengan',
   'auth.terms.link': 'terma penggunaan',
 
+  'auth.microsoft': 'Teruskan dengan Microsoft',
+  'auth.phone': 'Teruskan dengan Telefon',
+  'auth.phone.placeholder': '+601112345678',
+  'auth.phone.send': 'Hantar OTP',
+  'auth.phone.sending': 'Menghantar…',
+  'auth.phone.otp.placeholder': '6-digit OTP',
+  'auth.phone.verify': 'Sahkan',
+  'auth.phone.verifying': 'Mengesahkan…',
+  'auth.phone.sent.title': 'OTP dihantar',
+  'auth.phone.sent.desc': 'Masukkan kod 6 digit yang dihantar ke',
+
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
   'history.empty': 'Tiada sejarah lagi.',
@@ -125,6 +136,17 @@ const EN: Translations = {
   'auth.terms': 'By signing in, you agree to our',
   'auth.terms.link': 'terms of use',
 
+  'auth.microsoft': 'Continue with Microsoft',
+  'auth.phone': 'Continue with Phone',
+  'auth.phone.placeholder': '+601112345678',
+  'auth.phone.send': 'Send OTP',
+  'auth.phone.sending': 'Sending…',
+  'auth.phone.otp.placeholder': '6-digit OTP',
+  'auth.phone.verify': 'Verify',
+  'auth.phone.verifying': 'Verifying…',
+  'auth.phone.sent.title': 'OTP sent',
+  'auth.phone.sent.desc': 'Enter the 6-digit code sent to',
+
   /* ── history ── */
   'history.title': 'Query History',
   'history.empty': 'No history yet.',
@@ -201,6 +223,17 @@ const ZH: Translations = {
   'auth.email.back': '返回',
   'auth.terms': '登录即表示您同意我们的',
   'auth.terms.link': '使用条款',
+
+  'auth.microsoft': '使用 Microsoft 继续',
+  'auth.phone': '使用手机继续',
+  'auth.phone.placeholder': '+601112345678',
+  'auth.phone.send': '发送验证码',
+  'auth.phone.sending': '发送中…',
+  'auth.phone.otp.placeholder': '6位验证码',
+  'auth.phone.verify': '验证',
+  'auth.phone.verifying': '验证中…',
+  'auth.phone.sent.title': '验证码已发送',
+  'auth.phone.sent.desc': '请输入发送至以下号码的6位验证码',
 
   /* ── history ── */
   'history.title': '查询历史',
