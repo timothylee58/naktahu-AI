@@ -151,8 +151,8 @@ export function AuthButton() {
               <div className="px-6 pt-6 pb-4 border-b border-zinc-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-bold text-zinc-900">Masuk ke NakTahu</h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">Simpan sejarah soalan anda</p>
+                    <h2 className="text-base font-bold text-zinc-900">{t('auth.modal.title')}</h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">{t('auth.modal.subtitle')}</p>
                   </div>
                   <button
                     onClick={closeModal}
@@ -178,12 +178,12 @@ export function AuthButton() {
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                   </svg>
-                  {signingIn ? 'Menghubungi Google...' : 'Teruskan dengan Google'}
+                  {signingIn ? t('auth.google.loading') : t('auth.google')}
                 </button>
 
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px bg-zinc-100" />
-                  <span className="text-xs text-zinc-400 font-medium">atau</span>
+                  <span className="text-xs text-zinc-400 font-medium">{t('auth.or')}</span>
                   <div className="flex-1 h-px bg-zinc-100" />
                 </div>
 
@@ -199,8 +199,8 @@ export function AuthButton() {
                         <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
                       </svg>
                     </div>
-                    <p className="text-sm font-semibold text-zinc-800">Semak emel anda</p>
-                    <p className="text-xs text-zinc-500 mt-1">Pautan log masuk dihantar ke <span className="font-medium">{email}</span></p>
+                    <p className="text-sm font-semibold text-zinc-800">{t('auth.email.sent.title')}</p>
+                    <p className="text-xs text-zinc-500 mt-1">{t('auth.email.sent.desc')} <span className="font-medium">{email}</span></p>
                   </motion.div>
                 ) : emailMode ? (
                   <div className="flex flex-col gap-2">
@@ -209,7 +209,7 @@ export function AuthButton() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && signInWithEmail()}
-                      placeholder="nama@emel.com"
+                      placeholder={t('auth.email.placeholder')}
                       className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       autoFocus
                     />
@@ -218,13 +218,13 @@ export function AuthButton() {
                       disabled={!email || signingIn}
                       className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50"
                     >
-                      {signingIn ? 'Menghantar...' : 'Hantar pautan log masuk'}
+                      {signingIn ? t('auth.email.sending') : t('auth.email.send')}
                     </button>
                     <button
                       onClick={() => setEmailMode(false)}
                       className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1"
                     >
-                      Kembali
+                      {t('auth.email.back')}
                     </button>
                   </div>
                 ) : (
@@ -236,13 +236,13 @@ export function AuthButton() {
                       <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z" />
                       <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z" />
                     </svg>
-                    Teruskan dengan Emel
+                    {t('auth.email')}
                   </button>
                 )}
 
                 <p className="text-center text-xs text-zinc-400 mt-1">
-                  Dengan log masuk, anda bersetuju dengan{' '}
-                  <span className="underline cursor-pointer hover:text-zinc-600">terma penggunaan</span> kami.
+                  {t('auth.terms')}{' '}
+                  <span className="underline cursor-pointer hover:text-zinc-600">{t('auth.terms.link')}</span>
                 </p>
               </div>
             </motion.div>

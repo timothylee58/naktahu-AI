@@ -31,6 +31,22 @@ const MS: Translations = {
   'header.sign_in': 'Daftar / Masuk',
   'header.sign_out': 'Keluar',
 
+  /* ── auth modal ── */
+  'auth.modal.title': 'Masuk ke NakTahu',
+  'auth.modal.subtitle': 'Simpan sejarah soalan anda',
+  'auth.google': 'Teruskan dengan Google',
+  'auth.google.loading': 'Menghubungi Google…',
+  'auth.or': 'atau',
+  'auth.email': 'Teruskan dengan Emel',
+  'auth.email.placeholder': 'nama@emel.com',
+  'auth.email.send': 'Hantar pautan log masuk',
+  'auth.email.sending': 'Menghantar…',
+  'auth.email.sent.title': 'Semak emel anda',
+  'auth.email.sent.desc': 'Pautan log masuk dihantar ke',
+  'auth.email.back': 'Kembali',
+  'auth.terms': 'Dengan log masuk, anda bersetuju dengan',
+  'auth.terms.link': 'terma penggunaan',
+
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
   'history.empty': 'Tiada sejarah lagi.',
@@ -93,6 +109,22 @@ const EN: Translations = {
   'header.sign_in': 'Register / Login',
   'header.sign_out': 'Sign Out',
 
+  /* ── auth modal ── */
+  'auth.modal.title': 'Sign in to NakTahu',
+  'auth.modal.subtitle': 'Save your question history',
+  'auth.google': 'Continue with Google',
+  'auth.google.loading': 'Connecting to Google…',
+  'auth.or': 'or',
+  'auth.email': 'Continue with Email',
+  'auth.email.placeholder': 'name@email.com',
+  'auth.email.send': 'Send login link',
+  'auth.email.sending': 'Sending…',
+  'auth.email.sent.title': 'Check your email',
+  'auth.email.sent.desc': 'Login link sent to',
+  'auth.email.back': 'Back',
+  'auth.terms': 'By signing in, you agree to our',
+  'auth.terms.link': 'terms of use',
+
   /* ── history ── */
   'history.title': 'Query History',
   'history.empty': 'No history yet.',
@@ -153,6 +185,22 @@ const ZH: Translations = {
   'header.history': '历史记录',
   'header.sign_in': '注册 / 登录',
   'header.sign_out': '退出',
+
+  /* ── auth modal ── */
+  'auth.modal.title': '登录 NakTahu',
+  'auth.modal.subtitle': '保存您的问题历史',
+  'auth.google': '使用 Google 继续',
+  'auth.google.loading': '正在连接 Google…',
+  'auth.or': '或',
+  'auth.email': '使用电子邮件继续',
+  'auth.email.placeholder': 'nama@emel.com',
+  'auth.email.send': '发送登录链接',
+  'auth.email.sending': '发送中…',
+  'auth.email.sent.title': '请查看您的电子邮件',
+  'auth.email.sent.desc': '登录链接已发送至',
+  'auth.email.back': '返回',
+  'auth.terms': '登录即表示您同意我们的',
+  'auth.terms.link': '使用条款',
 
   /* ── history ── */
   'history.title': '查询历史',
