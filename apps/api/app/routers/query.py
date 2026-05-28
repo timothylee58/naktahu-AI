@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import uuid
 from typing import AsyncGenerator, Optional
 
 import structlog
+import weave
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -56,11 +58,19 @@ def _extract_user_id(authorization: Optional[str]) -> Optional[str]:
         return None
 
 
-async def _sse_generator(
+@weave.op()
+async def _run_pipeline(
     query: str,
     session_id: str,
     user_id: Optional[str],
-) -> AsyncGenerator[str, None]:
+) -> dict:
+    """Execute the full LangGraph pipeline and return a structured result dict.
+
+    This is the root Weave trace for every query. All agent nodes decorated
+    with @weave.op automatically nest as child spans under this call.
+
+    Returns a dict consumed by _sse_generator to stream SSE events.
+    """
     inputs: AgentState = {
         "query": query,
         "session_id": session_id,
@@ -73,19 +83,54 @@ async def _sse_generator(
         "error": None,
     }
 
+    tokens: list[str] = []
     final_state: AgentState = {}  # type: ignore[assignment]
+    t0 = time.monotonic()
 
+    async for mode, data in pipeline.astream(
+        inputs, stream_mode=["updates", "custom"]
+    ):
+        if mode == "custom":
+            tokens.append(str(data))
+        elif mode == "updates":
+            if isinstance(data, dict):
+                for _node, update in data.items():
+                    if isinstance(update, dict):
+                        final_state.update(update)  # type: ignore[typeddict-item]
+
+    latency_ms = round((time.monotonic() - t0) * 1000)
+    full_text = "".join(tokens) or final_state.get("streaming_token_buffer", "")
+
+    return {
+        "tokens": tokens,
+        "final_state": dict(final_state),
+        # ── experiment metrics surfaced in the Weave UI ──
+        "metrics": {
+            "latency_ms": latency_ms,
+            "token_count": len(tokens),
+            "char_count": len(full_text),
+            "confidence": final_state.get("confidence_score", 0.0),
+            "domain": final_state.get("domain", "unknown"),
+            "language": final_state.get("language", "unknown"),
+            "needs_clarification": final_state.get("needs_clarification", False),
+            "blocked": final_state.get("error") == "blocked",
+            "fallback_used": len(tokens) > 0 and len("".join(tokens[:10])) < 20,
+        },
+    }
+
+
+async def _sse_generator(
+    query: str,
+    session_id: str,
+    user_id: Optional[str],
+) -> AsyncGenerator[str, None]:
     try:
-        async for mode, data in pipeline.astream(
-            inputs, stream_mode=["updates", "custom"]
-        ):
-            if mode == "custom":
-                yield _sse("token", {"text": data})
-            elif mode == "updates":
-                if isinstance(data, dict):
-                    for _node, update in data.items():
-                        if isinstance(update, dict):
-                            final_state.update(update)  # type: ignore[typeddict-item]
+        result = await _run_pipeline(query, session_id, user_id)
+        tokens = result["tokens"]
+        final_state = result["final_state"]
+
+        for token in tokens:
+            yield _sse("token", {"text": token})
 
         for citation in final_state.get("citations", []):
             yield _sse("citation", dict(citation))
@@ -117,7 +162,6 @@ async def query_endpoint(
     user_id = _extract_user_id(authorization)
     rate = _AUTH_RATE if user_id else _ANON_RATE
 
-    # Sanitise query text (length already validated by Pydantic)
     clean_query = sanitise_query(body.query)
     session_id = body.session_id or str(uuid.uuid4())
 
@@ -129,7 +173,6 @@ async def query_endpoint(
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            # Surface rate limit info so the frontend can degrade gracefully
             "X-RateLimit-Limit": rate,
         },
     )

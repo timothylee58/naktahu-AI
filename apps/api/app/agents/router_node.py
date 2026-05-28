@@ -5,6 +5,7 @@ import json
 import re
 
 import structlog
+import weave
 
 from app.models.state import AgentState
 from app.services.llm_client import ILMU_CHAT_MODEL, ilmu_client
@@ -24,6 +25,7 @@ _DOMAIN_ALIASES = {"health": "healthcare", "epf": "epf", "pension": "epf", "kwsp
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
+@weave.op()
 async def router_node(state: AgentState) -> dict:
     """Classify query intent, language, and domain."""
     query = state.get("query", "")

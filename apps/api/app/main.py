@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.telemetry import configure_telemetry
+from app.core.weave_tracing import init_weave
 from app.middleware.request_id import RequestIDMiddleware
 from app.routers.health import router as health_router
 from app.routers.query import router as query_router
@@ -23,6 +24,7 @@ log = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):  # type: ignore[type-arg]
+    init_weave()
     log.info("startup", version=application.version)
     yield
     log.info("shutdown")

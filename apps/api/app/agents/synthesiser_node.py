@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import AsyncGenerator
 
 import structlog
+import weave
 from langgraph.config import get_stream_writer
 
 from app.models.state import AgentState
@@ -100,6 +101,7 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
             yield token
 
 
+@weave.op()
 async def synthesiser_node(state: AgentState) -> dict:
     """LangGraph node — streams tokens via get_stream_writer() and accumulates buffer."""
     write = get_stream_writer()
