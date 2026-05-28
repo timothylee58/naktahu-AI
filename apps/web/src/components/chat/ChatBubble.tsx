@@ -1,10 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Citation } from '@/lib/types';
 import { CitationChip } from './CitationChip';
 import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
+import { ResponseActions } from './ResponseActions';
 
 interface UserBubbleProps {
   role: 'user';
@@ -19,6 +22,7 @@ interface AssistantBubbleProps {
   confidence: number | null;
   isStreaming: boolean;
   isThinking?: boolean;
+  onRegenerate?: () => void;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -43,7 +47,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -65,9 +69,16 @@ export function ChatBubble(props: ChatBubbleProps) {
           ) : isStreaming || (tokens?.length ?? 0) > 0 ? (
             <StreamingText tokens={tokens ?? []} isStreaming={isStreaming} />
           ) : (
-            <span className="chat-content text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: content }} />
+            <span className="chat-content text-sm leading-relaxed">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            </span>
           )}
         </motion.div>
+
+        {/* Action buttons — only after streaming completes */}
+        {!isStreaming && !isThinking && content && (
+          <ResponseActions content={content} onRegenerate={onRegenerate} isStreaming={isStreaming} />
+        )}
 
         {hasLowConfidence && (
           <motion.div
