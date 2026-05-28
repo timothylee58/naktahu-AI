@@ -34,6 +34,10 @@ body {
   scrollbar-color: #d4d4d8 transparent;
 }
 
+/* Hide scrollbar for chip row */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 /* Chat message prose */
 .chat-content h2 { font-size: 1rem; font-weight: 700; margin: 0.75rem 0 0.25rem; }
 .chat-content h3 { font-size: 0.9rem; font-weight: 600; margin: 0.5rem 0 0.2rem; }

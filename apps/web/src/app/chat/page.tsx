@@ -11,6 +11,7 @@ import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import type { Message } from '@/lib/types';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { PromptChips } from '@/components/chat/PromptChips';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { HistorySidebar } from '@/components/history/HistorySidebar';
 
@@ -29,6 +30,7 @@ export default function ChatPage() {
   const [injectedQuery, setInjectedQuery] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const lastUserQuery = useRef<string>('');
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -155,6 +157,7 @@ export default function ChatPage() {
 
   const handleSend = useCallback(
     (query: string) => {
+      lastUserQuery.current = query;
       reset();
       streamingAssistantId.current = null;
       bubbleCreated.current = false;
@@ -187,13 +190,31 @@ export default function ChatPage() {
     [reset, startStream, locale],
   );
 
+  const handleRegenerate = useCallback(() => {
+    if (!lastUserQuery.current) return;
+    // Remove the last assistant message before re-sending
+    setMessages((prev) => {
+      const lastAssistantIdx = [...prev].reverse().findIndex((m) => m.role === 'assistant');
+      if (lastAssistantIdx === -1) return prev;
+      const idx = prev.length - 1 - lastAssistantIdx;
+      return prev.filter((_, i) => i !== idx);
+    });
+    handleSend(lastUserQuery.current);
+  }, [handleSend]);
+
   const handleSelectHistoryQuery = useCallback((query: string) => {
     setInjectedQuery(query);
     setSidebarOpen(false);
   }, []);
 
+  const handleChipSelect = useCallback((query: string) => {
+    setInjectedQuery(query);
+  }, []);
+
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
+
+  const showChips = messages.length === 0 && !isStreaming;
 
   return (
     <div className="flex flex-col h-full bg-zinc-50/50">
@@ -277,6 +298,7 @@ export default function ChatPage() {
               confidence={msg.confidence}
               isStreaming={msg.isStreaming}
               isThinking={msg.isStreaming && (msg.tokens?.length ?? 0) === 0}
+              onRegenerate={!msg.isStreaming ? handleRegenerate : undefined}
             />
           ),
         )}
@@ -284,13 +306,19 @@ export default function ChatPage() {
       </div>
 
       {/* input bar */}
-      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 py-3">
+      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 pt-3 pb-3 flex flex-col gap-2">
+        {showChips && (
+          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} />
+        )}
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
           detectedLanguage={detectedLang}
           inject={injectedQuery}
         />
+        <p className="text-center text-[10px] text-zinc-400">
+          Enter to send · Ctrl+Enter · Esc to clear
+        </p>
       </div>
     </div>
   );

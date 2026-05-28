@@ -1,29 +1,62 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useI18n } from '@/lib/i18n';
 
-const DOT_COUNT = 3;
+const STAGES_MS = [
+  'Mencari dalam pangkalan data…',
+  'Menganalisis maklumat…',
+  'Menyusun jawapan…',
+];
+
+const STAGES_EN = [
+  'Searching knowledge base…',
+  'Analysing information…',
+  'Drafting response…',
+];
+
+const STAGE_DURATION = 1800; // ms per stage
 
 export function ThinkingIndicator() {
+  const { locale } = useI18n();
+  const stages = locale === 'ms' ? STAGES_MS : STAGES_EN;
+  const [stage, setStage] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStage((s) => (s + 1) % stages.length);
+    }, STAGE_DURATION);
+    return () => clearInterval(timer);
+  }, [stages.length]);
+
   return (
-    <div
-      className="flex items-center gap-1.5 px-4 py-3"
-      role="status"
-      aria-label="Thinking"
-    >
-      {Array.from({ length: DOT_COUNT }).map((_, i) => (
+    <div className="flex items-center gap-2.5 px-1 py-1" role="status" aria-label={stages[stage]}>
+      {/* Animated dots */}
+      <div className="flex items-center gap-1">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="block w-1.5 h-1.5 rounded-full bg-blue-400"
+            animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2, ease: 'easeInOut' }}
+          />
+        ))}
+      </div>
+
+      {/* Stage label */}
+      <AnimatePresence mode="wait">
         <motion.span
-          key={i}
-          className="block w-2 h-2 rounded-full bg-zinc-400"
-          animate={{ scale: [1, 1.4, 1] }}
-          transition={{
-            duration: 0.6,
-            repeat: Infinity,
-            delay: i * 0.15,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
+          key={stage}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.25 }}
+          className="text-xs text-zinc-400"
+        >
+          {stages[stage]}
+        </motion.span>
+      </AnimatePresence>
     </div>
   );
 }
