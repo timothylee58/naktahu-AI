@@ -176,14 +176,19 @@ export function LandingClient() {
           <span>{t('landing.footer.tagline')}</span>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-white transition-colors"
-          >
-            {t('landing.footer.github')} ↗
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors"
+            >
+              {t('landing.footer.github')} ↗
+            </a>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              {t('footer.privacy')}
+            </Link>
+          </div>
           <span className="text-xs max-w-xs text-right">
             {t('landing.footer.disclaimer')}
           </span>

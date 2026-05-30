@@ -129,7 +129,7 @@ export function HistorySidebar({
     [accessToken],
   );
 
-  const { data: entries = [] } = useSWR<HistoryEntry[]>(
+  const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
     accessToken ? 'history' : null,
     fetcher!,
     { revalidateOnFocus: true },
@@ -188,6 +188,22 @@ export function HistorySidebar({
                 <p className="text-sm text-zinc-500 text-center px-4 py-8">
                   {t('history.sign_in_prompt')}
                 </p>
+              ) : historyLoading ? (
+                <div className="flex flex-col gap-2 px-2 py-3">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="h-12 rounded-lg bg-zinc-100 animate-pulse" />
+                  ))}
+                </div>
+              ) : historyError ? (
+                <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                  <p className="text-sm text-zinc-500">{t('error.history_fetch')}</p>
+                  <button
+                    onClick={() => mutate()}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                  >
+                    {t('error.retry')}
+                  </button>
+                </div>
               ) : entries.length === 0 ? (
                 <p className="text-sm text-zinc-400 text-center px-4 py-8">
                   {t('history.empty')}

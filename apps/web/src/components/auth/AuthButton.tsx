@@ -284,7 +284,7 @@ export function AuthButton() {
                 {tab === 'options' && (
                   <p className="text-center text-xs text-zinc-400 mt-1">
                     {t('auth.terms')}{' '}
-                    <span className="underline cursor-pointer hover:text-zinc-600">{t('auth.terms.link')}</span>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600 transition-colors">{t('auth.terms.link')}</a>
                   </p>
                 )}
               </div>

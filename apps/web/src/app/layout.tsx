@@ -4,6 +4,7 @@ import './globals.css';
 import { I18nProvider } from '@/lib/i18n';
 import { PageTransition } from '@/components/PageTransition';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -43,7 +44,9 @@ export default function RootLayout({
     >
       <body className="min-h-full h-full flex flex-col bg-zinc-50 font-sans">
         <I18nProvider>
-          <PageTransition>{children}</PageTransition>
+          <ErrorBoundary>
+            <PageTransition>{children}</PageTransition>
+          </ErrorBoundary>
         </I18nProvider>
         <ServiceWorkerRegistration />
       </body>

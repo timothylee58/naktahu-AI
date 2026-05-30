@@ -99,6 +99,11 @@ const MS: Translations = {
   'error.stream': 'Ralat semasa mendapatkan jawapan. Cuba lagi.',
   'error.voice_unsupported':
     'Pengecaman suara tidak disokong oleh pelayar ini.',
+  'error.history_fetch': 'Gagal memuatkan sejarah. Cuba lagi.',
+  'error.retry': 'Cuba Lagi',
+
+  /* ── footer ── */
+  'footer.privacy': 'Dasar Privasi',
 };
 
 const EN: Translations = {
@@ -188,6 +193,11 @@ const EN: Translations = {
   'error.stream': 'Error fetching answer. Please try again.',
   'error.voice_unsupported':
     'Speech recognition is not supported in this browser.',
+  'error.history_fetch': 'Failed to load history. Please try again.',
+  'error.retry': 'Try Again',
+
+  /* ── footer ── */
+  'footer.privacy': 'Privacy Policy',
 };
 
 const ZH: Translations = {
@@ -270,6 +280,11 @@ const ZH: Translations = {
   /* ── errors ── */
   'error.stream': '获取答案时出错，请重试。',
   'error.voice_unsupported': '此浏览器不支持语音识别。',
+  'error.history_fetch': '加载历史记录失败，请重试。',
+  'error.retry': '重试',
+
+  /* ── footer ── */
+  'footer.privacy': '隐私政策',
 };
 
 const DICTS: Record<UILocale, Translations> = { ms: MS, en: EN, zh: ZH };
