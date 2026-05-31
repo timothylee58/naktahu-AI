@@ -313,7 +313,7 @@ export default function ChatPage() {
           inject={injectedQuery}
         />
         <p className="text-center text-[10px] text-zinc-400">
-          Enter to send · Ctrl+Enter · Esc to clear
+          {t('chat.keyboard_hint')}
         </p>
       </div>
     </div>

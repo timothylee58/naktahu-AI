@@ -36,6 +36,12 @@ export function TypewriterQuery({ locale = 'ms' }: TypewriterQueryProps) {
   const queries = locale === 'zh' ? QUERIES_ZH : locale === 'ms' ? QUERIES_MS : QUERIES_EN;
   const [displayText, setDisplayText] = useState('');
   const [queryIdx, setQueryIdx] = useState(0);
+
+  // Reset to first query when locale changes
+  useEffect(() => {
+    setQueryIdx(0);
+    setDisplayText('');
+  }, [locale]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
