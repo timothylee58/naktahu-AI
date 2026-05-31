@@ -11,8 +11,10 @@ import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import type { Message } from '@/lib/types';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { PromptChips } from '@/components/chat/PromptChips';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { HistorySidebar } from '@/components/history/HistorySidebar';
+import { LangToggle } from '@/components/LangToggle';
 
 let msgCounter = 0;
 function makeId() {
@@ -20,7 +22,7 @@ function makeId() {
 }
 
 export default function ChatPage() {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
   const supabase = useMemo(() => createClient(), []);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,6 +31,7 @@ export default function ChatPage() {
   const [injectedQuery, setInjectedQuery] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const lastUserQuery = useRef<string>('');
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -61,6 +64,7 @@ export default function ChatPage() {
   } = useSSEStream({ language: locale, accessToken: accessToken ?? undefined });
 
   const streamingAssistantId = useRef<string | null>(null);
+  const bubbleCreated = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,9 +76,12 @@ export default function ChatPage() {
 
   // When first token arrives, remove ThinkingIndicator and show streaming bubble
   useEffect(() => {
-    if (tokens.length === 1 && thinkingId) {
-      setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
-      setThinkingId(null);
+    if (tokens?.length > 0 && !bubbleCreated.current) {
+      bubbleCreated.current = true;
+      if (thinkingId) {
+        setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
+        setThinkingId(null);
+      }
       const assistantId = makeId();
       streamingAssistantId.current = assistantId;
       setMessages((prev) => [
@@ -83,7 +90,7 @@ export default function ChatPage() {
           id: assistantId,
           role: 'assistant',
           content: '',
-          tokens: [tokens[0]],
+          tokens: [...tokens],
           citations: [],
           confidence: null,
           isStreaming: true,
@@ -151,8 +158,10 @@ export default function ChatPage() {
 
   const handleSend = useCallback(
     (query: string) => {
+      lastUserQuery.current = query;
       reset();
       streamingAssistantId.current = null;
+      bubbleCreated.current = false;
 
       const userMsg: Message = {
         id: makeId(),
@@ -182,16 +191,34 @@ export default function ChatPage() {
     [reset, startStream, locale],
   );
 
+  const handleRegenerate = useCallback(() => {
+    if (!lastUserQuery.current) return;
+    // Remove the last assistant message before re-sending
+    setMessages((prev) => {
+      const lastAssistantIdx = [...prev].reverse().findIndex((m) => m.role === 'assistant');
+      if (lastAssistantIdx === -1) return prev;
+      const idx = prev.length - 1 - lastAssistantIdx;
+      return prev.filter((_, i) => i !== idx);
+    });
+    handleSend(lastUserQuery.current);
+  }, [handleSend]);
+
   const handleSelectHistoryQuery = useCallback((query: string) => {
     setInjectedQuery(query);
     setSidebarOpen(false);
   }, []);
 
+  const handleChipSelect = useCallback((query: string) => {
+    setInjectedQuery(query);
+  }, []);
+
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
+  const showChips = messages.length === 0 && !isStreaming;
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-zinc-50/50">
       {/* History sidebar */}
       <HistorySidebar
         isOpen={sidebarOpen}
@@ -202,7 +229,7 @@ export default function ChatPage() {
       />
 
       {/* header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-2">
           {/* sidebar toggle */}
           <button
@@ -234,24 +261,36 @@ export default function ChatPage() {
 
         <div className="flex items-center gap-2">
           <AuthButton />
-          <button
-            onClick={() => setLocale(locale === 'ms' ? 'en' : 'ms')}
-            className="text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-full px-3 py-1.5 transition-colors"
-          >
-            {t('header.lang_toggle')}
-          </button>
+          <LangToggle variant="light" />
         </div>
       </header>
 
       {/* message list */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scroll-smooth"
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-zinc-400 select-none">
-            <span className="text-4xl">🇲🇾</span>
-            <p className="text-sm max-w-xs">{t('chat.empty')}</p>
+          <div className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6">
+            {/* Logo mark */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/20">
+              <svg viewBox="0 0 32 32" className="w-9 h-9" fill="none" aria-hidden>
+                <circle cx="16" cy="16" r="12" fill="white" fillOpacity="0.15" />
+                <path d="M9 12h14M9 16h9M9 20h11" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-lg font-bold text-zinc-700">NakTahu AI</p>
+              <p className="text-sm text-zinc-400 max-w-[260px] leading-relaxed">{t('chat.empty')}</p>
+            </div>
+            {/* Quick domain pills */}
+            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+              {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
+                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1">
+                  {t(`domain.${d}`)}
+                </span>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((msg) =>
@@ -262,11 +301,12 @@ export default function ChatPage() {
               key={msg.id}
               role="assistant"
               content={msg.content}
-              tokens={msg.tokens}
-              citations={msg.citations}
+              tokens={msg.tokens ?? []}
+              citations={msg.citations ?? []}
               confidence={msg.confidence}
               isStreaming={msg.isStreaming}
-              isThinking={msg.isStreaming && msg.tokens.length === 0}
+              isThinking={msg.isStreaming && (msg.tokens?.length ?? 0) === 0}
+              onRegenerate={!msg.isStreaming ? handleRegenerate : undefined}
             />
           ),
         )}
@@ -274,13 +314,19 @@ export default function ChatPage() {
       </div>
 
       {/* input bar */}
-      <div className="flex-shrink-0 border-t border-zinc-100 bg-white px-4 py-3">
+      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2">
+        {showChips && (
+          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} />
+        )}
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
           detectedLanguage={detectedLang}
           inject={injectedQuery}
         />
+        <p className="hidden sm:block text-center text-[10px] text-zinc-400">
+          {t('chat.keyboard_hint')}
+        </p>
       </div>
     </div>
   );

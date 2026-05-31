@@ -1,6 +1,7 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface StreamingTextProps {
   tokens: string[];
@@ -8,18 +9,11 @@ interface StreamingTextProps {
 }
 
 export function StreamingText({ tokens, isStreaming }: StreamingTextProps) {
+  const text = tokens.join('');
+
   return (
-    <span className="whitespace-pre-wrap break-words">
-      {tokens.map((token, i) => (
-        <motion.span
-          key={i}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.1 }}
-        >
-          {token}
-        </motion.span>
-      ))}
+    <span className="chat-content text-sm leading-relaxed">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
       {isStreaming && (
         <span
           aria-hidden

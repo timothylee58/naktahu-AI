@@ -1,18 +1,15 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { I18nProvider } from '@/lib/i18n';
 import { PageTransition } from '@/components/PageTransition';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -43,11 +40,13 @@ export default function RootLayout({
   return (
     <html
       lang="ms"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full h-full flex flex-col bg-zinc-50">
+      <body className="min-h-full h-full flex flex-col bg-zinc-50 font-sans">
         <I18nProvider>
-          <PageTransition>{children}</PageTransition>
+          <ErrorBoundary>
+            <PageTransition>{children}</PageTransition>
+          </ErrorBoundary>
         </I18nProvider>
         <ServiceWorkerRegistration />
       </body>

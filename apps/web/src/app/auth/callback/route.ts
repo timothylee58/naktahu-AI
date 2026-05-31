@@ -5,6 +5,15 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/chat';
+  const oauthError = searchParams.get('error');
+  const oauthErrorDesc = searchParams.get('error_description');
+
+  if (oauthError) {
+    const url = new URL('/?error=auth', origin);
+    url.searchParams.set('reason', oauthError);
+    if (oauthErrorDesc) url.searchParams.set('detail', oauthErrorDesc);
+    return NextResponse.redirect(url);
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -14,6 +23,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // On error redirect to home with error param
   return NextResponse.redirect(new URL('/?error=auth', origin));
 }

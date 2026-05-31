@@ -14,7 +14,7 @@ interface ChatInputProps {
   onSend: (query: string) => void;
   isStreaming: boolean;
   detectedLanguage?: string;
-  /** Externally injected query (e.g. from history sidebar). */
+  /** Externally injected query (e.g. from history sidebar or prompt chips). */
   inject?: string;
 }
 
@@ -28,7 +28,7 @@ export function ChatInput({
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const voiceLang = locale === 'ms' ? 'ms-MY' : 'en-MY';
+  const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
   const { isListening, transcript, startListening, stopListening, isSupported } =
     useVoiceInput({ language: voiceLang });
 
@@ -36,7 +36,7 @@ export function ChatInput({
     if (transcript) setValue(transcript);
   }, [transcript]);
 
-  // Inject query from history sidebar
+  // Inject query from history sidebar or prompt chips
   useEffect(() => {
     if (inject !== undefined && inject !== '') {
       setValue(inject);
@@ -67,9 +67,22 @@ export function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Ctrl+Enter or Cmd+Enter — send
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleSubmit();
+        return;
+      }
+      // Enter without shift — send (existing behaviour)
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
+        return;
+      }
+      // Esc — clear input
+      if (e.key === 'Escape') {
+        setValue('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
       }
     },
     [handleSubmit],

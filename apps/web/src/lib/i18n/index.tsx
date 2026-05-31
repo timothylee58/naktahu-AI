@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -22,6 +23,7 @@ const MS: Translations = {
   'chat.language_indicator': 'BM',
   'chat.empty':
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
+  'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
 
   /* ── header ── */
   'header.title': 'NakTahu',
@@ -30,6 +32,30 @@ const MS: Translations = {
   'header.history': 'Sejarah',
   'header.sign_in': 'Daftar / Masuk',
   'header.sign_out': 'Keluar',
+
+  /* ── language picker ── */
+  'lang.ms': 'Bahasa Malaysia',
+  'lang.en': 'English',
+  'lang.zh': '中文',
+  'lang.label': 'Bahasa',
+
+  /* ── auth modal ── */
+  'auth.modal.title': 'Masuk ke NakTahu',
+  'auth.modal.subtitle': 'Simpan sejarah soalan anda',
+  'auth.google': 'Teruskan dengan Google',
+  'auth.google.loading': 'Menghubungi Google…',
+  'auth.or': 'atau',
+  'auth.email': 'Teruskan dengan Emel',
+  'auth.email.placeholder': 'nama@emel.com',
+  'auth.email.send': 'Hantar pautan log masuk',
+  'auth.email.sending': 'Menghantar…',
+  'auth.email.sent.title': 'Semak emel anda',
+  'auth.email.sent.desc': 'Pautan log masuk dihantar ke',
+  'auth.email.back': 'Kembali',
+  'auth.terms': 'Dengan log masuk, anda bersetuju dengan',
+  'auth.terms.link': 'terma penggunaan',
+  'auth.microsoft': 'Teruskan dengan Microsoft',
+  'auth.microsoft.loading': 'Menghubungi Microsoft…',
 
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
@@ -40,14 +66,16 @@ const MS: Translations = {
   'history.group.earlier': 'Sebelum ini',
 
   /* ── landing ── */
+  'landing.badge': 'Dibuat untuk Malaysia',
   'landing.hero.headline': 'Tanya apa sahaja tentang Malaysia.',
+  'landing.hero.headline.highlight': 'Malaysia',
   'landing.hero.subtext':
     'NakTahu AI memberi jawapan berdasarkan sumber rasmi kerajaan.',
   'landing.hero.cta': 'Mula Bertanya',
   'landing.features.title': 'Kenapa NakTahu?',
-  'landing.features.bilingual.title': 'Dwibahasa BM & EN',
+  'landing.features.bilingual.title': 'Tiga Bahasa',
   'landing.features.bilingual.desc':
-    'Tanya dalam Bahasa Malaysia atau Inggeris — jawapan tepat dalam kedua-dua bahasa.',
+    'Tanya dalam BM, Inggeris atau Mandarin — jawapan tepat dalam ketiga-tiga bahasa.',
   'landing.features.cited.title': 'Sumber Disahkan',
   'landing.features.cited.desc':
     'Setiap jawapan disertakan pautan ke dokumen rasmi kerajaan.',
@@ -72,6 +100,11 @@ const MS: Translations = {
   'error.stream': 'Ralat semasa mendapatkan jawapan. Cuba lagi.',
   'error.voice_unsupported':
     'Pengecaman suara tidak disokong oleh pelayar ini.',
+  'error.history_fetch': 'Gagal memuatkan sejarah. Cuba lagi.',
+  'error.retry': 'Cuba Lagi',
+
+  /* ── footer ── */
+  'footer.privacy': 'Dasar Privasi',
 };
 
 const EN: Translations = {
@@ -84,6 +117,7 @@ const EN: Translations = {
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
   'chat.language_indicator': 'EN',
   'chat.empty': 'Ask me anything about Malaysian government services.',
+  'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
 
   /* ── header ── */
   'header.title': 'NakTahu',
@@ -92,6 +126,30 @@ const EN: Translations = {
   'header.history': 'History',
   'header.sign_in': 'Register / Login',
   'header.sign_out': 'Sign Out',
+
+  /* ── language picker ── */
+  'lang.ms': 'Bahasa Malaysia',
+  'lang.en': 'English',
+  'lang.zh': '中文',
+  'lang.label': 'Language',
+
+  /* ── auth modal ── */
+  'auth.modal.title': 'Sign in to NakTahu',
+  'auth.modal.subtitle': 'Save your question history',
+  'auth.google': 'Continue with Google',
+  'auth.google.loading': 'Connecting to Google…',
+  'auth.or': 'or',
+  'auth.email': 'Continue with Email',
+  'auth.email.placeholder': 'name@email.com',
+  'auth.email.send': 'Send login link',
+  'auth.email.sending': 'Sending…',
+  'auth.email.sent.title': 'Check your email',
+  'auth.email.sent.desc': 'Login link sent to',
+  'auth.email.back': 'Back',
+  'auth.terms': 'By signing in, you agree to our',
+  'auth.terms.link': 'terms of use',
+  'auth.microsoft': 'Continue with Microsoft',
+  'auth.microsoft.loading': 'Connecting to Microsoft…',
 
   /* ── history ── */
   'history.title': 'Query History',
@@ -102,14 +160,16 @@ const EN: Translations = {
   'history.group.earlier': 'Earlier',
 
   /* ── landing ── */
+  'landing.badge': 'Built for Malaysia',
   'landing.hero.headline': 'Ask anything about Malaysia.',
+  'landing.hero.headline.highlight': 'Malaysia',
   'landing.hero.subtext':
     'NakTahu AI provides answers grounded in official government sources.',
   'landing.hero.cta': 'Start Asking',
   'landing.features.title': 'Why NakTahu?',
-  'landing.features.bilingual.title': 'Bilingual BM & EN',
+  'landing.features.bilingual.title': 'Trilingual BM · EN · 中文',
   'landing.features.bilingual.desc':
-    'Ask in Bahasa Malaysia or English — accurate answers in both.',
+    'Ask in Bahasa Malaysia, English, or Mandarin — accurate answers in all three.',
   'landing.features.cited.title': 'Verified Sources',
   'landing.features.cited.desc':
     'Every answer links back to official government documents.',
@@ -134,6 +194,11 @@ const EN: Translations = {
   'error.stream': 'Error fetching answer. Please try again.',
   'error.voice_unsupported':
     'Speech recognition is not supported in this browser.',
+  'error.history_fetch': 'Failed to load history. Please try again.',
+  'error.retry': 'Try Again',
+
+  /* ── footer ── */
+  'footer.privacy': 'Privacy Policy',
 };
 
 const ZH: Translations = {
@@ -145,6 +210,7 @@ const ZH: Translations = {
   'chat.warning.low_confidence': '答案可能不准确 / Answer may be inaccurate',
   'chat.language_indicator': '中文',
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
+  'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
 
   /* ── header ── */
   'header.title': 'NakTahu',
@@ -153,6 +219,30 @@ const ZH: Translations = {
   'header.history': '历史记录',
   'header.sign_in': '注册 / 登录',
   'header.sign_out': '退出',
+
+  /* ── language picker ── */
+  'lang.ms': 'Bahasa Malaysia',
+  'lang.en': 'English',
+  'lang.zh': '中文',
+  'lang.label': '语言',
+
+  /* ── auth modal ── */
+  'auth.modal.title': '登录 NakTahu',
+  'auth.modal.subtitle': '保存您的问题历史',
+  'auth.google': '使用 Google 继续',
+  'auth.google.loading': '正在连接 Google…',
+  'auth.or': '或',
+  'auth.email': '使用电子邮件继续',
+  'auth.email.placeholder': 'name@email.com',
+  'auth.email.send': '发送登录链接',
+  'auth.email.sending': '发送中…',
+  'auth.email.sent.title': '请查看您的电子邮件',
+  'auth.email.sent.desc': '登录链接已发送至',
+  'auth.email.back': '返回',
+  'auth.terms': '登录即表示您同意我们的',
+  'auth.terms.link': '使用条款',
+  'auth.microsoft': '使用 Microsoft 继续',
+  'auth.microsoft.loading': '正在连接 Microsoft…',
 
   /* ── history ── */
   'history.title': '查询历史',
@@ -163,11 +253,13 @@ const ZH: Translations = {
   'history.group.earlier': '更早',
 
   /* ── landing ── */
+  'landing.badge': '专为马来西亚打造',
   'landing.hero.headline': '随时询问有关马来西亚的问题。',
+  'landing.hero.headline.highlight': '马来西亚',
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.hero.cta': '开始提问',
   'landing.features.title': '为什么选择 NakTahu？',
-  'landing.features.bilingual.title': '多语言支持',
+  'landing.features.bilingual.title': '三语支持 BM · EN · 中文',
   'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
   'landing.features.cited.title': '经过验证的来源',
   'landing.features.cited.desc': '每个答案都链接到官方政府文件。',
@@ -189,9 +281,23 @@ const ZH: Translations = {
   /* ── errors ── */
   'error.stream': '获取答案时出错，请重试。',
   'error.voice_unsupported': '此浏览器不支持语音识别。',
+  'error.history_fetch': '加载历史记录失败，请重试。',
+  'error.retry': '重试',
+
+  /* ── footer ── */
+  'footer.privacy': '隐私政策',
 };
 
 const DICTS: Record<UILocale, Translations> = { ms: MS, en: EN, zh: ZH };
+
+const STORAGE_KEY = 'naktahu_locale';
+
+function readStoredLocale(): UILocale {
+  if (typeof window === 'undefined') return 'ms';
+  const v = localStorage.getItem(STORAGE_KEY);
+  if (v === 'ms' || v === 'en' || v === 'zh') return v;
+  return 'ms';
+}
 
 interface I18nContextValue {
   locale: UILocale;
@@ -206,14 +312,24 @@ const I18nContext = createContext<I18nContextValue>({
 });
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<UILocale>('ms');
+  const [locale, setLocaleState] = useState<UILocale>('ms');
+
+  // Hydrate from localStorage after mount (avoids SSR mismatch)
+  useEffect(() => {
+    setLocaleState(readStoredLocale());
+  }, []);
+
+  const setLocale = useCallback((l: UILocale) => {
+    localStorage.setItem(STORAGE_KEY, l);
+    setLocaleState(l);
+  }, []);
 
   const t = useCallback(
     (key: string) => DICTS[locale][key] ?? key,
     [locale],
   );
 
-  const value = useMemo(() => ({ locale, setLocale, t }), [locale, t]);
+  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
