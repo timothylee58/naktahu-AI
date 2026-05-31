@@ -227,7 +227,7 @@ export function AuthButton() {
                         <path fill="#00A4EF" d="M1 13h10v10H1z"/>
                         <path fill="#FFB900" d="M13 13h10v10H13z"/>
                       </svg>
-                      {t('auth.microsoft')}
+                      {signingIn ? t('auth.microsoft.loading') : t('auth.microsoft')}
                     </button>
 
                     <div className="flex items-center gap-3">

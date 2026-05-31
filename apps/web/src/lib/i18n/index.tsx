@@ -55,6 +55,7 @@ const MS: Translations = {
   'auth.terms': 'Dengan log masuk, anda bersetuju dengan',
   'auth.terms.link': 'terma penggunaan',
   'auth.microsoft': 'Teruskan dengan Microsoft',
+  'auth.microsoft.loading': 'Menghubungi Microsoft…',
 
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
@@ -148,6 +149,7 @@ const EN: Translations = {
   'auth.terms': 'By signing in, you agree to our',
   'auth.terms.link': 'terms of use',
   'auth.microsoft': 'Continue with Microsoft',
+  'auth.microsoft.loading': 'Connecting to Microsoft…',
 
   /* ── history ── */
   'history.title': 'Query History',
@@ -240,6 +242,7 @@ const ZH: Translations = {
   'auth.terms': '登录即表示您同意我们的',
   'auth.terms.link': '使用条款',
   'auth.microsoft': '使用 Microsoft 继续',
+  'auth.microsoft.loading': '正在连接 Microsoft…',
 
   /* ── history ── */
   'history.title': '查询历史',
