@@ -54,7 +54,7 @@ export function LandingClient() {
           animate="show"
           className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#2563EB] uppercase border border-[#2563EB]/30 rounded-full px-4 py-1.5"
         >
-          🇲🇾 Dibuat untuk Malaysia
+          🇲🇾 {t('landing.badge')}
         </motion.div>
 
         <motion.h1
@@ -64,15 +64,19 @@ export function LandingClient() {
           animate="show"
           className="text-4xl sm:text-6xl font-bold leading-tight max-w-3xl tracking-tight"
         >
-          {t('landing.hero.headline').split('Malaysia').map((part, i, arr) =>
-            i < arr.length - 1 ? (
-              <span key={i}>
-                {part}<span className="text-[#2563EB]">Malaysia.</span>
-              </span>
-            ) : (
-              <span key={i}>{part}</span>
-            )
-          )}
+          {(() => {
+            const headline = t('landing.hero.headline');
+            const highlight = t('landing.hero.headline.highlight');
+            const idx = headline.indexOf(highlight);
+            if (idx === -1) return headline;
+            return (
+              <>
+                {headline.slice(0, idx)}
+                <span className="text-[#2563EB]">{highlight}</span>
+                {headline.slice(idx + highlight.length)}
+              </>
+            );
+          })()}
         </motion.h1>
 
         <motion.p
@@ -176,14 +180,19 @@ export function LandingClient() {
           <span>{t('landing.footer.tagline')}</span>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-white transition-colors"
-          >
-            {t('landing.footer.github')} ↗
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors"
+            >
+              {t('landing.footer.github')} ↗
+            </a>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              {t('footer.privacy')}
+            </Link>
+          </div>
           <span className="text-xs max-w-xs text-right">
             {t('landing.footer.disclaimer')}
           </span>

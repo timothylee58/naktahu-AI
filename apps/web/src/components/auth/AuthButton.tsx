@@ -6,7 +6,7 @@ import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
 
-type Tab = 'options' | 'email' | 'phone';
+type Tab = 'options' | 'email';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
@@ -19,9 +19,6 @@ export function AuthButton() {
   const [tab, setTab] = useState<Tab>('options');
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [phoneSent, setPhoneSent] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
 
   // Ensure anonymous users have a stable session ID for migration later
@@ -62,7 +59,7 @@ export function AuthButton() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); setPhone(''); setOtp(''); setPhoneSent(false); };
+  const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
   const closeModal = () => { setOpen(false); };
 
   const signInWithGoogle = async () => {
@@ -92,22 +89,6 @@ export function AuthButton() {
     setSigningIn(false);
   };
 
-  const sendPhoneOtp = async () => {
-    if (!phone) return;
-    setSigningIn(true);
-    await supabase.auth.signInWithOtp({ phone });
-    setPhoneSent(true);
-    setSigningIn(false);
-  };
-
-  const verifyPhoneOtp = async () => {
-    if (!phone || !otp) return;
-    setSigningIn(true);
-    await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
-    setSigningIn(false);
-    closeModal();
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     // Re-create anon session ID for the next anonymous session
@@ -135,7 +116,7 @@ export function AuthButton() {
             />
           ) : (
             <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-              {(user.email ?? user.phone ?? 'U')[0].toUpperCase()}
+              {(user.email ?? 'U')[0].toUpperCase()}
             </div>
           )}
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-zinc-400">
@@ -154,7 +135,7 @@ export function AuthButton() {
                 className="absolute right-0 mt-2 w-52 bg-white border border-zinc-100 rounded-2xl shadow-xl z-50 overflow-hidden ring-1 ring-zinc-900/5"
               >
                 <div className="px-4 py-3 border-b border-zinc-100">
-                  <p className="text-xs font-medium text-zinc-500 truncate">{user.email ?? user.phone}</p>
+                  <p className="text-xs font-medium text-zinc-500 truncate">{user.email}</p>
                 </div>
                 <button
                   onClick={signOut}
@@ -246,7 +227,7 @@ export function AuthButton() {
                         <path fill="#00A4EF" d="M1 13h10v10H1z"/>
                         <path fill="#FFB900" d="M13 13h10v10H13z"/>
                       </svg>
-                      {t('auth.microsoft')}
+                      {signingIn ? t('auth.microsoft.loading') : t('auth.microsoft')}
                     </button>
 
                     <div className="flex items-center gap-3">
@@ -267,16 +248,6 @@ export function AuthButton() {
                       {t('auth.email')}
                     </button>
 
-                    {/* Phone */}
-                    <button
-                      onClick={() => setTab('phone')}
-                      className="w-full flex items-center justify-center gap-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-sm font-medium rounded-xl px-4 py-3 transition-colors border border-zinc-200"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
-                        <path fillRule="evenodd" d="M2 3.5A1.5 1.5 0 0 1 3.5 2h1.148a1.5 1.5 0 0 1 1.465 1.175l.716 3.223a1.5 1.5 0 0 1-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 0 0 6.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 0 1 1.767-1.052l3.223.716A1.5 1.5 0 0 1 18 16.352V17.5a1.5 1.5 0 0 1-1.5 1.5H15c-1.149 0-2.263-.15-3.326-.43A13.022 13.022 0 0 1 2.43 8.326 13.019 13.019 0 0 1 2 5V3.5Z" clipRule="evenodd"/>
-                      </svg>
-                      {t('auth.phone')}
-                    </button>
                   </>
                 )}
 
@@ -310,47 +281,10 @@ export function AuthButton() {
                   )
                 )}
 
-                {/* ── Phone tab ── */}
-                {tab === 'phone' && (
-                  phoneSent ? (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs text-zinc-500 text-center">{t('auth.phone.sent.desc')} <span className="font-medium">{phone}</span></p>
-                      <input type="text" inputMode="numeric" maxLength={6} value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                        onKeyDown={(e) => e.key === 'Enter' && verifyPhoneOtp()}
-                        placeholder={t('auth.phone.otp.placeholder')}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent tracking-widest text-center"
-                        autoFocus />
-                      <button onClick={verifyPhoneOtp} disabled={otp.length !== 6 || signingIn}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
-                        {signingIn ? t('auth.phone.verifying') : t('auth.phone.verify')}
-                      </button>
-                      <button onClick={() => { setPhoneSent(false); setOtp(''); }} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">
-                        {t('auth.email.back')}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && sendPhoneOtp()}
-                        placeholder={t('auth.phone.placeholder')}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        autoFocus />
-                      <button onClick={sendPhoneOtp} disabled={!phone || signingIn}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
-                        {signingIn ? t('auth.phone.sending') : t('auth.phone.send')}
-                      </button>
-                      <button onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">
-                        {t('auth.email.back')}
-                      </button>
-                    </div>
-                  )
-                )}
-
                 {tab === 'options' && (
                   <p className="text-center text-xs text-zinc-400 mt-1">
                     {t('auth.terms')}{' '}
-                    <span className="underline cursor-pointer hover:text-zinc-600">{t('auth.terms.link')}</span>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600 transition-colors">{t('auth.terms.link')}</a>
                   </p>
                 )}
               </div>

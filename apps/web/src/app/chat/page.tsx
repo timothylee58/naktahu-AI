@@ -271,13 +271,25 @@ export default function ChatPage() {
         className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4 text-zinc-400 select-none">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🇲🇾</span>
+          <div className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6">
+            {/* Logo mark */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/20">
+              <svg viewBox="0 0 32 32" className="w-9 h-9" fill="none" aria-hidden>
+                <circle cx="16" cy="16" r="12" fill="white" fillOpacity="0.15" />
+                <path d="M9 12h14M9 16h9M9 20h11" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
             </div>
-            <div>
-              <p className="text-base font-semibold text-zinc-600">NakTahu AI</p>
-              <p className="text-sm text-zinc-400 max-w-xs mt-1">{t('chat.empty')}</p>
+            <div className="flex flex-col gap-1">
+              <p className="text-lg font-bold text-zinc-700">NakTahu AI</p>
+              <p className="text-sm text-zinc-400 max-w-[260px] leading-relaxed">{t('chat.empty')}</p>
+            </div>
+            {/* Quick domain pills */}
+            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+              {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
+                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1">
+                  {t(`domain.${d}`)}
+                </span>
+              ))}
             </div>
           </div>
         )}
@@ -302,7 +314,7 @@ export default function ChatPage() {
       </div>
 
       {/* input bar */}
-      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 pt-3 pb-3 flex flex-col gap-2">
+      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2">
         {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} />
         )}
@@ -312,8 +324,8 @@ export default function ChatPage() {
           detectedLanguage={detectedLang}
           inject={injectedQuery}
         />
-        <p className="text-center text-[10px] text-zinc-400">
-          Enter to send · Ctrl+Enter · Esc to clear
+        <p className="hidden sm:block text-center text-[10px] text-zinc-400">
+          {t('chat.keyboard_hint')}
         </p>
       </div>
     </div>

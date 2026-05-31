@@ -130,7 +130,7 @@ export default function HistoryPage() {
     [accessToken],
   );
 
-  const { data: entries = [] } = useSWR<HistoryEntry[]>(
+  const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
     accessToken ? 'history-page' : null,
     fetcher!,
     { revalidateOnFocus: true },
@@ -174,6 +174,30 @@ export default function HistoryPage() {
           <p className="text-sm text-zinc-500 text-center py-12">
             {t('history.sign_in_prompt')}
           </p>
+        ) : historyLoading ? (
+          <div className="flex flex-col gap-3">
+            {[1, 2, 3, 4].map((n) => (
+              <div
+                key={n}
+                className="h-16 rounded-xl bg-white border border-zinc-100 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : historyError ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-red-400">
+                <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <p className="text-sm text-zinc-500">{t('error.history_fetch')}</p>
+            <button
+              onClick={() => mutate()}
+              className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+            >
+              {t('error.retry')}
+            </button>
+          </div>
         ) : entries.length === 0 ? (
           <p className="text-sm text-zinc-400 text-center py-12">
             {t('history.empty')}

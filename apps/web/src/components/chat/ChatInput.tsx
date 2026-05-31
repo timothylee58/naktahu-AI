@@ -28,7 +28,7 @@ export function ChatInput({
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const voiceLang = locale === 'ms' ? 'ms-MY' : 'en-MY';
+  const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
   const { isListening, transcript, startListening, stopListening, isSupported } =
     useVoiceInput({ language: voiceLang });
 
