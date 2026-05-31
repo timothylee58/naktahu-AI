@@ -10,6 +10,17 @@ type Tab = 'options' | 'email';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return generateUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function AuthButton() {
   const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
@@ -24,7 +35,7 @@ export function AuthButton() {
   // Ensure anonymous users have a stable session ID for migration later
   useEffect(() => {
     if (!localStorage.getItem(ANON_SESSION_KEY)) {
-      localStorage.setItem(ANON_SESSION_KEY, crypto.randomUUID());
+      localStorage.setItem(ANON_SESSION_KEY, generateUUID());
     }
   }, []);
 
@@ -64,35 +75,37 @@ export function AuthButton() {
 
   const signInWithGoogle = async () => {
     setSigningIn('google');
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+    if (error) setSigningIn(null);
   };
 
   const signInWithMicrosoft = async () => {
     setSigningIn('microsoft');
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+    if (error) setSigningIn(null);
   };
 
   const signInWithEmail = async () => {
     if (!email) return;
     setSigningIn('email');
-    await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
-    setEmailSent(true);
     setSigningIn(null);
+    if (!error) setEmailSent(true);
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     // Re-create anon session ID for the next anonymous session
-    localStorage.setItem(ANON_SESSION_KEY, crypto.randomUUID());
+    localStorage.setItem(ANON_SESSION_KEY, generateUUID());
   };
 
   if (loading) {

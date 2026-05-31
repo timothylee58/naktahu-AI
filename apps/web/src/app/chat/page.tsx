@@ -193,12 +193,14 @@ export default function ChatPage() {
 
   const handleRegenerate = useCallback(() => {
     if (!lastUserQuery.current) return;
-    // Remove the last assistant message before re-sending
     setMessages((prev) => {
       const lastAssistantIdx = [...prev].reverse().findIndex((m) => m.role === 'assistant');
       if (lastAssistantIdx === -1) return prev;
-      const idx = prev.length - 1 - lastAssistantIdx;
-      return prev.filter((_, i) => i !== idx);
+      const assistantIdx = prev.length - 1 - lastAssistantIdx;
+      const lastUserIdx = [...prev.slice(0, assistantIdx)].reverse().findIndex((m) => m.role === 'user');
+      if (lastUserIdx === -1) return prev.filter((_, i) => i !== assistantIdx);
+      const userIdx = assistantIdx - 1 - lastUserIdx;
+      return prev.filter((_, i) => i !== assistantIdx && i !== userIdx);
     });
     handleSend(lastUserQuery.current);
   }, [handleSend]);
