@@ -33,6 +33,8 @@ const LOW_CONFIDENCE_THRESHOLD = 0.4;
 const spring = { duration: 0.28, ease: [0.16, 1, 0.3, 1] } as const;
 
 export function ChatBubble(props: ChatBubbleProps) {
+  const { t } = useI18n();
+
   if (props.role === 'user') {
     return (
       <div className="flex justify-end">

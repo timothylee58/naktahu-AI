@@ -16,11 +16,17 @@ const STAGES_EN = [
   'Drafting response…',
 ];
 
+const STAGES_ZH = [
+  '正在搜索数据库…',
+  '正在分析信息…',
+  '正在撰写回复…',
+];
+
 const STAGE_DURATION = 1800; // ms per stage
 
 export function ThinkingIndicator() {
   const { locale } = useI18n();
-  const stages = locale === 'ms' ? STAGES_MS : STAGES_EN;
+  const stages = locale === 'ms' ? STAGES_MS : locale === 'zh' ? STAGES_ZH : STAGES_EN;
   const [stage, setStage] = useState(0);
 
   useEffect(() => {

@@ -125,7 +125,10 @@ export default function HistoryPage() {
         ? () =>
             fetch('/api/v1/history', {
               headers: { Authorization: `Bearer ${accessToken}` },
-            }).then((r) => r.json() as Promise<HistoryEntry[]>)
+            }).then((r) => {
+              if (!r.ok) throw new Error('Failed to fetch history');
+              return r.json() as Promise<HistoryEntry[]>;
+            })
         : null,
     [accessToken],
   );

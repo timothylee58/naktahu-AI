@@ -31,20 +31,21 @@ export function CitationChip({ citation }: CitationChipProps) {
       <span className="truncate max-w-[12rem]">
         {truncate(title, 32)}
       </span>
-      {/* external link icon */}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 16 16"
-        fill="currentColor"
-        className="w-3 h-3 flex-shrink-0 opacity-60"
-        aria-hidden
-      >
-        <path
-          fillRule="evenodd"
-          d="M4.5 11.5a.75.75 0 0 0 1.06 0l5-5v2.69a.75.75 0 0 0 1.5 0V5a.75.75 0 0 0-.75-.75H7.06a.75.75 0 0 0 0 1.5H9.75l-5 5a.75.75 0 0 0 0 1.06Z"
-          clipRule="evenodd"
-        />
-      </svg>
+      {hasUrl && (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="w-3 h-3 flex-shrink-0 opacity-60"
+          aria-hidden
+        >
+          <path
+            fillRule="evenodd"
+            d="M4.5 11.5a.75.75 0 0 0 1.06 0l5-5v2.69a.75.75 0 0 0 1.5 0V5a.75.75 0 0 0-.75-.75H7.06a.75.75 0 0 0 0 1.5H9.75l-5 5a.75.75 0 0 0 0 1.06Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      )}
     </motion.a>
   );
 }
