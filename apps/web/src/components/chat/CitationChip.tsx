@@ -12,17 +12,16 @@ function truncate(s: string, max: number) {
 }
 
 export function CitationChip({ citation }: CitationChipProps) {
-  const url = citation.url ?? citation.source_url;
+  const url = citation.url ?? citation.source_url ?? '#';
   const title = citation.title ?? citation.source_title ?? '';
-  const hasUrl = Boolean(url);
   return (
     <motion.a
       href={url}
-      target={hasUrl ? '_blank' : undefined}
-      rel={hasUrl ? 'noopener noreferrer' : undefined}
-      whileHover={hasUrl ? { scale: 1.03 } : undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      whileHover={{ scale: 1.03 }}
       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-      className={`inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline transition-colors ${hasUrl ? 'cursor-pointer hover:bg-blue-100' : 'cursor-default'}`}
+      className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline cursor-pointer hover:bg-blue-100 transition-colors"
       title={title}
     >
       <span className="font-semibold truncate max-w-[6rem]">

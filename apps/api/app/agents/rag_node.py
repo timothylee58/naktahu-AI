@@ -5,10 +5,16 @@ import hashlib
 import json
 
 import structlog
+import weave
 
 from app.models.state import AgentState
 from app.services import cache as cache_svc
-from app.services.llm_client import ILMU_EMBEDDING_MODEL, ilmu_client
+from app.services.llm_client import (
+    ILMU_EMBEDDING_MODEL,
+    OPENAI_EMBEDDING_MODEL,
+    ilmu_client,
+    openai_client,
+)
 from app.services.vector_store import ChunkResult, hybrid_search
 
 log = structlog.get_logger(__name__)
@@ -52,13 +58,18 @@ def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
 
 
 async def _embed(query: str) -> list[float]:
-    resp = await ilmu_client.embeddings.create(
-        input=query,
-        model=ILMU_EMBEDDING_MODEL,
-    )
-    return resp.data[0].embedding
+    try:
+        resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
+        return resp.data[0].embedding
+    except Exception as exc:
+        if openai_client is None:
+            raise RuntimeError("No embedding provider available") from exc
+        log.warning("ilmu_embed_failed_using_openai", error=str(exc))
+        resp = await openai_client.embeddings.create(input=query, model=OPENAI_EMBEDDING_MODEL)
+        return resp.data[0].embedding
 
 
+@weave.op()
 async def rag_node(state: AgentState) -> dict:
     """Check Redis cache, then fall through to hybrid search on miss."""
     query = state.get("query", "")

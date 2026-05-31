@@ -18,6 +18,7 @@ class AgentState(TypedDict, total=False):
     query: str
     language: Literal["bm", "en"]
     domain: str
+    intent: str
     session_id: str
     user_id: Optional[str]
     retrieved_chunks: list[ChunkResult]

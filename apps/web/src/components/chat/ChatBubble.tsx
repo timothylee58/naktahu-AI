@@ -50,6 +50,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
+  const { t } = useI18n();
   const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 

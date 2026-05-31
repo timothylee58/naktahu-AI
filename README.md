@@ -1,8 +1,9 @@
 # NakTahu AI
 
 > **Ilmu tempatan, jawapan seketika.**
+----
 
-NakTahu AI is a Malaysian-focused bilingual AI answer engine that delivers cited, government-sourced answers in Bahasa Malaysia and English.
+NakTahu AI is a Malaysian-focused trilingual AI answer engine that delivers cited, government-sourced answers in Bahasa Malaysia, English and Mandarin.
 
 ---
 
