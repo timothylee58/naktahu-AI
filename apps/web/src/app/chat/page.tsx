@@ -31,6 +31,11 @@ function ChatPageInner() {
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
+
+  const q = searchParams.get('q');
+  useEffect(() => {
+    if (q !== null) setInjectedQuery(q);
+  }, [q]);
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const lastUserQuery = useRef<string>('');

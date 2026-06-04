@@ -85,6 +85,7 @@ function OptionCard({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
         selected
           ? 'border-blue-500 bg-blue-50 text-blue-800 ring-1 ring-blue-400'
@@ -126,7 +127,7 @@ function StepSection({
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
-    <div className="flex gap-1.5">
+    <div role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={total} className="flex gap-1.5">
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
@@ -208,8 +209,8 @@ export default function CareerPage() {
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <Link href="/" className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-500 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+        <Link href="/" aria-label={t('career.back')} className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-500 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5" aria-hidden="true">
             <path fillRule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clipRule="evenodd" />
           </svg>
         </Link>
