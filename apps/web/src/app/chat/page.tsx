@@ -35,6 +35,7 @@ function ChatPageInner() {
   const q = searchParams.get('q');
   useEffect(() => {
     if (q !== null) setInjectedQuery(q);
+    else setInjectedQuery('');
   }, [q]);
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
