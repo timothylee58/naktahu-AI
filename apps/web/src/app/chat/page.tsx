@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
@@ -24,11 +25,12 @@ function makeId() {
 export default function ChatPage() {
   const { t, locale } = useI18n();
   const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [injectedQuery, setInjectedQuery] = useState('');
+  const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const lastUserQuery = useRef<string>('');

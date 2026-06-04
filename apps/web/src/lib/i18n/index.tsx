@@ -96,6 +96,26 @@ const MS: Translations = {
   'domain.health': 'Kesihatan',
   'domain.immigration': 'Imigresen',
 
+  /* ── career wizard ── */
+  'career.badge': 'Perancang Kerjaya',
+  'career.hero.title': 'Rancang laluan kerjaya anda',
+  'career.hero.sub': 'Jawab 3 soalan ringkas — dapatkan pelan tindakan peribadi.',
+  'career.step': 'Langkah',
+  'career.of': 'daripada',
+  'career.back': 'Kembali',
+  'career.next': 'Seterusnya',
+  'career.generate': 'Jana Pelan Kerjaya',
+  'career.s1.title': 'Apakah latar belakang anda?',
+  'career.s1.edu': 'Tahap Pendidikan',
+  'career.s1.field': 'Bidang Semasa',
+  'career.s1.status': 'Status Kewarganegaraan',
+  'career.s2.title': 'Apakah matlamat anda?',
+  'career.s2.goal': 'Sasaran Kerjaya',
+  'career.s2.timeline': 'Jangka Masa',
+  'career.s3.title': 'Butiran tambahan',
+  'career.s3.state': 'Negeri',
+  'career.s3.lang': 'Bahasa Pilihan',
+
   /* ── errors ── */
   'error.stream': 'Ralat semasa mendapatkan jawapan. Cuba lagi.',
   'error.voice_unsupported':
@@ -190,6 +210,26 @@ const EN: Translations = {
   'domain.health': 'Healthcare',
   'domain.immigration': 'Immigration',
 
+  /* ── career wizard ── */
+  'career.badge': 'Career Planner',
+  'career.hero.title': 'Plan your career path',
+  'career.hero.sub': 'Answer 3 quick questions — get a personalised action plan.',
+  'career.step': 'Step',
+  'career.of': 'of',
+  'career.back': 'Back',
+  'career.next': 'Next',
+  'career.generate': 'Generate Career Plan',
+  'career.s1.title': 'What is your background?',
+  'career.s1.edu': 'Education Level',
+  'career.s1.field': 'Current Field',
+  'career.s1.status': 'Citizenship Status',
+  'career.s2.title': 'What is your goal?',
+  'career.s2.goal': 'Career Target',
+  'career.s2.timeline': 'Timeline',
+  'career.s3.title': 'A few more details',
+  'career.s3.state': 'State',
+  'career.s3.lang': 'Preferred Language',
+
   /* ── errors ── */
   'error.stream': 'Error fetching answer. Please try again.',
   'error.voice_unsupported':
@@ -277,6 +317,26 @@ const ZH: Translations = {
   'domain.education': '教育与大马教育文凭',
   'domain.health': '医疗卫生',
   'domain.immigration': '移民事务',
+
+  /* ── career wizard ── */
+  'career.badge': '职业规划',
+  'career.hero.title': '规划您的职业道路',
+  'career.hero.sub': '回答3个简短问题，获取个性化行动计划。',
+  'career.step': '第',
+  'career.of': '步，共',
+  'career.back': '返回',
+  'career.next': '下一步',
+  'career.generate': '生成职业计划',
+  'career.s1.title': '您的背景是什么？',
+  'career.s1.edu': '教育程度',
+  'career.s1.field': '当前领域',
+  'career.s1.status': '公民身份',
+  'career.s2.title': '您的目标是什么？',
+  'career.s2.goal': '职业目标',
+  'career.s2.timeline': '时间线',
+  'career.s3.title': '更多详情',
+  'career.s3.state': '州属',
+  'career.s3.lang': '首选语言',
 
   /* ── errors ── */
   'error.stream': '获取答案时出错，请重试。',
