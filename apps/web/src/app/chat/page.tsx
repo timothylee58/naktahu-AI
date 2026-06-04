@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
@@ -22,7 +22,7 @@ function makeId() {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
-export default function ChatPage() {
+function ChatPageInner() {
   const { t, locale } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
@@ -331,5 +331,13 @@ export default function ChatPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
   );
 }
