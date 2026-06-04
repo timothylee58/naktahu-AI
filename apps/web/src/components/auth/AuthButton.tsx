@@ -10,6 +10,17 @@ type Tab = 'options' | 'email';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function AuthButton() {
   const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
@@ -19,12 +30,11 @@ export function AuthButton() {
   const [tab, setTab] = useState<Tab>('options');
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
+  const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | 'email' | null>(null);
 
-  // Ensure anonymous users have a stable session ID for migration later
   useEffect(() => {
     if (!localStorage.getItem(ANON_SESSION_KEY)) {
-      localStorage.setItem(ANON_SESSION_KEY, crypto.randomUUID());
+      localStorage.setItem(ANON_SESSION_KEY, generateUUID());
     }
   }, []);
 
@@ -63,8 +73,8 @@ export function AuthButton() {
   const closeModal = () => { setOpen(false); };
 
   const signInWithGoogle = async () => {
-    setSigningIn(true);
-    await supabase.auth.signInWithOAuth({
+    setSigningIn('google');
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
@@ -80,29 +90,20 @@ export function AuthButton() {
     if (error) setSigningIn(null);
   };
 
-  const signInWithMicrosoft = async () => {
-    setSigningIn(true);
-    await supabase.auth.signInWithOAuth({
-      provider: 'azure',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
-  };
-
   const signInWithEmail = async () => {
     if (!email) return;
-    setSigningIn(true);
-    await supabase.auth.signInWithOtp({
+    setSigningIn('email');
+    const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
-    setEmailSent(true);
-    setSigningIn(false);
+    setSigningIn(null);
+    if (!error) setEmailSent(true);
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // Re-create anon session ID for the next anonymous session
-    localStorage.setItem(ANON_SESSION_KEY, crypto.randomUUID());
+    localStorage.setItem(ANON_SESSION_KEY, generateUUID());
   };
 
   if (loading) {
@@ -213,7 +214,7 @@ export function AuthButton() {
                     {/* Google */}
                     <button
                       onClick={signInWithGoogle}
-                      disabled={signingIn}
+                      disabled={signingIn !== null}
                       className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60"
                     >
                       <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
@@ -222,13 +223,13 @@ export function AuthButton() {
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                       </svg>
-                      {signingIn ? t('auth.google.loading') : t('auth.google')}
+                      {signingIn === 'google' ? t('auth.google.loading') : t('auth.google')}
                     </button>
 
                     {/* Microsoft */}
                     <button
                       onClick={signInWithMicrosoft}
-                      disabled={signingIn}
+                      disabled={signingIn !== null}
                       className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60"
                     >
                       <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
@@ -237,7 +238,7 @@ export function AuthButton() {
                         <path fill="#00A4EF" d="M1 13h10v10H1z"/>
                         <path fill="#FFB900" d="M13 13h10v10H13z"/>
                       </svg>
-                      {signingIn ? t('auth.microsoft.loading') : t('auth.microsoft')}
+                      {signingIn === 'microsoft' ? t('auth.microsoft.loading') : t('auth.microsoft')}
                     </button>
 
                     <div className="flex items-center gap-3">
@@ -280,9 +281,9 @@ export function AuthButton() {
                         placeholder={t('auth.email.placeholder')}
                         className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         autoFocus />
-                      <button onClick={signInWithEmail} disabled={!email || signingIn}
+                      <button onClick={signInWithEmail} disabled={!email || signingIn !== null}
                         className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
-                        {signingIn ? t('auth.email.sending') : t('auth.email.send')}
+                        {signingIn === 'email' ? t('auth.email.sending') : t('auth.email.send')}
                       </button>
                       <button onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">
                         {t('auth.email.back')}
