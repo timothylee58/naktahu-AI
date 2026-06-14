@@ -90,7 +90,7 @@ async def rag_node(state: AgentState) -> dict:
         embedding = await _embed(query)
         chunks = await hybrid_search(query, embedding, domain=domain, limit=5)
     except Exception as exc:
-        log.warning("rag_node_embed_failed", error=str(exc))
+        log.warning("rag_retrieval_failed", error=str(exc))
         return {"retrieved_chunks": []}
 
     # Persist to cache
