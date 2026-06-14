@@ -86,8 +86,12 @@ async def rag_node(state: AgentState) -> dict:
 
     # Cache miss — generate embedding and search
     log.info("rag_cache_miss", key=key[:16])
-    embedding = await _embed(query)
-    chunks = await hybrid_search(query, embedding, domain=domain, limit=5)
+    try:
+        embedding = await _embed(query)
+        chunks = await hybrid_search(query, embedding, domain=domain, limit=5)
+    except Exception as exc:
+        log.warning("rag_retrieval_failed", error=str(exc))
+        return {"retrieved_chunks": []}
 
     # Persist to cache
     await cache_svc.set_cached_result(key, _serialize_chunks(chunks), ttl=_CACHE_TTL)
