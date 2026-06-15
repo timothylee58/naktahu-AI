@@ -100,9 +100,14 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
         try:
             async for token in _stream_anthropic(context):
                 yield token
-        except Exception as exc:
-            log.error("anthropic_fallback_failed", error=str(exc))
-            yield "I'm sorry, I'm unable to answer right now. Please try again later."
+        except Exception:
+            log.error("anthropic_fallback_failed", exc_info=True)
+            lang = state.get("language", "en")
+            fallback = {
+                "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
+                "zh": "抱歉，我现在无法回答。请稍后再试。",
+            }.get(lang, "I'm sorry, I'm unable to answer right now. Please try again later.")
+            yield fallback
 
 
 @weave.op()
