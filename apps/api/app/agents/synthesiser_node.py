@@ -97,8 +97,17 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     if ilmu_failed or len(emitted_tokens) < 10:
         if emitted_tokens:
             log.warning("ilmu_response_too_short_fallback", tokens=len(emitted_tokens))
-        async for token in _stream_anthropic(context):
-            yield token
+        try:
+            async for token in _stream_anthropic(context):
+                yield token
+        except Exception:
+            log.error("anthropic_fallback_failed", exc_info=True)
+            lang = state.get("language", "en")
+            fallback = {
+                "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
+                "zh": "抱歉，我现在无法回答。请稍后再试。",
+            }.get(lang, "I'm sorry, I'm unable to answer right now. Please try again later.")
+            yield fallback
 
 
 @weave.op()
