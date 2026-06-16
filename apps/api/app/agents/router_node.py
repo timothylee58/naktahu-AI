@@ -24,11 +24,23 @@ _VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "
 _DOMAIN_ALIASES = {"health": "healthcare", "epf": "epf", "pension": "epf", "kwsp": "epf", "tax": "tax", "cukai": "tax"}
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
+# Unicode ranges that unambiguously identify script
+_CJK_RE = re.compile(r'[一-鿿㐀-䶿豈-﫿]')
+
+
+def _script_detect(query: str) -> str | None:
+    """Return 'zh' if the query contains CJK characters, else None."""
+    return "zh" if _CJK_RE.search(query) else None
+
 
 @weave.op()
 async def router_node(state: AgentState) -> dict:
     """Classify query intent, language, and domain."""
     query = state.get("query", "")
+
+    # Deterministic script check before calling the LLM — CJK is unambiguous
+    script_lang = _script_detect(query)
+
     try:
         resp = await ilmu_client.chat.completions.create(
             model=ILMU_CHAT_MODEL,
@@ -52,6 +64,11 @@ async def router_node(state: AgentState) -> dict:
         language = language.strip().lower()
     if language not in {"bm", "en", "zh"}:
         language = "en"
+
+    # Script detection overrides LLM when CJK characters are present —
+    # ILMU may misclassify Mandarin queries as 'bm' since it's Malaysia-tuned
+    if script_lang:
+        language = script_lang
 
     domain = parsed.get("domain", "government")
     if isinstance(domain, str):
