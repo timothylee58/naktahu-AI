@@ -29,7 +29,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
-  const { isListening, transcript, startListening, stopListening, isSupported } =
+  const { isListening, transcript, error: voiceError, startListening, stopListening, isSupported } =
     useVoiceInput({ language: voiceLang });
 
   useEffect(() => {
@@ -117,13 +117,21 @@ export function ChatInput({
 
       {/* mic button */}
       {isSupported && (
+        <div className="relative flex-shrink-0">
+        {voiceError && (
+          <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] bg-zinc-800 text-white rounded px-2 py-0.5 pointer-events-none">
+            {voiceError === 'not-allowed' ? t('chat.mic_denied') : voiceError}
+          </span>
+        )}
         <button
           type="button"
           onClick={isListening ? stopListening : startListening}
           aria-label={t('chat.mic')}
-          className={`flex-shrink-0 p-2 rounded-full transition-colors mb-0.5 ${
+          className={`p-2 rounded-full transition-colors mb-0.5 ${
             isListening
               ? 'bg-red-100 text-red-600 animate-pulse'
+              : voiceError
+              ? 'text-red-400 hover:text-red-600 hover:bg-red-50'
               : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'
           }`}
         >
@@ -138,6 +146,7 @@ export function ChatInput({
             <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357Z" />
           </svg>
         </button>
+        </div>
       )}
 
       {/* send button */}

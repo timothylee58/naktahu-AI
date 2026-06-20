@@ -17,6 +17,7 @@ const MS: Translations = {
   'chat.placeholder': 'Taip soalan anda di sini…',
   'chat.send': 'Hantar',
   'chat.mic': 'Input suara',
+  'chat.mic_denied': 'Akses mikrofon dinafikan',
   'chat.thinking': 'Sedang berfikir…',
   'chat.warning.low_confidence':
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
@@ -132,6 +133,7 @@ const EN: Translations = {
   'chat.placeholder': 'Type your question here…',
   'chat.send': 'Send',
   'chat.mic': 'Voice input',
+  'chat.mic_denied': 'Microphone access denied',
   'chat.thinking': 'Thinking…',
   'chat.warning.low_confidence':
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
@@ -246,6 +248,7 @@ const ZH: Translations = {
   'chat.placeholder': '在此输入您的问题…',
   'chat.send': '发送',
   'chat.mic': '语音输入',
+  'chat.mic_denied': '麦克风访问被拒绝',
   'chat.thinking': '思考中…',
   'chat.warning.low_confidence': '答案可能不准确 / Answer may be inaccurate',
   'chat.language_indicator': '中文',

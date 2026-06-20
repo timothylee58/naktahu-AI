@@ -9,6 +9,7 @@ export interface UseVoiceInputParams {
 export interface UseVoiceInputReturn {
   isListening: boolean;
   transcript: string;
+  error: string | null;
   startListening: () => void;
   stopListening: () => void;
   isSupported: boolean;
@@ -29,6 +30,10 @@ interface ISpeechRecognitionEvent {
   readonly results: ISpeechRecognitionResultList;
 }
 
+interface ISpeechRecognitionErrorEvent {
+  readonly error: string;
+}
+
 interface ISpeechRecognition extends EventTarget {
   lang: string;
   interimResults: boolean;
@@ -39,7 +44,7 @@ interface ISpeechRecognition extends EventTarget {
   abort(): void;
   onstart: (() => void) | null;
   onresult: ((event: ISpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: ISpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
 }
 
@@ -57,11 +62,24 @@ function getSR(): ISpeechRecognitionCtor | null {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
+// Map app locale to BCP-47 tags recognised by the Web Speech API
+function toBcp47(language: string): string {
+  const map: Record<string, string> = {
+    'ms-MY': 'ms-MY',
+    'en-MY': 'en-MY',
+    'zh-MY': 'zh-CN', // zh-MY is not a valid tag — use zh-CN (Simplified Mandarin)
+    'zh-CN': 'zh-CN',
+    'zh-TW': 'zh-TW',
+  };
+  return map[language] ?? language;
+}
+
 export function useVoiceInput({
   language = 'ms-MY',
 }: UseVoiceInputParams = {}): UseVoiceInputReturn {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
 
@@ -78,9 +96,10 @@ export function useVoiceInput({
     const Ctor = getSR();
     if (!Ctor) return;
     recognitionRef.current?.abort();
+    setError(null);
 
     const rec = new Ctor();
-    rec.lang = language;
+    rec.lang = toBcp47(language);
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     rec.continuous = false;
@@ -96,7 +115,13 @@ export function useVoiceInput({
       }
       setTranscript(final || interim);
     };
-    rec.onerror = () => setIsListening(false);
+    rec.onerror = (e: ISpeechRecognitionErrorEvent) => {
+      setIsListening(false);
+      // 'no-speech' is benign — user just didn't speak
+      if (e.error !== 'no-speech') {
+        setError(e.error);
+      }
+    };
     rec.onend = () => setIsListening(false);
 
     recognitionRef.current = rec;
@@ -110,5 +135,5 @@ export function useVoiceInput({
     };
   }, []);
 
-  return { isListening, transcript, startListening, stopListening, isSupported };
+  return { isListening, transcript, error, startListening, stopListening, isSupported };
 }
