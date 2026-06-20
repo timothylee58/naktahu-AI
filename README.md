@@ -18,20 +18,20 @@ NakTahu AI is a Malaysian-focused trilingual AI answer engine that delivers cite
 ┌─────────────────────────────────────────────────────────────────┐
 │                  apps/web  (Next.js 15, Vercel)                 │
 │                                                                 │
-│   SearchBar → useSSEStream hook → CitationChip × 1–3           │
-│   Navbar (language toggle) ← i18n (bm.json / en.json)         │
+│   SearchBar → useSSEStream hook → CitationChip × 1–3            │
+│   Navbar (language toggle) ← i18n (bm.json / en.json)           │
 └────────────────────────────┬────────────────────────────────────┘
                              │ SSE  /api/v1/query
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  apps/api  (FastAPI, Render)                    │
 │                                                                 │
-│   ┌──────────┐    ┌─────────┐    ┌───────────┐    ┌─────────┐ │
-│   │  router  │───▶│  rag   │───▶│  analyst  │───▶│synth   │ │
-│   │  _node   │    │  _node  │    │  _node    │    │iser    │ │
-│   │  (ILMU)  │    │pgvector │    │confidence │    │(ILMU+  │ │
-│   └──────────┘    └────┬────┘    └───────────┘    │fallbk) │ │
-│                        │                           └────┬───┘ │
+│   ┌──────────┐    ┌─────────┐    ┌───────────┐    ┌─────────┐   │
+│   │  router  │───▶│  rag   │───▶│  analyst  │───▶│synth    │  │
+│   │  _node   │    │  _node  │    │  _node    │    │iser     │   │
+│   │  (ILMU)  │    │pgvector │    │confidence │    │(ILMU+   │   │
+│   └──────────┘    └────┬────┘    └───────────┘    │fallbk)  │   │
+│                        │                           └────┬───┘   │
 │                   Redis cache                      SSE stream   │
 └────────────────────────┼────────────────────────────────┼───────┘
                          │                                │
