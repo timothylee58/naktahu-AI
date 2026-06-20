@@ -95,7 +95,13 @@ export function useVoiceInput({
   const startListening = useCallback(() => {
     const Ctor = getSR();
     if (!Ctor) return;
-    recognitionRef.current?.abort();
+    if (recognitionRef.current) {
+      recognitionRef.current.onstart = null;
+      recognitionRef.current.onresult = null;
+      recognitionRef.current.onerror = null;
+      recognitionRef.current.onend = null;
+      recognitionRef.current.abort();
+    }
     setError(null);
 
     const rec = new Ctor();
@@ -117,8 +123,8 @@ export function useVoiceInput({
     };
     rec.onerror = (e: ISpeechRecognitionErrorEvent) => {
       setIsListening(false);
-      // 'no-speech' is benign — user just didn't speak
-      if (e.error !== 'no-speech') {
+      // 'no-speech' and 'aborted' are benign
+      if (e.error !== 'no-speech' && e.error !== 'aborted') {
         setError(e.error);
       }
     };
