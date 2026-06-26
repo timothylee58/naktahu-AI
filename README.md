@@ -7,6 +7,19 @@ NakTahu AI is a Malaysian-focused trilingual AI answer engine that delivers cite
 
 ---
 
+## Features
+
+- **Trilingual answers** — BM, EN, and ZH (Mandarin) in a single interface.
+- **Voice input** — users can dictate queries using the Web Speech API. Supported languages: Bahasa Malaysia (`ms-MY`), English (`en-MY`), and Mandarin (`zh-CN`). Voice input requires Chrome or Edge; other browsers lack the necessary Google speech API keys.
+- **Deterministic CJK language detection** — the `router_node` performs a Unicode range check for CJK script. Any query containing CJK characters is tagged `"zh"`, overriding the LLM classifier and guaranteeing a Mandarin response.
+- **Synthesiser language enforcement** — the `synthesiser_node` prepends a language-specific instruction (BM / EN / ZH) to the system prompt so the response language always matches the detected query language, regardless of retrieved document language.
+- **Cited answers** — every response surfaces 1–3 citation chips linked to official Malaysian government sources.
+- **Guided career assessment** — the `/career` page walks users through a step-by-step assessment to match their profile against relevant career pathways.
+- **Redis-backed caching** — repeated queries skip the vector database retrieval (1-hour TTL).
+- **Rate limiting** — anonymous users 30 req/hour, authenticated users 200 req/hour.
+
+---
+
 ## Architecture
 
 ```
@@ -16,10 +29,10 @@ NakTahu AI is a Malaysian-focused trilingual AI answer engine that delivers cite
                              │ HTTPS
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  apps/web  (Next.js 15, Vercel)                 │
+│                  apps/web  (Next.js 15, Netlify)                 │
 │                                                                 │
 │   SearchBar → useSSEStream hook → CitationChip × 1–3            │
-│   Navbar (language toggle) ← i18n (bm.json / en.json)           │
+│   Navbar (language toggle) ← i18n (index.tsx: BM / EN / ZH)     │
 └────────────────────────────┬────────────────────────────────────┘
                              │ SSE  /api/v1/query
                              ▼
@@ -48,7 +61,7 @@ NakTahu AI is a Malaysian-focused trilingual AI answer engine that delivers cite
 ```
 naktahu-AI/
 ├── apps/
-│   ├── web/          — Next.js 15 App Router frontend (Vercel)
+│   ├── web/          — Next.js 15 App Router frontend (Netlify)
 │   └── api/          — FastAPI backend with LangGraph agent (Render)
 ├── packages/
 │   └── shared-types/ — Shared TypeScript interfaces
@@ -58,8 +71,9 @@ naktahu-AI/
 │   └── docker-compose.yml
 └── .github/
     └── workflows/
-        ├── ci.yml    — typecheck + pytest on PR
-        └── deploy.yml — Vercel + Render on main merge
+        ├── ci.yml              — typecheck + pytest on PR
+        ├── deploy.yml          — Netlify + Render on main merge
+        └── ping-supabase.yml   — cron (Mon + Thu 9 AM UTC) to keep the Supabase free-tier project alive
 ```
 
 ---
@@ -152,7 +166,8 @@ Frontend available at `http://localhost:3000`.
 | Trigger | Action |
 |---|---|
 | PR to `main` | `tsc --noEmit` + `pytest` |
-| Push to `main` | Deploy `apps/web` → Vercel, trigger Render deploy hook for `apps/api` |
+| Push to `main` | Deploy `apps/web` → Netlify, trigger Render deploy hook for `apps/api` |
+| Mon + Thu 9 AM UTC | `ping-supabase.yml` — wakes the Supabase free-tier project to prevent auto-pause |
 
 ---
 
@@ -160,7 +175,7 @@ Frontend available at `http://localhost:3000`.
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15, TypeScript strict, Tailwind CSS, shadcn/ui, Framer Motion |
+| Frontend | Next.js 15, TypeScript strict, Tailwind CSS, shadcn/ui, Framer Motion, Web Speech API (voice input) |
 | Backend | Python 3.11, FastAPI, LangGraph 0.2+, LangChain Core |
 | LLM | ILMU API (primary) + `claude-sonnet-4-20250514` (synthesis fallback) |
 | Embeddings | ILMU API (`ilmu-embedding`) |
