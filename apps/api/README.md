@@ -53,7 +53,7 @@ The pipeline is a LangGraph `StateGraph` with four nodes executed in sequence. S
 
 Classifies the query into:
 - **language:** `bm` (Bahasa Malaysia), `en` (English), or `zh` (Chinese/Mandarin)
-- **domain:** `government`, `education`, `legal`, `finance`, `health`, or `culture`
+- **domain:** `government`, `education`, `legal`, `finance`, `healthcare`, `epf`, `tax`, `business`, `immigration`, or `culture`
 
 Uses the ILMU chat model with structured JSON output. A deterministic CJK Unicode range check runs after the LLM call and overrides the language result when Chinese characters are detected, preventing misclassification of Chinese queries as BM.
 
@@ -76,7 +76,7 @@ Streams the final answer via `AsyncGenerator`:
 - **Primary LLM:** ILMU API (OpenAI-compatible)
 - **Fallback LLM:** Anthropic `claude-sonnet-4-20250514`
 
-A language-specific instruction is prepended to the system prompt to enforce response language matching the query language. If both LLMs fail, a bilingual degraded message is returned instead of a hard error.
+A language-specific instruction is prepended to the system prompt to enforce response language matching the query language. If both LLMs fail, a localized degraded message is returned instead of a hard error.
 
 ---
 
@@ -107,7 +107,7 @@ event: error     data: {"message": "..."}
 | Query result cache | `cache:{sha256(query\|language\|domain)}` | 3600 s (1 hour) |
 | User session history | `session:{user_id}:history` | 2592000 s (30 days) |
 
-Session history is stored as a Redis List (`LPUSH` + `LTRIM` to 50 entries). A cache hit on a query result bypasses `rag_node` and `analyst_node` entirely.
+Session history is stored as a Redis List (`LPUSH` + `LTRIM` to 50 entries). A cache hit on a query result bypasses the vector database search.
 
 ---
 

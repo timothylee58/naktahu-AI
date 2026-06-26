@@ -10,12 +10,12 @@ NakTahu AI is a Malaysian-focused trilingual AI answer engine that delivers cite
 ## Features
 
 - **Trilingual answers** — BM, EN, and ZH (Mandarin) in a single interface.
-- **Voice input** — users can dictate queries using the Web Speech API. Supported languages: Bahasa Malaysia (`ms-MY`), English (`en-US`), and Mandarin (`zh-CN`). Voice input requires Chrome or Edge; other browsers lack the necessary Google speech API keys.
-- **Deterministic CJK language detection** — the `router_node` performs a Unicode range check for CJK script before calling the LLM. Any query containing CJK characters is tagged `"zh"` immediately, bypassing the LLM classifier and guaranteeing a Mandarin response.
+- **Voice input** — users can dictate queries using the Web Speech API. Supported languages: Bahasa Malaysia (`ms-MY`), English (`en-MY`), and Mandarin (`zh-CN`). Voice input requires Chrome or Edge; other browsers lack the necessary Google speech API keys.
+- **Deterministic CJK language detection** — the `router_node` performs a Unicode range check for CJK script. Any query containing CJK characters is tagged `"zh"`, overriding the LLM classifier and guaranteeing a Mandarin response.
 - **Synthesiser language enforcement** — the `synthesiser_node` prepends a language-specific instruction (BM / EN / ZH) to the system prompt so the response language always matches the detected query language, regardless of retrieved document language.
 - **Cited answers** — every response surfaces 1–3 citation chips linked to official Malaysian government sources.
 - **Guided career assessment** — the `/career` page walks users through a step-by-step assessment to match their profile against relevant career pathways.
-- **Redis-backed caching** — repeated queries skip the RAG and analyst nodes (1-hour TTL).
+- **Redis-backed caching** — repeated queries skip the vector database retrieval (1-hour TTL).
 - **Rate limiting** — anonymous users 30 req/hour, authenticated users 200 req/hour.
 
 ---
