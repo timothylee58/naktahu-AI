@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { LangToggle } from '@/components/LangToggle';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
@@ -41,9 +42,11 @@ export function LandingClient() {
         <span className="text-lg font-bold tracking-tight">NakTahu</span>
         <div className="flex items-center gap-3">
           <LangToggle />
-          <AuthButton />
+          <AuthButton variant="dark" />
         </div>
       </motion.nav>
+
+      <AuthErrorBanner />
 
       {/* Hero */}
       <section className="flex flex-col items-center justify-center flex-1 text-center px-6 py-24 gap-8">
