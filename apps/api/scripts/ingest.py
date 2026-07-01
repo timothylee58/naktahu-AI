@@ -19,14 +19,20 @@ import argparse
 import os
 import sys
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import structlog
 from dotenv import load_dotenv
 from supabase import create_client
 
+from app.middleware.sanitise import INJECTION_PATTERNS
+
 load_dotenv()
+
+log = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -36,6 +42,26 @@ EMBEDDING_DIM = 1536
 TABLE = "dosm_documents"
 DEFAULT_BATCH = 100
 RATE_LIMIT_PAUSE = 0.5  # seconds between embedding batches
+
+
+# ---------------------------------------------------------------------------
+# Injection scan — reuses the exact pattern list applied to user queries in
+# app/middleware/sanitise.py (INJECTION_PATTERNS), so poisoned rows in an
+# ingested CSV cannot smuggle an indirect prompt injection into
+# document_chunks/dosm_documents and later into synthesiser_node's context,
+# bypassing the user-facing input sanitiser entirely.
+# ---------------------------------------------------------------------------
+
+def _scan_for_injection(content: str) -> str | None:
+    """Return the matched pattern string if content looks like a prompt
+    injection attempt, else None. Scans an NFKC-normalised copy so full-width
+    / compatibility-character evasion can't dodge the same regexes used on
+    the query side."""
+    text = unicodedata.normalize("NFKC", content)
+    for pattern in INJECTION_PATTERNS:
+        if pattern.search(text):
+            return pattern.pattern
+    return None
 
 
 def _require_env(name: str) -> str:
@@ -139,6 +165,7 @@ def main() -> None:
 
     total_inserted = 0
     total_errors = 0
+    total_skipped_injection = 0
 
     for csv_path in csv_paths:
         print(f"\n{'─'*60}")
@@ -152,9 +179,33 @@ def main() -> None:
 
         # Drop rows with empty content
         df = df[df["content"].str.strip() != ""]
-        print(f"  Rows to ingest: {len(df)}")
 
-        records = [row_to_record(row, csv_path.name) for _, row in df.iterrows()]
+        # Scan each row's content for prompt-injection patterns BEFORE it is
+        # embedded or written to Supabase. Matching rows are skipped (not the
+        # whole batch/file) so one poisoned CSV row can't block ingestion of
+        # the rest of the dataset. This runs identically in --dry-run so
+        # operators can preview what would be skipped without writing.
+        clean_rows = []
+        skipped_injection = 0
+        for row_num, (_, row) in enumerate(df.iterrows(), start=1):
+            matched = _scan_for_injection(str(row["content"]))
+            if matched:
+                skipped_injection += 1
+                log.warning(
+                    "ingest_row_skipped_injection_suspected",
+                    dataset=csv_path.name,
+                    row_number=row_num,
+                    matched_pattern=matched,
+                    dry_run=args.dry_run,
+                )
+                continue
+            clean_rows.append(row)
+
+        total_skipped_injection += skipped_injection
+        print(f"  Rows to ingest: {len(clean_rows)}"
+              + (f" ({skipped_injection} skipped — injection suspected, see logs)" if skipped_injection else ""))
+
+        records = [row_to_record(row, csv_path.name) for row in clean_rows]
         texts = [r["content"] for r in records]
 
         # Process in batches
@@ -187,6 +238,8 @@ def main() -> None:
                 time.sleep(RATE_LIMIT_PAUSE)
 
     print(f"\n{'='*60}")
+    if total_skipped_injection:
+        print(f"Skipped {total_skipped_injection} row(s) — prompt-injection pattern suspected (see warnings above).")
     if args.dry_run:
         print("Dry-run complete — no data written to Supabase.")
     else:

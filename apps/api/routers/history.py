@@ -1,8 +1,9 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
+from middleware.rate_limit import apply_query_rate_limit
 from services.auth import UserContext, get_current_user
 from services.history import fetch_history_entries, persist_session_entry
 
@@ -18,8 +19,10 @@ class HistoryEntryPayload(BaseModel):
 
 
 @router.get("/history")
+@apply_query_rate_limit()
 async def get_history(
     request: Request,
+    response: Response,
     user: Annotated[UserContext, Depends(get_current_user)],
 ):
     redis_client = request.app.state.redis
@@ -28,8 +31,10 @@ async def get_history(
 
 
 @router.post("/history", status_code=201)
+@apply_query_rate_limit()
 async def post_history(
     request: Request,
+    response: Response,
     body: HistoryEntryPayload,
     user: Annotated[UserContext, Depends(get_current_user)],
 ):

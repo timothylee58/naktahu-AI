@@ -59,8 +59,13 @@ async def test_analyst_needs_clarification_when_low_confidence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analyst_no_clarification_when_high_confidence() -> None:
-    """needs_clarification=False when confidence ≥ 0.4."""
+async def test_analyst_single_high_scoring_chunk_still_needs_clarification() -> None:
+    """A single lucky/keyword-stuffed chunk must not suppress clarification.
+
+    Even though this one chunk scores ≥0.4 on its own (gov.my URL + title +
+    full keyword overlap), only 1 chunk clears the 0.3 supporting-chunk bar,
+    so the evidentiary gate should force needs_clarification=True.
+    """
     good_chunk = _make_chunk(
         source_url="https://www.hasil.gov.my",
         source_title="LHDN FAQ",
@@ -69,6 +74,33 @@ async def test_analyst_no_clarification_when_high_confidence() -> None:
     result = await analyst_node({
         "query": "cukai pendapatan individu",
         "retrieved_chunks": [good_chunk],
+    })
+
+    assert result["confidence_score"] >= 0.4
+    assert result["needs_clarification"] is True
+
+
+@pytest.mark.asyncio
+async def test_analyst_no_clarification_with_multiple_solid_chunks() -> None:
+    """needs_clarification=False when ≥2 chunks individually score > 0.3.
+
+    With two (or more) corroborating chunks that each clear the supporting
+    bar, the aggregate confidence ≥0.4 should be trusted and clarification
+    should not be forced.
+    """
+    chunk_a = _make_chunk(
+        source_url="https://www.hasil.gov.my",
+        source_title="LHDN FAQ",
+        content="cukai pendapatan individu",
+    )
+    chunk_b = _make_chunk(
+        source_url="https://www.hasil.gov.my/panduan",
+        source_title="Panduan Cukai Pendapatan",
+        content="cukai pendapatan individu kadar semasa",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan individu",
+        "retrieved_chunks": [chunk_a, chunk_b],
     })
 
     assert result["confidence_score"] >= 0.4

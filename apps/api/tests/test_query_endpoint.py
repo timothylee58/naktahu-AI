@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import jwt
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.routers.query import _extract_user_id
+from core.config import settings
 
 
 # ---------------------------------------------------------------------------
@@ -188,3 +192,53 @@ async def test_query_endpoint_error_on_pipeline_failure() -> None:
     error_events = [e for e in events if e.get("event") == "error"]
     assert error_events, "Expected an error event on pipeline failure"
     assert "message" in error_events[0]["data"]
+
+
+# ---------------------------------------------------------------------------
+# _extract_user_id — must verify JWT signature, never trust an unverified decode
+# ---------------------------------------------------------------------------
+
+def _make_token(sub: str = "user-1", secret: str | None = None, exp_seconds: int = 3600) -> str:
+    return jwt.encode(
+        {
+            "sub": sub,
+            "aud": settings.supabase_jwt_aud,
+            "exp": int(time.time()) + exp_seconds,
+        },
+        secret if secret is not None else settings.jwt_secret,
+        algorithm="HS256",
+    )
+
+
+def test_extract_user_id_accepts_valid_signature() -> None:
+    token = _make_token(sub="user-42")
+    assert _extract_user_id(f"Bearer {token}") == "user-42"
+
+
+def test_extract_user_id_rejects_tampered_signature() -> None:
+    # Signed with the wrong secret — payload looks legitimate but signature is invalid.
+    token = _make_token(sub="attacker", secret="not-the-real-secret")
+    assert _extract_user_id(f"Bearer {token}") is None
+
+
+def test_extract_user_id_rejects_forged_none_algorithm() -> None:
+    # Classic JWT attack: attacker crafts an unsigned token with alg=none and
+    # sets an arbitrary sub claim. A verified decoder must reject this.
+    forged = jwt.encode(
+        {"sub": "attacker", "aud": settings.supabase_jwt_aud},
+        key="",
+        algorithm="none",
+    )
+    assert _extract_user_id(f"Bearer {forged}") is None
+
+
+def test_extract_user_id_rejects_expired_token() -> None:
+    token = _make_token(sub="user-1", exp_seconds=-10)
+    assert _extract_user_id(f"Bearer {token}") is None
+
+
+def test_extract_user_id_returns_none_for_missing_or_malformed_header() -> None:
+    assert _extract_user_id(None) is None
+    assert _extract_user_id("") is None
+    assert _extract_user_id("NotBearer abc") is None
+    assert _extract_user_id("Bearer not-a-jwt") is None

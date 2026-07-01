@@ -6,12 +6,14 @@ via get_stream_writer() so the SSE endpoint can receive them in real time.
 """
 from __future__ import annotations
 
+import re
 from typing import AsyncGenerator
 
 import structlog
 import weave
 from langgraph.config import get_stream_writer
 
+from app.middleware.sanitise import INJECTION_PATTERNS
 from app.models.state import AgentState
 from app.services.llm_client import (
     FALLBACK_MODEL,
@@ -22,6 +24,39 @@ from app.services.llm_client import (
 from app.services.vector_store import ChunkResult
 
 log = structlog.get_logger(__name__)
+
+# Output-side red-flag patterns — last line of defence against jailbreaks that
+# slip past guard_node/sanitise.py via indirect injection (e.g. hidden in a
+# retrieved RAG chunk). Reuses the shared INJECTION_PATTERNS list and adds a
+# few patterns specific to *model output* (identity breaks, system-prompt
+# leakage, explicit jailbreak confirmations) that wouldn't appear in a raw
+# user query.
+_OUTPUT_ONLY_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in [
+        r"\bas\s+DAN\b",
+        r"i\s+am\s+now\s+unrestricted",
+        r"i\s+(?:am|'m)\s+no\s+longer\s+bound\s+by",
+        r"ignoring\s+my\s+(?:previous|prior)\s+instructions",
+        r"my\s+system\s+prompt\s+(?:is|says|states)",
+        r"here\s+(?:is|are)\s+my\s+(?:system\s+)?instructions",
+        r"you\s+are\s+NakTahu\s+AI.{0,80}(?:but|however|ignore|override|now\s+act)",
+    ]
+]
+
+_OUTPUT_FLAG_PATTERNS = INJECTION_PATTERNS + _OUTPUT_ONLY_PATTERNS
+
+
+def _scan_output_for_red_flags(text: str) -> bool:
+    """Return True if the final synthesised text matches a known red-flag pattern.
+
+    Cheap single regex-list scan over the already-accumulated buffer — no
+    extra LLM call, and it only runs once the stream has completed so it adds
+    no latency to token-by-token streaming.
+    """
+    for pattern in _OUTPUT_FLAG_PATTERNS:
+        if pattern.search(text):
+            return True
+    return False
 
 _LANG_INSTRUCTION = {
     "bm": "PENTING: Anda MESTI menjawab dalam Bahasa Malaysia sahaja.",
@@ -129,4 +164,31 @@ async def synthesiser_node(state: AgentState) -> dict:
     async for token in stream_synthesis(state):
         write(token)
         full_text += token
-    return {"streaming_token_buffer": full_text}
+
+    # Post-hoc output-side safety scan. This is a last line of defence for
+    # jailbreaks that slip past the input-side guard_node/sanitise.py checks
+    # (e.g. via indirect injection hidden in a retrieved RAG chunk that isn't
+    # sanitised the same way user input is). It cannot un-stream tokens
+    # already sent to the client over SSE, but it stops the contaminated
+    # response from being persisted into session history (which could
+    # otherwise poison the RAG/session cache) and surfaces the incident to
+    # monitoring.
+    output_flagged = _scan_output_for_red_flags(full_text)
+    if output_flagged:
+        log.warning(
+            "synthesiser_output_flagged",
+            query=state.get("query", "")[:200],
+            session_id=state.get("session_id"),
+            user_id=state.get("user_id"),
+            domain=state.get("domain"),
+            language=state.get("language"),
+            flagged_content=full_text[:500],
+        )
+
+    return {
+        "streaming_token_buffer": full_text,
+        "output_flagged": output_flagged,
+        # Signal to callers (e.g. the SSE endpoint / session-history writer)
+        # that this response must NOT be persisted into session history.
+        "skip_history_persist": output_flagged,
+    }

@@ -19,6 +19,8 @@ _GOV_DOMAIN_RE = re.compile(
 
 _CLARIFICATION_THRESHOLD = 0.4
 _STALE_DAYS = 90
+_MIN_SUPPORTING_CHUNK_SCORE = 0.3
+_MIN_SUPPORTING_CHUNKS = 2
 
 
 def _is_stale(chunk: ChunkResult) -> bool:
@@ -88,10 +90,21 @@ async def analyst_node(state: AgentState) -> dict:
 
     needs_clarification = confidence < _CLARIFICATION_THRESHOLD
 
+    # Evidentiary gate: don't let a single lucky/keyword-stuffed chunk pass
+    # the clarification threshold on its own. Require corroboration from at
+    # least _MIN_SUPPORTING_CHUNKS chunks that individually clear
+    # _MIN_SUPPORTING_CHUNK_SCORE before confidence can suppress clarification.
+    supporting_chunks = sum(
+        1 for score, _ in scored if score > _MIN_SUPPORTING_CHUNK_SCORE
+    )
+    if not needs_clarification and supporting_chunks < _MIN_SUPPORTING_CHUNKS:
+        needs_clarification = True
+
     log.info(
         "analyst_done",
         confidence=confidence,
         needs_clarification=needs_clarification,
+        supporting_chunks=supporting_chunks,
         citations=len(citations),
     )
     return {

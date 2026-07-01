@@ -77,5 +77,9 @@ async def router_node(state: AgentState) -> dict:
     if domain not in _VALID_DOMAINS:
         domain = "government"
 
-    log.info("router_classified", language=language, domain=domain)
-    return {"language": language, "domain": domain}
+    intent = parsed.get("intent", "")
+    if not isinstance(intent, str):
+        intent = ""
+
+    log.info("router_classified", language=language, domain=domain, intent=intent)
+    return {"language": language, "domain": domain, "intent": intent}
