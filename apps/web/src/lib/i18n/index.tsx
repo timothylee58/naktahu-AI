@@ -57,6 +57,10 @@ const MS: Translations = {
   'auth.terms.link': 'terma penggunaan',
   'auth.microsoft': 'Teruskan dengan Microsoft',
   'auth.microsoft.loading': 'Menghubungi Microsoft…',
+  'auth.error.title': 'Log masuk gagal',
+  'auth.error.generic': 'Tidak dapat melengkapkan log masuk. Sila cuba lagi.',
+  'auth.error.access_denied': 'Log masuk dibatalkan. Sila cuba lagi jika anda ingin meneruskan.',
+  'auth.error.dismiss': 'Tutup',
 
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
@@ -172,6 +176,10 @@ const EN: Translations = {
   'auth.terms.link': 'terms of use',
   'auth.microsoft': 'Continue with Microsoft',
   'auth.microsoft.loading': 'Connecting to Microsoft…',
+  'auth.error.title': 'Sign-in failed',
+  'auth.error.generic': 'Could not complete sign-in. Please try again.',
+  'auth.error.access_denied': 'Sign-in was cancelled. Try again if you want to continue.',
+  'auth.error.dismiss': 'Dismiss',
 
   /* ── history ── */
   'history.title': 'Query History',
@@ -286,6 +294,10 @@ const ZH: Translations = {
   'auth.terms.link': '使用条款',
   'auth.microsoft': '使用 Microsoft 继续',
   'auth.microsoft.loading': '正在连接 Microsoft…',
+  'auth.error.title': '登录失败',
+  'auth.error.generic': '无法完成登录，请重试。',
+  'auth.error.access_denied': '登录已取消。如需继续，请重试。',
+  'auth.error.dismiss': '关闭',
 
   /* ── history ── */
   'history.title': '查询历史',

@@ -8,6 +8,8 @@ import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
+import { AuthButton } from '@/components/auth/AuthButton';
+import { LangToggle } from '@/components/LangToggle';
 
 interface HistoryEntry {
   query: string;
@@ -144,22 +146,28 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3">
-        <Link href="/chat" className="p-1 rounded hover:bg-zinc-100 text-zinc-500">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="w-5 h-5"
-          >
-            <path
-              fillRule="evenodd"
-              d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </Link>
-        <h1 className="font-semibold text-zinc-900">{t('history.title')}</h1>
+      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/chat" className="p-1 rounded hover:bg-zinc-100 text-zinc-500 flex-shrink-0">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-5 h-5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </Link>
+          <h1 className="font-semibold text-zinc-900 truncate">{t('history.title')}</h1>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <AuthButton />
+          <LangToggle variant="light" />
+        </div>
       </header>
 
       {/* Content */}

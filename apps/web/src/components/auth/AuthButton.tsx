@@ -8,6 +8,11 @@ import { useI18n } from '@/lib/i18n';
 
 type Tab = 'options' | 'email';
 
+interface AuthButtonProps {
+  /** Skeleton + dropdown hover styles for dark (landing) vs light (chat) headers */
+  variant?: 'dark' | 'light';
+}
+
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
 function generateUUID(): string {
@@ -21,7 +26,7 @@ function generateUUID(): string {
   });
 }
 
-export function AuthButton() {
+export function AuthButton({ variant = 'light' }: AuthButtonProps) {
   const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
@@ -106,8 +111,13 @@ export function AuthButton() {
     localStorage.setItem(ANON_SESSION_KEY, generateUUID());
   };
 
+  const skeletonClass =
+    variant === 'dark'
+      ? 'bg-white/10 animate-pulse'
+      : 'bg-zinc-200 animate-pulse';
+
   if (loading) {
-    return <div className="w-24 h-8 rounded-full bg-zinc-200 animate-pulse" />;
+    return <div className={`w-24 h-8 rounded-full ${skeletonClass}`} />;
   }
 
   if (user) {
@@ -179,20 +189,25 @@ export function AuthButton() {
 
       <AnimatePresence>
         {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto"
+          >
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={closeModal}
+              aria-hidden
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 16 }}
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white rounded-3xl shadow-2xl z-50 overflow-hidden ring-1 ring-zinc-900/10"
+              className="relative w-full max-w-sm max-h-[min(90dvh,calc(100vh-2rem))] overflow-y-auto bg-white rounded-3xl shadow-2xl ring-1 ring-zinc-900/10"
             >
               {/* Header */}
               <div className="px-6 pt-6 pb-4 border-b border-zinc-100 flex items-center justify-between">
@@ -300,7 +315,7 @@ export function AuthButton() {
                 )}
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
     </>
