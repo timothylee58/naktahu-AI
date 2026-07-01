@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
+from services.auth import _decode_supabase_jwt
 
 log = structlog.get_logger(__name__)
 
@@ -44,18 +45,18 @@ def _sse(event: str, data: dict | str) -> str:
 
 
 def _extract_user_id(authorization: Optional[str]) -> Optional[str]:
-    """Extract sub claim from Bearer JWT — verification is in auth middleware."""
+    """Extract the verified sub claim from a Bearer JWT.
+
+    Delegates to the shared, signature-verifying decoder used by the rest of
+    the API (services.auth._decode_supabase_jwt) so there is a single source
+    of truth for JWT verification. Returns None for missing/malformed/expired/
+    invalid-signature tokens — never trusts an unverified payload.
+    """
     if not authorization or not authorization.startswith("Bearer "):
         return None
-    try:
-        import base64
-        token = authorization.split(" ", 1)[1]
-        payload_b64 = token.split(".")[1]
-        payload_b64 += "=" * (4 - len(payload_b64) % 4)
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-        return payload.get("sub")
-    except Exception:
-        return None
+    token = authorization.split(" ", 1)[1]
+    ctx = _decode_supabase_jwt(token)
+    return ctx.user_id if ctx else None
 
 
 @weave.op()

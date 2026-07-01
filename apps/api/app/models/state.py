@@ -16,7 +16,7 @@ class Citation(TypedDict):
 
 class AgentState(TypedDict, total=False):
     query: str
-    language: Literal["bm", "en"]
+    language: Literal["bm", "en", "zh"]
     domain: str
     intent: str
     session_id: str
@@ -27,3 +27,5 @@ class AgentState(TypedDict, total=False):
     needs_clarification: bool
     streaming_token_buffer: str
     error: Optional[str]
+    output_flagged: bool
+    skip_history_persist: bool

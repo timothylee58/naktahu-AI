@@ -1,0 +1,60 @@
+{"query": "Berapa kadar cukai pendapatan untuk individu pada tahun 2024?", "expected_language": "bm"}
+{"query": "Bagaimana cara mendaftar syarikat sendirian berhad dengan SSM?", "expected_language": "bm"}
+{"query": "Apakah syarat kelayakan untuk memohon bantuan Sara Hidup?", "expected_language": "bm"}
+{"query": "Saya nak semak baki KWSP saya, macam mana caranya?", "expected_language": "bm"}
+{"query": "Bilakah tarikh akhir untuk memfailkan borang cukai e-BE?", "expected_language": "bm"}
+{"query": "Apakah dokumen yang diperlukan untuk memperbaharui pasport Malaysia?", "expected_language": "bm"}
+{"query": "Macam mana nak buat aduan polis untuk kes ragut?", "expected_language": "bm"}
+{"query": "Apa itu Perkeso dan bagaimana saya boleh membuat tuntutan?", "expected_language": "bm"}
+{"query": "Berapa lama tempoh proses pendaftaran perkahwinan di Jabatan Pendaftaran?", "expected_language": "bm"}
+{"query": "Bolehkah saya mohon pinjaman PTPTN semasa sedang bekerja?", "expected_language": "bm"}
+{"query": "Apakah prosedur untuk menukar nama dalam geran tanah?", "expected_language": "bm"}
+{"query": "Saya ingin tahu tentang skim insurans kesihatan mySalam.", "expected_language": "bm"}
+{"query": "Bagaimana cara memohon lesen memandu baharu di JPJ?", "expected_language": "bm"}
+{"query": "Apakah kadar levi pekerja asing di Malaysia tahun ini?", "expected_language": "bm"}
+{"query": "Macam mana nak daftar sebagai pengundi di SPR?", "expected_language": "bm"}
+{"query": "Apakah bantuan kerajaan yang tersedia untuk golongan OKU?", "expected_language": "bm"}
+{"query": "Bila tarikh pembayaran BR1M atau STR seterusnya?", "expected_language": "bm"}
+{"query": "Saya nak tahu proses rayuan cukai pintu di majlis perbandaran.", "expected_language": "bm"}
+{"query": "Apakah keperluan untuk membuka akaun bank bagi pelajar bawah umur?", "expected_language": "bm"}
+{"query": "Macam mana cara mohon geran perniagaan kecil melalui SME Corp?", "expected_language": "bm"}
+{"query": "What is the current income tax rate for individuals in Malaysia?", "expected_language": "en"}
+{"query": "How do I register a new company with the Companies Commission of Malaysia (SSM)?", "expected_language": "en"}
+{"query": "What are the eligibility requirements for the Sumbangan Tunai Rahmah aid?", "expected_language": "en"}
+{"query": "How can I check my EPF account balance online?", "expected_language": "en"}
+{"query": "When is the deadline to file the e-BE income tax form?", "expected_language": "en"}
+{"query": "What documents do I need to renew my Malaysian passport?", "expected_language": "en"}
+{"query": "How do I file a police report for a snatch theft case?", "expected_language": "en"}
+{"query": "What is SOCSO and how do I make a claim?", "expected_language": "en"}
+{"query": "How long does the marriage registration process take at JPN?", "expected_language": "en"}
+{"query": "Can I apply for a PTPTN loan while I am already working?", "expected_language": "en"}
+{"query": "What is the procedure to transfer ownership on a land title?", "expected_language": "en"}
+{"query": "Tell me about the mySalam health insurance scheme.", "expected_language": "en"}
+{"query": "How do I apply for a new driving licence at JPJ?", "expected_language": "en"}
+{"query": "What is the current foreign worker levy rate in Malaysia?", "expected_language": "en"}
+{"query": "How do I register as a voter with the Election Commission (SPR)?", "expected_language": "en"}
+{"query": "What government assistance is available for persons with disabilities (OKU)?", "expected_language": "en"}
+{"query": "When is the next STR cash aid payment date?", "expected_language": "en"}
+{"query": "What is the appeal process for assessment tax (cukai pintu) at the local council?", "expected_language": "en"}
+{"query": "What are the requirements to open a bank account for a minor student?", "expected_language": "en"}
+{"query": "How do I apply for a small business grant through SME Corp?", "expected_language": "en"}
+{"query": "2024年马来西亚个人所得税税率是多少？", "expected_language": "zh"}
+{"query": "如何在公司委员会（SSM）注册新公司？", "expected_language": "zh"}
+{"query": "申请Sumbangan Tunai Rahmah援助金的资格条件是什么？", "expected_language": "zh"}
+{"query": "我怎样在网上查看我的公积金（EPF）户口余额？", "expected_language": "zh"}
+{"query": "提交e-BE所得税表格的截止日期是什么时候？", "expected_language": "zh"}
+{"query": "更新马来西亚护照需要哪些文件？", "expected_language": "zh"}
+{"query": "抢劫案怎样去警局报案？", "expected_language": "zh"}
+{"query": "什么是社会保险机构（Perkeso），我要怎样申请索赔？", "expected_language": "zh"}
+{"query": "在国民登记局办理结婚登记需要多长时间？", "expected_language": "zh"}
+{"query": "我在工作期间可以申请PTPTN贷款吗？", "expected_language": "zh"}
+{"query": "更改地契拥有人姓名的手续是什么？", "expected_language": "zh"}
+{"query": "请告诉我关于mySalam医疗保险计划的资料。", "expected_language": "zh"}
+{"query": "怎样在陆路交通局（JPJ）申请新的驾驶执照？", "expected_language": "zh"}
+{"query": "今年马来西亚的外劳征税率是多少？", "expected_language": "zh"}
+{"query": "我要怎样在选举委员会（SPR）登记成为选民？", "expected_language": "zh"}
+{"query": "残疾人士（OKU）可以获得哪些政府援助？", "expected_language": "zh"}
+{"query": "下一次STR现金援助的付款日期是什么时候？", "expected_language": "zh"}
+{"query": "地方议会门牌税（cukai pintu）的上诉程序是怎样的？", "expected_language": "zh"}
+{"query": "为未成年学生开设银行户口需要什么条件？", "expected_language": "zh"}
+{"query": "如何透过SME Corp申请中小企业补助金？我也想知道 macam mana proses dia。", "expected_language": "zh"}

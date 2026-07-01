@@ -95,3 +95,15 @@ def test_post_history_persists_redis_and_supabase(client):
     pipe.execute.assert_called_once()
     sb.table.assert_called_with("user_sessions")
     insert_mock.execute.assert_called_once()
+
+
+def test_history_authenticated_rate_limit_201st_returns_429(client):
+    c, *_ = client
+    headers = _auth_header(sub="hist-rate-user")
+    for i in range(200):
+        r = c.get("/api/v1/history", headers=headers)
+        assert r.status_code == 200, r.text
+    blocked = c.get("/api/v1/history", headers=headers)
+    assert blocked.status_code == 429
+    lowered = {k.lower(): v for k, v in blocked.headers.items()}
+    assert "retry-after" in lowered

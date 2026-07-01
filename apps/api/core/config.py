@@ -17,6 +17,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
     )
+    guard_llm_check_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("GUARD_LLM_CHECK_ENABLED", "guard_llm_check_enabled"),
+    )
 
 
 settings = Settings()

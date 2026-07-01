@@ -1,0 +1,20 @@
+{"query": "What is the process to register a new business with SSM in Malaysia?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "How do I check my EPF (KWSP) account balance?", "expected_topic": "epf", "min_confidence": 0.4}
+{"query": "What are the current income tax brackets for individuals in Malaysia?", "expected_topic": "tax", "min_confidence": 0.4}
+{"query": "How do I renew my MyKad identity card?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "What is the eligibility criteria for PTPTN education loans?", "expected_topic": "education", "min_confidence": 0.4}
+{"query": "How do I apply for a Malaysian passport renewal?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "What is SOCSO (Perkeso) and who is covered by it?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "What documents are needed to register a marriage in Malaysia?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "How does the Malaysian public healthcare system (KKM) work for foreigners?", "expected_topic": "healthcare", "min_confidence": 0.4}
+{"query": "What are the requirements to obtain a driving licence from JPJ?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "How do I file my e-BE income tax form with LHDN?", "expected_topic": "tax", "min_confidence": 0.4}
+{"query": "What is the process for a foreign spouse to apply for a Malaysian long-term social visit pass?", "expected_topic": "immigration", "min_confidence": 0.4}
+{"query": "What legal protections exist for tenants under Malaysian rental law?", "expected_topic": "legal", "min_confidence": 0.4}
+{"query": "How do I register a small business under SSM as a sole proprietor?", "expected_topic": "business", "min_confidence": 0.4}
+{"query": "What is Bantuan Sara Hidup (BSH) or Sumbangan Tunai Rahmah (STR)?", "expected_topic": "finance", "min_confidence": 0.4}
+{"query": "What are the steps to transfer land title ownership in Malaysia?", "expected_topic": "legal", "min_confidence": 0.4}
+{"query": "How can I register as a voter with the Election Commission (SPR)?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "What is the minimum wage policy currently in effect in Malaysia?", "expected_topic": "finance", "min_confidence": 0.4}
+{"query": "What government assistance programs exist for persons with disabilities (OKU) in Malaysia?", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "What are the requirements for UPSR/PT3 replacement assessments in the Malaysian school system?", "expected_topic": "education", "min_confidence": 0.4}
