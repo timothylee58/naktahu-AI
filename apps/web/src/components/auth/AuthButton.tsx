@@ -11,6 +11,8 @@ type Tab = 'options' | 'email';
 interface AuthButtonProps {
   /** Skeleton + dropdown hover styles for dark (landing) vs light (chat) headers */
   variant?: 'dark' | 'light';
+  /** sidebar = full-width register/login in left panel */
+  layout?: 'compact' | 'sidebar';
 }
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
@@ -26,7 +28,7 @@ function generateUUID(): string {
   });
 }
 
-export function AuthButton({ variant = 'light' }: AuthButtonProps) {
+export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButtonProps) {
   const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
@@ -116,11 +118,48 @@ export function AuthButton({ variant = 'light' }: AuthButtonProps) {
       ? 'bg-white/10 animate-pulse'
       : 'bg-zinc-200 animate-pulse';
 
+  const isSidebar = layout === 'sidebar';
+
   if (loading) {
-    return <div className={`w-24 h-8 rounded-full ${skeletonClass}`} />;
+    return (
+      <div
+        className={`${isSidebar ? 'w-full h-10' : 'w-24 h-8'} rounded-xl ${skeletonClass}`}
+      />
+    );
   }
 
   if (user) {
+    if (isSidebar) {
+      return (
+        <div className="w-full flex flex-col gap-2">
+          <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
+            {user.user_metadata?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.user_metadata.avatar_url as string}
+                alt="avatar"
+                className="w-8 h-8 rounded-full border border-zinc-200 flex-shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {(user.email ?? 'U')[0].toUpperCase()}
+              </div>
+            )}
+            <span className={`text-xs font-medium truncate min-w-0 ${variant === 'dark' ? 'text-zinc-300' : 'text-zinc-600'}`}>
+              {user.email}
+            </span>
+          </div>
+          <button
+            onClick={signOut}
+            className={`w-full text-sm font-medium rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${variant === 'dark' ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'}`}
+          >
+            {t('header.sign_out')}
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="relative">
         <button
@@ -176,16 +215,58 @@ export function AuthButton({ variant = 'light' }: AuthButtonProps) {
     );
   }
 
+  const signInButtonClass =
+    isSidebar
+      ? `w-full text-sm font-semibold rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
+          variant === 'dark'
+            ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/30'
+            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20'
+        }`
+      : 'text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-4 py-2 transition-colors shadow-sm shadow-blue-900/20';
+
+  const registerButtonClass =
+    `w-full text-sm font-semibold rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
+      variant === 'dark'
+        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/30'
+        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20'
+    }`;
+
+  const loginButtonClass =
+    `w-full text-sm font-medium rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
+      variant === 'dark'
+        ? 'text-zinc-200 hover:bg-white/10 border border-white/20'
+        : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+    }`;
+
   return (
     <>
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={openModal}
-        className="text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-4 py-2 transition-colors shadow-sm shadow-blue-900/20"
-      >
-        {t('header.sign_in')}
-      </motion.button>
+      {isSidebar ? (
+        <div className="flex flex-col gap-2 w-full">
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={openModal}
+            className={registerButtonClass}
+          >
+            {t('header.register')}
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={openModal}
+            className={loginButtonClass}
+          >
+            {t('header.login')}
+          </motion.button>
+        </div>
+      ) : (
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={openModal}
+          className={signInButtonClass}
+        >
+          {t('header.sign_in')}
+        </motion.button>
+      )}
 
       <AnimatePresence>
         {open && (
@@ -212,8 +293,8 @@ export function AuthButton({ variant = 'light' }: AuthButtonProps) {
               {/* Header */}
               <div className="px-6 pt-6 pb-4 border-b border-zinc-100 flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-bold text-zinc-900">{t('auth.modal.title')}</h2>
-                  <p className="text-xs text-zinc-500 mt-0.5">{t('auth.modal.subtitle')}</p>
+                  <h2 className="text-base font-bold text-zinc-900 locale-nowrap">{t('auth.modal.title')}</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5 locale-text-balance">{t('auth.modal.subtitle')}</p>
                 </div>
                 <button onClick={closeModal} className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
@@ -230,7 +311,7 @@ export function AuthButton({ variant = 'light' }: AuthButtonProps) {
                     <button
                       onClick={signInWithGoogle}
                       disabled={signingIn !== null}
-                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60"
+                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60 locale-nowrap"
                     >
                       <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -245,7 +326,7 @@ export function AuthButton({ variant = 'light' }: AuthButtonProps) {
                     <button
                       onClick={signInWithMicrosoft}
                       disabled={signingIn !== null}
-                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60"
+                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60 locale-nowrap"
                     >
                       <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
                         <path fill="#F25022" d="M1 1h10v10H1z"/>
@@ -265,7 +346,7 @@ export function AuthButton({ variant = 'light' }: AuthButtonProps) {
                     {/* Email */}
                     <button
                       onClick={() => setTab('email')}
-                      className="w-full flex items-center justify-center gap-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-sm font-medium rounded-xl px-4 py-3 transition-colors border border-zinc-200"
+                      className="w-full flex items-center justify-center gap-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-sm font-medium rounded-xl px-4 py-3 transition-colors border border-zinc-200 locale-nowrap"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
                         <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z"/>
