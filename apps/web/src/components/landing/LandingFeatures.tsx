@@ -42,8 +42,8 @@ export function LandingFeatures() {
           className="flex flex-col gap-4 bg-white/5 border border-white/10 rounded-2xl p-6"
         >
           <span className="text-[#2563EB]">{FEATURE_ICONS[i]}</span>
-          <h3 className="font-semibold text-zinc-100">{t(f.titleKey)}</h3>
-          <p className="text-sm text-zinc-400 leading-relaxed">{t(f.descKey)}</p>
+          <h3 className="font-semibold text-zinc-100 locale-nowrap">{t(f.titleKey)}</h3>
+          <p className="text-sm text-zinc-400 leading-relaxed locale-text-balance">{t(f.descKey)}</p>
         </motion.div>
       ))}
     </div>
