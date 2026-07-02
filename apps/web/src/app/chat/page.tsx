@@ -14,7 +14,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AuthButton } from '@/components/auth/AuthButton';
-import { HistorySidebar } from '@/components/history/HistorySidebar';
+import { ChatSidebar } from '@/components/chat/ChatSidebar';
 import { LangToggle } from '@/components/LangToggle';
 
 let msgCounter = 0;
@@ -220,64 +220,79 @@ function ChatPageInner() {
     setInjectedQuery(query);
   }, []);
 
+  const handleNewChat = useCallback(() => {
+    reset();
+    streamingAssistantId.current = null;
+    bubbleCreated.current = false;
+    lastUserQuery.current = '';
+    setThinkingId(null);
+    setMessages([]);
+    setInjectedQuery('');
+    setSidebarOpen(false);
+  }, [reset]);
+
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
   const showChips = messages.length === 0 && !isStreaming;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-50/50">
-      {/* History sidebar */}
-      <HistorySidebar
+    <div className="flex h-full bg-zinc-50/50">
+      {/* Left panel — persistent on desktop, slide-over on mobile */}
+      <ChatSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
+        onNewChat={handleNewChat}
       />
 
-      {/* header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          {/* sidebar toggle */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label={t('header.history')}
-            className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="w-5 h-5"
+      {/* Main column */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* header */}
+        <header className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* sidebar toggle — mobile only */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label={t('header.history')}
+              className="md:hidden p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors flex-shrink-0"
             >
-              <path
-                fillRule="evenodd"
-                d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="w-5 h-5"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
 
-          <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold text-zinc-900 tracking-tight">
-              {t('header.title')}
-            </span>
-            <span className="text-xs text-zinc-500">{t('header.subtitle')}</span>
-          </Link>
-        </div>
+            <Link href="/" className="flex flex-col min-w-0">
+              <span className="text-base font-bold text-zinc-900 tracking-tight truncate">
+                {t('header.title')}
+              </span>
+              <span className="text-xs text-zinc-500 truncate">{t('header.subtitle')}</span>
+            </Link>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <AuthButton />
-          <LangToggle variant="light" />
-        </div>
-      </header>
+          {/* Auth + language live in the sidebar footer on desktop */}
+          <div className="flex md:hidden items-center gap-2 flex-shrink-0">
+            <AuthButton />
+            <LangToggle variant="light" />
+          </div>
+        </header>
 
-      {/* message list */}
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
-      >
+        {/* message list */}
+        <div
+          ref={listRef}
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
+        >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6">
             {/* Logo mark */}
@@ -289,12 +304,12 @@ function ChatPageInner() {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-lg font-bold text-zinc-700">NakTahu AI</p>
-              <p className="text-sm text-zinc-400 max-w-[260px] leading-relaxed">{t('chat.empty')}</p>
+              <p className="text-sm text-zinc-400 max-w-[280px] leading-relaxed">{t('chat.empty')}</p>
             </div>
             {/* Quick domain pills */}
-            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+            <div className="flex flex-wrap justify-center gap-2 max-w-sm">
               {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1">
+                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1 whitespace-nowrap">
                   {t(`domain.${d}`)}
                 </span>
               ))}
@@ -332,9 +347,10 @@ function ChatPageInner() {
           detectedLanguage={detectedLang}
           inject={injectedQuery}
         />
-        <p className="hidden sm:block text-center text-[10px] text-zinc-400">
-          {t('chat.keyboard_hint')}
-        </p>
+          <p className="hidden sm:block text-center text-[10px] text-zinc-400">
+            {t('chat.keyboard_hint')}
+          </p>
+        </div>
       </div>
     </div>
   );
