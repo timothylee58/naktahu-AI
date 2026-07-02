@@ -14,9 +14,17 @@ const OPTIONS: { value: UILocale; label: string; native: string }[] = [
 interface LangToggleProps {
   /** 'dark' = landing page glass style; 'light' = chat header style */
   variant?: 'dark' | 'light';
+  /** Open the menu upward — for use in bottom-anchored containers (e.g. sidebar footer). */
+  dropUp?: boolean;
+  /** Horizontal alignment of the menu relative to the button. */
+  align?: 'left' | 'right';
 }
 
-export function LangToggle({ variant = 'dark' }: LangToggleProps) {
+export function LangToggle({
+  variant = 'dark',
+  dropUp = false,
+  align = 'right',
+}: LangToggleProps) {
   const { locale, setLocale } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -75,11 +83,11 @@ export function LangToggle({ variant = 'dark' }: LangToggleProps) {
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            initial={{ opacity: 0, y: dropUp ? 6 : -6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            exit={{ opacity: 0, y: dropUp ? 6 : -6, scale: 0.96 }}
             transition={{ duration: 0.14 }}
-            className={`absolute right-0 mt-2 w-44 rounded-2xl border overflow-hidden z-50 ${dropdownBase}`}
+            className={`absolute w-44 rounded-2xl border overflow-hidden z-50 ${align === 'left' ? 'left-0' : 'right-0'} ${dropUp ? 'bottom-full mb-2' : 'mt-2'} ${dropdownBase}`}
           >
             {OPTIONS.map((opt) => (
               <button

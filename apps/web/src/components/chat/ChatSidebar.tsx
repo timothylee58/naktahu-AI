@@ -210,9 +210,10 @@ function SidebarInner({
         )}
       </div>
 
-      {/* footer: language + auth */}
-      <div className="border-t border-zinc-100 px-3 py-3 flex items-center justify-between gap-2">
-        <LangToggle variant="light" />
+      {/* footer: language + auth — stacked so neither control can overflow the
+          narrow panel (long BM/EN/ZH labels stay inside the 288px sidebar) */}
+      <div className="border-t border-zinc-100 px-3 py-3 flex flex-col items-start gap-2">
+        <LangToggle variant="light" dropUp align="left" />
         <AuthButton variant="light" />
       </div>
     </div>
