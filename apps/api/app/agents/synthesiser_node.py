@@ -121,6 +121,51 @@ async def _stream_anthropic(context: str, system_prompt: str) -> AsyncGenerator[
                 yield token
 
 
+async def _generate_suggestions(query: str, domain: str, language: str) -> list[str]:
+    """Generate 3 follow-up question suggestions based on the query, domain, and language."""
+    suggestion_prompt = {
+        "bm": f"Berdasarkan soalan '{query}' dalam domain {domain}, cadangkan 3 soalan susulan yang singkat dan relevan. Jawab dalam format JSON: [\"soalan1\", \"soalan2\", \"soalan3\"]",
+        "zh": f"根据领域 {domain} 中的问题 '{query}'，建议 3 个简短且相关的后续问题。以 JSON 格式回答：[\"问题1\", \"问题2\", \"问题3\"]",
+        "en": f"Based on the question '{query}' in the domain {domain}, suggest 3 short and relevant follow-up questions. Answer in JSON format: [\"question1\", \"question2\", \"question3\"]",
+    }
+    
+    prompt = suggestion_prompt.get(language, suggestion_prompt["en"])
+    
+    try:
+        response = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+            temperature=0.7,
+        )
+        content = response.choices[0].message.content or "[]"
+        # Extract JSON array from response
+        import json
+        suggestions = json.loads(content)
+        if isinstance(suggestions, list) and len(suggestions) >= 3:
+            return suggestions[:3]
+    except Exception as exc:
+        log.warning("suggestion_generation_failed", error=str(exc))
+    
+    # Fallback suggestions based on domain and language
+    fallback_suggestions = {
+        "government": {
+            "bm": ["Bagaimana cara memohon dokumen ini?", "Berapa lama masa pemprosesan?", "Apakah dokumen yang diperlukan?"],
+            "zh": ["如何申请此文件？", "处理需要多长时间？", "需要什么文件？"],
+            "en": ["How do I apply for this?", "How long does processing take?", "What documents are needed?"],
+        },
+        "education": {
+            "bm": ["Apakah syarat kelayakan?", "Bagaimana cara memohon?", "Apakah tarikh akhir permohonan?"],
+            "zh": ["有什么资格要求？", "如何申请？", "申请截止日期是什么时候？"],
+            "en": ["What are the eligibility requirements?", "How do I apply?", "What is the application deadline?"],
+        },
+    }
+    
+    domain_key = domain if domain in fallback_suggestions else "government"
+    lang_key = language if language in ["bm", "zh", "en"] else "en"
+    return fallback_suggestions[domain_key].get(lang_key, fallback_suggestions["government"]["en"])
+
+
 async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     """Public async generator for direct use by the SSE endpoint.
 
@@ -185,10 +230,18 @@ async def synthesiser_node(state: AgentState) -> dict:
             flagged_content=full_text[:500],
         )
 
+    # Generate follow-up suggestions
+    suggestions = await _generate_suggestions(
+        state.get("query", ""),
+        state.get("domain", "government"),
+        state.get("language", "en")
+    )
+
     return {
         "streaming_token_buffer": full_text,
         "output_flagged": output_flagged,
         # Signal to callers (e.g. the SSE endpoint / session-history writer)
         # that this response must NOT be persisted into session history.
         "skip_history_persist": output_flagged,
+        "suggestions": suggestions,
     }

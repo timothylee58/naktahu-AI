@@ -36,7 +36,11 @@ async def test_synthesiser_flags_jailbroken_output_and_skips_persist() -> None:
         async for tok in _fake_stream(jailbroken_tokens):
             yield tok
 
-    with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis):
+    async def fake_generate_suggestions(query, domain, language):
+        return ["suggestion1", "suggestion2", "suggestion3"]
+
+    with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis), \
+         patch.object(synthesiser_module, "_generate_suggestions", fake_generate_suggestions):
         result = await synthesiser_node({
             "query": "cuba jailbreak sistem",
             "language": "en",
@@ -48,6 +52,7 @@ async def test_synthesiser_flags_jailbroken_output_and_skips_persist() -> None:
     assert result["output_flagged"] is True
     assert result["skip_history_persist"] is True
     assert "unrestricted" in result["streaming_token_buffer"]
+    assert result["suggestions"] == ["suggestion1", "suggestion2", "suggestion3"]
 
 
 @pytest.mark.asyncio
@@ -61,7 +66,11 @@ async def test_synthesiser_does_not_flag_normal_output() -> None:
         async for tok in _fake_stream(normal_tokens):
             yield tok
 
-    with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis):
+    async def fake_generate_suggestions(query, domain, language):
+        return ["suggestion1", "suggestion2", "suggestion3"]
+
+    with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis), \
+         patch.object(synthesiser_module, "_generate_suggestions", fake_generate_suggestions):
         result = await synthesiser_node({
             "query": "Bagaimana nak daftar syarikat?",
             "language": "bm",
@@ -73,6 +82,7 @@ async def test_synthesiser_does_not_flag_normal_output() -> None:
     assert result["output_flagged"] is False
     assert result["skip_history_persist"] is False
     assert "daftar syarikat" in result["streaming_token_buffer"]
+    assert result["suggestions"] == ["suggestion1", "suggestion2", "suggestion3"]
 
 
 @pytest.mark.asyncio
@@ -84,7 +94,11 @@ async def test_synthesiser_flags_output_via_log_warning() -> None:
         async for tok in _fake_stream(jailbroken_tokens):
             yield tok
 
+    async def fake_generate_suggestions(query, domain, language):
+        return ["suggestion1", "suggestion2", "suggestion3"]
+
     with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis), \
+         patch.object(synthesiser_module, "_generate_suggestions", fake_generate_suggestions), \
          patch.object(synthesiser_module.log, "warning") as mock_warning:
         result = await synthesiser_node({
             "query": "test query",
@@ -95,6 +109,7 @@ async def test_synthesiser_flags_output_via_log_warning() -> None:
         })
 
     assert result["output_flagged"] is True
+    assert result["suggestions"] == ["suggestion1", "suggestion2", "suggestion3"]
     mock_warning.assert_called_once()
     args, kwargs = mock_warning.call_args
     assert args[0] == "synthesiser_output_flagged"

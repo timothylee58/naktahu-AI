@@ -63,6 +63,7 @@ function ChatPageInner() {
     tokens,
     citations,
     metadata,
+    suggestions,
     isStreaming,
     error,
     startStream,
@@ -134,6 +135,7 @@ function ChatPageInner() {
                 query: lastUserQuery.current,
                 domain: metadata?.domain,
                 language: metadata?.detectedLanguage,
+                suggestions,
               }
             : m,
         ),
@@ -316,6 +318,8 @@ function ChatPageInner() {
               domain={msg.domain}
               language={msg.language}
               accessToken={accessToken ?? undefined}
+              suggestions={msg.suggestions ?? []}
+              onSuggestionSelect={handleChipSelect}
             />
           ),
         )}

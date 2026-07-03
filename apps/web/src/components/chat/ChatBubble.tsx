@@ -9,6 +9,7 @@ import { CitationChip } from './CitationChip';
 import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ResponseActions } from './ResponseActions';
+import { SuggestionChips } from './SuggestionChips';
 
 interface UserBubbleProps {
   role: 'user';
@@ -28,6 +29,8 @@ interface AssistantBubbleProps {
   domain?: string;
   language?: string;
   accessToken?: string;
+  suggestions?: string[];
+  onSuggestionSelect?: (query: string) => void;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -54,7 +57,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -130,6 +133,15 @@ export function ChatBubble(props: ChatBubbleProps) {
               </motion.div>
             ))}
           </motion.div>
+        )}
+
+        {/* Suggestions — only show after streaming completes and if we have suggestions */}
+        {!isStreaming && !isThinking && suggestions.length > 0 && onSuggestionSelect && (
+          <SuggestionChips
+            suggestions={suggestions}
+            onSelect={onSuggestionSelect}
+            disabled={false}
+          />
         )}
       </div>
     </div>
