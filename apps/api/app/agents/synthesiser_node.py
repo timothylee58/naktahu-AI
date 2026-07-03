@@ -82,6 +82,26 @@ def _build_system_prompt(language: str) -> str:
     return f"{lang_instruction}\n\n{_BASE_SYSTEM_PROMPT}"
 
 
+def _freshness_instruction(answer_as_of: str | None) -> str:
+    """Extra system-prompt guidance when the retrieved evidence may be stale.
+
+    RAG faithfulness/confidence only measure answer-to-chunk consistency, so a
+    stale chunk can be reproduced perfectly while being factually out of date
+    (e.g. last year's withdrawal cap). When analyst_node flags stale_warning,
+    this forces the model to date-stamp figures and tell the user to verify the
+    current value, rather than presenting a possibly-outdated number as current.
+    """
+    dated = f" The most recent retrieved source is dated {answer_as_of}." if answer_as_of else ""
+    return (
+        "FRESHNESS WARNING: The retrieved sources may be out of date."
+        f"{dated} For every figure, rate, fee, cap, threshold, deadline, or rule you state, "
+        "explicitly note the date or budget year it applies to, and warn the user that it may "
+        "have changed since then. Advise them to confirm the current value on the official "
+        "source before relying on it. Never present a possibly-outdated figure as the definitive "
+        "current value."
+    )
+
+
 def _build_context(state: AgentState) -> str:
     chunks: list[ChunkResult] = state.get("retrieved_chunks", [])
     query = state.get("query", "")
@@ -174,6 +194,8 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     """
     language = state.get("language", "en")
     system_prompt = _build_system_prompt(language)
+    if state.get("stale_warning"):
+        system_prompt = f"{system_prompt}\n\n{_freshness_instruction(state.get('answer_as_of'))}"
     context = _build_context(state)
     emitted_tokens: list[str] = []
     ilmu_failed = False

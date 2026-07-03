@@ -30,3 +30,9 @@ class AgentState(TypedDict, total=False):
     output_flagged: bool
     skip_history_persist: bool
     suggestions: list[str]
+    # Freshness signals. faithfulness/confidence only measure answer-to-chunk
+    # consistency, not whether the chunk is still current — these carry the
+    # recency verdict from analyst_node to synthesiser_node so a stale-but-
+    # faithful answer is date-stamped and hedged rather than stated as current.
+    stale_warning: bool
+    answer_as_of: Optional[str]

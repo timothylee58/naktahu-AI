@@ -105,6 +105,33 @@ network calls, so it is **skipped by default**. It only runs when:
 
 If either condition is unmet, the tests report `SKIPPED`, not `FAILED`.
 
+### 4. `test_freshness.py` — freshness gate (stale-but-faithful)
+
+RAGAS-style **faithfulness** and the `answer_quality` confidence gate only
+measure *answer-to-chunk* consistency, never *chunk-to-reality* accuracy. A
+stale chunk reproduced perfectly scores fully faithful while being factually
+wrong, with a real gov.my citation — and a faithfulness/confidence-only gate
+never catches it:
+
+```
+EPF Budget 2023: withdrawal cap = RM1,000   ← old chunk, still in corpus
+Budget 2024:     withdrawal cap = RM500      ← new rule, not yet ingested
+stale-only corpus → answer says RM1,000 → faithfulness 1.0 → silently wrong
+```
+
+This suite is the missing gate. It constructs dated `ChunkResult`s directly (no
+LLM/RAG calls) and asserts `analyst_node`:
+
+- **flags** stale-only evidence via `stale_warning`, `answer_as_of`, and
+  per-citation `stale_disclaimer` (so the synthesiser date-stamps and hedges the
+  figure instead of stating it as current — see
+  `synthesiser_node._freshness_instruction`), and
+- **prefers the newest** source when both last year's and this year's figure are
+  present (recency penalty + prefer-newest tie-break in `analyst_node`).
+
+Freshness relies on ingesting `expiry_aware` chunks with a `source_date`; chunks
+without those are treated as non-expiring and never flagged.
+
 ## Running
 
 ```bash

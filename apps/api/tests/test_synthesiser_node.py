@@ -7,12 +7,62 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.agents import synthesiser_node as synthesiser_module
-from app.agents.synthesiser_node import synthesiser_node
+from app.agents.synthesiser_node import stream_synthesis, synthesiser_node
 
 
 async def _fake_stream(tokens: list[str]) -> AsyncGenerator[str, None]:
     for token in tokens:
         yield token
+
+
+async def _empty_stream(*_a, **_k) -> AsyncGenerator[str, None]:
+    if False:  # pragma: no cover - makes this an async generator
+        yield ""
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesis_injects_freshness_warning_when_stale() -> None:
+    """When analyst flags stale_warning, the synthesiser system prompt gains a
+    freshness instruction so figures are date-stamped and hedged."""
+    captured: dict[str, str] = {}
+
+    async def fake_ilmu(_context, system_prompt):
+        captured["system_prompt"] = system_prompt
+        yield "answer"
+
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", _empty_stream):
+        async for _ in stream_synthesis({
+            "language": "en",
+            "query": "epf withdrawal cap",
+            "retrieved_chunks": [],
+            "stale_warning": True,
+            "answer_as_of": "2023-10-01",
+        }):
+            pass
+
+    assert "FRESHNESS WARNING" in captured["system_prompt"]
+    assert "2023-10-01" in captured["system_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesis_no_freshness_warning_when_fresh() -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_ilmu(_context, system_prompt):
+        captured["system_prompt"] = system_prompt
+        yield "a full and complete answer with plenty of content here"
+
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", _empty_stream):
+        async for _ in stream_synthesis({
+            "language": "en",
+            "query": "epf withdrawal cap",
+            "retrieved_chunks": [],
+        }):
+            pass
+
+    assert "FRESHNESS WARNING" not in captured["system_prompt"]
 
 
 @pytest.fixture(autouse=True)
