@@ -20,6 +20,8 @@ def _make_chunk(
     *,
     expiry_aware: bool = False,
     source_date: str | None = None,
+    effective_date: str | None = None,
+    superseded_by: str | None = None,
     chunk_id: str = "test-id",
 ) -> ChunkResult:
     return ChunkResult(
@@ -32,6 +34,8 @@ def _make_chunk(
         similarity=0.8,
         expiry_aware=expiry_aware,
         source_date=source_date,
+        effective_date=effective_date,
+        superseded_by=superseded_by,
     )
 
 
@@ -245,6 +249,98 @@ async def test_analyst_recency_penalty_lowers_confidence_for_stale() -> None:
     stale_result = await analyst_node({"query": "epf withdrawal cap", "retrieved_chunks": _pair(_STALE_DATE)})
 
     assert stale_result["confidence_score"] < fresh_result["confidence_score"]
+
+
+@pytest.mark.asyncio
+async def test_analyst_hard_rejects_superseded_chunks() -> None:
+    """A chunk with superseded_by set is never scored or cited, and is dropped
+    from the retrieved set so the synthesiser can't build context from it."""
+    superseded = _make_chunk(
+        source_url="https://www.kwsp.gov.my/old",
+        content="epf withdrawal cap rm1000",
+        superseded_by="new-chunk-id",
+        chunk_id="old",
+    )
+    current = _make_chunk(
+        source_url="https://www.kwsp.gov.my/new",
+        content="epf withdrawal cap rm500",
+        chunk_id="new",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal cap",
+        "retrieved_chunks": [superseded, current],
+    })
+
+    urls = [c["url"] for c in result["citations"]]
+    assert "https://www.kwsp.gov.my/old" not in urls
+    retained_ids = [c.id for c in result["retrieved_chunks"]]
+    assert retained_ids == ["new"]
+
+
+@pytest.mark.asyncio
+async def test_analyst_all_superseded_triggers_clarification_and_warning() -> None:
+    """If every retrieved chunk is superseded, clarify and flag staleness."""
+    superseded = _make_chunk(
+        source_url="https://www.kwsp.gov.my/old",
+        content="epf withdrawal cap rm1000",
+        superseded_by="new-chunk-id",
+        chunk_id="old",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal cap",
+        "retrieved_chunks": [superseded],
+    })
+
+    assert result["retrieved_chunks"] == []
+    assert result["citations"] == []
+    assert result["needs_clarification"] is True
+    assert result["stale_warning"] is True
+
+
+@pytest.mark.asyncio
+async def test_analyst_effective_date_populates_stale_warnings() -> None:
+    """A chunk whose effective_date passed >90d ago is recorded in stale_warnings
+    with the expected structure (independent of source_date/expiry_aware)."""
+    stale = _make_chunk(
+        source_url="https://www.kwsp.gov.my/a",
+        source_title="KWSP 2023 Guidelines",
+        content="epf withdrawal cap rm1000",
+        effective_date=_STALE_DATE,
+        chunk_id="epf-2023",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal cap",
+        "retrieved_chunks": [stale],
+    })
+
+    assert result["stale_warning"] is True
+    assert result["answer_as_of"] == _STALE_DATE
+    warnings = result["stale_warnings"]
+    assert len(warnings) == 1
+    w = warnings[0]
+    assert w["chunk_id"] == "epf-2023"
+    assert w["source_title"] == "KWSP 2023 Guidelines"
+    assert w["effective_date"] == _STALE_DATE
+    assert w["days_since_effective"] > 90
+
+
+@pytest.mark.asyncio
+async def test_analyst_future_effective_date_not_stale() -> None:
+    """A rule that only takes effect in the future is not flagged as stale."""
+    future_date = (date.today() + timedelta(days=30)).isoformat()
+    upcoming = _make_chunk(
+        source_url="https://www.kwsp.gov.my/a",
+        content="epf withdrawal cap rm500",
+        effective_date=future_date,
+        chunk_id="future",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal cap",
+        "retrieved_chunks": [upcoming],
+    })
+
+    assert result["stale_warning"] is False
+    assert result["stale_warnings"] == []
 
 
 @pytest.mark.asyncio

@@ -33,7 +33,13 @@ _STALE = (date.today() - timedelta(days=400)).isoformat()
 _FRESH = date.today().isoformat()
 
 
-def _chunk(chunk_id: str, content: str, url: str, source_date: str) -> ChunkResult:
+def _chunk(
+    chunk_id: str,
+    content: str,
+    url: str,
+    effective_date: str,
+    superseded_by: str | None = None,
+) -> ChunkResult:
     return ChunkResult(
         id=chunk_id,
         content=content,
@@ -42,8 +48,8 @@ def _chunk(chunk_id: str, content: str, url: str, source_date: str) -> ChunkResu
         ministry="KWSP",
         language="en",
         similarity=0.9,
-        expiry_aware=True,
-        source_date=source_date,
+        effective_date=effective_date,
+        superseded_by=superseded_by,
     )
 
 
@@ -63,6 +69,26 @@ async def test_stale_but_faithful_answer_is_flagged() -> None:
     assert result["answer_as_of"] == _STALE
     assert result["citations"], "expected real citations (mirrors the 'looks legit' failure)"
     assert all(c["stale_disclaimer"] for c in result["citations"])
+    # Structured, per-chunk staleness record for observability / logging.
+    assert result["stale_warnings"], "effective-date staleness not recorded"
+    assert all(w["days_since_effective"] > 90 for w in result["stale_warnings"])
+
+
+@pytest.mark.asyncio
+async def test_superseded_chunk_is_never_cited() -> None:
+    """When the old figure is explicitly superseded by the new one, the old
+    chunk must be hard-rejected — never scored, cited, or passed downstream."""
+    corpus = [
+        _chunk("epf-2023", "EPF Budget 2023 withdrawal cap is RM1000.", "https://www.kwsp.gov.my/2023", _STALE, superseded_by="epf-2024"),
+        _chunk("epf-2024", "EPF Budget 2024 withdrawal cap is RM500.", "https://www.kwsp.gov.my/2024", _FRESH),
+    ]
+
+    result = await analyst_node({"query": "epf withdrawal cap", "retrieved_chunks": corpus})
+
+    cited_urls = [c["url"] for c in result["citations"]]
+    assert "https://www.kwsp.gov.my/2023" not in cited_urls, "superseded chunk was cited"
+    assert [c.id for c in result["retrieved_chunks"]] == ["epf-2024"]
+    assert result["stale_warning"] is False
 
 
 @pytest.mark.asyncio

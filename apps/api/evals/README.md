@@ -122,15 +122,21 @@ stale-only corpus → answer says RM1,000 → faithfulness 1.0 → silently wron
 This suite is the missing gate. It constructs dated `ChunkResult`s directly (no
 LLM/RAG calls) and asserts `analyst_node`:
 
-- **flags** stale-only evidence via `stale_warning`, `answer_as_of`, and
-  per-citation `stale_disclaimer` (so the synthesiser date-stamps and hedges the
-  figure instead of stating it as current — see
-  `synthesiser_node._freshness_instruction`), and
+- **flags** stale-only evidence via `stale_warning`, `answer_as_of`, structured
+  `stale_warnings`, and per-citation `stale_disclaimer` (so the synthesiser
+  date-stamps and hedges the figure instead of stating it as current — see
+  `synthesiser_node._freshness_instruction`),
+- **hard-rejects superseded chunks** (`superseded_by` set) — dropped from the
+  retrieved set so they are never scored, cited, or seen by the synthesiser, and
 - **prefers the newest** source when both last year's and this year's figure are
   present (recency penalty + prefer-newest tie-break in `analyst_node`).
 
-Freshness relies on ingesting `expiry_aware` chunks with a `source_date`; chunks
-without those are treated as non-expiring and never flagged.
+Freshness relies on ingesting the `document_chunks.effective_date` (when the
+rule/figure takes effect; migration 007) and `superseded_by` (link to the
+replacing chunk) columns — falling back to `expiry_aware` + `source_date` for
+older rows. Chunks with none of these are treated as non-expiring and never
+flagged, so ingestion should stamp `effective_date` (and set `superseded_by`
+when a newer version is added) for time-sensitive facts.
 
 ## Running
 

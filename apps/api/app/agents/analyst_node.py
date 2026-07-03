@@ -28,14 +28,37 @@ _MIN_SUPPORTING_CHUNK_SCORE = 0.3
 _MIN_SUPPORTING_CHUNKS = 2
 
 
-def _is_stale(chunk: ChunkResult) -> bool:
-    if not chunk.expiry_aware or not chunk.source_date:
-        return False
+def _staleness_ref(chunk: ChunkResult) -> str | None:
+    """The date used to judge staleness.
+
+    Prefers ``effective_date`` (when the rule/figure actually takes effect —
+    the meaningful signal). Falls back to ``source_date`` only for chunks
+    explicitly marked ``expiry_aware``.
+    """
+    if chunk.effective_date:
+        return chunk.effective_date
+    if chunk.expiry_aware and chunk.source_date:
+        return chunk.source_date
+    return None
+
+
+def _days_since_effective(chunk: ChunkResult) -> int | None:
+    """Whole days since the chunk's effective/source date, or None if unknown
+    or not yet in effect (future/today dates are never stale)."""
+    ref = _staleness_ref(chunk)
+    if not ref:
+        return None
     try:
-        source_dt = date.fromisoformat(chunk.source_date)
-        return (date.today() - source_dt).days > _STALE_DAYS
+        ref_dt = date.fromisoformat(ref)
     except ValueError:
-        return False
+        return None
+    days = (date.today() - ref_dt).days
+    return days if days > 0 else None
+
+
+def _is_stale(chunk: ChunkResult) -> bool:
+    days = _days_since_effective(chunk)
+    return days is not None and days > _STALE_DAYS
 
 
 def _adjusted_score(base: float, stale: bool) -> float:
@@ -52,8 +75,12 @@ def _adjusted_score(base: float, stale: bool) -> float:
 
 
 def _recency_key(chunk: ChunkResult) -> str:
-    """Sortable recency key; missing dates sort oldest (empty string)."""
-    return chunk.source_date or ""
+    """Sortable recency key; missing dates sort oldest (empty string).
+
+    Uses effective_date first (falls back to source_date) so prefer-newest
+    ranks by when the rule takes effect, not when the doc was scraped.
+    """
+    return chunk.effective_date or chunk.source_date or ""
 
 
 def _score_chunk(chunk: ChunkResult, query: str) -> float:
@@ -79,18 +106,52 @@ def _score_chunk(chunk: ChunkResult, query: str) -> float:
 
 @weave.op()
 async def analyst_node(state: AgentState) -> dict:
-    """Score retrieved chunks, select top 3 citations, compute confidence."""
+    """Score retrieved chunks, select top 3 citations, compute confidence.
+
+    Before scoring, two freshness checks run (faithfulness/relevance can't see
+    either):
+      1. Superseded chunks (``superseded_by`` set) are hard-rejected — dropped
+         from the retrieved set entirely so they can never be scored, cited, or
+         seen by the synthesiser.
+      2. Chunks whose ``effective_date`` passed more than ``_STALE_DAYS`` ago are
+         recorded in ``stale_warnings`` and down-weighted, and the answer is
+         flagged so the synthesiser date-stamps and hedges it.
+    """
     query = state.get("query", "")
-    chunks: list[ChunkResult] = state.get("retrieved_chunks", [])
+    retrieved: list[ChunkResult] = state.get("retrieved_chunks", [])
+
+    # 1. Hard-reject superseded chunks (never cite a chunk a newer one replaces).
+    #    Build a new list rather than mutating the input while iterating.
+    chunks = [c for c in retrieved if c.superseded_by is None]
+    superseded_count = len(retrieved) - len(chunks)
+    if superseded_count:
+        log.info("analyst_dropped_superseded", count=superseded_count)
+
+    # 2. Record effective-date staleness for the surviving chunks.
+    stale_warnings: list[dict] = []
+    for chunk in chunks:
+        if not _is_stale(chunk):
+            continue
+        days_old = _days_since_effective(chunk)
+        stale_warnings.append({
+            "chunk_id": chunk.id,
+            "source_title": chunk.source_title,
+            "effective_date": _staleness_ref(chunk),
+            "days_since_effective": days_old,
+        })
 
     if not chunks:
-        log.warning("analyst_no_chunks")
+        # Either nothing was retrieved, or everything retrieved was superseded.
+        log.warning("analyst_no_usable_chunks", superseded_count=superseded_count)
         return {
+            "retrieved_chunks": chunks,
             "citations": [],
             "confidence_score": 0.0,
             "needs_clarification": True,
-            "stale_warning": False,
+            # All-superseded is itself a staleness signal worth surfacing.
+            "stale_warning": superseded_count > 0,
             "answer_as_of": None,
+            "stale_warnings": stale_warnings,
         }
 
     # (adjusted_score, recency_key, chunk). Recency-penalise stale chunks and
@@ -124,7 +185,7 @@ async def analyst_node(state: AgentState) -> dict:
     # new rule hasn't been ingested) — the synthesiser must date-stamp and hedge.
     top_chunk = top3[0][2]
     stale_warning = _is_stale(top_chunk)
-    answer_as_of = top_chunk.source_date if stale_warning else None
+    answer_as_of = _staleness_ref(top_chunk) if stale_warning else None
 
     needs_clarification = confidence < _CLARIFICATION_THRESHOLD
 
@@ -146,11 +207,17 @@ async def analyst_node(state: AgentState) -> dict:
         citations=len(citations),
         stale_warning=stale_warning,
         answer_as_of=answer_as_of,
+        stale_warnings=len(stale_warnings),
+        superseded_dropped=superseded_count,
     )
     return {
+        # Persist the superseded-pruned set so the synthesiser never builds
+        # context from a chunk a newer one replaces.
+        "retrieved_chunks": chunks,
         "citations": citations,
         "confidence_score": confidence,
         "needs_clarification": needs_clarification,
         "stale_warning": stale_warning,
         "answer_as_of": answer_as_of,
+        "stale_warnings": stale_warnings,
     }
