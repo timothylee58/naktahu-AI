@@ -136,6 +136,10 @@ async def _sse_generator(
         for citation in final_state.get("citations", []):
             yield _sse("citation", dict(citation))
 
+        # Stream suggestions as individual events
+        for suggestion in final_state.get("suggestions", []):
+            yield _sse("suggestion", {"text": suggestion})
+
         yield _sse(
             "metadata",
             {
