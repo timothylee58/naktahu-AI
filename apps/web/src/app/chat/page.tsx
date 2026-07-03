@@ -28,7 +28,23 @@ function ChatPageInner() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
+
+  // Hydrate the desktop collapse preference after mount (avoids SSR mismatch)
+  useEffect(() => {
+    if (localStorage.getItem('naktahu_sidebar_collapsed') === '1') {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem('naktahu_sidebar_collapsed', next ? '1' : '0');
+      return next;
+    });
+  }, []);
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -218,6 +234,17 @@ function ChatPageInner() {
     setInjectedQuery(query);
   }, []);
 
+  const handleNewChat = useCallback(() => {
+    reset();
+    streamingAssistantId.current = null;
+    bubbleCreated.current = false;
+    lastUserQuery.current = '';
+    setThinkingId(null);
+    setMessages([]);
+    setInjectedQuery('');
+    setSidebarOpen(false);
+  }, [reset]);
+
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
@@ -232,6 +259,7 @@ function ChatPageInner() {
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
+        onNewChat={handleNewChat}
       />
 
       <div className="flex flex-col flex-1 min-w-0 h-full">
@@ -267,11 +295,11 @@ function ChatPageInner() {
         </div>
       </header>
 
-      {/* message list */}
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
-      >
+        {/* message list */}
+        <div
+          ref={listRef}
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
+        >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6">
             {/* Logo mark */}
@@ -283,12 +311,12 @@ function ChatPageInner() {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-lg font-bold text-zinc-700">NakTahu AI</p>
-              <p className="text-sm text-zinc-400 max-w-[260px] leading-relaxed">{t('chat.empty')}</p>
+              <p className="text-sm text-zinc-400 max-w-[280px] leading-relaxed">{t('chat.empty')}</p>
             </div>
             {/* Quick domain pills */}
-            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+            <div className="flex flex-wrap justify-center gap-2 max-w-sm">
               {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1">
+                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1 whitespace-nowrap">
                   {t(`domain.${d}`)}
                 </span>
               ))}
@@ -326,9 +354,10 @@ function ChatPageInner() {
           detectedLanguage={detectedLang}
           inject={injectedQuery}
         />
-        <p className="hidden sm:block text-center text-[10px] text-zinc-400">
-          {t('chat.keyboard_hint')}
-        </p>
+          <p className="hidden sm:block text-center text-[10px] text-zinc-400">
+            {t('chat.keyboard_hint')}
+          </p>
+        </div>
       </div>
       </div>
     </div>
