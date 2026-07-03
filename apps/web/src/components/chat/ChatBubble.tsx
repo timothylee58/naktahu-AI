@@ -24,6 +24,10 @@ interface AssistantBubbleProps {
   isStreaming: boolean;
   isThinking?: boolean;
   onRegenerate?: () => void;
+  query?: string;
+  domain?: string;
+  language?: string;
+  accessToken?: string;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -50,7 +54,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -80,7 +84,16 @@ export function ChatBubble(props: ChatBubbleProps) {
 
         {/* Action buttons — only after streaming completes */}
         {!isStreaming && !isThinking && content && (
-          <ResponseActions content={content} onRegenerate={onRegenerate} isStreaming={isStreaming} />
+          <ResponseActions
+            content={content}
+            onRegenerate={onRegenerate}
+            isStreaming={isStreaming}
+            query={query}
+            domain={domain}
+            language={language}
+            citations={citations}
+            accessToken={accessToken}
+          />
         )}
 
         {hasLowConfidence && (

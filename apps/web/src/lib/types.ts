@@ -23,6 +23,10 @@ export interface Message {
   citations: Citation[];
   confidence: number | null;
   isStreaming: boolean;
+  /** For assistant messages: the user query this answered, plus its resolved domain/language. Used for feedback submission. */
+  query?: string;
+  domain?: string;
+  language?: string;
 }
 
 export type UILocale = 'en' | 'ms' | 'zh';
