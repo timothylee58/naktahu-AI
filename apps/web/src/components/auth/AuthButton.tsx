@@ -38,6 +38,8 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | 'email' | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
     if (!localStorage.getItem(ANON_SESSION_KEY)) {
@@ -46,12 +48,14 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAccessToken(data.session?.access_token ?? null);
       setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      setAccessToken(session?.access_token ?? null);
       if (session?.user) {
         // Migrate anonymous history to authenticated account
         const anonId = localStorage.getItem(ANON_SESSION_KEY);
@@ -75,6 +79,28 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     });
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setCredits(null);
+      return;
+    }
+    let active = true;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
+    fetch(`${apiBase}/api/v1/billing/credits`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { credits_remaining: number } | null) => {
+        if (active && data) setCredits(data.credits_remaining);
+      })
+      .catch(() => {
+        // Non-critical — badge just won't show a credit count
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
 
   const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
   const closeModal = () => { setOpen(false); };
@@ -196,6 +222,16 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
               >
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <p className="text-xs font-medium text-zinc-500 truncate">{user.email}</p>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
+                      {(user.app_metadata?.plan as string | undefined) ?? 'free'}
+                    </span>
+                    {credits !== null && credits > 0 && (
+                      <span className="text-[10px] font-medium text-zinc-500">
+                        {credits} credits
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={signOut}

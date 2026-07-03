@@ -11,12 +11,13 @@ from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
 
 
-def _auth_header(sub: str = "hist-user") -> dict[str, str]:
+def _auth_header(sub: str = "hist-user", plan: str = "pro") -> dict[str, str]:
     tok = jwt.encode(
         {
             "sub": sub,
             "aud": settings.supabase_jwt_aud,
             "exp": int(time.time()) + 3600,
+            "app_metadata": {"plan": plan},
         },
         settings.jwt_secret,
         algorithm="HS256",
@@ -64,6 +65,25 @@ def test_get_history_401_without_auth(client):
     c, *_ = client
     res = c.get("/api/v1/history")
     assert res.status_code == 401
+
+
+def test_get_history_403_on_free_plan(client):
+    c, *_ = client
+    res = c.get("/api/v1/history", headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 403
+
+
+def test_post_history_403_on_free_plan(client):
+    c, *_ = client
+    body = {
+        "query": "What is VAT?",
+        "language": "ms",
+        "domain": "tax",
+        "response_summary": "VAT is a consumption tax.",
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 403
 
 
 def test_post_history_persists_redis_and_supabase(client):

@@ -3,8 +3,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
+from middleware.plan_gate import require_plan
 from middleware.rate_limit import apply_query_rate_limit
-from services.auth import UserContext, get_current_user
+from services.auth import UserContext
 from services.history import fetch_history_entries, persist_session_entry
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
@@ -23,7 +24,7 @@ class HistoryEntryPayload(BaseModel):
 async def get_history(
     request: Request,
     response: Response,
-    user: Annotated[UserContext, Depends(get_current_user)],
+    user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
     redis_client = request.app.state.redis
     entries = await fetch_history_entries(redis_client, user.user_id)
@@ -36,7 +37,7 @@ async def post_history(
     request: Request,
     response: Response,
     body: HistoryEntryPayload,
-    user: Annotated[UserContext, Depends(get_current_user)],
+    user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
     redis_client = request.app.state.redis
     await persist_session_entry(
