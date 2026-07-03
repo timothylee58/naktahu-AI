@@ -189,38 +189,56 @@ async def _generate_suggestions(query: str, domain: str, language: str) -> list[
 async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     """Public async generator for direct use by the SSE endpoint.
 
-    Tries ILMU first; falls back to Anthropic if ILMU fails or emits fewer than
-    10 tokens (indicating a truncated/empty response).
+    Streams the answer from ILMU. Only when ILMU yields *no* usable content do
+    we fall back to Anthropic, and only when Anthropic also yields nothing do we
+    emit the static apology.
+
+    Why the gate is "no content emitted" rather than a token-count threshold:
+    tokens are streamed to the client as they arrive and cannot be un-sent. If
+    ILMU has already streamed a complete answer, running the fallback would
+    *append* a second answer (or the apology) onto the real one — producing the
+    corrupted "…all times.I'm sorry, I'm unable to answer right now." output.
+    A short/single-chunk response is still a real response, so it must not
+    trigger a fallback.
     """
     language = state.get("language", "en")
     system_prompt = _build_system_prompt(language)
     if state.get("stale_warning"):
         system_prompt = f"{system_prompt}\n\n{_freshness_instruction(state.get('answer_as_of'))}"
     context = _build_context(state)
-    emitted_tokens: list[str] = []
-    ilmu_failed = False
+    emitted_any = False
     try:
         async for token in _stream_ilmu(context, system_prompt):
-            emitted_tokens.append(token)
+            if token.strip():
+                emitted_any = True
             yield token
     except Exception as exc:
-        ilmu_failed = True
-        log.warning("ilmu_fallback_triggered", error=str(exc))
+        # If ILMU raised *after* already streaming content, that content is on
+        # the wire — do not append a fallback. Only a pre-content failure
+        # (emitted_any is False) is eligible for the Anthropic fallback below.
+        log.warning("ilmu_stream_error", error=str(exc), emitted_any=emitted_any)
 
-    # Fall back to Anthropic if ILMU failed or gave an unusably short response
-    if ilmu_failed or len(emitted_tokens) < 10:
-        if emitted_tokens:
-            log.warning("ilmu_response_too_short_fallback", tokens=len(emitted_tokens))
-        try:
-            async for token in _stream_anthropic(context, system_prompt):
-                yield token
-        except Exception:
-            log.error("anthropic_fallback_failed", exc_info=True)
-            fallback = {
-                "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
-                "zh": "抱歉，我现在无法回答。请稍后再试。",
-            }.get(language, "I'm sorry, I'm unable to answer right now. Please try again later.")
-            yield fallback
+    if emitted_any:
+        return
+
+    # ILMU produced nothing usable — safe to try Anthropic since nothing has
+    # been streamed to the client yet.
+    log.warning("ilmu_no_output_falling_back_to_anthropic")
+    anthropic_any = False
+    try:
+        async for token in _stream_anthropic(context, system_prompt):
+            if token.strip():
+                anthropic_any = True
+            yield token
+    except Exception:
+        log.error("anthropic_fallback_failed", exc_info=True)
+
+    if not anthropic_any:
+        fallback = {
+            "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
+            "zh": "抱歉，我现在无法回答。请稍后再试。",
+        }.get(language, "I'm sorry, I'm unable to answer right now. Please try again later.")
+        yield fallback
 
 
 @weave.op()

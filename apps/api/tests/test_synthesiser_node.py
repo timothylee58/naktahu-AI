@@ -1,4 +1,4 @@
-"""Tests for app.agents.synthesiser_node — output-side safety scan."""
+"""Tests for app.agents.synthesiser_node — output-side safety scan + fallback."""
 from __future__ import annotations
 
 from typing import AsyncGenerator
@@ -9,60 +9,110 @@ import pytest
 from app.agents import synthesiser_node as synthesiser_module
 from app.agents.synthesiser_node import stream_synthesis, synthesiser_node
 
+_FALLBACK_EN = "I'm sorry, I'm unable to answer right now. Please try again later."
+
 
 async def _fake_stream(tokens: list[str]) -> AsyncGenerator[str, None]:
     for token in tokens:
         yield token
 
 
-async def _empty_stream(*_a, **_k) -> AsyncGenerator[str, None]:
-    if False:  # pragma: no cover - makes this an async generator
-        yield ""
+async def _collect_synthesis(state: dict) -> str:
+    out: list[str] = []
+    async for token in stream_synthesis(state):
+        out.append(token)
+    return "".join(out)
 
 
 @pytest.mark.asyncio
-async def test_stream_synthesis_injects_freshness_warning_when_stale() -> None:
-    """When analyst flags stale_warning, the synthesiser system prompt gains a
-    freshness instruction so figures are date-stamped and hedged."""
-    captured: dict[str, str] = {}
+async def test_stream_synthesis_keeps_ilmu_answer_without_appending_fallback() -> None:
+    """A complete ILMU answer (even in few chunks) must NOT trigger a fallback.
 
-    async def fake_ilmu(_context, system_prompt):
-        captured["system_prompt"] = system_prompt
-        yield "answer"
+    Regression: previously `len(emitted_tokens) < 10` counted stream *chunks*,
+    so a full answer delivered in a handful of chunks appended the Anthropic
+    retry / static apology onto the real answer.
+    """
+    answer_chunks = [
+        "If you lose your MyKad, report it to the police ",
+        "and apply for a replacement at the nearest JPN office.",
+    ]
+    anthropic_called = False
+
+    def fake_ilmu(_context, _system):
+        return _fake_stream(answer_chunks)
+
+    def fake_anthropic(_context, _system):
+        nonlocal anthropic_called
+        anthropic_called = True
+        return _fake_stream(["SHOULD NOT APPEAR"])
 
     with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
-         patch.object(synthesiser_module, "_stream_anthropic", _empty_stream):
-        async for _ in stream_synthesis({
-            "language": "en",
-            "query": "epf withdrawal cap",
-            "retrieved_chunks": [],
-            "stale_warning": True,
-            "answer_as_of": "2023-10-01",
-        }):
-            pass
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        text = await _collect_synthesis({"language": "en", "query": "mykad", "retrieved_chunks": []})
 
-    assert "FRESHNESS WARNING" in captured["system_prompt"]
-    assert "2023-10-01" in captured["system_prompt"]
+    assert "JPN office." in text
+    assert _FALLBACK_EN not in text
+    assert "SHOULD NOT APPEAR" not in text
+    assert anthropic_called is False
 
 
 @pytest.mark.asyncio
-async def test_stream_synthesis_no_freshness_warning_when_fresh() -> None:
-    captured: dict[str, str] = {}
+async def test_stream_synthesis_no_fallback_when_ilmu_errors_after_content() -> None:
+    """If ILMU streams content then raises, the streamed content is preserved
+    and no fallback text is appended (it can't be un-sent)."""
+    anthropic_called = False
 
-    async def fake_ilmu(_context, system_prompt):
-        captured["system_prompt"] = system_prompt
-        yield "a full and complete answer with plenty of content here"
+    async def fake_ilmu(_context, _system):
+        yield "Here is a valid answer. "
+        yield "With more detail."
+        raise RuntimeError("stream broke at the end")
+
+    def fake_anthropic(_context, _system):
+        nonlocal anthropic_called
+        anthropic_called = True
+        return _fake_stream(["SHOULD NOT APPEAR"])
 
     with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
-         patch.object(synthesiser_module, "_stream_anthropic", _empty_stream):
-        async for _ in stream_synthesis({
-            "language": "en",
-            "query": "epf withdrawal cap",
-            "retrieved_chunks": [],
-        }):
-            pass
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        text = await _collect_synthesis({"language": "en", "query": "q", "retrieved_chunks": []})
 
-    assert "FRESHNESS WARNING" not in captured["system_prompt"]
+    assert text == "Here is a valid answer. With more detail."
+    assert _FALLBACK_EN not in text
+    assert anthropic_called is False
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesis_falls_back_to_anthropic_when_ilmu_empty() -> None:
+    """When ILMU yields nothing, Anthropic is used and no apology is appended."""
+    def fake_ilmu(_context, _system):
+        return _fake_stream([])
+
+    def fake_anthropic(_context, _system):
+        return _fake_stream(["Anthropic answer.", " Done."])
+
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        text = await _collect_synthesis({"language": "en", "query": "q", "retrieved_chunks": []})
+
+    assert text == "Anthropic answer. Done."
+    assert _FALLBACK_EN not in text
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesis_static_fallback_only_when_both_providers_yield_nothing() -> None:
+    """With no usable output from either provider, the static apology is emitted once."""
+    def fake_ilmu(_context, _system):
+        return _fake_stream([])
+
+    async def fake_anthropic(_context, _system):
+        raise RuntimeError("anthropic unavailable")
+        yield ""  # pragma: no cover - marks this as an async generator
+
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        text = await _collect_synthesis({"language": "en", "query": "q", "retrieved_chunks": []})
+
+    assert text == _FALLBACK_EN
 
 
 @pytest.fixture(autouse=True)
