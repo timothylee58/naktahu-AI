@@ -5,7 +5,20 @@ Outputs: scripts/ingest/data/processed/chunks.jsonl
 
 Each JSONL line contains:
   id, content, content_hash, language, domain, source_title, source_url,
-  ministry, embedding, expiry_aware, source_date
+  ministry, embedding, expiry_aware, source_date, effective_date, supersedes
+
+Raw-file header fields (SOURCE_DATE, EXPIRY_AWARE, EFFECTIVE_DATE, SUPERSEDES
+are optional):
+
+  SOURCE_TITLE: ...
+  SOURCE_URL: ...
+  MINISTRY: ...
+  DOMAIN: ...
+  SOURCE_DATE: 2024-05-01
+  EXPIRY_AWARE: true
+  EFFECTIVE_DATE: 2024-05-01     # when the rule/figure takes effect
+  SUPERSEDES: https://old.url    # comma/space separated old source URLs
+  ---
 
 Run:
     python scripts/ingest/chunk_and_embed.py
@@ -26,6 +39,11 @@ import pycld2
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import OpenAI
+
+try:  # works both as `python scripts/ingest/chunk_and_embed.py` and `-m`
+    from scripts.ingest.metadata import parse_header
+except ImportError:  # pragma: no cover - script run with scripts/ingest on sys.path
+    from metadata import parse_header
 
 load_dotenv(Path(__file__).parent.parent.parent / "apps" / "api" / ".env")
 
@@ -49,33 +67,6 @@ DOMAIN_CHUNK_SIZES: dict[str, int] = {
 DEFAULT_CHUNK_SIZE = 512
 
 EMBED_BATCH = 50
-
-
-HEADER_RE = re.compile(
-    r"SOURCE_TITLE:[ \t]*(.+)\n"
-    r"SOURCE_URL:[ \t]*(.+)\n"
-    r"MINISTRY:[ \t]*(.+)\n"
-    r"DOMAIN:[ \t]*(.+)\n"
-    r"(?:SOURCE_DATE:[ \t]*([^\n]*)\n)?"
-    r"(?:EXPIRY_AWARE:[ \t]*([^\n]*)\n)?"
-    r"---\n",
-)
-
-
-def parse_header(raw: str) -> tuple[dict[str, str], str]:
-    m = HEADER_RE.match(raw)
-    if not m:
-        raise ValueError("Missing metadata header in file")
-    meta = {
-        "source_title": m.group(1).strip(),
-        "source_url": m.group(2).strip(),
-        "ministry": m.group(3).strip(),
-        "domain": m.group(4).strip(),
-        "source_date": (m.group(5) or "").strip() or None,
-        "expiry_aware": (m.group(6) or "").strip().lower() == "true",
-    }
-    body = raw[m.end():]
-    return meta, body
 
 
 def content_hash(text: str) -> str:
@@ -118,6 +109,8 @@ def chunk_file(path: Path, domain_filter: str | None) -> list[dict]:
             "domain": parts[0] if parts else "government",
             "source_date": None,
             "expiry_aware": False,
+            "effective_date": None,
+            "supersedes": [],
         }
         body = raw
 
@@ -148,6 +141,10 @@ def chunk_file(path: Path, domain_filter: str | None) -> list[dict]:
             "ministry": meta["ministry"],
             "expiry_aware": meta["expiry_aware"],
             "source_date": meta["source_date"],
+            "effective_date": meta.get("effective_date"),
+            # doc-level; consumed by upload_to_supabase to set superseded_by on
+            # old chunks. Not a document_chunks column (stripped before upsert).
+            "supersedes": meta.get("supersedes", []),
             "embedding": None,
         })
     return records

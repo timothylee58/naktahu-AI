@@ -4,6 +4,7 @@ MINISTRY: Kumpulan Wang Simpanan Pekerja
 DOMAIN: epf
 SOURCE_DATE: 
 EXPIRY_AWARE: false
+EFFECTIVE_DATE: 2024-01-01
 ---
 ## EPF Contribution Rates
 Kadar caruman KWSP bagi pekerja di bawah umur 60 tahun: Pekerja menyumbang 11% daripada gaji bulanan. Majikan menyumbang 13% bagi pekerja bergaji RM5,000 ke bawah, dan 12% bagi pekerja bergaji melebihi RM5,000. Bagi pekerja berumur 60 tahun ke atas: Pekerja 5.5%, Majikan 4%.

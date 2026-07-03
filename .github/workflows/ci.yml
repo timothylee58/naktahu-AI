@@ -97,8 +97,8 @@ jobs:
       - name: Install eval deps
         run: pip install pytest "supabase>=2.10.0"
 
-      - name: Run eval-metric tests
-        run: pytest scripts/evals/ -q
+      - name: Run eval-metric + ingest-metadata tests
+        run: pytest scripts/evals/ scripts/ingest/test_metadata.py -q
         env:
           PYTHONPATH: .
 
