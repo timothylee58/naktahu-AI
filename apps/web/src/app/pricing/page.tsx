@@ -21,6 +21,8 @@ type CheckoutItem =
   | 'credits_20'
   | 'credits_50';
 
+type CheckoutProvider = 'stripe' | 'hitpay';
+
 function PlanCard({
   name,
   price,
@@ -94,7 +96,7 @@ export default function PricingPage() {
   const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [pendingItem, setPendingItem] = useState<CheckoutItem | null>(null);
+  const [pending, setPending] = useState<{ item: CheckoutItem; provider: CheckoutProvider } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,13 +116,13 @@ export default function PricingPage() {
   const currentPlan = (user?.app_metadata?.plan as string | undefined) ?? 'free';
 
   const startCheckout = useCallback(
-    async (item: CheckoutItem) => {
+    async (item: CheckoutItem, provider: CheckoutProvider = 'stripe') => {
       if (!accessToken) {
         setError(t('pricing.signin_required'));
         return;
       }
       setError(null);
-      setPendingItem(item);
+      setPending({ item, provider });
       try {
         const res = await fetch(`${API_BASE}/api/v1/billing/checkout`, {
           method: 'POST',
@@ -128,18 +130,21 @@ export default function PricingPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({ item }),
+          body: JSON.stringify({ item, provider }),
         });
         if (!res.ok) throw new Error('checkout_failed');
         const data = (await res.json()) as { url: string };
         window.location.href = data.url;
       } catch {
         setError(t('pricing.error'));
-        setPendingItem(null);
+        setPending(null);
       }
     },
     [accessToken, t],
   );
+
+  const isPending = (item: CheckoutItem, provider: CheckoutProvider) =>
+    pending?.item === item && pending?.provider === provider;
 
   return (
     <div className="min-h-screen bg-zinc-50/50">
@@ -195,7 +200,7 @@ export default function PricingPage() {
             ctaLabel={currentPlan === 'pro' ? t('pricing.free.cta') : t('pricing.pro.cta')}
             highlighted
             disabled={currentPlan === 'pro'}
-            loading={pendingItem === 'pro_individu'}
+            loading={isPending('pro_individu', 'stripe')}
             onSubscribe={() => startCheckout('pro_individu')}
           />
           <PlanCard
@@ -210,7 +215,7 @@ export default function PricingPage() {
             ]}
             ctaLabel={currentPlan === 'business' ? t('pricing.free.cta') : t('pricing.business.cta')}
             disabled={currentPlan === 'business'}
-            loading={pendingItem === 'pro_perniagaan'}
+            loading={isPending('pro_perniagaan', 'stripe')}
             onSubscribe={() => startCheckout('pro_perniagaan')}
           />
         </div>
@@ -226,10 +231,10 @@ export default function PricingPage() {
           </div>
           <button
             onClick={() => startCheckout('student')}
-            disabled={currentPlan === 'student' || pendingItem === 'student'}
+            disabled={currentPlan === 'student' || isPending('student', 'stripe')}
             className="flex-shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pendingItem === 'student'
+            {isPending('student', 'stripe')
               ? '…'
               : currentPlan === 'student'
                 ? t('pricing.free.cta')
@@ -241,7 +246,7 @@ export default function PricingPage() {
         <div className="mt-6 rounded-2xl border border-zinc-100 ring-1 ring-zinc-900/5 bg-white p-6">
           <h3 className="text-sm font-semibold text-zinc-900">{t('pricing.credits.title')}</h3>
           <p className="mt-1 text-sm text-zinc-500">{t('pricing.credits.subtitle')}</p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-col gap-3">
             {(
               [
                 ['credits_5', 5],
@@ -249,14 +254,30 @@ export default function PricingPage() {
                 ['credits_50', 50],
               ] as const
             ).map(([item, n]) => (
-              <button
+              <div
                 key={item}
-                onClick={() => startCheckout(item)}
-                disabled={pendingItem === item}
-                className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-4 py-2.5"
               >
-                {pendingItem === item ? '…' : `${n} — RM ${n * 5} · ${t('pricing.credits.buy')}`}
-              </button>
+                <span className="text-sm font-medium text-zinc-700">
+                  {n} — RM {n * 5}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => startCheckout(item, 'stripe')}
+                    disabled={isPending(item, 'stripe')}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPending(item, 'stripe') ? '…' : t('pricing.credits.card')}
+                  </button>
+                  <button
+                    onClick={() => startCheckout(item, 'hitpay')}
+                    disabled={isPending(item, 'hitpay')}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-teal-50 hover:bg-teal-100 text-teal-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPending(item, 'hitpay') ? '…' : t('pricing.credits.fpx')}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </div>

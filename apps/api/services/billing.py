@@ -1,21 +1,29 @@
-"""Stripe checkout, webhook processing, and agent credit ledger.
+"""Stripe + HitPay checkout, webhook processing, and agent credit ledger.
 
 Two kinds of purchase:
-- Plan items (subscription mode) — on completion, sets the Supabase user's
-  app_metadata.plan via the admin API. Takes effect on the user's next JWT
-  refresh (the frontend forces one on the checkout success redirect).
-- Credit items (payment mode) — on completion, tops up agent_credits.
+- Plan items (subscription mode, Stripe only) — on completion, sets the
+  Supabase user's app_metadata.plan via the admin API. Takes effect on the
+  user's next JWT refresh (the frontend forces one on the checkout success
+  redirect).
+- Credit items (one-time payment) — on completion, tops up agent_credits.
+  Available via either Stripe (card) or HitPay (FPX/DuitNow QR) — HitPay is
+  scoped to credit packs only for now; its recurring-billing surface hasn't
+  been evaluated, so plan subscriptions stay Stripe-only.
 
-Webhook delivery is at-least-once, not exactly-once — stripe_events dedupes
-by Stripe's event id before either path runs.
+Webhook delivery is at-least-once, not exactly-once for both providers —
+stripe_events / hitpay_events dedupe by the provider's event/payment id
+before either path runs.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac as hmac_lib
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import httpx
 import stripe
 import structlog
 from postgrest.exceptions import APIError
@@ -44,6 +52,13 @@ _CREDIT_ITEMS: dict[str, tuple[str, int]] = {
 }
 
 VALID_CHECKOUT_ITEMS = set(_PLAN_ITEMS) | set(_CREDIT_ITEMS)
+
+# RM per agent credit (matches the pricing page and CLAUDE.md's "RM 5 per
+# credit" — HitPay takes a raw MYR amount rather than a Stripe-style price
+# ID, so the amount is derived from the credit count here instead of being
+# configured per item).
+CREDIT_PRICE_MYR = 5
+HITPAY_VALID_ITEMS = set(_CREDIT_ITEMS)
 
 
 def create_checkout_session(
@@ -77,6 +92,71 @@ def create_checkout_session(
     return session.url
 
 
+async def create_hitpay_payment_request(
+    *, item: str, user_id: str, user_email: Optional[str]
+) -> str:
+    """Create a HitPay payment request (FPX/DuitNow QR) for a credit pack
+    and return its checkout URL. Credit packs only — see module docstring.
+
+    HitPay has no arbitrary metadata field like Stripe's Checkout Session,
+    so the (item, user_id) pair needed to credit the right account on
+    webhook delivery is encoded into reference_number and parsed back out
+    in process_hitpay_webhook.
+    """
+    if item not in HITPAY_VALID_ITEMS:
+        raise ValueError(f"HitPay checkout is credit-packs only, got: {item}")
+    if not settings.hitpay_api_key:
+        raise RuntimeError("HitPay API key not configured")
+
+    _price_attr, credits = _CREDIT_ITEMS[item]
+    amount = credits * CREDIT_PRICE_MYR
+    reference_number = f"{item}:{user_id}"
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.post(
+                f"{settings.hitpay_base_url}/payment-requests",
+                headers={"X-BUSINESS-API-KEY": settings.hitpay_api_key},
+                data={
+                    "amount": str(amount),
+                    "currency": "MYR",
+                    "email": user_email or "",
+                    "reference_number": reference_number,
+                    "redirect_url": f"{settings.frontend_url}/pricing?checkout=success",
+                    "webhook": f"{settings.public_api_url}/api/v1/billing/webhook/hitpay",
+                },
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.error("hitpay_checkout_failed", item=item, error=str(exc))
+            raise RuntimeError("HitPay did not return a checkout URL") from exc
+
+    data = resp.json()
+    url = data.get("url")
+    if not url:
+        raise RuntimeError("HitPay did not return a checkout URL")
+    return url
+
+
+def verify_hitpay_webhook_signature(form: dict[str, str]) -> bool:
+    """HMAC-SHA256 over the sorted, concatenated key+value pairs of every
+    field except `hmac`, keyed by the HitPay salt (a separate secret from
+    the API key — Settings > Payment Gateway > Webhook in the dashboard).
+    This is HitPay's documented scheme, distinct from Stripe's
+    timestamp-based Hitpay-Signature-style header verification.
+    """
+    received = form.get("hmac", "")
+    if not received or not settings.hitpay_salt:
+        return False
+
+    fields = {k: v for k, v in form.items() if k != "hmac"}
+    concatenated = "".join(f"{k}{fields[k]}" for k in sorted(fields))
+    expected = hmac_lib.new(
+        settings.hitpay_salt.encode(), concatenated.encode(), hashlib.sha256
+    ).hexdigest()
+    return hmac_lib.compare_digest(expected, received)
+
+
 async def mark_event_processed(supabase_client: Client, event_id: str) -> bool:
     """Atomically claim the Stripe event id via the unique constraint.
 
@@ -107,6 +187,49 @@ async def unmark_event_processed(supabase_client: Client, event_id: str) -> None
         supabase_client.table("stripe_events").delete().eq("stripe_event_id", event_id).execute()
 
     await asyncio.to_thread(_delete)
+
+
+async def mark_hitpay_event_processed(supabase_client: Client, payment_id: str) -> bool:
+    """Same atomic-claim pattern as mark_event_processed, against the
+    separate hitpay_events table (HitPay's payment_id is not comparable to
+    a Stripe event id, so it gets its own idempotency ledger rather than
+    sharing stripe_events)."""
+
+    def _insert() -> bool:
+        try:
+            supabase_client.table("hitpay_events").insert({"hitpay_payment_id": payment_id}).execute()
+            return True
+        except APIError as exc:
+            if exc.code == _POSTGRES_UNIQUE_VIOLATION:
+                return False
+            raise
+
+    return await asyncio.to_thread(_insert)
+
+
+async def unmark_hitpay_event_processed(supabase_client: Client, payment_id: str) -> None:
+    def _delete() -> None:
+        supabase_client.table("hitpay_events").delete().eq("hitpay_payment_id", payment_id).execute()
+
+    await asyncio.to_thread(_delete)
+
+
+async def process_hitpay_webhook(supabase_client: Client, form: dict[str, str]) -> None:
+    reference_number = form.get("reference_number", "")
+    status = form.get("status", "")
+
+    item, _sep, user_id = reference_number.partition(":")
+    if not item or not user_id or item not in HITPAY_VALID_ITEMS:
+        logger.warning("hitpay_webhook_unrecognised_reference", reference_number=reference_number)
+        return
+
+    if status != "completed":
+        logger.info("hitpay_webhook_ignored_status", status=status, reference_number=reference_number)
+        return
+
+    _price_attr, credits = _CREDIT_ITEMS[item]
+    await add_credits(supabase_client, user_id, credits)
+    logger.info("hitpay_credits_added", user_id=user_id, credits=credits, item=item)
 
 
 async def process_checkout_completed(supabase_client: Client, session_data: dict[str, Any]) -> None:
