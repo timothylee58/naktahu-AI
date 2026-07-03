@@ -26,7 +26,7 @@ const MS: Translations = {
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
   'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
 
-  /* ── header ── */
+  /* ── header & nav ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Soal tentang kerajaan',
   'header.lang_toggle': 'EN',
@@ -36,6 +36,11 @@ const MS: Translations = {
   'header.register': 'Daftar',
   'header.login': 'Masuk',
   'header.sign_out': 'Keluar',
+  'nav.try_question': 'Cuba Tanya',
+  'nav.home': 'Beranda',
+  'nav.about': 'Tentang Kami',
+  'nav.faq': 'Bantuan / FAQ',
+  'nav.contact': 'Hubungi Kami',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -148,7 +153,7 @@ const EN: Translations = {
   'chat.empty': 'Ask me anything about Malaysian government services.',
   'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
 
-  /* ── header ── */
+  /* ── header & nav ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Ask about government',
   'header.lang_toggle': 'BM',
@@ -158,6 +163,11 @@ const EN: Translations = {
   'header.register': 'Register',
   'header.login': 'Login',
   'header.sign_out': 'Sign Out',
+  'nav.try_question': 'Try a Question',
+  'nav.home': 'Home',
+  'nav.about': 'About Us',
+  'nav.faq': 'Help / FAQ',
+  'nav.contact': 'Contact Us',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -269,7 +279,7 @@ const ZH: Translations = {
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
   'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
 
-  /* ── header ── */
+  /* ── header & nav ── */
   'header.title': 'NakTahu',
   'header.subtitle': '询问政府事务',
   'header.lang_toggle': 'BM',
@@ -279,6 +289,11 @@ const ZH: Translations = {
   'header.register': '注册',
   'header.login': '登录',
   'header.sign_out': '退出',
+  'nav.try_question': '尝试提问',
+  'nav.home': '首页',
+  'nav.about': '关于我们',
+  'nav.faq': '帮助 / 常见问题',
+  'nav.contact': '联系我们',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
