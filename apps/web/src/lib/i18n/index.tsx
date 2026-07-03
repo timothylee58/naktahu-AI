@@ -42,6 +42,8 @@ const MS: Translations = {
   'nav.about': 'Tentang Kami',
   'nav.faq': 'Bantuan / FAQ',
   'nav.contact': 'Hubungi Kami',
+  'sidebar.collapse': 'Lipat panel',
+  'sidebar.expand': 'Buka panel',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -170,6 +172,8 @@ const EN: Translations = {
   'nav.about': 'About Us',
   'nav.faq': 'Help / FAQ',
   'nav.contact': 'Contact Us',
+  'sidebar.collapse': 'Collapse sidebar',
+  'sidebar.expand': 'Expand sidebar',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -297,6 +301,8 @@ const ZH: Translations = {
   'nav.about': '关于我们',
   'nav.faq': '帮助 / 常见问题',
   'nav.contact': '联系我们',
+  'sidebar.collapse': '收起侧栏',
+  'sidebar.expand': '展开侧栏',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
