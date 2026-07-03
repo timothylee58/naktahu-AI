@@ -1,0 +1,6 @@
+{"query": "epf withdrawal cap", "domain": "epf", "chunks": [{"effective_days_ago": 45, "superseded_by": null}, {"effective_days_ago": 90, "superseded_by": null}]}
+{"query": "income tax relief", "domain": "tax", "chunks": [{"effective_days_ago": 60, "superseded_by": null}, {"effective_days_ago": 120, "superseded_by": null}]}
+{"query": "passport renewal fee", "domain": "immigration", "chunks": [{"effective_days_ago": 30, "superseded_by": null}]}
+{"query": "spm exam schedule", "domain": "education", "chunks": [{"effective_days_ago": 200, "superseded_by": null}, {"effective_days_ago": 300, "superseded_by": null}]}
+{"query": "ssm company registration steps", "domain": "business", "chunks": [{"effective_days_ago": 150, "superseded_by": null}]}
+{"query": "clinic panel list", "domain": "healthcare", "chunks": [{"effective_days_ago": 250, "superseded_by": null}]}

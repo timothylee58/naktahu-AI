@@ -78,3 +78,38 @@ jobs:
         run: pytest tests/ -q
         env:
           PYTHONPATH: .
+
+  # ── Eval gate: faithfulness (existing) + temporal_accuracy (new) ───────────
+  # Faithfulness only checks answer-to-chunk consistency, so a stale chunk
+  # reproduced perfectly passes it while being factually wrong. This job adds a
+  # second deploy gate — average temporal_accuracy (chunk currency) — and records
+  # both scores to the eval_runs table when Supabase creds are configured.
+  eval-gate:
+    name: Eval gate (faithfulness + temporal_accuracy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install eval deps
+        run: pip install pytest "supabase>=2.10.0"
+
+      - name: Run eval-metric tests
+        run: pytest scripts/evals/ -q
+        env:
+          PYTHONPATH: .
+
+      - name: Run deploy eval gate
+        # temporal_accuracy is computed offline from the golden samples;
+        # faithfulness is enforced when FAITHFULNESS_SCORE is provided (from a
+        # live RAGAS run) and skipped otherwise. Records to eval_runs when
+        # SUPABASE creds are present.
+        run: python -m scripts.evals.run_eval_gate --samples scripts/evals/data/temporal_golden.jsonl
+        env:
+          PYTHONPATH: .
+          FAITHFULNESS_SCORE: ${{ secrets.FAITHFULNESS_SCORE }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

@@ -105,6 +105,45 @@ network calls, so it is **skipped by default**. It only runs when:
 
 If either condition is unmet, the tests report `SKIPPED`, not `FAILED`.
 
+### 4. `test_freshness.py` — freshness gate (stale-but-faithful)
+
+RAGAS-style **faithfulness** and the `answer_quality` confidence gate only
+measure *answer-to-chunk* consistency, never *chunk-to-reality* accuracy. A
+stale chunk reproduced perfectly scores fully faithful while being factually
+wrong, with a real gov.my citation — and a faithfulness/confidence-only gate
+never catches it:
+
+```
+EPF Budget 2023: withdrawal cap = RM1,000   ← old chunk, still in corpus
+Budget 2024:     withdrawal cap = RM500      ← new rule, not yet ingested
+stale-only corpus → answer says RM1,000 → faithfulness 1.0 → silently wrong
+```
+
+This suite is the missing gate. It constructs dated `ChunkResult`s directly (no
+LLM/RAG calls) and asserts `analyst_node`:
+
+- **flags** stale-only evidence via `stale_warning`, `answer_as_of`, structured
+  `stale_warnings`, and per-citation `stale_disclaimer` (so the synthesiser
+  date-stamps and hedges the figure instead of stating it as current — see
+  `synthesiser_node._freshness_instruction`),
+- **hard-rejects superseded chunks** (`superseded_by` set) — dropped from the
+  retrieved set so they are never scored, cited, or seen by the synthesiser, and
+- **prefers the newest** source when both last year's and this year's figure are
+  present (recency penalty + prefer-newest tie-break in `analyst_node`).
+
+Freshness relies on ingesting the `document_chunks.effective_date` (when the
+rule/figure takes effect; migration 007) and `superseded_by` (link to the
+replacing chunk) columns — falling back to `expiry_aware` + `source_date` for
+older rows. Chunks with none of these are treated as non-expiring and never
+flagged, so ingestion should stamp `effective_date` (and set `superseded_by`
+when a newer version is added) for time-sensitive facts.
+
+For the **dataset-level** counterpart — a custom `temporal_accuracy` metric that
+scores chunk currency ("is this chunk current as of today?"), the axis RAGAS
+faithfulness cannot measure — see `scripts/evals/temporal_scorer.py` and
+`scripts/evals/README.md`. This suite gates `analyst_node`'s runtime behaviour;
+that metric scores the same freshness axis over a dataset.
+
 ## Running
 
 ```bash

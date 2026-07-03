@@ -18,6 +18,12 @@ class ChunkResult:
     similarity: float
     expiry_aware: bool = False
     source_date: str | None = None  # ISO date string e.g. "2024-03-15"
+    # Date the rule/figure this chunk describes takes effect (ISO string). Used
+    # by analyst_node's effective-date staleness check.
+    effective_date: str | None = None
+    # id of the chunk that replaces this one; superseded chunks are hard-rejected
+    # by analyst_node and never cited.
+    superseded_by: str | None = None
 
 
 async def _get_client() -> AsyncClient:
@@ -61,6 +67,8 @@ async def hybrid_search(
                 similarity=float(row["similarity"]),
                 expiry_aware=bool(row.get("expiry_aware", False)),
                 source_date=row.get("source_date"),
+                effective_date=row.get("effective_date"),
+                superseded_by=row.get("superseded_by"),
             )
         )
     return results
