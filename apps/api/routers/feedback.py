@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from middleware.rate_limit import apply_query_rate_limit
@@ -28,6 +28,9 @@ async def post_feedback(
     body: FeedbackPayload,
     optional_user: Annotated[Optional[UserContext], Depends(get_optional_user)],
 ):
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Feedback service temporarily unavailable")
+
     await submit_feedback(
         supabase_client=request.app.state.supabase,
         user_id=optional_user.user_id if optional_user else None,

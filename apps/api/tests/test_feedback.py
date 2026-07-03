@@ -106,3 +106,10 @@ def test_post_feedback_rate_limit_31st_anonymous_returns_429(client):
         assert r.status_code == 201, r.text
     blocked = c.post("/api/v1/feedback", json=_body(query="q-blocked"))
     assert blocked.status_code == 429
+
+
+def test_post_feedback_returns_503_when_supabase_unavailable(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.post("/api/v1/feedback", json=_body())
+    assert res.status_code == 503

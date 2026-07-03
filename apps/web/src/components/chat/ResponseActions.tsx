@@ -51,7 +51,7 @@ export function ResponseActions({
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-        await fetch(`${API_BASE}/api/v1/feedback`, {
+        const res = await fetch(`${API_BASE}/api/v1/feedback`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -64,8 +64,10 @@ export function ResponseActions({
             rating: rating === 'up' ? 1 : -1,
           }),
         });
+        if (!res.ok) throw new Error('Failed to submit feedback');
       } catch {
-        // Feedback is best-effort — a failed submit shouldn't disrupt the chat experience.
+        // Submission failed — revert so the button reflects reality and the user can retry.
+        setFeedback(null);
       } finally {
         setSubmitting(false);
       }

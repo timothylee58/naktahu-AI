@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS feedback (
     response_summary text        NOT NULL,
     citations        jsonb       NOT NULL DEFAULT '[]',
     domain           varchar(32) NOT NULL,
-    language         varchar(2)  NOT NULL,
+    language         varchar(16) NOT NULL,
     rating           smallint    NOT NULL CHECK (rating IN (-1, 1)),
     created_at       timestamptz NOT NULL DEFAULT now()
 );
