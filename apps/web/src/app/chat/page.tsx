@@ -131,6 +131,9 @@ function ChatPageInner() {
                 citations,
                 confidence,
                 isStreaming: false,
+                query: lastUserQuery.current,
+                domain: metadata?.domain,
+                language: metadata?.detectedLanguage,
               }
             : m,
         ),
@@ -309,6 +312,10 @@ function ChatPageInner() {
               isStreaming={msg.isStreaming}
               isThinking={msg.isStreaming && (msg.tokens?.length ?? 0) === 0}
               onRegenerate={!msg.isStreaming ? handleRegenerate : undefined}
+              query={msg.query}
+              domain={msg.domain}
+              language={msg.language}
+              accessToken={accessToken ?? undefined}
             />
           ),
         )}
