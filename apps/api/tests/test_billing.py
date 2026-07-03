@@ -11,17 +11,16 @@ from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
 
 
-def _auth_header(sub: str = "billing-user", plan: str = "free") -> dict[str, str]:
-    tok = jwt.encode(
-        {
-            "sub": sub,
-            "aud": settings.supabase_jwt_aud,
-            "exp": int(time.time()) + 3600,
-            "app_metadata": {"plan": plan},
-        },
-        settings.jwt_secret,
-        algorithm="HS256",
-    )
+def _auth_header(sub: str = "billing-user", plan: str = "free", email: str | None = None) -> dict[str, str]:
+    payload = {
+        "sub": sub,
+        "aud": settings.supabase_jwt_aud,
+        "exp": int(time.time()) + 3600,
+        "app_metadata": {"plan": plan},
+    }
+    if email:
+        payload["email"] = email
+    tok = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
     return {"Authorization": f"Bearer {tok}"}
 
 
@@ -40,10 +39,14 @@ def client(monkeypatch):
     table_mock.select.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
     table_mock.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
     table_mock.insert.return_value.execute.return_value = MagicMock(data=[{"id": "1"}])
-    table_mock.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[{"id": "1"}])
+    table_mock.delete.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+    rpc_mock = MagicMock()
+    rpc_mock.execute.return_value = MagicMock(data=None)
 
     sb = MagicMock()
     sb.table.return_value = table_mock
+    sb.rpc.return_value = rpc_mock
     sb.auth.admin.update_user_by_id = MagicMock()
 
     monkeypatch.setattr(api_main, "create_client", lambda url, key: sb)
@@ -85,14 +88,31 @@ def test_checkout_creates_session_and_returns_url(client, monkeypatch):
     res = c.post(
         "/api/v1/billing/checkout",
         json={"item": "pro_individu"},
-        headers=_auth_header(sub="checkout-user"),
+        headers=_auth_header(sub="checkout-user", email="checkout-user@example.com"),
     )
     assert res.status_code == 200, res.text
     assert res.json() == {"url": "https://checkout.stripe.com/test-session"}
     kwargs = create_mock.call_args.kwargs
     assert kwargs["mode"] == "subscription"
     assert kwargs["client_reference_id"] == "checkout-user"
+    assert kwargs["customer_email"] == "checkout-user@example.com"
     assert kwargs["metadata"] == {"user_id": "checkout-user", "item": "pro_individu"}
+
+
+def test_checkout_omits_email_when_jwt_has_none(client, monkeypatch):
+    c, *_ = client
+    fake_session = MagicMock()
+    fake_session.url = "https://checkout.stripe.com/test-session"
+    create_mock = MagicMock(return_value=fake_session)
+    monkeypatch.setattr(stripe.checkout.Session, "create", create_mock)
+
+    res = c.post(
+        "/api/v1/billing/checkout",
+        json={"item": "pro_individu"},
+        headers=_auth_header(sub="no-email-user"),
+    )
+    assert res.status_code == 200, res.text
+    assert create_mock.call_args.kwargs["customer_email"] is None
 
 
 def test_checkout_503_when_price_not_configured(client, monkeypatch):
@@ -121,6 +141,17 @@ def test_webhook_rejects_invalid_signature(client, monkeypatch):
     assert res.status_code == 400
 
 
+def test_webhook_500_when_secret_not_configured(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "")
+    res = c.post(
+        "/api/v1/billing/webhook",
+        content=b"{}",
+        headers={"stripe-signature": "anything"},
+    )
+    assert res.status_code == 500
+
+
 def test_webhook_checkout_completed_updates_plan(client, monkeypatch):
     c, sb, table_mock = client
     event = {
@@ -147,7 +178,7 @@ def test_webhook_checkout_completed_updates_plan(client, monkeypatch):
     )
 
 
-def test_webhook_checkout_completed_adds_credits(client, monkeypatch):
+def test_webhook_checkout_completed_adds_credits_via_rpc(client, monkeypatch):
     c, sb, table_mock = client
     event = {
         "id": "evt_credits_1",
@@ -167,15 +198,11 @@ def test_webhook_checkout_completed_adds_credits(client, monkeypatch):
         headers={"stripe-signature": "valid"},
     )
     assert res.status_code == 200, res.text
-    sb.table.assert_any_call("agent_credits")
-    # insert is called twice: once for the stripe_events dedupe row, once
-    # for the agent_credits topup — find the credits insert specifically.
-    credit_inserts = [
-        call.args[0] for call in table_mock.insert.call_args_list if "credits_remaining" in call.args[0]
-    ]
-    assert len(credit_inserts) == 1
-    assert credit_inserts[0]["user_id"] == "credits-user"
-    assert credit_inserts[0]["credits_remaining"] == 5
+    sb.rpc.assert_called_once()
+    rpc_name, rpc_args = sb.rpc.call_args.args
+    assert rpc_name == "add_agent_credits"
+    assert rpc_args["p_user_id"] == "credits-user"
+    assert rpc_args["p_amount"] == 5
 
 
 def test_webhook_duplicate_event_not_reprocessed(client, monkeypatch):
@@ -210,6 +237,33 @@ def test_webhook_duplicate_event_not_reprocessed(client, monkeypatch):
     sb.auth.admin.update_user_by_id.assert_not_called()
 
 
+def test_webhook_releases_claim_on_processing_failure(client, monkeypatch):
+    """A transient failure after the event is claimed must not permanently
+    blacklist it — Stripe's retry needs to be able to reprocess."""
+    c, sb, table_mock = client
+    event = {
+        "id": "evt_fails_1",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": "cs_test_4",
+                "metadata": {"user_id": "fail-user", "item": "pro_individu"},
+            }
+        },
+    }
+    monkeypatch.setattr(stripe.Webhook, "construct_event", MagicMock(return_value=event))
+    sb.auth.admin.update_user_by_id.side_effect = RuntimeError("supabase admin API timeout")
+
+    with pytest.raises(RuntimeError):
+        c.post(
+            "/api/v1/billing/webhook",
+            content=b"{}",
+            headers={"stripe-signature": "valid"},
+        )
+
+    table_mock.delete.return_value.eq.assert_called_once_with("stripe_event_id", "evt_fails_1")
+
+
 def test_get_credits_requires_auth(client):
     c, *_ = client
     res = c.get("/api/v1/billing/credits")
@@ -231,3 +285,10 @@ def test_get_credits_zero_when_no_row(client):
     res = c.get("/api/v1/billing/credits", headers=_auth_header(sub="no-credits-user"))
     assert res.status_code == 200, res.text
     assert res.json() == {"credits_remaining": 0}
+
+
+def test_get_credits_503_when_supabase_unavailable(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.get("/api/v1/billing/credits", headers=_auth_header(sub="degraded-user"))
+    assert res.status_code == 503

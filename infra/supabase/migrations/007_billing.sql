@@ -34,3 +34,23 @@ CREATE POLICY agent_credits_select_own
 -- idempotency ledger, not user-visible data. RLS enabled with no policies
 -- means it's unreadable and unwritable except via the service role.
 ALTER TABLE stripe_events ENABLE ROW LEVEL SECURITY;
+
+-- Atomic upsert for credit top-ups. A plain select-then-update/insert from
+-- the API would race under concurrent webhook deliveries (two deliveries
+-- reading the same "current" balance and each writing current+n, losing one
+-- top-up). INSERT ... ON CONFLICT does the read-modify-write as a single
+-- statement under the row lock, so concurrent calls always sum correctly.
+CREATE OR REPLACE FUNCTION add_agent_credits(
+    p_user_id uuid,
+    p_amount  int,
+    p_now     timestamptz
+) RETURNS void AS $$
+BEGIN
+    INSERT INTO agent_credits (user_id, credits_remaining, credits_used, last_topup)
+    VALUES (p_user_id, p_amount, 0, p_now)
+    ON CONFLICT (user_id)
+    DO UPDATE SET
+        credits_remaining = agent_credits.credits_remaining + EXCLUDED.credits_remaining,
+        last_topup = EXCLUDED.last_topup;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

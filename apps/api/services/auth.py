@@ -22,6 +22,7 @@ class UserContext:
     user_id: str
     is_anonymous: bool
     plan: str = "free"
+    email: Optional[str] = None
 
 
 def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
@@ -47,7 +48,11 @@ def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
         if isinstance(raw_plan, str) and raw_plan in VALID_PLANS:
             plan = raw_plan
 
-    return UserContext(user_id=sub, is_anonymous=False, plan=plan)
+    email = payload.get("email")
+    if not isinstance(email, str):
+        email = None
+
+    return UserContext(user_id=sub, is_anonymous=False, plan=plan, email=email)
 
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> UserContext:

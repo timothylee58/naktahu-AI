@@ -13,6 +13,7 @@ from services.billing import (
     get_credits_remaining,
     mark_event_processed,
     process_checkout_completed,
+    unmark_event_processed,
 )
 
 logger = structlog.get_logger()
@@ -32,7 +33,7 @@ async def post_checkout(
     if body.item not in VALID_CHECKOUT_ITEMS:
         raise HTTPException(status_code=422, detail=f"Unknown checkout item: {body.item}")
     try:
-        url = create_checkout_session(item=body.item, user_id=user.user_id, user_email=None)
+        url = create_checkout_session(item=body.item, user_id=user.user_id, user_email=user.email)
     except RuntimeError as exc:
         logger.error("checkout_session_failed", item=body.item, error=str(exc))
         raise HTTPException(status_code=503, detail="Checkout is temporarily unavailable") from exc
@@ -44,6 +45,10 @@ async def stripe_webhook(request: Request):
     if not request.app.state.supabase:
         raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
 
+    if not settings.stripe_webhook_secret:
+        logger.error("stripe_webhook_secret_not_configured")
+        raise HTTPException(status_code=500, detail="Webhook verification is not configured")
+
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
     try:
@@ -53,12 +58,22 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid webhook signature") from exc
 
     sb = request.app.state.supabase
+
+    # Claim the event id atomically first (via the stripe_events unique
+    # constraint) so two concurrent deliveries of the same event can't both
+    # process it. If processing then fails, release the claim so Stripe's
+    # automatic retry can reprocess rather than being rejected as a
+    # duplicate of a purchase that never actually completed.
     is_new = await mark_event_processed(sb, event["id"])
     if not is_new:
         return {"status": "duplicate"}
 
-    if event["type"] == "checkout.session.completed":
-        await process_checkout_completed(sb, event["data"]["object"])
+    try:
+        if event["type"] == "checkout.session.completed":
+            await process_checkout_completed(sb, event["data"]["object"])
+    except Exception:
+        await unmark_event_processed(sb, event["id"])
+        raise
 
     return {"status": "ok"}
 
@@ -68,5 +83,7 @@ async def get_credits(
     request: Request,
     user: Annotated[UserContext, Depends(get_current_user)],
 ):
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
     remaining = await get_credits_remaining(request.app.state.supabase, user.user_id)
     return {"credits_remaining": remaining}

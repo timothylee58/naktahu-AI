@@ -78,7 +78,13 @@ def create_checkout_session(
 
 
 async def mark_event_processed(supabase_client: Client, event_id: str) -> bool:
-    """Insert the Stripe event id. Returns False if already processed (duplicate delivery)."""
+    """Atomically claim the Stripe event id via the unique constraint.
+
+    Returns False if already claimed (duplicate delivery — including a
+    concurrent delivery of the same event, which Stripe does send). Must be
+    paired with unmark_event_processed() on processing failure so a
+    transient error doesn't permanently blacklist a retryable event.
+    """
 
     def _insert() -> bool:
         try:
@@ -90,6 +96,17 @@ async def mark_event_processed(supabase_client: Client, event_id: str) -> bool:
             raise
 
     return await asyncio.to_thread(_insert)
+
+
+async def unmark_event_processed(supabase_client: Client, event_id: str) -> None:
+    """Release a claimed event id after processing fails, so Stripe's
+    automatic retry can reprocess it instead of being rejected as a
+    duplicate of a purchase that never actually completed."""
+
+    def _delete() -> None:
+        supabase_client.table("stripe_events").delete().eq("stripe_event_id", event_id).execute()
+
+    await asyncio.to_thread(_delete)
 
 
 async def process_checkout_completed(supabase_client: Client, session_data: dict[str, Any]) -> None:
@@ -121,30 +138,22 @@ async def _set_plan(supabase_client: Client, user_id: str, plan: str) -> None:
 
 
 async def add_credits(supabase_client: Client, user_id: str, n: int) -> None:
-    def _upsert() -> None:
-        existing = (
-            supabase_client.table("agent_credits")
-            .select("credits_remaining")
-            .eq("user_id", user_id)
-            .execute()
-        )
-        now = datetime.now(timezone.utc).isoformat()
-        if existing.data:
-            current = existing.data[0]["credits_remaining"]
-            supabase_client.table("agent_credits").update(
-                {"credits_remaining": current + n, "last_topup": now}
-            ).eq("user_id", user_id).execute()
-        else:
-            supabase_client.table("agent_credits").insert(
-                {
-                    "user_id": user_id,
-                    "credits_remaining": n,
-                    "credits_used": 0,
-                    "last_topup": now,
-                }
-            ).execute()
+    """Atomic top-up via the add_agent_credits RPC (infra/supabase/migrations/007_billing.sql).
 
-    await asyncio.to_thread(_upsert)
+    A select-then-update/insert from here would race under concurrent
+    webhook deliveries — two calls could both read the same starting
+    balance and each write current+n, silently losing one top-up. The RPC
+    does the read-modify-write inside a single statement under Postgres's
+    row lock, so concurrent calls always sum correctly.
+    """
+
+    def _rpc() -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        supabase_client.rpc(
+            "add_agent_credits", {"p_user_id": user_id, "p_amount": n, "p_now": now}
+        ).execute()
+
+    await asyncio.to_thread(_rpc)
 
 
 async def get_credits_remaining(supabase_client: Optional[Client], user_id: str) -> int:

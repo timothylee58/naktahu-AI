@@ -78,17 +78,21 @@ export function AuthButton() {
       setCredits(null);
       return;
     }
+    let active = true;
     const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
     fetch(`${apiBase}/api/v1/billing/credits`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { credits_remaining: number } | null) => {
-        if (data) setCredits(data.credits_remaining);
+        if (active && data) setCredits(data.credits_remaining);
       })
       .catch(() => {
         // Non-critical — badge just won't show a credit count
       });
+    return () => {
+      active = false;
+    };
   }, [accessToken]);
 
   const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
