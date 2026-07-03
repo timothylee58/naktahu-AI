@@ -34,7 +34,24 @@ body {
   scrollbar-color: #d4d4d8 transparent;
 }
 
-/* Hide scrollbar for chip row */
+/* Chinese typography — avoid orphaned characters per line */
+html[lang='zh-Hans'] {
+  word-break: keep-all;
+  line-break: strict;
+}
+
+.locale-nowrap {
+  white-space: nowrap;
+}
+
+.locale-text-balance {
+  text-wrap: balance;
+}
+
+html[lang='zh-Hans'] .locale-text-balance {
+  text-wrap: pretty;
+}
+
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 

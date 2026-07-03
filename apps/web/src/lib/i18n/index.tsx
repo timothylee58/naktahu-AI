@@ -32,7 +32,10 @@ const MS: Translations = {
   'header.subtitle': 'Soal tentang kerajaan',
   'header.lang_toggle': 'EN',
   'header.history': 'Sejarah',
+  'header.menu': 'Menu',
   'header.sign_in': 'Daftar / Masuk',
+  'header.register': 'Daftar',
+  'header.login': 'Masuk',
   'header.sign_out': 'Keluar',
 
   /* ── sidebar ── */
@@ -156,7 +159,10 @@ const EN: Translations = {
   'header.subtitle': 'Ask about government',
   'header.lang_toggle': 'BM',
   'header.history': 'History',
+  'header.menu': 'Menu',
   'header.sign_in': 'Register / Login',
+  'header.register': 'Register',
+  'header.login': 'Login',
   'header.sign_out': 'Sign Out',
 
   /* ── sidebar ── */
@@ -279,7 +285,10 @@ const ZH: Translations = {
   'header.subtitle': '询问政府事务',
   'header.lang_toggle': 'BM',
   'header.history': '历史记录',
-  'header.sign_in': '注册 / 登录',
+  'header.menu': '菜单',
+  'header.sign_in': '注册登录',
+  'header.register': '注册',
+  'header.login': '登录',
   'header.sign_out': '退出',
 
   /* ── sidebar ── */
@@ -295,10 +304,10 @@ const ZH: Translations = {
   /* ── auth modal ── */
   'auth.modal.title': '登录 NakTahu',
   'auth.modal.subtitle': '保存您的问题历史',
-  'auth.google': '使用 Google 继续',
-  'auth.google.loading': '正在连接 Google…',
+  'auth.google': 'Google 登录',
+  'auth.google.loading': '连接 Google…',
   'auth.or': '或',
-  'auth.email': '使用电子邮件继续',
+  'auth.email': '邮箱登录',
   'auth.email.placeholder': 'name@email.com',
   'auth.email.send': '发送登录链接',
   'auth.email.sending': '发送中…',
@@ -307,8 +316,8 @@ const ZH: Translations = {
   'auth.email.back': '返回',
   'auth.terms': '登录即表示您同意我们的',
   'auth.terms.link': '使用条款',
-  'auth.microsoft': '使用 Microsoft 继续',
-  'auth.microsoft.loading': '正在连接 Microsoft…',
+  'auth.microsoft': 'Microsoft 登录',
+  'auth.microsoft.loading': '连接 Microsoft…',
   'auth.error.title': '登录失败',
   'auth.error.generic': '无法完成登录，请重试。',
   'auth.error.access_denied': '登录已取消。如需继续，请重试。',
@@ -329,7 +338,7 @@ const ZH: Translations = {
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.hero.cta': '开始提问',
   'landing.features.title': '为什么选择 NakTahu？',
-  'landing.features.bilingual.title': '三语支持 BM · EN · 中文',
+  'landing.features.bilingual.title': '三语 BM·EN·中文',
   'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
   'landing.features.cited.title': '经过验证的来源',
   'landing.features.cited.desc': '每个答案都链接到官方政府文件。',
@@ -406,12 +415,15 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate from localStorage after mount (avoids SSR mismatch)
   useEffect(() => {
-    setLocaleState(readStoredLocale());
+    const stored = readStoredLocale();
+    setLocaleState(stored);
+    document.documentElement.lang = stored === 'zh' ? 'zh-Hans' : stored;
   }, []);
 
   const setLocale = useCallback((l: UILocale) => {
     localStorage.setItem(STORAGE_KEY, l);
     setLocaleState(l);
+    document.documentElement.lang = l === 'zh' ? 'zh-Hans' : l;
   }, []);
 
   const t = useCallback(

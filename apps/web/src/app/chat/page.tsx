@@ -13,9 +13,7 @@ import type { Message } from '@/lib/types';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
-import { AuthButton } from '@/components/auth/AuthButton';
-import { ChatSidebar } from '@/components/chat/ChatSidebar';
-import { LangToggle } from '@/components/LangToggle';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 let msgCounter = 0;
 function makeId() {
@@ -254,71 +252,48 @@ function ChatPageInner() {
 
   return (
     <div className="flex h-full bg-zinc-50/50">
-      {/* Left panel — persistent on desktop (collapsible), full-page overlay on mobile */}
-      <ChatSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={toggleSidebarCollapsed}
+      <AppSidebar
+        isMobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        showHistory
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
         onNewChat={handleNewChat}
       />
 
-      {/* Main column */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* header */}
-        <header className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            {/* sidebar toggle — mobile only */}
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label={t('header.history')}
-              className="md:hidden p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors flex-shrink-0"
+      <div className="flex flex-col flex-1 min-w-0 h-full">
+      {/* header */}
+      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-2">
+          {/* sidebar toggle — mobile only */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label={t('header.history')}
+            className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors lg:hidden"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-5 h-5"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                className="w-5 h-5"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
+              <path
+                fillRule="evenodd"
+                d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
 
-            {/* expand sidebar — desktop only, when the panel is collapsed */}
-            {sidebarCollapsed && (
-              <button
-                onClick={toggleSidebarCollapsed}
-                aria-label={t('sidebar.expand')}
-                title={t('sidebar.expand')}
-                className="hidden md:inline-flex p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors flex-shrink-0"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                  <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
-                </svg>
-              </button>
-            )}
-
-            <Link href="/" className="flex flex-col min-w-0">
-              <span className="text-base font-bold text-zinc-900 tracking-tight truncate">
-                {t('header.title')}
-              </span>
-              <span className="text-xs text-zinc-500 truncate">{t('header.subtitle')}</span>
-            </Link>
-          </div>
-
-          {/* Auth + language live in the sidebar footer on desktop */}
-          <div className="flex md:hidden items-center gap-2 flex-shrink-0">
-            <AuthButton />
-            <LangToggle variant="light" />
-          </div>
-        </header>
+          <Link href="/" className="flex flex-col">
+            <span className="text-base font-bold text-zinc-900 tracking-tight">
+              {t('header.title')}
+            </span>
+            <span className="text-xs text-zinc-500">{t('header.subtitle')}</span>
+          </Link>
+        </div>
+      </header>
 
         {/* message list */}
         <div
@@ -383,6 +358,7 @@ function ChatPageInner() {
             {t('chat.keyboard_hint')}
           </p>
         </div>
+      </div>
       </div>
     </div>
   );
