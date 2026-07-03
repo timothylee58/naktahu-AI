@@ -25,6 +25,7 @@ const MS: Translations = {
   'chat.empty':
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
   'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
+  'chat.suggestions_label': 'Anda mungkin ingin tanya',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
@@ -152,6 +153,7 @@ const EN: Translations = {
   'chat.language_indicator': 'EN',
   'chat.empty': 'Ask me anything about Malaysian government services.',
   'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
+  'chat.suggestions_label': 'You might also ask',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
@@ -278,6 +280,7 @@ const ZH: Translations = {
   'chat.language_indicator': '中文',
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
   'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
+  'chat.suggestions_label': '您可能还想问',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
