@@ -10,6 +10,7 @@ from app.services.vector_store import ChunkResult
 
 _STALE_DATE = (date.today() - timedelta(days=400)).isoformat()
 _FRESH_DATE = date.today().isoformat()
+_AGED_200 = (date.today() - timedelta(days=200)).isoformat()
 
 
 def _make_chunk(
@@ -322,6 +323,33 @@ async def test_analyst_effective_date_populates_stale_warnings() -> None:
     assert w["source_title"] == "KWSP 2023 Guidelines"
     assert w["effective_date"] == _STALE_DATE
     assert w["days_since_effective"] > 90
+
+
+@pytest.mark.asyncio
+async def test_analyst_staleness_window_is_domain_aware() -> None:
+    """A 200-day-old effective_date is stale in a strict policy domain (epf,
+    180d) but current in a lenient one (education, 365d)."""
+    def _aged():
+        return _make_chunk(
+            source_url="https://www.gov.my/a",
+            content="epf withdrawal cap rm500",
+            effective_date=_AGED_200,
+            chunk_id="aged",
+        )
+
+    strict = await analyst_node({
+        "query": "epf withdrawal cap",
+        "domain": "epf",
+        "retrieved_chunks": [_aged()],
+    })
+    lenient = await analyst_node({
+        "query": "epf withdrawal cap",
+        "domain": "education",
+        "retrieved_chunks": [_aged()],
+    })
+
+    assert strict["stale_warning"] is True
+    assert lenient["stale_warning"] is False
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,11 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+try:  # works both as `python scripts/ingest/seed_to_raw.py` and `-m`
+    from scripts.ingest.metadata import most_recent_effective_date
+except ImportError:  # pragma: no cover - script run with scripts/ingest on sys.path
+    from metadata import most_recent_effective_date
+
 SEED_DIR = Path(__file__).parent / "seed"
 RAW_DIR = Path(__file__).parent / "data" / "raw"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -46,6 +51,10 @@ def convert(csv_path: Path, domain: str, expiry_aware: bool) -> int:
     source_url = first.get("url", "")
     source_title = first.get("source_title", csv_path.stem.replace("_", " ").title())
 
+    # Derive effective_date from the most recent `year` present so freshness
+    # signals (analyst_node / temporal_accuracy) reflect the data's vintage.
+    effective_date = most_recent_effective_date(row.get("year") for row in rows) or ""
+
     header = (
         f"SOURCE_TITLE: {source_title}\n"
         f"SOURCE_URL: {source_url}\n"
@@ -53,6 +62,7 @@ def convert(csv_path: Path, domain: str, expiry_aware: bool) -> int:
         f"DOMAIN: {domain}\n"
         f"SOURCE_DATE: \n"
         f"EXPIRY_AWARE: {str(expiry_aware).lower()}\n"
+        f"EFFECTIVE_DATE: {effective_date}\n"
         "---\n"
     )
 

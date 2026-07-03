@@ -18,7 +18,14 @@ _GOV_DOMAIN_RE = re.compile(
 )
 
 _CLARIFICATION_THRESHOLD = 0.4
-_STALE_DAYS = 90
+# Domain-aware staleness windows. Kept in sync with the temporal_accuracy eval
+# metric (scripts/evals/temporal_scorer.py) so runtime flagging and the deploy
+# gate agree: policy domains that change often get a tighter window. Using
+# effective_date semantics, a flat short window (e.g. 90d) would over-flag a
+# rule that only just took effect, so windows are months/a year, not days.
+_STRICT_DOMAINS = frozenset({"tax", "epf", "immigration"})
+_STRICT_STALE_DAYS = 180
+_DEFAULT_STALE_DAYS = 365
 # Recency penalty applied to a stale chunk's relevance/authority score. Enough
 # to let a fresher chunk outrank a stale one on the same topic (prefer-newest)
 # and to pull confidence down when the only supporting evidence is stale,
@@ -56,9 +63,13 @@ def _days_since_effective(chunk: ChunkResult) -> int | None:
     return days if days > 0 else None
 
 
-def _is_stale(chunk: ChunkResult) -> bool:
+def _stale_threshold(domain: str | None) -> int:
+    return _STRICT_STALE_DAYS if domain in _STRICT_DOMAINS else _DEFAULT_STALE_DAYS
+
+
+def _is_stale(chunk: ChunkResult, domain: str | None = None) -> bool:
     days = _days_since_effective(chunk)
-    return days is not None and days > _STALE_DAYS
+    return days is not None and days > _stale_threshold(domain)
 
 
 def _adjusted_score(base: float, stale: bool) -> float:
@@ -113,11 +124,12 @@ async def analyst_node(state: AgentState) -> dict:
       1. Superseded chunks (``superseded_by`` set) are hard-rejected — dropped
          from the retrieved set entirely so they can never be scored, cited, or
          seen by the synthesiser.
-      2. Chunks whose ``effective_date`` passed more than ``_STALE_DAYS`` ago are
-         recorded in ``stale_warnings`` and down-weighted, and the answer is
-         flagged so the synthesiser date-stamps and hedges it.
+      2. Chunks whose ``effective_date`` passed more than the domain staleness
+         window ago are recorded in ``stale_warnings`` and down-weighted, and the
+         answer is flagged so the synthesiser date-stamps and hedges it.
     """
     query = state.get("query", "")
+    domain = state.get("domain")
     retrieved: list[ChunkResult] = state.get("retrieved_chunks", [])
 
     # 1. Hard-reject superseded chunks (never cite a chunk a newer one replaces).
@@ -130,7 +142,7 @@ async def analyst_node(state: AgentState) -> dict:
     # 2. Record effective-date staleness for the surviving chunks.
     stale_warnings: list[dict] = []
     for chunk in chunks:
-        if not _is_stale(chunk):
+        if not _is_stale(chunk, domain):
             continue
         days_old = _days_since_effective(chunk)
         stale_warnings.append({
@@ -159,7 +171,7 @@ async def analyst_node(state: AgentState) -> dict:
     # both last year's and this year's figure are in the corpus, the newer one
     # drives the answer.
     scored: list[tuple[float, str, ChunkResult]] = [
-        (_adjusted_score(_score_chunk(chunk, query), _is_stale(chunk)), _recency_key(chunk), chunk)
+        (_adjusted_score(_score_chunk(chunk, query), _is_stale(chunk, domain)), _recency_key(chunk), chunk)
         for chunk in chunks
     ]
     scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
@@ -173,7 +185,7 @@ async def analyst_node(state: AgentState) -> dict:
             ministry=chunk.ministry,
             url=chunk.source_url,
             confidence=score,
-            stale_disclaimer=_is_stale(chunk),
+            stale_disclaimer=_is_stale(chunk, domain),
         )
         for score, _, chunk in top3
         if chunk.source_url  # omit fabricated / empty URLs per CLAUDE.md
@@ -184,7 +196,7 @@ async def analyst_node(state: AgentState) -> dict:
     # is itself stale, the corpus has no current source for this query (e.g. the
     # new rule hasn't been ingested) — the synthesiser must date-stamp and hedge.
     top_chunk = top3[0][2]
-    stale_warning = _is_stale(top_chunk)
+    stale_warning = _is_stale(top_chunk, domain)
     answer_as_of = _staleness_ref(top_chunk) if stale_warning else None
 
     needs_clarification = confidence < _CLARIFICATION_THRESHOLD
