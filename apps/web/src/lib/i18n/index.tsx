@@ -342,7 +342,7 @@ const ZH: Translations = {
 
   /* ── landing ── */
   'landing.badge': '专为马来西亚打造',
-  'landing.hero.headline': '随时询问有关马来西亚的问题。',
+  'landing.hero.headline': '关于马来西亚政策，尽管问',
   'landing.hero.headline.highlight': '马来西亚',
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.hero.cta': '开始提问',
