@@ -26,6 +26,13 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         validation_alias=AliasChoices("FRONTEND_URL", "frontend_url"),
     )
+    # This API's own public URL — needed to hand HitPay a webhook callback
+    # address per-request (Stripe's webhook URL is configured once in its
+    # dashboard instead, so it has no equivalent setting here).
+    public_api_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias=AliasChoices("PUBLIC_API_URL", "public_api_url"),
+    )
     stripe_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("STRIPE_SECRET_KEY", "stripe_secret_key"),
@@ -59,6 +66,24 @@ class Settings(BaseSettings):
     stripe_price_credits_50: str = Field(
         default="",
         validation_alias=AliasChoices("STRIPE_PRICE_CREDITS_50", "stripe_price_credits_50"),
+    )
+
+    # HitPay — FPX/DuitNow QR checkout for agent-credit top-ups only (see
+    # services/billing.py). Not used for subscription plans; HitPay's
+    # recurring billing surface hasn't been evaluated yet.
+    hitpay_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("HITPAY_API_KEY", "hitpay_api_key"),
+    )
+    # The webhook HMAC secret — a separate value from the API key, found
+    # under Payment Gateway > Payment Requests > Webhook in the dashboard.
+    hitpay_salt: str = Field(
+        default="",
+        validation_alias=AliasChoices("HITPAY_SALT", "hitpay_salt"),
+    )
+    hitpay_base_url: str = Field(
+        default="https://api.sandbox.hit-pay.com/v1",
+        validation_alias=AliasChoices("HITPAY_BASE_URL", "hitpay_base_url"),
     )
 
 
