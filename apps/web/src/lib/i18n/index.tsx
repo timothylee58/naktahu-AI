@@ -25,53 +25,25 @@ const MS: Translations = {
   'chat.empty':
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
   'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
+  'chat.suggestions_label': 'Anda mungkin ingin tanya',
 
-  /* ── header ── */
+  /* ── header & nav ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Soal tentang kerajaan',
   'header.lang_toggle': 'EN',
   'header.history': 'Sejarah',
+  'header.menu': 'Menu',
   'header.sign_in': 'Daftar / Masuk',
+  'header.register': 'Daftar',
+  'header.login': 'Masuk',
   'header.sign_out': 'Keluar',
-  'header.pricing': 'Harga',
-
-  /* ── pricing ── */
-  'pricing.title': 'Pilih pelan anda',
-  'pricing.subtitle': 'Mula percuma. Naik taraf bila-bila masa.',
-  'pricing.free.name': 'Percuma',
-  'pricing.free.price': 'RM 0',
-  'pricing.free.period': '/bulan',
-  'pricing.free.cta': 'Pelan semasa anda',
-  'pricing.free.feature.1': '20 soalan sehari',
-  'pricing.free.feature.2': 'Semua 6 domain RAG',
-  'pricing.free.feature.3': 'BM + EN dengan sumber rujukan',
-  'pricing.pro.name': 'Pro — Individu',
-  'pricing.pro.price': 'RM 19',
-  'pricing.pro.period': '/bulan',
-  'pricing.pro.cta': 'Langgani',
-  'pricing.pro.feature.1': 'Soalan tanpa had',
-  'pricing.pro.feature.2': 'Input suara (ms-MY)',
-  'pricing.pro.feature.3': 'Sejarah 30 hari + eksport PDF',
-  'pricing.pro.feature.4': 'Ejen Pemantau Tarikh Akhir',
-  'pricing.business.name': 'Pro — Perniagaan',
-  'pricing.business.price': 'RM 99',
-  'pricing.business.period': '/bulan setiap ruang kerja',
-  'pricing.business.cta': 'Langgani',
-  'pricing.business.feature.1': 'Semua ciri Pro',
-  'pricing.business.feature.2': '5 tempat pasukan',
-  'pricing.business.feature.3': 'Sejarah dikongsi',
-  'pricing.business.feature.4': '1,000 panggilan API/bulan',
-  'pricing.student.name': 'Pelajar',
-  'pricing.student.price': 'RM 29',
-  'pricing.student.period': '/bulan',
-  'pricing.student.cta': 'Langgani',
-  'pricing.student.desc': 'Ejen Kajian untuk pelajar SPM/STPM — muat naik PDF, penjejakan topik.',
-  'pricing.credits.title': 'Kredit Ejen',
-  'pricing.credits.subtitle': 'RM 5 sekredit — digunakan untuk laporan Ejen Pematuhan, konsultasi Imigresen.',
-  'pricing.credits.buy': 'Beli',
-  'pricing.signin_required': 'Sila daftar masuk untuk melanggan',
-  'pricing.processing': 'Memproses…',
-  'pricing.error': 'Sesuatu tidak kena. Sila cuba lagi.',
+  'nav.try_question': 'Cuba Tanya',
+  'nav.home': 'Beranda',
+  'nav.about': 'Tentang Kami',
+  'nav.faq': 'Bantuan / FAQ',
+  'nav.contact': 'Hubungi Kami',
+  'sidebar.collapse': 'Lipat panel',
+  'sidebar.expand': 'Buka panel',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -96,6 +68,10 @@ const MS: Translations = {
   'auth.terms.link': 'terma penggunaan',
   'auth.microsoft': 'Teruskan dengan Microsoft',
   'auth.microsoft.loading': 'Menghubungi Microsoft…',
+  'auth.error.title': 'Log masuk gagal',
+  'auth.error.generic': 'Tidak dapat melengkapkan log masuk. Sila cuba lagi.',
+  'auth.error.access_denied': 'Log masuk dibatalkan. Sila cuba lagi jika anda ingin meneruskan.',
+  'auth.error.dismiss': 'Tutup',
 
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
@@ -179,53 +155,25 @@ const EN: Translations = {
   'chat.language_indicator': 'EN',
   'chat.empty': 'Ask me anything about Malaysian government services.',
   'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
+  'chat.suggestions_label': 'You might also ask',
 
-  /* ── header ── */
+  /* ── header & nav ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Ask about government',
   'header.lang_toggle': 'BM',
   'header.history': 'History',
+  'header.menu': 'Menu',
   'header.sign_in': 'Register / Login',
+  'header.register': 'Register',
+  'header.login': 'Login',
   'header.sign_out': 'Sign Out',
-  'header.pricing': 'Pricing',
-
-  /* ── pricing ── */
-  'pricing.title': 'Choose your plan',
-  'pricing.subtitle': 'Start free. Upgrade any time.',
-  'pricing.free.name': 'Free',
-  'pricing.free.price': 'RM 0',
-  'pricing.free.period': '/mo',
-  'pricing.free.cta': 'Your current plan',
-  'pricing.free.feature.1': '20 queries per day',
-  'pricing.free.feature.2': 'All 6 RAG domains',
-  'pricing.free.feature.3': 'BM + EN with source citations',
-  'pricing.pro.name': 'Pro — Individual',
-  'pricing.pro.price': 'RM 19',
-  'pricing.pro.period': '/mo',
-  'pricing.pro.cta': 'Subscribe',
-  'pricing.pro.feature.1': 'Unlimited queries',
-  'pricing.pro.feature.2': 'Voice input (ms-MY)',
-  'pricing.pro.feature.3': '30-day history + PDF export',
-  'pricing.pro.feature.4': 'Deadline Monitor agent',
-  'pricing.business.name': 'Pro — Business',
-  'pricing.business.price': 'RM 99',
-  'pricing.business.period': '/mo per workspace',
-  'pricing.business.cta': 'Subscribe',
-  'pricing.business.feature.1': 'Everything in Pro',
-  'pricing.business.feature.2': '5 team seats',
-  'pricing.business.feature.3': 'Shared history',
-  'pricing.business.feature.4': '1,000 API calls/mo',
-  'pricing.student.name': 'Student',
-  'pricing.student.price': 'RM 29',
-  'pricing.student.period': '/mo',
-  'pricing.student.cta': 'Subscribe',
-  'pricing.student.desc': 'Study Agent for SPM/STPM students — PDF upload, topic tracking.',
-  'pricing.credits.title': 'Agent Credits',
-  'pricing.credits.subtitle': 'RM 5 per credit — spent on Compliance Drafter reports, Immigration consults.',
-  'pricing.credits.buy': 'Buy',
-  'pricing.signin_required': 'Sign in to subscribe',
-  'pricing.processing': 'Processing…',
-  'pricing.error': 'Something went wrong. Please try again.',
+  'nav.try_question': 'Try a Question',
+  'nav.home': 'Home',
+  'nav.about': 'About Us',
+  'nav.faq': 'Help / FAQ',
+  'nav.contact': 'Contact Us',
+  'sidebar.collapse': 'Collapse sidebar',
+  'sidebar.expand': 'Expand sidebar',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -250,6 +198,10 @@ const EN: Translations = {
   'auth.terms.link': 'terms of use',
   'auth.microsoft': 'Continue with Microsoft',
   'auth.microsoft.loading': 'Connecting to Microsoft…',
+  'auth.error.title': 'Sign-in failed',
+  'auth.error.generic': 'Could not complete sign-in. Please try again.',
+  'auth.error.access_denied': 'Sign-in was cancelled. Try again if you want to continue.',
+  'auth.error.dismiss': 'Dismiss',
 
   /* ── history ── */
   'history.title': 'Query History',
@@ -332,53 +284,25 @@ const ZH: Translations = {
   'chat.language_indicator': '中文',
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
   'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
+  'chat.suggestions_label': '您可能还想问',
 
-  /* ── header ── */
+  /* ── header & nav ── */
   'header.title': 'NakTahu',
   'header.subtitle': '询问政府事务',
   'header.lang_toggle': 'BM',
   'header.history': '历史记录',
-  'header.sign_in': '注册 / 登录',
+  'header.menu': '菜单',
+  'header.sign_in': '注册登录',
+  'header.register': '注册',
+  'header.login': '登录',
   'header.sign_out': '退出',
-  'header.pricing': '价格',
-
-  /* ── pricing ── */
-  'pricing.title': '选择您的套餐',
-  'pricing.subtitle': '免费开始，随时升级。',
-  'pricing.free.name': '免费版',
-  'pricing.free.price': 'RM 0',
-  'pricing.free.period': '/月',
-  'pricing.free.cta': '您当前的套餐',
-  'pricing.free.feature.1': '每日 20 次查询',
-  'pricing.free.feature.2': '全部 6 个知识领域',
-  'pricing.free.feature.3': '马来文 + 英文，附来源引用',
-  'pricing.pro.name': 'Pro — 个人版',
-  'pricing.pro.price': 'RM 19',
-  'pricing.pro.period': '/月',
-  'pricing.pro.cta': '订阅',
-  'pricing.pro.feature.1': '无限次查询',
-  'pricing.pro.feature.2': '语音输入 (ms-MY)',
-  'pricing.pro.feature.3': '30 天历史记录 + PDF 导出',
-  'pricing.pro.feature.4': '截止日期监控代理',
-  'pricing.business.name': 'Pro — 商业版',
-  'pricing.business.price': 'RM 99',
-  'pricing.business.period': '/月，每个工作区',
-  'pricing.business.cta': '订阅',
-  'pricing.business.feature.1': '包含 Pro 所有功能',
-  'pricing.business.feature.2': '5 个团队席位',
-  'pricing.business.feature.3': '共享历史记录',
-  'pricing.business.feature.4': '每月 1,000 次 API 调用',
-  'pricing.student.name': '学生版',
-  'pricing.student.price': 'RM 29',
-  'pricing.student.period': '/月',
-  'pricing.student.cta': '订阅',
-  'pricing.student.desc': '面向 SPM/STPM 学生的学习代理 — PDF 上传、主题追踪。',
-  'pricing.credits.title': '代理点数',
-  'pricing.credits.subtitle': '每点数 RM 5 — 用于合规起草代理报告、移民咨询。',
-  'pricing.credits.buy': '购买',
-  'pricing.signin_required': '请登录以订阅',
-  'pricing.processing': '处理中…',
-  'pricing.error': '出了点问题，请重试。',
+  'nav.try_question': '尝试提问',
+  'nav.home': '首页',
+  'nav.about': '关于我们',
+  'nav.faq': '帮助 / 常见问题',
+  'nav.contact': '联系我们',
+  'sidebar.collapse': '收起侧栏',
+  'sidebar.expand': '展开侧栏',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -389,10 +313,10 @@ const ZH: Translations = {
   /* ── auth modal ── */
   'auth.modal.title': '登录 NakTahu',
   'auth.modal.subtitle': '保存您的问题历史',
-  'auth.google': '使用 Google 继续',
-  'auth.google.loading': '正在连接 Google…',
+  'auth.google': 'Google 登录',
+  'auth.google.loading': '连接 Google…',
   'auth.or': '或',
-  'auth.email': '使用电子邮件继续',
+  'auth.email': '邮箱登录',
   'auth.email.placeholder': 'name@email.com',
   'auth.email.send': '发送登录链接',
   'auth.email.sending': '发送中…',
@@ -401,8 +325,12 @@ const ZH: Translations = {
   'auth.email.back': '返回',
   'auth.terms': '登录即表示您同意我们的',
   'auth.terms.link': '使用条款',
-  'auth.microsoft': '使用 Microsoft 继续',
-  'auth.microsoft.loading': '正在连接 Microsoft…',
+  'auth.microsoft': 'Microsoft 登录',
+  'auth.microsoft.loading': '连接 Microsoft…',
+  'auth.error.title': '登录失败',
+  'auth.error.generic': '无法完成登录，请重试。',
+  'auth.error.access_denied': '登录已取消。如需继续，请重试。',
+  'auth.error.dismiss': '关闭',
 
   /* ── history ── */
   'history.title': '查询历史',
@@ -414,12 +342,12 @@ const ZH: Translations = {
 
   /* ── landing ── */
   'landing.badge': '专为马来西亚打造',
-  'landing.hero.headline': '随时询问有关马来西亚的问题。',
+  'landing.hero.headline': '关于马来西亚政策，尽管问',
   'landing.hero.headline.highlight': '马来西亚',
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.hero.cta': '开始提问',
   'landing.features.title': '为什么选择 NakTahu？',
-  'landing.features.bilingual.title': '三语支持 BM · EN · 中文',
+  'landing.features.bilingual.title': '三语 BM·EN·中文',
   'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
   'landing.features.cited.title': '经过验证的来源',
   'landing.features.cited.desc': '每个答案都链接到官方政府文件。',
@@ -496,12 +424,15 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate from localStorage after mount (avoids SSR mismatch)
   useEffect(() => {
-    setLocaleState(readStoredLocale());
+    const stored = readStoredLocale();
+    setLocaleState(stored);
+    document.documentElement.lang = stored === 'zh' ? 'zh-Hans' : stored;
   }, []);
 
   const setLocale = useCallback((l: UILocale) => {
     localStorage.setItem(STORAGE_KEY, l);
     setLocaleState(l);
+    document.documentElement.lang = l === 'zh' ? 'zh-Hans' : l;
   }, []);
 
   const t = useCallback(

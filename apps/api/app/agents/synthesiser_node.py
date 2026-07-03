@@ -121,39 +121,102 @@ async def _stream_anthropic(context: str, system_prompt: str) -> AsyncGenerator[
                 yield token
 
 
+async def _generate_suggestions(query: str, domain: str, language: str) -> list[str]:
+    """Generate 3 follow-up question suggestions based on the query, domain, and language."""
+    suggestion_prompt = {
+        "bm": f"Berdasarkan soalan '{query}' dalam domain {domain}, cadangkan 3 soalan susulan yang singkat dan relevan. Jawab dalam format JSON: [\"soalan1\", \"soalan2\", \"soalan3\"]",
+        "zh": f"根据领域 {domain} 中的问题 '{query}'，建议 3 个简短且相关的后续问题。以 JSON 格式回答：[\"问题1\", \"问题2\", \"问题3\"]",
+        "en": f"Based on the question '{query}' in the domain {domain}, suggest 3 short and relevant follow-up questions. Answer in JSON format: [\"question1\", \"question2\", \"question3\"]",
+    }
+    
+    prompt = suggestion_prompt.get(language, suggestion_prompt["en"])
+    
+    try:
+        response = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+            temperature=0.7,
+        )
+        content = response.choices[0].message.content or "[]"
+        # Extract JSON array from response
+        import json
+        suggestions = json.loads(content)
+        if isinstance(suggestions, list) and len(suggestions) >= 3:
+            return suggestions[:3]
+    except Exception as exc:
+        log.warning("suggestion_generation_failed", error=str(exc))
+    
+    # Fallback suggestions based on domain and language
+    fallback_suggestions = {
+        "government": {
+            "bm": ["Bagaimana cara memohon dokumen ini?", "Berapa lama masa pemprosesan?", "Apakah dokumen yang diperlukan?"],
+            "zh": ["如何申请此文件？", "处理需要多长时间？", "需要什么文件？"],
+            "en": ["How do I apply for this?", "How long does processing take?", "What documents are needed?"],
+        },
+        "education": {
+            "bm": ["Apakah syarat kelayakan?", "Bagaimana cara memohon?", "Apakah tarikh akhir permohonan?"],
+            "zh": ["有什么资格要求？", "如何申请？", "申请截止日期是什么时候？"],
+            "en": ["What are the eligibility requirements?", "How do I apply?", "What is the application deadline?"],
+        },
+    }
+    
+    domain_key = domain if domain in fallback_suggestions else "government"
+    lang_key = language if language in ["bm", "zh", "en"] else "en"
+    return fallback_suggestions[domain_key].get(lang_key, fallback_suggestions["government"]["en"])
+
+
 async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     """Public async generator for direct use by the SSE endpoint.
 
-    Tries ILMU first; falls back to Anthropic if ILMU fails or emits fewer than
-    10 tokens (indicating a truncated/empty response).
+    Streams the answer from ILMU. Only when ILMU yields *no* usable content do
+    we fall back to Anthropic, and only when Anthropic also yields nothing do we
+    emit the static apology.
+
+    Why the gate is "no content emitted" rather than a token-count threshold:
+    tokens are streamed to the client as they arrive and cannot be un-sent. If
+    ILMU has already streamed a complete answer, running the fallback would
+    *append* a second answer (or the apology) onto the real one — producing the
+    corrupted "…all times.I'm sorry, I'm unable to answer right now." output.
+    A short/single-chunk response is still a real response, so it must not
+    trigger a fallback.
     """
     language = state.get("language", "en")
     system_prompt = _build_system_prompt(language)
     context = _build_context(state)
-    emitted_tokens: list[str] = []
-    ilmu_failed = False
+    emitted_any = False
     try:
         async for token in _stream_ilmu(context, system_prompt):
-            emitted_tokens.append(token)
+            if token.strip():
+                emitted_any = True
             yield token
     except Exception as exc:
-        ilmu_failed = True
-        log.warning("ilmu_fallback_triggered", error=str(exc))
+        # If ILMU raised *after* already streaming content, that content is on
+        # the wire — do not append a fallback. Only a pre-content failure
+        # (emitted_any is False) is eligible for the Anthropic fallback below.
+        log.warning("ilmu_stream_error", error=str(exc), emitted_any=emitted_any)
 
-    # Fall back to Anthropic if ILMU failed or gave an unusably short response
-    if ilmu_failed or len(emitted_tokens) < 10:
-        if emitted_tokens:
-            log.warning("ilmu_response_too_short_fallback", tokens=len(emitted_tokens))
-        try:
-            async for token in _stream_anthropic(context, system_prompt):
-                yield token
-        except Exception:
-            log.error("anthropic_fallback_failed", exc_info=True)
-            fallback = {
-                "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
-                "zh": "抱歉，我现在无法回答。请稍后再试。",
-            }.get(language, "I'm sorry, I'm unable to answer right now. Please try again later.")
-            yield fallback
+    if emitted_any:
+        return
+
+    # ILMU produced nothing usable — safe to try Anthropic since nothing has
+    # been streamed to the client yet.
+    log.warning("ilmu_no_output_falling_back_to_anthropic")
+    anthropic_any = False
+    try:
+        async for token in _stream_anthropic(context, system_prompt):
+            if token.strip():
+                anthropic_any = True
+            yield token
+    except Exception:
+        log.error("anthropic_fallback_failed", exc_info=True)
+
+    if not anthropic_any:
+        fallback = {
+            "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
+            "zh": "抱歉，我现在无法回答。请稍后再试。",
+        }.get(language, "I'm sorry, I'm unable to answer right now. Please try again later.")
+        yield fallback
 
 
 @weave.op()
@@ -185,10 +248,18 @@ async def synthesiser_node(state: AgentState) -> dict:
             flagged_content=full_text[:500],
         )
 
+    # Generate follow-up suggestions
+    suggestions = await _generate_suggestions(
+        state.get("query", ""),
+        state.get("domain", "government"),
+        state.get("language", "en")
+    )
+
     return {
         "streaming_token_buffer": full_text,
         "output_flagged": output_flagged,
         # Signal to callers (e.g. the SSE endpoint / session-history writer)
         # that this response must NOT be persisted into session history.
         "skip_history_persist": output_flagged,
+        "suggestions": suggestions,
     }

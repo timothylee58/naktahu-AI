@@ -13,9 +13,7 @@ import type { Message } from '@/lib/types';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
-import { AuthButton } from '@/components/auth/AuthButton';
-import { HistorySidebar } from '@/components/history/HistorySidebar';
-import { LangToggle } from '@/components/LangToggle';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 let msgCounter = 0;
 function makeId() {
@@ -65,6 +63,7 @@ function ChatPageInner() {
     tokens,
     citations,
     metadata,
+    suggestions,
     isStreaming,
     error,
     startStream,
@@ -136,6 +135,7 @@ function ChatPageInner() {
                 query: lastUserQuery.current,
                 domain: metadata?.domain,
                 language: metadata?.detectedLanguage,
+                suggestions,
               }
             : m,
         ),
@@ -229,24 +229,25 @@ function ChatPageInner() {
   const showChips = messages.length === 0 && !isStreaming;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-50/50">
-      {/* History sidebar */}
-      <HistorySidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+    <div className="flex h-full bg-zinc-50/50">
+      <AppSidebar
+        isMobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        showHistory
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
       />
 
+      <div className="flex flex-col flex-1 min-w-0 h-full">
       {/* header */}
       <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-2">
-          {/* sidebar toggle */}
+          {/* sidebar toggle — mobile only */}
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label={t('header.history')}
-            className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors lg:hidden"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -268,17 +269,6 @@ function ChatPageInner() {
             </span>
             <span className="text-xs text-zinc-500">{t('header.subtitle')}</span>
           </Link>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/pricing"
-            className="text-sm font-medium text-zinc-500 hover:text-zinc-800 transition-colors px-2 py-1.5"
-          >
-            {t('header.pricing')}
-          </Link>
-          <AuthButton />
-          <LangToggle variant="light" />
         </div>
       </header>
 
@@ -328,6 +318,8 @@ function ChatPageInner() {
               domain={msg.domain}
               language={msg.language}
               accessToken={accessToken ?? undefined}
+              suggestions={msg.suggestions ?? []}
+              onSuggestionSelect={handleChipSelect}
             />
           ),
         )}
@@ -348,6 +340,7 @@ function ChatPageInner() {
         <p className="hidden sm:block text-center text-[10px] text-zinc-400">
           {t('chat.keyboard_hint')}
         </p>
+      </div>
       </div>
     </div>
   );

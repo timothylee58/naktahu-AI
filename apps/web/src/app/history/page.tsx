@@ -8,6 +8,7 @@ import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 interface HistoryEntry {
   query: string;
@@ -101,6 +102,7 @@ export default function HistoryPage() {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -142,10 +144,27 @@ export default function HistoryPage() {
   const groups = useMemo(() => groupEntries(entries), [entries]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-zinc-50 flex">
+      <AppSidebar
+        isMobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        showHistory
+        user={user}
+        accessToken={accessToken}
+      />
+
+      <div className="flex flex-col flex-1 min-w-0 min-h-screen">
       <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3">
-        <Link href="/chat" className="p-1 rounded hover:bg-zinc-100 text-zinc-500">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label={t('header.history')}
+          className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors lg:hidden"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+            <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
+          </svg>
+        </button>
+        <Link href="/chat" className="p-1 rounded hover:bg-zinc-100 text-zinc-500 flex-shrink-0">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
@@ -159,7 +178,7 @@ export default function HistoryPage() {
             />
           </svg>
         </Link>
-        <h1 className="font-semibold text-zinc-900">{t('history.title')}</h1>
+        <h1 className="font-semibold text-zinc-900 truncate locale-nowrap">{t('history.title')}</h1>
       </header>
 
       {/* Content */}
@@ -222,6 +241,7 @@ export default function HistoryPage() {
           </>
         )}
       </main>
+      </div>
     </div>
   );
 }

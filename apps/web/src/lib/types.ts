@@ -27,6 +27,7 @@ export interface Message {
   query?: string;
   domain?: string;
   language?: string;
+  suggestions?: string[];
 }
 
 export type UILocale = 'en' | 'ms' | 'zh';

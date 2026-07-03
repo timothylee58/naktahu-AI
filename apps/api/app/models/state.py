@@ -29,3 +29,4 @@ class AgentState(TypedDict, total=False):
     error: Optional[str]
     output_flagged: bool
     skip_history_persist: bool
+    suggestions: list[str]
