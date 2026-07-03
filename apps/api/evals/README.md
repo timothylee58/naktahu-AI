@@ -138,6 +138,12 @@ older rows. Chunks with none of these are treated as non-expiring and never
 flagged, so ingestion should stamp `effective_date` (and set `superseded_by`
 when a newer version is added) for time-sensitive facts.
 
+For the **dataset-level** counterpart — a custom `temporal_accuracy` metric that
+scores chunk currency ("is this chunk current as of today?"), the axis RAGAS
+faithfulness cannot measure — see `scripts/evals/temporal_scorer.py` and
+`scripts/evals/README.md`. This suite gates `analyst_node`'s runtime behaviour;
+that metric scores the same freshness axis over a dataset.
+
 ## Running
 
 ```bash
