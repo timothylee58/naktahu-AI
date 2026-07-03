@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { AuthButton } from '@/components/auth/AuthButton';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
-import { AppSidebar } from '@/components/layout/AppSidebar';
+import { LangToggle } from '@/components/LangToggle';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
@@ -29,36 +29,23 @@ const fadeUp = {
 
 export function LandingClient() {
   const { t } = useI18n();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#0A0F1E] text-white font-sans">
-      <AppSidebar
-        variant="dark"
-        isMobileOpen={sidebarOpen}
-        onMobileClose={() => setSidebarOpen(false)}
-      />
+    <div className="flex flex-col min-h-screen bg-[#0A0F1E] text-white font-sans">
+      <motion.nav
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-between px-6 py-4 border-b border-white/10"
+      >
+        <span className="text-lg font-bold tracking-tight locale-nowrap">NakTahu</span>
+        <div className="flex items-center gap-3">
+          <LangToggle variant="dark" />
+          <AuthButton variant="dark" />
+        </div>
+      </motion.nav>
 
-      <div className="flex flex-col flex-1 min-w-0">
-        <motion.nav
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center px-6 py-4 border-b border-white/10 lg:hidden"
-        >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label={t('header.menu')}
-            className="p-1.5 rounded-lg text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <span className="ml-3 text-lg font-bold tracking-tight locale-nowrap">NakTahu</span>
-        </motion.nav>
-
-        <AuthErrorBanner />
+      <AuthErrorBanner />
 
         <section className="flex flex-col items-center justify-center flex-1 text-center px-6 py-24 gap-8">
           <motion.div
@@ -208,7 +195,6 @@ export function LandingClient() {
             </span>
           </div>
         </footer>
-      </div>
     </div>
   );
 }
