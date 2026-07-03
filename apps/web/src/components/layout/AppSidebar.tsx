@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
@@ -110,6 +110,7 @@ function SidebarPanel({
   accessToken,
   onSelectQuery,
   onClose,
+  onCollapse,
 }: {
   variant: 'light' | 'dark';
   showHistory: boolean;
@@ -117,6 +118,7 @@ function SidebarPanel({
   accessToken: string | null;
   onSelectQuery?: (query: string) => void;
   onClose?: () => void;
+  onCollapse?: () => void;
 }) {
   const { t } = useI18n();
   const isDark = variant === 'dark';
@@ -158,17 +160,33 @@ function SidebarPanel({
         <Link href="/" className={`font-bold text-sm tracking-tight locale-nowrap ${titleClass}`}>
           NakTahu
         </Link>
-        {onClose && (
-          <button
-            onClick={onClose}
-            aria-label="Close sidebar"
-            className={`p-1 rounded lg:hidden ${closeHover}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-            </svg>
-          </button>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* collapse — desktop persistent panel only */}
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              aria-label={t('sidebar.collapse')}
+              title={t('sidebar.collapse')}
+              className={`hidden lg:inline-flex p-1 rounded ${closeHover}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
+          {/* close — mobile overlay only */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close sidebar"
+              className={`p-1 rounded lg:hidden ${closeHover}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {showHistory && (
@@ -275,6 +293,8 @@ function SidebarPanel({
   );
 }
 
+const COLLAPSE_KEY = 'naktahu_sidebar_collapsed';
+
 export function AppSidebar({
   variant = 'light',
   isMobileOpen,
@@ -284,10 +304,28 @@ export function AppSidebar({
   accessToken = null,
   onSelectQuery,
 }: AppSidebarProps) {
+  const { t } = useI18n();
   const isDark = variant === 'dark';
   const shellClass = isDark
     ? 'bg-[#0A0F1E] border-white/10 text-white'
     : 'bg-white border-zinc-200 text-zinc-900';
+
+  // Desktop-only collapse of the persistent panel; persisted across reloads.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem(COLLAPSE_KEY) === '1') setCollapsed(true);
+  }, []);
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0');
+      return next;
+    });
+  }, []);
+
+  const expandTabClass = isDark
+    ? 'bg-[#0A0F1E] border-white/10 text-zinc-300 hover:text-white hover:bg-white/10'
+    : 'bg-white border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100';
 
   const panelProps = {
     variant,
@@ -299,9 +337,26 @@ export function AppSidebar({
 
   return (
     <>
-      <aside className={`hidden lg:flex w-72 flex-shrink-0 flex-col border-r h-full ${shellClass}`}>
-        <SidebarPanel {...panelProps} />
+      {/* Persistent panel — desktop (hidden when collapsed) */}
+      <aside
+        className={`${collapsed ? 'hidden' : 'hidden lg:flex'} w-72 flex-shrink-0 flex-col border-r h-full ${shellClass}`}
+      >
+        <SidebarPanel {...panelProps} onCollapse={toggleCollapsed} />
       </aside>
+
+      {/* Expand tab — desktop only, shown when the panel is collapsed */}
+      {collapsed && (
+        <button
+          onClick={toggleCollapsed}
+          aria-label={t('sidebar.expand')}
+          title={t('sidebar.expand')}
+          className={`hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 items-center justify-center w-6 h-16 rounded-r-xl border border-l-0 shadow-md transition-colors ${expandTabClass}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+            <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clipRule="evenodd" />
+          </svg>
+        </button>
+      )}
 
       <AnimatePresence>
         {isMobileOpen && (
