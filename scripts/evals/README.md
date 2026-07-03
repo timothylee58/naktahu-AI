@@ -71,7 +71,39 @@ class TemporalAccuracy(Metric):
     # map each RAGAS sample's retrieved contexts' metadata → aggregate_temporal_accuracy(...)
 ```
 
-### Running
+## Deploy gate (`run_eval_gate.py`)
+
+Two deploy gates run in CI (`.github/workflows/ci.yml` → `eval-gate` job):
+
+```python
+if scores["faithfulness"] < 0.7:        # existing gate
+    sys.exit(1)
+if scores["temporal_accuracy"] < 0.6:   # new freshness gate
+    sys.exit(1)
+```
+
+- `avg_temporal_accuracy` is computed offline from `data/temporal_golden.jsonl`
+  (chunks use `effective_days_ago`, resolved against today, so the fixture never
+  ages out) and averaged across samples (each sample = its worst chunk).
+- `faithfulness` is read from `--faithfulness` / `--scores-json` /
+  `FAITHFULNESS_SCORE` (produced by a live RAGAS run, which needs LLM
+  credentials). When absent its gate is **skipped** unless
+  `--require-faithfulness` is set, so credential-free CI still enforces the
+  temporal gate.
+- Each run is recorded to the **`eval_runs`** table (migration 009), including
+  `avg_temporal_accuracy`, `faithfulness`, `passed`, and the full `scores` — a
+  best-effort insert that is skipped when Supabase creds are absent (never fails
+  the gate).
+
+```bash
+# temporal gate only (offline)
+PYTHONPATH=. python -m scripts.evals.run_eval_gate
+
+# both gates (faithfulness from a RAGAS run)
+PYTHONPATH=. python -m scripts.evals.run_eval_gate --faithfulness 0.82
+```
+
+## Running tests
 
 ```bash
 PYTHONPATH=. pytest scripts/evals/ -q
