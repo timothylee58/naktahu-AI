@@ -21,11 +21,19 @@ interface HistoryEntry {
 interface ChatSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Desktop-only: whether the persistent panel is collapsed (hidden). */
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   user: User | null;
   accessToken: string | null;
   onSelectQuery: (query: string) => void;
   onNewChat: () => void;
 }
+
+type SidebarInnerProps = Pick<
+  ChatSidebarProps,
+  'user' | 'accessToken' | 'onSelectQuery' | 'onNewChat' | 'onClose' | 'onToggleCollapse'
+>;
 
 const DAY_MS = 86_400_000;
 
@@ -107,7 +115,8 @@ function SidebarInner({
   onSelectQuery,
   onNewChat,
   onClose,
-}: Omit<ChatSidebarProps, 'isOpen'>) {
+  onToggleCollapse,
+}: SidebarInnerProps) {
   const { t } = useI18n();
 
   const fetcher = useMemo(
@@ -147,16 +156,29 @@ function SidebarInner({
             {t('header.subtitle')}
           </span>
         </Link>
-        {/* close — mobile overlay only */}
-        <button
-          onClick={onClose}
-          aria-label={t('auth.error.dismiss')}
-          className="md:hidden p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 flex-shrink-0"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* collapse — desktop persistent panel only */}
+          <button
+            onClick={onToggleCollapse}
+            aria-label={t('sidebar.collapse')}
+            title={t('sidebar.collapse')}
+            className="hidden md:inline-flex p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+              <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
+            </svg>
+          </button>
+          {/* close — mobile overlay only */}
+          <button
+            onClick={onClose}
+            aria-label={t('auth.error.dismiss')}
+            className="md:hidden p-1 rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* new chat */}
@@ -223,6 +245,8 @@ function SidebarInner({
 export function ChatSidebar({
   isOpen,
   onClose,
+  collapsed,
+  onToggleCollapse,
   user,
   accessToken,
   onSelectQuery,
@@ -235,40 +259,32 @@ export function ChatSidebar({
       onSelectQuery={onSelectQuery}
       onNewChat={onNewChat}
       onClose={onClose}
+      onToggleCollapse={onToggleCollapse}
     />
   );
 
   return (
     <>
-      {/* Persistent panel — desktop */}
-      <aside className="hidden md:flex md:flex-col md:w-72 md:flex-shrink-0 border-r border-zinc-200 bg-white">
+      {/* Persistent panel — desktop (hidden when collapsed) */}
+      <aside
+        className={`${collapsed ? 'hidden' : 'hidden md:flex'} md:flex-col md:w-72 md:flex-shrink-0 border-r border-zinc-200 bg-white`}
+      >
         {inner}
       </aside>
 
-      {/* Slide-over panel — mobile */}
+      {/* Full-page overlay — mobile only */}
       <AnimatePresence>
         {isOpen && (
-          <>
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/30 z-20 md:hidden"
-              onClick={onClose}
-            />
-            <motion.aside
-              key="sidebar"
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              className="fixed top-0 left-0 h-full w-72 max-w-[85vw] bg-white border-r border-zinc-200 z-30 shadow-xl md:hidden"
-            >
-              {inner}
-            </motion.aside>
-          </>
+          <motion.aside
+            key="sidebar"
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            className="fixed inset-0 h-full w-full bg-white z-30 md:hidden"
+          >
+            {inner}
+          </motion.aside>
         )}
       </AnimatePresence>
     </>

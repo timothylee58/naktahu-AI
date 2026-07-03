@@ -30,7 +30,23 @@ function ChatPageInner() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
+
+  // Hydrate the desktop collapse preference after mount (avoids SSR mismatch)
+  useEffect(() => {
+    if (localStorage.getItem('naktahu_sidebar_collapsed') === '1') {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem('naktahu_sidebar_collapsed', next ? '1' : '0');
+      return next;
+    });
+  }, []);
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -238,10 +254,12 @@ function ChatPageInner() {
 
   return (
     <div className="flex h-full bg-zinc-50/50">
-      {/* Left panel — persistent on desktop, slide-over on mobile */}
+      {/* Left panel — persistent on desktop (collapsible), full-page overlay on mobile */}
       <ChatSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapsed}
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
@@ -272,6 +290,20 @@ function ChatPageInner() {
                 />
               </svg>
             </button>
+
+            {/* expand sidebar — desktop only, when the panel is collapsed */}
+            {sidebarCollapsed && (
+              <button
+                onClick={toggleSidebarCollapsed}
+                aria-label={t('sidebar.expand')}
+                title={t('sidebar.expand')}
+                className="hidden md:inline-flex p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors flex-shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                  <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
 
             <Link href="/" className="flex flex-col min-w-0">
               <span className="text-base font-bold text-zinc-900 tracking-tight truncate">

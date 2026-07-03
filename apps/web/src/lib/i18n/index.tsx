@@ -35,6 +35,10 @@ const MS: Translations = {
   'header.sign_in': 'Daftar / Masuk',
   'header.sign_out': 'Keluar',
 
+  /* ── sidebar ── */
+  'sidebar.collapse': 'Lipat panel',
+  'sidebar.expand': 'Buka panel',
+
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -155,6 +159,10 @@ const EN: Translations = {
   'header.sign_in': 'Register / Login',
   'header.sign_out': 'Sign Out',
 
+  /* ── sidebar ── */
+  'sidebar.collapse': 'Collapse sidebar',
+  'sidebar.expand': 'Expand sidebar',
+
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -273,6 +281,10 @@ const ZH: Translations = {
   'header.history': '历史记录',
   'header.sign_in': '注册 / 登录',
   'header.sign_out': '退出',
+
+  /* ── sidebar ── */
+  'sidebar.collapse': '收起侧栏',
+  'sidebar.expand': '展开侧栏',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
