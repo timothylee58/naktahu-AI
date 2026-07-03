@@ -10,11 +10,18 @@ from core.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/ignored", auto_error=False)
 
+# Supabase Auth includes app_metadata in the JWT automatically once set via
+# the admin API (services/billing.py, on checkout.session.completed). No
+# separate plan/subscriptions table needed — the JWT claim is the source of
+# truth, refreshed client-side after checkout completes.
+VALID_PLANS = {"free", "student", "pro", "business"}
+
 
 @dataclass(frozen=True)
 class UserContext:
     user_id: str
     is_anonymous: bool
+    plan: str = "free"
 
 
 def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
@@ -32,7 +39,15 @@ def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
     sub = payload.get("sub")
     if not sub or not isinstance(sub, str):
         return None
-    return UserContext(user_id=sub, is_anonymous=False)
+
+    plan = "free"
+    app_metadata = payload.get("app_metadata")
+    if isinstance(app_metadata, dict):
+        raw_plan = app_metadata.get("plan")
+        if isinstance(raw_plan, str) and raw_plan in VALID_PLANS:
+            plan = raw_plan
+
+    return UserContext(user_id=sub, is_anonymous=False, plan=plan)
 
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> UserContext:

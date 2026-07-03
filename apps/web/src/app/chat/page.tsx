@@ -271,6 +271,12 @@ function ChatPageInner() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/pricing"
+            className="text-sm font-medium text-zinc-500 hover:text-zinc-800 transition-colors px-2 py-1.5"
+          >
+            {t('header.pricing')}
+          </Link>
           <AuthButton />
           <LangToggle variant="light" />
         </div>
