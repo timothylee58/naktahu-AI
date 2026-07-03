@@ -20,6 +20,10 @@ are optional):
   SUPERSEDES: https://old.url    # comma/space separated old source URLs
   ---
 
+effective_date is also parsed per-chunk from the content itself (e.g. "Budget
+2024", "berkuat kuasa 1 Mei 2024", "w.e.f. 01/05/2024") which takes precedence
+over the header default — see metadata.extract_effective_date.
+
 Run:
     python scripts/ingest/chunk_and_embed.py
     python scripts/ingest/chunk_and_embed.py --domain tax
@@ -41,9 +45,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import OpenAI
 
 try:  # works both as `python scripts/ingest/chunk_and_embed.py` and `-m`
-    from scripts.ingest.metadata import parse_header
+    from scripts.ingest.metadata import extract_effective_date, parse_header
 except ImportError:  # pragma: no cover - script run with scripts/ingest on sys.path
-    from metadata import parse_header
+    from metadata import extract_effective_date, parse_header
 
 load_dotenv(Path(__file__).parent.parent.parent / "apps" / "api" / ".env")
 
@@ -130,6 +134,10 @@ def chunk_file(path: Path, domain_filter: str | None) -> list[dict]:
         chunk = chunk.strip()
         if len(chunk) < 80:
             continue
+        # Prefer a date parsed from the chunk's own text (e.g. "Budget 2024",
+        # "berkuat kuasa 1 Mei 2024", "w.e.f. 01/05/2024") — more precise than
+        # the file-level header default — and fall back to the header.
+        effective_date = extract_effective_date(chunk) or meta.get("effective_date")
         records.append({
             "id": str(uuid.uuid4()),
             "content": chunk,
@@ -141,7 +149,7 @@ def chunk_file(path: Path, domain_filter: str | None) -> list[dict]:
             "ministry": meta["ministry"],
             "expiry_aware": meta["expiry_aware"],
             "source_date": meta["source_date"],
-            "effective_date": meta.get("effective_date"),
+            "effective_date": effective_date,
             # doc-level; consumed by upload_to_supabase to set superseded_by on
             # old chunks. Not a document_chunks column (stripped before upsert).
             "supersedes": meta.get("supersedes", []),

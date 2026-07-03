@@ -101,6 +101,95 @@ def parse_header(raw: str) -> tuple[dict[str, Any], str]:
     return meta, body
 
 
+# --- content-level effective-date extraction -------------------------------
+# Bahasa Malaysia + English month names (incl. common abbreviations).
+_MONTHS: dict[str, int] = {
+    "january": 1, "jan": 1, "januari": 1,
+    "february": 2, "feb": 2, "februari": 2,
+    "march": 3, "mar": 3, "mac": 3,
+    "april": 4, "apr": 4,
+    "may": 5, "mei": 5,
+    "june": 6, "jun": 6,
+    "july": 7, "jul": 7, "julai": 7,
+    "august": 8, "aug": 8, "ogos": 8,
+    "september": 9, "sep": 9, "sept": 9,
+    "october": 10, "oct": 10, "oktober": 10,
+    "november": 11, "nov": 11,
+    "december": 12, "dec": 12, "disember": 12,
+}
+
+# Phrases that introduce an explicit commencement date (BM + EN).
+_EFFECTIVE_TRIGGER_RE = re.compile(
+    r"(?:mula\s+)?berkuat\s+kuasa(?:\s+(?:pada|mulai|dari))?"
+    r"|effective(?:\s+(?:from|on))?"
+    r"|with\s+effect\s+from"
+    r"|w\.?\s*e\.?\s*f\.?",
+    re.IGNORECASE,
+)
+# "Budget 2024" / "Bajet 2024" → the fiscal year the figure belongs to.
+_BUDGET_YEAR_RE = re.compile(r"\b(?:Bajet|Budget)\s+(\d{4})\b", re.IGNORECASE)
+
+_DMY_NUMERIC_RE = re.compile(r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})")
+_DMY_TEXT_RE = re.compile(r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})")
+_MY_TEXT_RE = re.compile(r"([A-Za-z]+)\s+(\d{4})")
+
+
+def _iso_or_none(year: int, month: int, day: int) -> Optional[str]:
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return None
+
+
+def _parse_date_fragment(fragment: str) -> Optional[str]:
+    """Parse the first date out of a short text fragment.
+
+    Handles Malaysian ``dd/mm/yyyy``, ``D Month YYYY``, and ``Month YYYY``
+    (day defaults to the 1st). Returns an ISO date string or None.
+    """
+    m = _DMY_NUMERIC_RE.search(fragment)
+    if m:  # Malaysian day-first numeric date
+        return _iso_or_none(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    m = _DMY_TEXT_RE.search(fragment)
+    if m:
+        month = _MONTHS.get(m.group(2).lower())
+        if month:
+            iso = _iso_or_none(int(m.group(3)), month, int(m.group(1)))
+            if iso:
+                return iso
+    m = _MY_TEXT_RE.search(fragment)
+    if m:
+        month = _MONTHS.get(m.group(1).lower())
+        if month:
+            return _iso_or_none(int(m.group(2)), month, 1)
+    return None
+
+
+def extract_effective_date(text: str) -> Optional[str]:
+    """Extract an ISO ``effective_date`` from a chunk's text, or None.
+
+    Precedence:
+      1. An explicit commencement phrase (``berkuat kuasa`` / ``effective`` /
+         ``w.e.f.``) followed by a date — the most precise signal.
+      2. A ``Budget``/``Bajet YYYY`` reference → 1 Jan of that fiscal year.
+
+    Chunk-level extraction is more precise than a file-level year, so callers
+    should prefer this over the header default and fall back to it.
+    """
+    if not text:
+        return None
+    for trigger in _EFFECTIVE_TRIGGER_RE.finditer(text):
+        # Look just past the trigger phrase for the date it introduces.
+        fragment = text[trigger.end(): trigger.end() + 40]
+        parsed = _parse_date_fragment(fragment)
+        if parsed:
+            return parsed
+    m = _BUDGET_YEAR_RE.search(text)
+    if m:
+        return f"{m.group(1)}-01-01"
+    return None
+
+
 def build_supersession_map(chunks: Iterable[dict[str, Any]]) -> dict[str, str]:
     """Map each superseded source_url -> a representative new chunk id.
 

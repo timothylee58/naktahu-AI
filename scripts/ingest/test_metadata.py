@@ -8,6 +8,7 @@ import pytest
 
 from scripts.ingest.metadata import (
     build_supersession_map,
+    extract_effective_date,
     most_recent_effective_date,
     parse_header,
     parse_supersedes,
@@ -123,3 +124,44 @@ def test_build_supersession_map() -> None:
 
 def test_build_supersession_map_empty() -> None:
     assert build_supersession_map([{"id": "x"}]) == {}
+
+
+# --- extract_effective_date (content-level) --------------------------------
+
+
+def test_extract_budget_year_bm_and_en() -> None:
+    assert extract_effective_date("Budget 2024 raised the relief to RM9,000.") == "2024-01-01"
+    assert extract_effective_date("Bajet 2023 memperkenalkan insentif baharu.") == "2023-01-01"
+
+
+def test_extract_berkuat_kuasa_month_year() -> None:
+    assert extract_effective_date(
+        "Struktur akaun baharu ini berkuat kuasa Mei 2024."
+    ) == "2024-05-01"
+
+
+def test_extract_berkuat_kuasa_full_date() -> None:
+    assert extract_effective_date(
+        "Kadar baharu berkuat kuasa 15 Mei 2024 di seluruh negara."
+    ) == "2024-05-15"
+
+
+def test_extract_effective_from_english() -> None:
+    assert extract_effective_date("The new rate is effective from 1 May 2024.") == "2024-05-01"
+    assert extract_effective_date("With effect from 15 March 2024, fees increase.") == "2024-03-15"
+
+
+def test_extract_wef_numeric_is_day_first() -> None:
+    # Malaysian dd/mm/yyyy
+    assert extract_effective_date("New fee applies w.e.f. 01/05/2024.") == "2024-05-01"
+    assert extract_effective_date("Berkuat kuasa 07-11-2024.") == "2024-11-07"
+
+
+def test_extract_effective_phrase_beats_budget_year() -> None:
+    text = "Under Budget 2023 the cap changed, effective from 1 May 2024."
+    assert extract_effective_date(text) == "2024-05-01"
+
+
+def test_extract_no_date_returns_none() -> None:
+    assert extract_effective_date("How to register a company with SSM.") is None
+    assert extract_effective_date("") is None
