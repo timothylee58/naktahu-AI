@@ -147,6 +147,10 @@ function SidebarPanel({
   const footerBorder = isDark ? 'border-white/10 bg-[#0A0F1E]/80' : 'border-zinc-100 bg-zinc-50/80';
   const titleClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const closeHover = isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-zinc-200' : 'hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700';
+  const navLinkClass = isDark
+    ? 'text-zinc-300 hover:text-white hover:bg-white/10'
+    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100';
+  const dividerClass = isDark ? 'border-white/10' : 'border-zinc-200';
 
   return (
     <>
@@ -218,7 +222,50 @@ function SidebarPanel({
         </div>
       )}
 
-      {!showHistory && <div className="flex-1 min-h-0" />}
+      {!showHistory && (
+        <nav className="flex flex-col gap-1 px-3 py-4">
+          <Link
+            href="/chat"
+            onClick={onClose}
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-lg font-medium text-sm border transition-colors locale-nowrap ${
+              isDark
+                ? 'border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M10 2a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 2ZM5.05 4.05a.75.75 0 0 1 1.06 0l1.062 1.06a.75.75 0 1 1-1.061 1.062L5.05 5.111a.75.75 0 0 1 0-1.06Zm9.9 0a.75.75 0 0 1 0 1.061l-1.06 1.061a.75.75 0 0 1-1.062-1.06l1.061-1.062a.75.75 0 0 1 1.061 0ZM3 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 3 8Zm11 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 14 8Zm-6.828 2.828a3 3 0 1 0 5.656 0 3 3 0 0 0-5.656 0ZM14 16a.75.75 0 0 1-.75.75h-6.5a.75.75 0 0 1 0-1.5h6.5A.75.75 0 0 1 14 16Zm-2.5-3.5a.75.75 0 0 0-3 0V14a.75.75 0 0 0 3 0v-1.5Z" clipRule="evenodd" />
+            </svg>
+            {t('nav.try_question')}
+          </Link>
+
+          <div className={`my-2 border-t ${dividerClass}`} />
+
+          <Link
+            href="/"
+            onClick={onClose}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
+          >
+            {t('nav.home')}
+          </Link>
+          <Link
+            href="/about"
+            onClick={onClose}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
+          >
+            {t('nav.about')}
+          </Link>
+          <Link
+            href="/faq"
+            onClick={onClose}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
+          >
+            {t('nav.faq')}
+          </Link>
+
+          <div className={`my-2 border-t ${dividerClass}`} />
+        </nav>
+      )}
 
       <div className={`flex-shrink-0 border-t px-4 py-4 flex flex-col gap-3 ${footerBorder}`}>
         <LangToggle variant={variant} layout="sidebar" />
