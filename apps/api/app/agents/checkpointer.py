@@ -1,10 +1,11 @@
 """LangGraph checkpointer — PostgresSaver when DATABASE_URL is set, else MemorySaver."""
 from __future__ import annotations
 
-import os
 from typing import Any, Optional
 
 import structlog
+
+from core.config import settings
 
 log = structlog.get_logger(__name__)
 
@@ -24,7 +25,7 @@ def get_checkpointer() -> Any:
 async def init_checkpointer() -> Any:
     """Call during app lifespan. Uses AsyncPostgresSaver when configured."""
     global _checkpointer
-    db_url = os.environ.get("DATABASE_URL", "").strip()
+    db_url = settings.database_url.strip()
     if not db_url:
         from langgraph.checkpoint.memory import MemorySaver
 

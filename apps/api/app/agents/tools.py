@@ -21,6 +21,7 @@ from app.services.llm_client import (
     OPENAI_EMBEDDING_MODEL,
 )
 from app.services.vector_store import ChunkResult, hybrid_search
+from core.config import settings
 
 log = structlog.get_logger(__name__)
 
@@ -157,7 +158,7 @@ async def generate_pdf(
         pdf_bytes = html.encode("utf-8")
 
     storage_path = f"agents/{agent_type}/{user_id}/{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.pdf"
-    bucket = os.environ.get("SUPABASE_STORAGE_BUCKET", "generated-documents")
+    bucket = settings.supabase_storage_bucket
 
     if not supabase_client:
         return storage_path, "", ""
@@ -187,8 +188,8 @@ async def send_email(
     html_body: str,
 ) -> bool:
     """Send via Resend API. Returns False when not configured."""
-    api_key = os.environ.get("RESEND_API_KEY", "").strip()
-    from_addr = os.environ.get("RESEND_FROM_EMAIL", "NakTahu <noreply@naktahu.ai>").strip()
+    api_key = settings.resend_api_key.strip()
+    from_addr = settings.resend_from_email.strip()
     if not api_key or not to:
         log.info("send_email_skipped", reason="not_configured")
         return False
