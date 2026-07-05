@@ -5,11 +5,12 @@ Execution order:
                         ↓                → clarification  (needs_clarification=True)
                        END  (blocked query — refusal already streamed)
 
-Compile with checkpointer=None (stateless).
-The SSE endpoint uses astream(stream_mode="custom") to receive tokens written
-by synthesiser_node via get_stream_writer().
+Pass a PostgresSaver (or other checkpointer) to build_graph() for persistent
+multi-turn state. Default export is stateless for the SSE /query endpoint.
 """
 from __future__ import annotations
+
+from typing import Any, Optional
 
 from langgraph.graph import END, START, StateGraph
 
@@ -79,5 +80,10 @@ def build_graph() -> StateGraph:
     return graph
 
 
-# Compiled stateless graph — import this in the endpoint
-pipeline = build_graph().compile(checkpointer=None)
+def compile_pipeline(checkpointer: Optional[Any] = None):
+    """Compile the main Q&A pipeline, optionally with a PostgresSaver."""
+    return build_graph().compile(checkpointer=checkpointer)
+
+
+# Stateless graph for the SSE /query endpoint (default).
+pipeline = compile_pipeline(checkpointer=None)

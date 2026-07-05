@@ -9,13 +9,14 @@ from typing import AsyncGenerator, Optional
 
 import structlog
 import weave
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
-from services.auth import _decode_supabase_jwt
+from services.auth import UserContext, _decode_supabase_jwt
+from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota
 
 log = structlog.get_logger(__name__)
 
@@ -44,18 +45,15 @@ def _sse(event: str, data: dict | str) -> str:
     return f"event: {event}\ndata: {payload}\n\n"
 
 
-def _extract_user_id(authorization: Optional[str]) -> Optional[str]:
-    """Extract the verified sub claim from a Bearer JWT.
-
-    Delegates to the shared, signature-verifying decoder used by the rest of
-    the API (services.auth._decode_supabase_jwt) so there is a single source
-    of truth for JWT verification. Returns None for missing/malformed/expired/
-    invalid-signature tokens — never trusts an unverified payload.
-    """
+def _extract_user(authorization: Optional[str]) -> Optional[UserContext]:
     if not authorization or not authorization.startswith("Bearer "):
         return None
     token = authorization.split(" ", 1)[1]
-    ctx = _decode_supabase_jwt(token)
+    return _decode_supabase_jwt(token)
+
+
+def _extract_user_id(authorization: Optional[str]) -> Optional[str]:
+    ctx = _extract_user(authorization)
     return ctx.user_id if ctx else None
 
 
@@ -162,10 +160,25 @@ async def _sse_generator(
 @router.post("/query")
 async def query_endpoint(
     body: QueryRequest,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ) -> StreamingResponse:
-    user_id = _extract_user_id(authorization)
+    user_ctx = _extract_user(authorization)
+    user_id = user_ctx.user_id if user_ctx else None
+    plan = user_ctx.plan if user_ctx else "free"
     rate = _AUTH_RATE if user_id else _ANON_RATE
+
+    redis_client = getattr(request.app.state, "redis", None)
+    quota_id = f"auth:{user_id}" if user_id else f"anon:{request.client.host if request.client else 'unknown'}"
+    allowed, used, limit = await check_and_increment_daily_quota(
+        redis_client, identifier=quota_id, plan=plan
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily query limit reached ({limit}/day on the free plan). Upgrade for unlimited queries.",
+            headers={"Retry-After": "86400", "X-Daily-Limit": str(limit), "X-Daily-Used": str(used)},
+        )
 
     clean_query = sanitise_query(body.query)
     session_id = body.session_id or str(uuid.uuid4())
@@ -179,5 +192,7 @@ async def query_endpoint(
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
             "X-RateLimit-Limit": rate,
+            "X-Daily-Limit": str(FREE_DAILY_LIMIT),
+            "X-Daily-Used": str(used),
         },
     )

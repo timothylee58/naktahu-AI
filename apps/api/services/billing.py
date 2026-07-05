@@ -293,3 +293,22 @@ async def get_credits_remaining(supabase_client: Optional[Client], user_id: str)
         return res.data[0]["credits_remaining"] if res.data else 0
 
     return await asyncio.to_thread(_fetch)
+
+
+async def deduct_credits(supabase_client: Optional[Client], user_id: str, n: int) -> int:
+    """Atomically deduct credits via deduct_agent_credits RPC.
+
+    Returns remaining balance, or -1 if insufficient credits or no client.
+    """
+    if not supabase_client or n <= 0:
+        return -1
+
+    def _rpc() -> int:
+        res = supabase_client.rpc(
+            "deduct_agent_credits", {"p_user_id": user_id, "p_amount": n}
+        ).execute()
+        if res.data is None:
+            return -1
+        return int(res.data)
+
+    return await asyncio.to_thread(_rpc)

@@ -23,6 +23,7 @@ dependencies = [
     "langchain-community>=0.3.0",
     "langchain-anthropic>=0.3.0",
     "langgraph>=0.2.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
     "slowapi>=0.1.9",
     "python-jose[cryptography]>=3.3.0",
     "PyJWT[crypto]>=2.9.0",
