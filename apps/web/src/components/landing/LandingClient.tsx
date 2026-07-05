@@ -146,23 +146,12 @@ export function LandingClient() {
               />
             </svg>
           </Link>
-          <p className={`text-sm ${mutedText}`}>
-            <Link
-              href="/pricing"
-              className="hover:text-[#2563EB] transition-colors locale-nowrap"
-            >
-              {t('nav.pricing')}
-            </Link>
-            <span className="mx-2 opacity-40" aria-hidden>
-              ·
-            </span>
-            <Link
-              href="/agents"
-              className="hover:text-[#2563EB] transition-colors locale-nowrap"
-            >
-              {t('nav.agents')}
-            </Link>
-          </p>
+          <Link
+            href="/pricing"
+            className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
+          >
+            {t('nav.pricing')}
+          </Link>
         </motion.div>
       </section>
 

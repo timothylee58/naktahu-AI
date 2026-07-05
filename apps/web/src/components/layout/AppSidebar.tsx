@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
 import { SidebarAgentsNav } from '@/components/agents/SidebarAgentsNav';
@@ -12,7 +13,13 @@ import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
-import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import {
+  fetchHistoryAuthed,
+  HistoryFetchError,
+  HISTORY_SWR_OPTIONS,
+  sidebarHistoryKey,
+  type HistoryEntry,
+} from '@/lib/history';
 import { canAccessHistory } from '@/lib/auth-plan';
 
 export interface AppSidebarProps {
@@ -80,13 +87,21 @@ function HistoryRow({
   const domainClass = colors[entry.domain] ?? colors['general'];
   const hoverClass = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
   const textClass = isDark ? 'text-zinc-200' : 'text-zinc-800';
+  const mutedClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+  const summary = entry.response_summary?.trim();
+  const headline = summary || entry.query;
 
   return (
     <button
       onClick={onClick}
       className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-1 ${hoverClass}`}
     >
-      <span className={`text-sm leading-snug line-clamp-2 ${textClass}`}>{truncate(entry.query, 56)}</span>
+      <span className={`text-sm leading-snug line-clamp-2 ${textClass}`}>{truncate(headline, 72)}</span>
+      {summary && (
+        <span className={`text-[11px] leading-snug line-clamp-1 ${mutedClass}`}>
+          {truncate(entry.query, 48)}
+        </span>
+      )}
       <span className={`self-start text-[10px] font-semibold px-1.5 py-0.5 rounded locale-nowrap ${domainClass}`}>
         {entry.domain}
       </span>
@@ -135,12 +150,13 @@ function SidebarPanel({
 }) {
   const { t } = useI18n();
   const isDark = variant === 'dark';
+  const supabase = useMemo(() => createClient(), []);
 
-  const historyEnabled = Boolean(showHistory && accessToken && user && canAccessHistory(user));
+  const historyEnabled = Boolean(showHistory && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    historyEnabled ? ['sidebar-history', accessToken] : null,
-    ([, token]) => fetchHistory(token as string),
+    historyEnabled && user ? sidebarHistoryKey(user.id) : null,
+    () => fetchHistoryAuthed(supabase),
     HISTORY_SWR_OPTIONS,
   );
 
@@ -189,7 +205,6 @@ function SidebarPanel({
             navLinkClass={isDark ? 'text-zinc-300 hover:text-white hover:bg-white/10' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
             dividerClass={dividerClass}
             onClose={onClose}
-            compact
           />
           <p className={`text-xs font-semibold uppercase tracking-wider px-3 locale-nowrap ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
             {t('history.title')}
