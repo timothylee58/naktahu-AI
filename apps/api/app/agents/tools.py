@@ -1,14 +1,25 @@
 """Shared agent tools: RAG query, PDF generation, email notification."""
 from __future__ import annotations
 
+import base64
+import binascii
+import io
+import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
 import structlog
 
-from app.services.llm_client import ILMU_EMBEDDING_MODEL, ilmu_client, openai_client, OPENAI_EMBEDDING_MODEL
+from app.services.llm_client import (
+    ILMU_CHAT_MODEL,
+    ILMU_EMBEDDING_MODEL,
+    ilmu_client,
+    openai_client,
+    OPENAI_EMBEDDING_MODEL,
+)
 from app.services.vector_store import ChunkResult, hybrid_search
 
 log = structlog.get_logger(__name__)
@@ -62,6 +73,7 @@ def _chunks_to_findings(chunks: list[dict[str, Any]], domain: str) -> list[dict[
             "summary": c.get("content", "")[:400],
             "source_title": c.get("source_title", ""),
             "source_url": c.get("source_url", ""),
+            "similarity": c.get("similarity", 0.0),
         })
     return findings
 
@@ -73,6 +85,58 @@ async def query_rag_findings(
 ) -> list[dict[str, Any]]:
     chunks = await query_rag(query, domain, language=language)
     return _chunks_to_findings(chunks, domain)
+
+
+def extract_pdf_text(document_base64: str) -> str:
+    """Extract plain text from a base64-encoded PDF. Falls back to empty string."""
+    try:
+        raw = base64.b64decode(document_base64, validate=True)
+    except (ValueError, binascii.Error):
+        return ""
+    try:
+        from pypdf import PdfReader  # type: ignore[import-untyped]
+
+        reader = PdfReader(io.BytesIO(raw))
+        parts = [page.extract_text() or "" for page in reader.pages]
+        return "\n".join(parts).strip()
+    except Exception as exc:
+        log.warning("pdf_extract_failed", error=str(exc))
+        return ""
+
+
+def extract_questions_from_text(text: str, limit: int = 10) -> list[str]:
+    """Heuristic question extraction from exam paper text."""
+    numbered = re.findall(r"(?:^|\n)\s*(?:\d+[\).:]|Soalan\s+\d+)\s*(.+?)(?=\n\s*(?:\d+[\).:]|Soalan\s+\d+)|\Z)", text, re.DOTALL | re.IGNORECASE)
+    cleaned = [re.sub(r"\s+", " ", q).strip() for q in numbered if len(q.strip()) > 10]
+    if cleaned:
+        return cleaned[:limit]
+    lines = [ln.strip() for ln in text.splitlines() if "?" in ln or ln.strip().endswith("?")]
+    return lines[:limit]
+
+
+async def llm_complete(
+    system: str,
+    user: str,
+    *,
+    language: str = "bm",
+    max_tokens: int = 512,
+) -> str:
+    """Single-shot ILMU chat completion for agent nodes."""
+    lang_note = "Respond in Bahasa Malaysia." if language == "bm" else "Respond in English."
+    try:
+        resp = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": f"{system}\n{lang_note}"},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=max_tokens,
+            temperature=0.2,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as exc:
+        log.warning("llm_complete_failed", error=str(exc))
+        return ""
 
 
 async def generate_pdf(

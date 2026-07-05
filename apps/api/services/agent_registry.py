@@ -49,6 +49,34 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="business",
             credit_cost=0,
         ),
+        "study-agent": AgentDefinition(
+            name="study-agent",
+            description="SPM past-paper upload with education RAG explanations.",
+            input_schema={},
+            plan_required="student",
+            credit_cost=0,
+        ),
+        "immigration-navigator": AgentDefinition(
+            name="immigration-navigator",
+            description="Conversational visa intake with immigration RAG.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=1,
+        ),
+        "health-triage": AgentDefinition(
+            name="health-triage",
+            description="BM symptom intake with KKM facility recommendations.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
+        "grant-finder": AgentDefinition(
+            name="grant-finder",
+            description="Government grant matching for SMEs and students.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
     }
 
 

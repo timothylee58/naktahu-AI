@@ -66,13 +66,11 @@ def _client() -> TestClient:
 
 
 def test_agent_start_unknown_agent() -> None:
-    fake_start = AsyncMock(return_value={"session_id": "s1", "status": "awaiting_hitl"})
-    with patch.object(agents_router, "start_compliance_drafter", fake_start):
-        res = _client().post(
-            "/api/v1/agents/unknown-agent/start",
-            json={"business_type": "sdn_bhd"},
-            headers=_auth_header(),
-        )
+    res = _client().post(
+        "/api/v1/agents/unknown-agent/start",
+        json={"business_type": "sdn_bhd"},
+        headers=_auth_header(),
+    )
     assert res.status_code == 404
 
 
@@ -86,8 +84,10 @@ def test_agent_start_compliance_drafter() -> None:
             "turns_count": 1,
         }
     )
+    handlers = dict(agents_router.AGENT_START_HANDLERS)
+    handlers["compliance-drafter"] = fake_start
     with (
-        patch.object(agents_router, "start_compliance_drafter", fake_start),
+        patch.object(agents_router, "AGENT_START_HANDLERS", handlers),
         patch.object(agents_router, "get_credits_remaining", AsyncMock(return_value=5)),
     ):
         res = _client().post(

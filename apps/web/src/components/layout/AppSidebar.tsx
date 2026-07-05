@@ -290,6 +290,13 @@ function SidebarPanel({
             {t('nav.pricing')}
           </Link>
           <Link
+            href="/agents"
+            onClick={onClose}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
+          >
+            Agents
+          </Link>
+          <Link
             href="/agents/compliance-drafter"
             onClick={onClose}
             className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
