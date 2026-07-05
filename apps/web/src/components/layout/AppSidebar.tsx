@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
 import { LangToggle } from '@/components/LangToggle';
 import { useI18n } from '@/lib/i18n';
 
@@ -191,6 +192,7 @@ function SidebarPanel({
 
       {showHistory && (
         <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-4 min-h-0">
+          <DeadlineWidget accessToken={accessToken} variant={variant} />
           <p className={`text-xs font-semibold uppercase tracking-wider px-3 locale-nowrap ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
             {t('history.title')}
           </p>
@@ -286,6 +288,13 @@ function SidebarPanel({
             className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
           >
             {t('nav.pricing')}
+          </Link>
+          <Link
+            href="/agents/compliance-drafter"
+            onClick={onClose}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap ${navLinkClass}`}
+          >
+            Compliance Drafter
           </Link>
 
           <div className={`my-2 border-t ${dividerClass}`} />

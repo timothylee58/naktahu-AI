@@ -183,6 +183,7 @@ export default function PricingPage() {
               t('pricing.free.feature.1'),
               t('pricing.free.feature.2'),
               t('pricing.free.feature.3'),
+              t('pricing.free.feature.4'),
             ]}
             ctaLabel={t('pricing.free.cta')}
             disabled
