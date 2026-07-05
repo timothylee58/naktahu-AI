@@ -26,6 +26,7 @@ from core.config import settings
 from middleware.rate_limit import anonymous_limiter
 from middleware.user_context import UserContextMiddleware
 from routers import billing, feedback, history
+from scripts.setup_agent_infra import ensure_storage_bucket
 from services.agent_registry import load_agent_registry
 
 configure_telemetry()
@@ -58,6 +59,7 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
         application.state.supabase = None
 
     application.state.checkpointer = await init_checkpointer()
+    ensure_storage_bucket(application.state.supabase)
     load_agent_registry(application.state.supabase)
 
     log.info("startup", version=application.version)

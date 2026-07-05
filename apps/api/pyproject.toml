@@ -35,6 +35,7 @@ dependencies = [
     "google-cloud-speech>=2.27.0",
     "stripe>=11.0.0",
     "python-multipart>=0.0.9",
+    "pypdf>=5.0.0",
 ]
 
 [project.optional-dependencies]
