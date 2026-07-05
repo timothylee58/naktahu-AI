@@ -10,6 +10,8 @@ import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 
+const LANDING_NAV_OMIT = ['/pricing', '/agents'] as const;
+
 export function LandingHeader() {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -31,7 +33,12 @@ export function LandingHeader() {
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
-          <SiteNavLinks variant={isDark ? 'dark' : 'light'} layout="horizontal" showChatCta />
+          <SiteNavLinks
+            variant={isDark ? 'dark' : 'light'}
+            layout="horizontal"
+            hideHome
+            excludeHrefs={LANDING_NAV_OMIT}
+          />
         </div>
 
         <div className="hidden md:flex items-center gap-2 flex-shrink-0">
@@ -70,6 +77,8 @@ export function LandingHeader() {
                 variant={isDark ? 'dark' : 'light'}
                 layout="vertical"
                 showChatCta
+                hideHome
+                excludeHrefs={LANDING_NAV_OMIT}
                 onNavigate={() => setMenuOpen(false)}
               />
               <div className="flex flex-col gap-2 pt-2 border-t border-inherit">

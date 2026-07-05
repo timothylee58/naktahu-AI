@@ -121,7 +121,13 @@ export function LandingClient() {
           <TypewriterQueryWrapper isDark={isDark} />
         </motion.div>
 
-        <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show">
+        <motion.div
+          custom={4}
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className="flex flex-col items-center gap-3"
+        >
           <Link
             href="/chat"
             className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 transition-colors text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
@@ -140,6 +146,23 @@ export function LandingClient() {
               />
             </svg>
           </Link>
+          <p className={`text-sm ${mutedText}`}>
+            <Link
+              href="/pricing"
+              className="hover:text-[#2563EB] transition-colors locale-nowrap"
+            >
+              {t('nav.pricing')}
+            </Link>
+            <span className="mx-2 opacity-40" aria-hidden>
+              ·
+            </span>
+            <Link
+              href="/agents"
+              className="hover:text-[#2563EB] transition-colors locale-nowrap"
+            >
+              {t('nav.agents')}
+            </Link>
+          </p>
         </motion.div>
       </section>
 

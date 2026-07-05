@@ -9,6 +9,9 @@ interface SiteNavLinksProps {
   onNavigate?: () => void;
   layout?: 'vertical' | 'horizontal';
   showChatCta?: boolean;
+  /** Omit links from the nav (e.g. landing header defers pricing/agents to hero). */
+  excludeHrefs?: readonly string[];
+  hideHome?: boolean;
 }
 
 const LINKS = [
@@ -23,10 +26,14 @@ export function SiteNavLinks({
   onNavigate,
   layout = 'vertical',
   showChatCta = false,
+  excludeHrefs = [],
+  hideHome = false,
 }: SiteNavLinksProps) {
   const { t } = useI18n();
   const pathname = usePathname();
   const isDark = variant === 'dark';
+  const excluded = new Set(excludeHrefs);
+  const visibleLinks = LINKS.filter((link) => !excluded.has(link.href));
 
   const linkClass = (href: string, emphasized = false) => {
     const active = pathname === href || (href !== '/' && pathname.startsWith(href));
@@ -66,14 +73,16 @@ export function SiteNavLinks({
           {t('nav.try_question')}
         </Link>
       )}
-      <Link
-        href="/"
-        onClick={onNavigate}
-        className={`${itemClass} ${linkClass('/')}`}
-      >
-        {t('nav.home')}
-      </Link>
-      {LINKS.map((link) => (
+      {!hideHome && (
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className={`${itemClass} ${linkClass('/')}`}
+        >
+          {t('nav.home')}
+        </Link>
+      )}
+      {visibleLinks.map((link) => (
         <Link
           key={link.href}
           href={link.href}
