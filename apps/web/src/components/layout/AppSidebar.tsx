@@ -11,8 +11,9 @@ import { SidebarAgentsNav } from '@/components/agents/SidebarAgentsNav';
 import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
+import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
-import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import { fetchHistoryAuthed, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
 import { canAccessHistory } from '@/lib/auth-plan';
 
 export interface AppSidebarProps {
@@ -135,12 +136,13 @@ function SidebarPanel({
 }) {
   const { t } = useI18n();
   const isDark = variant === 'dark';
+  const supabase = useMemo(() => createClient(), []);
 
-  const historyEnabled = Boolean(showHistory && accessToken && user && canAccessHistory(user));
+  const historyEnabled = Boolean(showHistory && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    historyEnabled ? ['sidebar-history', accessToken] : null,
-    ([, token]) => fetchHistory(token as string),
+    historyEnabled && user ? ['sidebar-history', user.id] : null,
+    () => fetchHistoryAuthed(supabase),
     HISTORY_SWR_OPTIONS,
   );
 
@@ -182,7 +184,7 @@ function SidebarPanel({
 
       {showHistory && (
         <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-4 min-h-0">
-          <DeadlineWidget accessToken={accessToken} variant={variant} />
+          <DeadlineWidget userId={user?.id ?? null} variant={variant} />
           <SidebarAgentsNav
             user={user}
             isDark={isDark}

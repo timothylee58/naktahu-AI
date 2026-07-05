@@ -5,8 +5,7 @@ export const dynamic = 'force-dynamic';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { useI18n } from '@/lib/i18n';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import type { Message } from '@/lib/types';
@@ -26,7 +25,7 @@ function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const supabase = useMemo(() => createClient(), []);
+  const { supabase, user, accessToken } = useSupabaseSession();
   const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,8 +38,6 @@ function ChatPageInner() {
     if (q !== null) setInjectedQuery(q);
     else setInjectedQuery('');
   }, [q]);
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const lastUserQuery = useRef<string>('');
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -50,23 +47,6 @@ function ChatPageInner() {
     () => messages.reduce((sum, msg) => sum + msg.content.length, 0),
     [messages],
   );
-
-  // Auth state
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
 
   const {
     tokens,

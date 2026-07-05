@@ -1,3 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchWithAuth } from '@/lib/auth-headers';
+
 export interface HistoryEntry {
   query: string;
   language: string;
@@ -17,10 +20,7 @@ export class HistoryFetchError extends Error {
   }
 }
 
-export async function fetchHistory(accessToken: string): Promise<HistoryEntry[]> {
-  const res = await fetch('/api/v1/history', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+async function parseHistoryResponse(res: Response): Promise<HistoryEntry[]> {
   if (res.status === 403) {
     throw new HistoryFetchError('pro_required', 'pro_required');
   }
@@ -33,10 +33,26 @@ export async function fetchHistory(accessToken: string): Promise<HistoryEntry[]>
   return res.json() as Promise<HistoryEntry[]>;
 }
 
-/** Stable SWR options — avoid refetch loops on focus/errors. */
+/** @deprecated Prefer fetchHistoryAuthed — avoids stale JWT in SWR keys. */
+export async function fetchHistory(accessToken: string): Promise<HistoryEntry[]> {
+  const res = await fetch('/api/v1/history', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return parseHistoryResponse(res);
+}
+
+/** Fetch history with live session token + 401 refresh retry. */
+export async function fetchHistoryAuthed(supabase: SupabaseClient): Promise<HistoryEntry[]> {
+  const res = await fetchWithAuth(supabase, '/api/v1/history');
+  return parseHistoryResponse(res);
+}
+
+/** Stable SWR options — avoid refetch loops on focus/errors/token rotation. */
 export const HISTORY_SWR_OPTIONS = {
   revalidateOnFocus: false,
   revalidateOnReconnect: false,
+  revalidateIfStale: false,
   shouldRetryOnError: false,
   dedupingInterval: 60_000,
+  keepPreviousData: true,
 } as const;

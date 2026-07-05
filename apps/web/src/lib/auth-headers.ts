@@ -1,32 +1,13 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
-const REFRESH_BUFFER_SEC = 60;
-
 function sessionAccessToken(session: Session | null | undefined): string | null {
   return session?.access_token ?? null;
 }
 
-function sessionNeedsRefresh(session: Session | null | undefined): boolean {
-  if (!session?.expires_at) return false;
-  const now = Math.floor(Date.now() / 1000);
-  return session.expires_at - now < REFRESH_BUFFER_SEC;
-}
-
-/** Returns a valid access token, refreshing proactively when near expiry. */
+/** Returns the current session access token without forcing a refresh. */
 export async function getAccessToken(supabase: SupabaseClient): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
-  let session = data.session;
-
-  if (!session) return null;
-
-  if (sessionNeedsRefresh(session)) {
-    const { data: refreshed, error } = await supabase.auth.refreshSession();
-    if (!error && refreshed.session) {
-      session = refreshed.session;
-    }
-  }
-
-  return sessionAccessToken(session);
+  return sessionAccessToken(data.session);
 }
 
 export async function getAuthHeaders(supabase: SupabaseClient): Promise<HeadersInit> {

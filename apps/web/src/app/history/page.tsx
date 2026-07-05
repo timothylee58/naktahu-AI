@@ -2,13 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { useI18n } from '@/lib/i18n';
-import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import { fetchHistoryAuthed, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
 import { canAccessHistory } from '@/lib/auth-plan';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -95,34 +94,14 @@ export default function HistoryPage() {
   const { t } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const supabase = useMemo(() => createClient(), []);
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { supabase, user, userId, accessToken, ready } = useSupabaseSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  const historyEnabled = Boolean(accessToken && user && canAccessHistory(user));
+  const historyEnabled = Boolean(userId && user && canAccessHistory(user) && ready);
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    historyEnabled ? ['history-page', accessToken] : null,
-    ([, token]) => fetchHistory(token as string),
+    historyEnabled ? ['history-page', userId] : null,
+    () => fetchHistoryAuthed(supabase),
     HISTORY_SWR_OPTIONS,
   );
 
@@ -172,7 +151,7 @@ export default function HistoryPage() {
 
       {/* Content */}
       <main className="flex-1 px-4 py-6 max-w-2xl w-full mx-auto flex flex-col gap-6">
-        {loading ? (
+        {!ready || historyLoading ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map((n) => (
               <div

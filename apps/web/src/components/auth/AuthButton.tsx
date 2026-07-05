@@ -54,19 +54,15 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
       setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
+      const nextUser = session?.user ?? null;
+      setUser((prev) => (prev?.id === nextUser?.id ? prev : nextUser));
       if (session?.user) {
         // Migrate anonymous history to authenticated account
         const anonId = localStorage.getItem(ANON_SESSION_KEY);
         if (anonId) {
           try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
-            await fetch(`${apiBase}/api/v1/session/migrate`, {
+            await fetchWithAuth(supabase, '/api/v1/session/migrate', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${session.access_token}`,
-              },
               body: JSON.stringify({ anonymous_id: anonId }),
             });
             localStorage.removeItem(ANON_SESSION_KEY);
@@ -80,7 +76,8 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) {
+    const userId = user?.id;
+    if (!userId) {
       setCredits(null);
       return;
     }
@@ -98,7 +95,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     return () => {
       active = false;
     };
-  }, [user, supabase]);
+  }, [user?.id, supabase]);
 
   const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
   const closeModal = () => { setOpen(false); };

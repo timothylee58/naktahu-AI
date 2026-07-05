@@ -1,6 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import useSWR from 'swr';
+import { createClient } from '@/lib/supabase/client';
+import { fetchWithAuth } from '@/lib/auth-headers';
 
 interface DeadlineEntry {
   id: string;
@@ -12,7 +15,7 @@ interface DeadlineEntry {
 }
 
 interface DeadlineWidgetProps {
-  accessToken: string | null;
+  userId: string | null;
   variant?: 'light' | 'dark';
 }
 
@@ -24,21 +27,29 @@ function daysUntil(isoDate: string): number {
   return Math.round((due.getTime() - now.getTime()) / 86_400_000);
 }
 
-export function DeadlineWidget({ accessToken, variant = 'light' }: DeadlineWidgetProps) {
+const DEADLINE_SWR_OPTIONS = {
+  revalidateOnFocus: false,
+  revalidateOnReconnect: false,
+  revalidateIfStale: false,
+  shouldRetryOnError: false,
+  dedupingInterval: 60_000,
+} as const;
+
+export function DeadlineWidget({ userId, variant = 'light' }: DeadlineWidgetProps) {
   const isDark = variant === 'dark';
+  const supabase = useMemo(() => createClient(), []);
+
   const { data: deadlines = [], isLoading } = useSWR<DeadlineEntry[]>(
-    accessToken ? 'deadline-widget' : null,
-    () =>
-      fetch('/api/v1/agents/deadline-monitor/deadlines', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).then((r) => {
-        if (!r.ok) throw new Error('deadlines');
-        return r.json() as Promise<DeadlineEntry[]>;
-      }),
-    { revalidateOnFocus: false },
+    userId ? ['deadline-widget', userId] : null,
+    async () => {
+      const res = await fetchWithAuth(supabase, '/api/v1/agents/deadline-monitor/deadlines');
+      if (!res.ok) throw new Error('deadlines');
+      return res.json() as Promise<DeadlineEntry[]>;
+    },
+    DEADLINE_SWR_OPTIONS,
   );
 
-  if (!accessToken) return null;
+  if (!userId) return null;
 
   const upcoming = deadlines
     .map((d) => ({ ...d, days: daysUntil(d.due_date) }))
