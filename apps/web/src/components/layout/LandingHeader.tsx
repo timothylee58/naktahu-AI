@@ -10,8 +10,6 @@ import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 
-const LANDING_NAV_OMIT = ['/pricing', '/agents'] as const;
-
 export function LandingHeader() {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -37,7 +35,6 @@ export function LandingHeader() {
             variant={isDark ? 'dark' : 'light'}
             layout="horizontal"
             hideHome
-            excludeHrefs={LANDING_NAV_OMIT}
           />
         </div>
 
