@@ -1,27 +1,37 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { mapApiErrorDetail } from '@/lib/auth-headers';
 import { useI18n } from '@/lib/i18n';
 
 type Step = 'business' | 'domains' | 'preview' | 'done';
 
 const BUSINESS_TYPES = [
-  { id: 'sole_proprietor', label: 'Sole proprietor / Peniaga tunggal' },
-  { id: 'sdn_bhd', label: 'Sdn Bhd' },
-  { id: 'partnership', label: 'Partnership / Perkongsian' },
-];
+  { id: 'sole_proprietor', labelKey: 'agents.compliance-drafter.business.sole' },
+  { id: 'sdn_bhd', labelKey: 'agents.compliance-drafter.business.sdn' },
+  { id: 'partnership', labelKey: 'agents.compliance-drafter.business.partnership' },
+] as const;
 
 const DOMAIN_OPTIONS = [
-  { id: 'tax', label: 'Tax (LHDN)' },
-  { id: 'business', label: 'Business (SSM)' },
-  { id: 'epf', label: 'EPF/KWSP' },
-];
+  { id: 'tax', labelKey: 'agents.compliance-drafter.domain.tax' },
+  { id: 'business', labelKey: 'agents.compliance-drafter.domain.business' },
+  { id: 'epf', labelKey: 'agents.compliance-drafter.domain.epf' },
+] as const;
+
+function resolveAgentError(message: string, t: (key: string) => string): string {
+  if (message === 'sign-in-required') return t('agents.error.sign_in');
+  if (message === 'start-failed' || message === 'agent-request-failed') {
+    return t('agents.error.start_failed');
+  }
+  if (message === 'confirm-failed') return t('agents.error.confirm_failed');
+  return mapApiErrorDetail(message, t);
+}
 
 export default function ComplianceDrafterPage() {
-  const { t } = useI18n();
-  const supabase = useMemo(() => createClient(), []);
+  const { t, locale } = useI18n();
+  const { start, post } = useAgentApi();
   const [step, setStep] = useState<Step>('business');
   const [businessType, setBusinessType] = useState('sole_proprietor');
   const [domains, setDomains] = useState<string[]>(['tax', 'business', 'epf']);
@@ -32,12 +42,11 @@ export default function ComplianceDrafterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const authHeaders = useCallback(async () => {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) throw new Error('sign-in-required');
-    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  }, [supabase]);
+  const queryLanguage = useMemo(() => {
+    if (locale === 'ms') return 'bm';
+    if (locale === 'zh') return 'en';
+    return 'en';
+  }, [locale]);
 
   const toggleDomain = (id: string) => {
     setDomains((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
@@ -47,22 +56,18 @@ export default function ComplianceDrafterPage() {
     setLoading(true);
     setError(null);
     try {
-      const headers = await authHeaders();
-      const res = await fetch('/api/v1/agents/compliance-drafter/start', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ business_type: businessType, domains, context, language: 'bm' }),
+      const data = await start('compliance-drafter', {
+        business_type: businessType,
+        domains,
+        context,
+        language: queryLanguage,
       });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { detail?: string };
-        throw new Error(body.detail ?? 'start-failed');
-      }
-      const data = (await res.json()) as { session_id: string; report_json?: Record<string, unknown> };
-      setSessionId(data.session_id);
-      setReport(data.report_json ?? null);
+      setSessionId((data.session_id as string) ?? null);
+      setReport((data.report_json as Record<string, unknown>) ?? null);
       setStep('preview');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'start-failed');
+      const message = e instanceof Error ? e.message : 'start-failed';
+      setError(resolveAgentError(message, t));
     } finally {
       setLoading(false);
     }
@@ -73,18 +78,14 @@ export default function ComplianceDrafterPage() {
     setLoading(true);
     setError(null);
     try {
-      const headers = await authHeaders();
-      const res = await fetch('/api/v1/agents/compliance-drafter/confirm', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ session_id: sessionId }),
+      const data = await post('/api/v1/agents/compliance-drafter/confirm', {
+        session_id: sessionId,
       });
-      if (!res.ok) throw new Error('confirm-failed');
-      const data = (await res.json()) as { signed_url?: string };
-      setDownloadUrl(data.signed_url ?? null);
+      setDownloadUrl((data.signed_url as string) ?? null);
       setStep('done');
-    } catch {
-      setError('confirm-failed');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'confirm-failed';
+      setError(resolveAgentError(message, t));
     } finally {
       setLoading(false);
     }
@@ -96,7 +97,7 @@ export default function ComplianceDrafterPage() {
         <Link href="/chat" className="text-sm text-blue-600 hover:underline">
           ← {t('nav.home')}
         </Link>
-        <h1 className="text-lg font-bold text-zinc-900">Compliance Drafter</h1>
+        <h1 className="text-lg font-bold text-zinc-900">{t('agents.compliance-drafter.title')}</h1>
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6">
@@ -108,7 +109,7 @@ export default function ComplianceDrafterPage() {
 
         {step === 'business' && (
           <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
-            <h2 className="font-semibold text-zinc-900">1. Business type</h2>
+            <h2 className="font-semibold text-zinc-900">{t('agents.compliance-drafter.step1')}</h2>
             <div className="flex flex-col gap-2">
               {BUSINESS_TYPES.map((b) => (
                 <label key={b.id} className="flex items-center gap-2 text-sm">
@@ -118,13 +119,13 @@ export default function ComplianceDrafterPage() {
                     checked={businessType === b.id}
                     onChange={() => setBusinessType(b.id)}
                   />
-                  {b.label}
+                  {t(b.labelKey)}
                 </label>
               ))}
             </div>
             <textarea
               className="w-full border border-zinc-200 rounded-xl p-3 text-sm"
-              placeholder="Additional context (optional)"
+              placeholder={t('agents.compliance-drafter.context_placeholder')}
               rows={3}
               value={context}
               onChange={(e) => setContext(e.target.value)}
@@ -134,14 +135,14 @@ export default function ComplianceDrafterPage() {
               onClick={() => setStep('domains')}
               className="self-end px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold"
             >
-              Next
+              {t('agents.compliance-drafter.next')}
             </button>
           </section>
         )}
 
         {step === 'domains' && (
           <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
-            <h2 className="font-semibold text-zinc-900">2. Compliance domains</h2>
+            <h2 className="font-semibold text-zinc-900">{t('agents.compliance-drafter.step2')}</h2>
             {DOMAIN_OPTIONS.map((d) => (
               <label key={d.id} className="flex items-center gap-2 text-sm">
                 <input
@@ -149,12 +150,12 @@ export default function ComplianceDrafterPage() {
                   checked={domains.includes(d.id)}
                   onChange={() => toggleDomain(d.id)}
                 />
-                {d.label}
+                {t(d.labelKey)}
               </label>
             ))}
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setStep('business')} className="px-4 py-2 text-sm">
-                Back
+                {t('agents.compliance-drafter.back')}
               </button>
               <button
                 type="button"
@@ -162,7 +163,7 @@ export default function ComplianceDrafterPage() {
                 onClick={() => void startAgent()}
                 className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"
               >
-                {loading ? 'Generating…' : 'Generate preview'}
+                {loading ? t('agents.compliance-drafter.generating') : t('agents.compliance-drafter.generate')}
               </button>
             </div>
           </section>
@@ -170,33 +171,31 @@ export default function ComplianceDrafterPage() {
 
         {step === 'preview' && report && (
           <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4">
-            <h2 className="font-semibold text-zinc-900">3. Review report (HITL)</h2>
+            <h2 className="font-semibold text-zinc-900">{t('agents.compliance-drafter.step3')}</h2>
             <pre className="text-xs bg-zinc-50 border border-zinc-100 rounded-xl p-4 overflow-auto max-h-80">
               {JSON.stringify(report, null, 2)}
             </pre>
-            <p className="text-xs text-zinc-500">
-              Confirm to generate PDF and email delivery. 1 agent credit (RM 5) unless on Business plan.
-            </p>
+            <p className="text-xs text-zinc-500">{t('agents.compliance-drafter.credit_note')}</p>
             <button
               type="button"
               disabled={loading}
               onClick={() => void confirmReport()}
               className="self-end px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"
             >
-              {loading ? 'Generating PDF…' : 'Confirm & generate PDF'}
+              {loading ? t('agents.compliance-drafter.confirming') : t('agents.compliance-drafter.confirm')}
             </button>
           </section>
         )}
 
         {step === 'done' && (
           <section className="bg-white rounded-2xl border border-green-200 p-6 flex flex-col gap-3">
-            <h2 className="font-semibold text-green-800">Report ready</h2>
+            <h2 className="font-semibold text-green-800">{t('agents.compliance-drafter.step4')}</h2>
             {downloadUrl ? (
               <a href={downloadUrl} className="text-blue-600 underline text-sm" target="_blank" rel="noreferrer">
-                Download PDF
+                {t('agents.compliance-drafter.download')}
               </a>
             ) : (
-              <p className="text-sm text-zinc-600">PDF generated — check your email if configured.</p>
+              <p className="text-sm text-zinc-600">{t('agents.compliance-drafter.email_hint')}</p>
             )}
           </section>
         )}

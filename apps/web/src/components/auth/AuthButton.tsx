@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
-import { planBadgeLabel } from '@/lib/auth-plan';
+import { fetchWithAuth } from '@/lib/auth-headers';
+import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
 
 type Tab = 'options' | 'email';
@@ -39,7 +40,6 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | 'email' | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
@@ -51,12 +51,10 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
       setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
       if (session?.user) {
         // Migrate anonymous history to authenticated account
         const anonId = localStorage.getItem(ANON_SESSION_KEY);
@@ -82,26 +80,25 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }, [supabase]);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!user) {
       setCredits(null);
       return;
     }
     let active = true;
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
-    fetch(`${apiBase}/api/v1/billing/credits`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { credits_remaining: number } | null) => {
-        if (active && data) setCredits(data.credits_remaining);
-      })
-      .catch(() => {
+    void (async () => {
+      try {
+        const res = await fetchWithAuth(supabase, '/api/v1/billing/credits');
+        if (!res.ok || !active) return;
+        const data = (await res.json()) as { credits_remaining: number };
+        if (active) setCredits(data.credits_remaining);
+      } catch {
         // Non-critical — badge just won't show a credit count
-      });
+      }
+    })();
     return () => {
       active = false;
     };
-  }, [accessToken]);
+  }, [user, supabase]);
 
   const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
   const closeModal = () => { setOpen(false); };
@@ -160,26 +157,46 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }
 
   if (user) {
+    const plan = effectivePlan(user);
+    const creditsLabel =
+      plan === 'business'
+        ? t('header.credits_unlimited')
+        : credits !== null
+          ? t('header.credits').replace('{n}', String(credits))
+          : null;
+
     if (isSidebar) {
       return (
         <div className="w-full flex flex-col gap-2">
-          <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
-            {user.user_metadata?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.user_metadata.avatar_url as string}
-                alt="avatar"
-                className="w-8 h-8 rounded-full border border-zinc-200 flex-shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {(user.email ?? 'U')[0].toUpperCase()}
-              </div>
-            )}
-            <span className={`text-xs font-medium truncate min-w-0 ${variant === 'dark' ? 'text-zinc-300' : 'text-zinc-600'}`}>
-              {user.email}
-            </span>
+          <div className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              {user.user_metadata?.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.user_metadata.avatar_url as string}
+                  alt="avatar"
+                  className="w-8 h-8 rounded-full border border-zinc-200 flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {(user.email ?? 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <span className={`text-xs font-medium truncate min-w-0 ${variant === 'dark' ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                {user.email}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${variant === 'dark' ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
+                {planBadgeLabel(user)}
+              </span>
+              {creditsLabel && (
+                <span className={`text-[10px] font-medium ${variant === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {creditsLabel}
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={signOut}
@@ -231,9 +248,9 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                     <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
                       {planBadgeLabel(user)}
                     </span>
-                    {credits !== null && credits > 0 && (
+                    {creditsLabel && (
                       <span className="text-[10px] font-medium text-zinc-500">
-                        {credits} credits
+                        {creditsLabel}
                       </span>
                     )}
                   </div>

@@ -52,7 +52,9 @@ export default function GrantFinderPage() {
                 <p className="font-semibold">{String(g.name)}</p>
                 <p className="text-zinc-600 mt-1">{String(g.eligibility)}</p>
                 <p className="text-xs text-zinc-500 mt-1">{String(g.amount_hint)} · {String(g.deadline_hint)}</p>
-                {g.url && <a href={String(g.url)} className="text-blue-600 text-xs mt-2 inline-block" target="_blank" rel="noreferrer">Official source</a>}
+                {typeof g.url === 'string' && g.url.length > 0 && (
+                  <a href={g.url} className="text-blue-600 text-xs mt-2 inline-block" target="_blank" rel="noreferrer">Official source</a>
+                )}
               </li>
             ))}
           </ul>

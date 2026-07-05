@@ -42,6 +42,11 @@ function ChatPageInner() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const conversationChars = useMemo(
+    () => messages.reduce((sum, msg) => sum + msg.content.length, 0),
+    [messages],
+  );
+
   // Auth state
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -336,6 +341,7 @@ function ChatPageInner() {
           isStreaming={isStreaming}
           detectedLanguage={detectedLang}
           inject={injectedQuery}
+          conversationChars={conversationChars}
         />
         <p className="hidden sm:block text-center text-[10px] text-zinc-400">
           {t('chat.keyboard_hint')}
