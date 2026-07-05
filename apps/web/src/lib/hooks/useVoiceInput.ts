@@ -12,7 +12,10 @@ export interface UseVoiceInputReturn {
   error: string | null;
   startListening: () => void;
   stopListening: () => void;
+  /** Web Speech API available (Chromium/Safari). */
   isSupported: boolean;
+  /** Any voice path available — Web Speech OR the server transcription fallback. */
+  available: boolean;
 }
 
 interface ISpeechRecognitionResult {
@@ -74,6 +77,37 @@ function toBcp47(language: string): string {
   return map[language] ?? language;
 }
 
+// Collapse a BCP-47 tag to the app locale the /transcribe endpoint expects.
+function toApiLanguage(language: string): 'bm' | 'en' | 'zh' {
+  const lower = language.toLowerCase();
+  if (lower.startsWith('ms')) return 'bm';
+  if (lower.startsWith('zh') || lower.startsWith('cmn')) return 'zh';
+  return 'en';
+}
+
+const MIC_RECORD_MIME = 'audio/webm;codecs=opus';
+
+function canRecordAudio(): boolean {
+  return (
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== 'undefined' &&
+    (MediaRecorder.isTypeSupported?.('audio/webm') ?? false)
+  );
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onloadend = () => {
+      const result = String(reader.result);
+      resolve(result.slice(result.indexOf(',') + 1)); // strip the data: prefix
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function useVoiceInput({
   language = 'ms-MY',
 }: UseVoiceInputParams = {}): UseVoiceInputReturn {
@@ -81,20 +115,95 @@ export function useVoiceInput({
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
+  // Server-transcription fallback (MediaRecorder → /api/v1/transcribe).
+  const [recordSupported, setRecordSupported] = useState(false);
+  const [transcribeAvailable, setTranscribeAvailable] = useState(true);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     setIsSupported(getSR() !== null);
+    setRecordSupported(canRecordAudio());
   }, []);
 
+  const stopTracks = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }, []);
+
+  // Assemble the recording, send it to the server, surface the transcript.
+  const handleRecordingStop = useCallback(async () => {
+    const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+    chunksRef.current = [];
+    stopTracks();
+    if (blob.size === 0) return;
+    try {
+      const audio_base64 = await blobToBase64(blob);
+      const res = await fetch('/api/v1/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio_base64, language: toApiLanguage(language) }),
+      });
+      if (res.status === 503) {
+        // Transcription not configured — stop offering the fallback mic.
+        setTranscribeAvailable(false);
+        return;
+      }
+      if (!res.ok) {
+        setError('transcribe-failed');
+        return;
+      }
+      const data = (await res.json()) as { transcript?: string };
+      if (data.transcript) setTranscript(data.transcript);
+    } catch {
+      setError('transcribe-failed');
+    }
+  }, [language, stopTracks]);
+
+  const startRecording = useCallback(async () => {
+    setError(null);
+    setTranscript('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported(MIC_RECORD_MIME)
+        ? MIC_RECORD_MIME
+        : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = handleRecordingStop;
+      recorderRef.current = recorder;
+      recorder.start();
+      setIsListening(true);
+    } catch {
+      setError('not-allowed');
+      setIsListening(false);
+      stopTracks();
+    }
+  }, [handleRecordingStop, stopTracks]);
+
   const stopListening = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop(); // fires onstop → handleRecordingStop
+      setIsListening(false);
+      return;
+    }
     recognitionRef.current?.stop();
     setIsListening(false);
   }, []);
 
   const startListening = useCallback(() => {
     const Ctor = getSR();
-    if (!Ctor) return;
+    if (!Ctor) {
+      // No Web Speech API — fall back to server transcription if possible.
+      if (recordSupported && transcribeAvailable) void startRecording();
+      return;
+    }
     if (recognitionRef.current) {
       recognitionRef.current.onstart = null;
       recognitionRef.current.onresult = null;
@@ -133,13 +242,27 @@ export function useVoiceInput({
     recognitionRef.current = rec;
     setTranscript('');
     rec.start();
-  }, [language]);
+  }, [language, recordSupported, transcribeAvailable, startRecording]);
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.abort();
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        recorderRef.current.stop();
+      }
+      stopTracks();
     };
-  }, []);
+  }, [stopTracks]);
 
-  return { isListening, transcript, error, startListening, stopListening, isSupported };
+  const available = isSupported || (recordSupported && transcribeAvailable);
+
+  return {
+    isListening,
+    transcript,
+    error,
+    startListening,
+    stopListening,
+    isSupported,
+    available,
+  };
 }
