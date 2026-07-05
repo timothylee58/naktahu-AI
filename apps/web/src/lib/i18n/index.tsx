@@ -43,6 +43,7 @@ const MS: Translations = {
   'nav.faq': 'Bantuan / FAQ',
   'nav.contact': 'Hubungi Kami',
   'nav.pricing': 'Harga',
+  'nav.agents': 'Ejen',
   'sidebar.collapse': 'Lipat panel',
   'sidebar.expand': 'Buka panel',
 
@@ -182,6 +183,36 @@ const MS: Translations = {
   'error.history_pro_required': 'Sejarah soalan memerlukan pelan Pro. Naik taraf untuk akses.',
   'error.retry': 'Cuba Lagi',
 
+  /* ── agents ── */
+  'agents.hub.title': 'Ejen NakTahu',
+  'agents.hub.subtitle':
+    'Ejen LangGraph dengan RAG sumber rasmi, penapisan pelan, dan meter kredit.',
+  'agents.hub.link': 'Semua ejen',
+  'agents.hub.sign_in': 'Daftar masuk untuk mengakses ejen produk.',
+  'agents.badge.new': 'Baharu',
+  'agents.plan.free': 'Percuma',
+  'agents.plan.free_plus': 'Percuma+',
+  'agents.plan.student': 'Pelajar',
+  'agents.plan.business': 'Perniagaan',
+  'agents.compliance-drafter.title': 'Pengarang Pematuhan',
+  'agents.compliance-drafter.desc':
+    'Laporan PDF pelbagai domain dengan semakan manusia. 1 kredit (Perniagaan tanpa had).',
+  'agents.study-agent.title': 'Ejen Kajian',
+  'agents.study-agent.desc':
+    'Muat naik kertas SPM — ekstrak soalan, penjelasan RAG, penjejakan topik.',
+  'agents.immigration-navigator.title': 'Navigator Imigresen',
+  'agents.immigration-navigator.desc':
+    'Intake visa 3–5 giliran → senarai semak, amaran, petikan dengan tarikh luput. 1 kredit.',
+  'agents.health-triage.title': 'Triaj Kesihatan',
+  'agents.health-triage.desc':
+    'Intake simptom BM → panduan KKM → cadangan klinik/hospital. Alat awam percuma.',
+  'agents.grant-finder.title': 'Pencari Geran',
+  'agents.grant-finder.desc':
+    'Padankan profil anda dengan geran kerajaan (MDEC, TEKUN, MARA, dll.).',
+  'agents.research-synthesiser.title': 'Penyelidik Sintesis',
+  'agents.research-synthesiser.desc':
+    'Carian RAG selari merentas 3 domain dengan petikan tidak berulang. Peringkat Perniagaan.',
+
   /* ── footer ── */
   'footer.privacy': 'Dasar Privasi',
 };
@@ -216,6 +247,7 @@ const EN: Translations = {
   'nav.faq': 'Help / FAQ',
   'nav.contact': 'Contact Us',
   'nav.pricing': 'Pricing',
+  'nav.agents': 'Agents',
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
 
@@ -355,6 +387,36 @@ const EN: Translations = {
   'error.history_pro_required': 'Query history requires a Pro plan. Upgrade to access.',
   'error.retry': 'Try Again',
 
+  /* ── agents ── */
+  'agents.hub.title': 'NakTahu Agents',
+  'agents.hub.subtitle':
+    'LangGraph-powered agents with official-source RAG, plan gating, and credit metering.',
+  'agents.hub.link': 'All agents',
+  'agents.hub.sign_in': 'Sign in to access product agents.',
+  'agents.badge.new': 'New',
+  'agents.plan.free': 'Free',
+  'agents.plan.free_plus': 'Free+',
+  'agents.plan.student': 'Student',
+  'agents.plan.business': 'Business',
+  'agents.compliance-drafter.title': 'Compliance Drafter',
+  'agents.compliance-drafter.desc':
+    'Multi-domain PDF report with human review. 1 credit (Business unlimited).',
+  'agents.study-agent.title': 'Study Agent',
+  'agents.study-agent.desc':
+    'Upload SPM past papers — extract questions, RAG explanations, topic tracking.',
+  'agents.immigration-navigator.title': 'Immigration Navigator',
+  'agents.immigration-navigator.desc':
+    '3–5 turn visa intake → checklist, warnings, expiry-aware citations. 1 credit.',
+  'agents.health-triage.title': 'Health Triage',
+  'agents.health-triage.desc':
+    'BM symptom intake → KKM guidance → clinic/hospital recommendation. Free civic tool.',
+  'agents.grant-finder.title': 'Grant Finder',
+  'agents.grant-finder.desc':
+    'Match your profile to government grants (MDEC, TEKUN, MARA, etc.).',
+  'agents.research-synthesiser.title': 'Research Synthesiser',
+  'agents.research-synthesiser.desc':
+    'Parallel fan-out across 3 RAG domains with deduplicated citations. Business tier.',
+
   /* ── footer ── */
   'footer.privacy': 'Privacy Policy',
 };
@@ -388,6 +450,7 @@ const ZH: Translations = {
   'nav.faq': '帮助 / 常见问题',
   'nav.contact': '联系我们',
   'nav.pricing': '价格',
+  'nav.agents': '智能代理',
   'sidebar.collapse': '收起侧栏',
   'sidebar.expand': '展开侧栏',
 
@@ -520,6 +583,29 @@ const ZH: Translations = {
   'error.history_fetch': '加载历史记录失败，请重试。',
   'error.history_pro_required': '查询历史需要 Pro 计划，请升级后使用。',
   'error.retry': '重试',
+
+  /* ── agents ── */
+  'agents.hub.title': 'NakTahu 智能代理',
+  'agents.hub.subtitle': '基于 LangGraph 的代理，官方来源 RAG、套餐门控与点数计量。',
+  'agents.hub.link': '全部代理',
+  'agents.hub.sign_in': '请登录以使用产品代理。',
+  'agents.badge.new': '新',
+  'agents.plan.free': '免费',
+  'agents.plan.free_plus': '免费+',
+  'agents.plan.student': '学生',
+  'agents.plan.business': '商业',
+  'agents.compliance-drafter.title': '合规起草代理',
+  'agents.compliance-drafter.desc': '多领域 PDF 报告，人工审核。1 点数（商业版无限）。',
+  'agents.study-agent.title': '学习代理',
+  'agents.study-agent.desc': '上传 SPM 试卷 — 提取题目、RAG 讲解、主题追踪。',
+  'agents.immigration-navigator.title': '移民导航代理',
+  'agents.immigration-navigator.desc': '3–5 轮签证信息采集 → 清单、警告、含有效期的引用。1 点数。',
+  'agents.health-triage.title': '健康分诊代理',
+  'agents.health-triage.desc': '马来文症状采集 → KKM 指引 → 诊所/医院推荐。免费公共工具。',
+  'agents.grant-finder.title': '资助查找代理',
+  'agents.grant-finder.desc': '匹配您的资料与政府资助（MDEC、TEKUN、MARA 等）。',
+  'agents.research-synthesiser.title': '研究综合代理',
+  'agents.research-synthesiser.desc': '跨 3 个领域并行 RAG，去重引用。商业版。',
 
   /* ── footer ── */
   'footer.privacy': '隐私政策',
