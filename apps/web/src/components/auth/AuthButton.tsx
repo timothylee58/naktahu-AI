@@ -118,7 +118,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     setSigningIn('microsoft');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Azure must return an email claim — see infra/supabase/AUTH_SETUP.md
+        scopes: 'email openid profile offline_access',
+      },
     });
     if (error) setSigningIn(null);
   };
