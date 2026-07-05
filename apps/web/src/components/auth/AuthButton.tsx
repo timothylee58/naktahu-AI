@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
-import { fetchWithAuth } from '@/lib/auth-headers';
+import { fetchUserCredits } from '@/lib/credits';
 import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
 
@@ -80,17 +80,16 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) {
+    const userId = user?.id;
+    if (!userId) {
       setCredits(null);
       return;
     }
     let active = true;
     void (async () => {
       try {
-        const res = await fetchWithAuth(supabase, '/api/v1/billing/credits');
-        if (!res.ok || !active) return;
-        const data = (await res.json()) as { credits_remaining: number };
-        if (active) setCredits(data.credits_remaining);
+        const remaining = await fetchUserCredits(supabase, userId);
+        if (active && remaining !== null) setCredits(remaining);
       } catch {
         // Non-critical — badge just won't show a credit count
       }
@@ -98,7 +97,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     return () => {
       active = false;
     };
-  }, [user, supabase]);
+  }, [user?.id, supabase]);
 
   const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
   const closeModal = () => { setOpen(false); };
