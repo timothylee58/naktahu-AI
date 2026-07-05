@@ -10,14 +10,7 @@ import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
 import { LangToggle } from '@/components/LangToggle';
 import { useI18n } from '@/lib/i18n';
 
-interface HistoryEntry {
-  query: string;
-  language: string;
-  domain: string;
-  response_summary: string;
-  citations: unknown[];
-  ts?: number;
-}
+import { fetchHistory, HistoryFetchError, type HistoryEntry } from '@/lib/history';
 
 export interface AppSidebarProps {
   variant?: 'light' | 'dark';
@@ -125,16 +118,7 @@ function SidebarPanel({
   const isDark = variant === 'dark';
 
   const fetcher = useMemo(
-    () =>
-      accessToken
-        ? () =>
-            fetch('/api/v1/history', {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            }).then((r) => {
-              if (!r.ok) throw new Error('history fetch failed');
-              return r.json() as Promise<HistoryEntry[]>;
-            })
-        : null,
+    () => (accessToken ? () => fetchHistory(accessToken) : null),
     [accessToken],
   );
 
@@ -208,13 +192,26 @@ function SidebarPanel({
             </div>
           ) : historyError ? (
             <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-              <p className={`text-sm locale-text-balance ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('error.history_fetch')}</p>
-              <button
-                onClick={() => mutate()}
-                className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
-              >
-                {t('error.retry')}
-              </button>
+              <p className={`text-sm locale-text-balance ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                {historyError instanceof HistoryFetchError && historyError.code === 'pro_required'
+                  ? t('error.history_pro_required')
+                  : t('error.history_fetch')}
+              </p>
+              {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
+                <Link
+                  href="/pricing"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
+                >
+                  {t('nav.pricing')}
+                </Link>
+              ) : (
+                <button
+                  onClick={() => mutate()}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
+                >
+                  {t('error.retry')}
+                </button>
+              )}
             </div>
           ) : entries.length === 0 ? (
             <p className={`text-sm text-center px-4 py-6 locale-text-balance ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>

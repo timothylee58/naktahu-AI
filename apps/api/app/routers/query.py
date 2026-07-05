@@ -16,7 +16,9 @@ from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
 from services.auth import UserContext, _decode_supabase_jwt
+from services.agent_registry import plan_satisfies
 from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota
+from services.history import persist_session_entry
 
 log = structlog.get_logger(__name__)
 
@@ -121,10 +123,12 @@ async def _run_pipeline(
 async def _sse_generator(
     query: str,
     session_id: str,
-    user_id: Optional[str],
+    user_ctx: Optional[UserContext],
+    request: Request,
+    language_hint: Optional[str],
 ) -> AsyncGenerator[str, None]:
     try:
-        result = await _run_pipeline(query, session_id, user_id)
+        result = await _run_pipeline(query, session_id, user_ctx.user_id if user_ctx else None)
         tokens = result["tokens"]
         final_state = result["final_state"]
 
@@ -151,6 +155,22 @@ async def _sse_generator(
             yield _sse("token", {"text": final_state["streaming_token_buffer"]})
 
         yield _sse("done", {})
+
+        if user_ctx and plan_satisfies(user_ctx.plan, "pro"):
+            full_text = "".join(tokens) or final_state.get("streaming_token_buffer", "")
+            try:
+                await persist_session_entry(
+                    redis_client=getattr(request.app.state, "redis", None),
+                    supabase_client=getattr(request.app.state, "supabase", None),
+                    user_id=user_ctx.user_id,
+                    query=query,
+                    language=str(final_state.get("language") or language_hint or "en"),
+                    domain=str(final_state.get("domain") or "government"),
+                    response_text=full_text,
+                    citations=list(final_state.get("citations") or []),
+                )
+            except Exception as exc:
+                log.warning("history_persist_failed", error=str(exc), user_id=user_ctx.user_id)
 
     except Exception as exc:
         log.error("sse_pipeline_error", error=str(exc), query=query[:80])
@@ -186,7 +206,7 @@ async def query_endpoint(
     log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
 
     return StreamingResponse(
-        _sse_generator(clean_query, session_id, user_id),
+        _sse_generator(clean_query, session_id, user_ctx, request, body.language),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -179,6 +179,7 @@ const MS: Translations = {
   'error.voice_unsupported':
     'Pengecaman suara tidak disokong oleh pelayar ini.',
   'error.history_fetch': 'Gagal memuatkan sejarah. Cuba lagi.',
+  'error.history_pro_required': 'Sejarah soalan memerlukan pelan Pro. Naik taraf untuk akses.',
   'error.retry': 'Cuba Lagi',
 
   /* ── footer ── */
@@ -351,6 +352,7 @@ const EN: Translations = {
   'error.voice_unsupported':
     'Speech recognition is not supported in this browser.',
   'error.history_fetch': 'Failed to load history. Please try again.',
+  'error.history_pro_required': 'Query history requires a Pro plan. Upgrade to access.',
   'error.retry': 'Try Again',
 
   /* ── footer ── */
@@ -516,6 +518,7 @@ const ZH: Translations = {
   'error.stream': '获取答案时出错，请重试。',
   'error.voice_unsupported': '此浏览器不支持语音识别。',
   'error.history_fetch': '加载历史记录失败，请重试。',
+  'error.history_pro_required': '查询历史需要 Pro 计划，请升级后使用。',
   'error.retry': '重试',
 
   /* ── footer ── */

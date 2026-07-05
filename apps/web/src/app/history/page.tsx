@@ -8,16 +8,8 @@ import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
+import { fetchHistory, HistoryFetchError, type HistoryEntry } from '@/lib/history';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-
-interface HistoryEntry {
-  query: string;
-  language: string;
-  domain: string;
-  response_summary: string;
-  citations: unknown[];
-  ts?: number;
-}
 
 const DAY_MS = 86_400_000;
 
@@ -122,16 +114,7 @@ export default function HistoryPage() {
   }, [supabase]);
 
   const fetcher = useMemo(
-    () =>
-      accessToken
-        ? () =>
-            fetch('/api/v1/history', {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            }).then((r) => {
-              if (!r.ok) throw new Error('Failed to fetch history');
-              return r.json() as Promise<HistoryEntry[]>;
-            })
-        : null,
+    () => (accessToken ? () => fetchHistory(accessToken) : null),
     [accessToken],
   );
 
@@ -212,13 +195,26 @@ export default function HistoryPage() {
                 <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
               </svg>
             </div>
-            <p className="text-sm text-zinc-500">{t('error.history_fetch')}</p>
-            <button
-              onClick={() => mutate()}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
-            >
-              {t('error.retry')}
-            </button>
+            <p className="text-sm text-zinc-500">
+              {historyError instanceof HistoryFetchError && historyError.code === 'pro_required'
+                ? t('error.history_pro_required')
+                : t('error.history_fetch')}
+            </p>
+            {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
+              <Link
+                href="/pricing"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+              >
+                {t('nav.pricing')}
+              </Link>
+            ) : (
+              <button
+                onClick={() => mutate()}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+              >
+                {t('error.retry')}
+              </button>
+            )}
           </div>
         ) : entries.length === 0 ? (
           <p className="text-sm text-zinc-400 text-center py-12">
