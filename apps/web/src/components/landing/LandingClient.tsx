@@ -8,6 +8,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
+import { pickRandomTaglineKey } from '@/lib/landing-taglines';
 
 const DOMAINS = [
   { key: 'tax' },
@@ -30,6 +31,8 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [taglineKey] = useState(() => pickRandomTaglineKey());
+  const tagline = t(taglineKey);
 
   return (
     <div className="flex min-h-screen bg-[#0A0F1E] text-white font-sans">
@@ -100,7 +103,7 @@ export function LandingClient() {
             animate="show"
             className="text-lg text-zinc-400 max-w-xl leading-relaxed locale-text-balance"
           >
-            {t('landing.hero.subtext')}
+            {tagline}
           </motion.p>
 
           <motion.div
@@ -187,7 +190,7 @@ export function LandingClient() {
         <footer className="border-t border-white/10 px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
           <div className="flex flex-col gap-1">
             <span className="font-semibold text-zinc-300 locale-nowrap">NakTahu AI</span>
-            <span className="locale-text-balance">{t('landing.footer.tagline')}</span>
+            <span className="locale-text-balance">{tagline}</span>
           </div>
           <div className="flex flex-col items-end gap-1 text-right">
             <div className="flex items-center gap-3">

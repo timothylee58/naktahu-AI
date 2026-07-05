@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { useI18n } from '@/lib/i18n';
+import { agentTitleKey } from '@/lib/agents';
 
 const SUBJECTS = ['sejarah', 'matematik', 'sains', 'bm', 'bi'];
 
 export default function StudyAgentPage() {
+  const { t } = useI18n();
   const { start, continue: cont } = useAgentApi();
   const [subject, setSubject] = useState('sejarah');
   const [paperText, setPaperText] = useState('');
