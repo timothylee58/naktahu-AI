@@ -1,6 +1,7 @@
 -- 012_storage_generated_documents.sql
 -- Private bucket for agent-generated PDFs (Compliance Drafter, etc.).
 -- API uploads via service role; users access files via signed URLs.
+-- No DROP statements — safe to run in Supabase SQL editor.
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
@@ -15,25 +16,42 @@ ON CONFLICT (id) DO UPDATE SET
     file_size_limit    = EXCLUDED.file_size_limit,
     allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Service role bypasses RLS; these policies cover authenticated direct access.
-DROP POLICY IF EXISTS "generated_documents_select_own" ON storage.objects;
-CREATE POLICY "generated_documents_select_own"
-    ON storage.objects
-    FOR SELECT
-    TO authenticated
-    USING (
-        bucket_id = 'generated-documents'
-        AND (storage.foldername(name))[1] = 'agents'
-        AND auth.uid()::text = (storage.foldername(name))[3]
-    );
+-- Optional RLS for authenticated direct access (API uses service role + signed URLs).
+DO $policy$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_policies
+        WHERE schemaname = 'storage'
+          AND tablename = 'objects'
+          AND policyname = 'generated_documents_select_own'
+    ) THEN
+        CREATE POLICY "generated_documents_select_own"
+            ON storage.objects
+            FOR SELECT
+            TO authenticated
+            USING (
+                bucket_id = 'generated-documents'
+                AND (storage.foldername(name))[1] = 'agents'
+                AND auth.uid()::text = (storage.foldername(name))[3]
+            );
+    END IF;
 
-DROP POLICY IF EXISTS "generated_documents_insert_own" ON storage.objects;
-CREATE POLICY "generated_documents_insert_own"
-    ON storage.objects
-    FOR INSERT
-    TO authenticated
-    WITH CHECK (
-        bucket_id = 'generated-documents'
-        AND (storage.foldername(name))[1] = 'agents'
-        AND auth.uid()::text = (storage.foldername(name))[3]
-    );
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_policies
+        WHERE schemaname = 'storage'
+          AND tablename = 'objects'
+          AND policyname = 'generated_documents_insert_own'
+    ) THEN
+        CREATE POLICY "generated_documents_insert_own"
+            ON storage.objects
+            FOR INSERT
+            TO authenticated
+            WITH CHECK (
+                bucket_id = 'generated-documents'
+                AND (storage.foldername(name))[1] = 'agents'
+                AND auth.uid()::text = (storage.foldername(name))[3]
+            );
+    END IF;
+END $policy$;
