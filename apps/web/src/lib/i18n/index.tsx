@@ -51,6 +51,11 @@ const MS: Translations = {
   'sidebar.collapse': 'Lipat panel',
   'sidebar.expand': 'Buka panel',
 
+  'theme.dark': 'Mod gelap',
+  'theme.light': 'Mod cerah',
+  'theme.switch_dark': 'Tukar ke mod gelap',
+  'theme.switch_light': 'Tukar ke mod cerah',
+
   /* ── pricing ── */
   'pricing.title': 'Pilih pelan anda',
   'pricing.subtitle': 'Mula percuma. Naik taraf bila-bila masa.',
@@ -297,6 +302,11 @@ const EN: Translations = {
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
 
+  'theme.dark': 'Dark mode',
+  'theme.light': 'Light mode',
+  'theme.switch_dark': 'Switch to dark mode',
+  'theme.switch_light': 'Switch to light mode',
+
   /* ── pricing ── */
   'pricing.title': 'Choose your plan',
   'pricing.subtitle': 'Start free. Upgrade any time.',
@@ -541,6 +551,11 @@ const ZH: Translations = {
   'nav.agents': '智能代理',
   'sidebar.collapse': '收起侧栏',
   'sidebar.expand': '展开侧栏',
+
+  'theme.dark': '深色模式',
+  'theme.light': '浅色模式',
+  'theme.switch_dark': '切换到深色模式',
+  'theme.switch_light': '切换到浅色模式',
 
   /* ── pricing ── */
   'pricing.title': '选择您的套餐',

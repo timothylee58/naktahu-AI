@@ -25,6 +25,7 @@ const QUERIES_ZH = [
 
 interface TypewriterQueryProps {
   locale?: 'ms' | 'en' | 'zh';
+  isDark?: boolean;
 }
 
 const CHAR_DELAY = 50;
@@ -32,7 +33,7 @@ const DELETE_DELAY = 30;
 const PAUSE_AFTER_TYPE = 2000;
 const PAUSE_BEFORE_TYPE = 500;
 
-export function TypewriterQuery({ locale = 'ms' }: TypewriterQueryProps) {
+export function TypewriterQuery({ locale = 'ms', isDark = true }: TypewriterQueryProps) {
   const queries = locale === 'zh' ? QUERIES_ZH : locale === 'ms' ? QUERIES_MS : QUERIES_EN;
   const [displayText, setDisplayText] = useState('');
   const [queryIdx, setQueryIdx] = useState(0);
@@ -80,9 +81,9 @@ export function TypewriterQuery({ locale = 'ms' }: TypewriterQueryProps) {
   }, [queryIdx, queries]);
 
   return (
-    <span className="text-zinc-400 text-sm">
+    <span className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
       {displayText}
-      <span className="inline-block w-0.5 h-[1em] bg-zinc-500 align-text-bottom ml-px animate-blink" />
+      <span className={`inline-block w-0.5 h-[1em] align-text-bottom ml-px animate-blink ${isDark ? 'bg-zinc-500' : 'bg-zinc-400'}`} />
     </span>
   );
 }

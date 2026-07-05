@@ -22,6 +22,7 @@ interface ChatInputProps {
   inject?: string;
   /** Character count from prior messages in the conversation. */
   conversationChars?: number;
+  variant?: 'light' | 'dark';
 }
 
 export function ChatInput({
@@ -30,8 +31,10 @@ export function ChatInput({
   detectedLanguage,
   inject,
   conversationChars = 0,
+  variant = 'light',
 }: ChatInputProps) {
   const { t, locale } = useI18n();
+  const isDark = variant === 'dark';
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -103,11 +106,25 @@ export function ChatInput({
   const usagePercent = contextUsagePercent(usedChars);
   const usageLabel = t('chat.context_usage').replace('{used}', formatContextUsage(usedChars));
 
+  const shellClass = isDark
+    ? 'bg-white/5 border-white/10'
+    : 'bg-white border-zinc-200 shadow-sm';
+  const langBadgeClass = isDark
+    ? 'text-zinc-400 bg-white/10'
+    : 'text-zinc-400 bg-zinc-100';
+  const inputClass = isDark
+    ? 'text-zinc-100 placeholder-zinc-500'
+    : 'text-zinc-800 placeholder-zinc-400';
+  const micIdleClass = isDark
+    ? 'text-zinc-400 hover:text-zinc-200 hover:bg-white/10'
+    : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100';
+  const contextTrackClass = isDark ? 'bg-white/10' : 'bg-zinc-100';
+  const contextLabelClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+
   return (
     <div className="flex flex-col gap-1.5 w-full">
-    <div className="flex items-end gap-2 bg-white border border-zinc-200 rounded-2xl px-3 py-2 shadow-sm">
-      {/* language indicator */}
-      <span className="flex-shrink-0 text-[10px] font-semibold text-zinc-400 bg-zinc-100 rounded-full px-2 py-0.5 mb-1 select-none">
+    <div className={`flex items-end gap-2 border rounded-2xl px-3 py-2 ${shellClass}`}>
+      <span className={`flex-shrink-0 text-[10px] font-semibold rounded-full px-2 py-0.5 mb-1 select-none ${langBadgeClass}`}>
         {langLabel}
       </span>
 
@@ -123,7 +140,7 @@ export function ChatInput({
         placeholder={t('chat.placeholder')}
         rows={1}
         disabled={isStreaming}
-        className="flex-1 resize-none bg-transparent text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto disabled:opacity-50"
+        className={`flex-1 resize-none bg-transparent text-sm focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto disabled:opacity-50 ${inputClass}`}
         aria-label={t('chat.placeholder')}
       />
 
@@ -144,7 +161,7 @@ export function ChatInput({
               ? 'bg-red-100 text-red-600 animate-pulse'
               : voiceError
               ? 'text-red-400 hover:text-red-600 hover:bg-red-50'
-              : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'
+              : micIdleClass
           }`}
         >
           <svg
@@ -183,7 +200,7 @@ export function ChatInput({
 
     <div className="flex items-center gap-2 px-1">
       <div
-        className="flex-1 h-1 bg-zinc-100 rounded-full overflow-hidden"
+        className={`flex-1 h-1 rounded-full overflow-hidden ${contextTrackClass}`}
         role="progressbar"
         aria-valuenow={Math.round(usagePercent)}
         aria-valuemin={0}
@@ -197,10 +214,10 @@ export function ChatInput({
           style={{ width: `${usagePercent}%` }}
         />
       </div>
-      <span className="text-[10px] text-zinc-400 tabular-nums flex-shrink-0 select-none">
+      <span className={`text-[10px] tabular-nums flex-shrink-0 select-none ${contextLabelClass}`}>
         {usageLabel}
       </span>
-      <span className="text-[10px] text-zinc-400 flex-shrink-0 select-none hidden sm:inline">
+      <span className={`text-[10px] flex-shrink-0 select-none hidden sm:inline ${contextLabelClass}`}>
         {t('chat.context_window')}
       </span>
     </div>

@@ -14,6 +14,8 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from '@/lib/theme';
 
 let msgCounter = 0;
 function makeId() {
@@ -22,6 +24,8 @@ function makeId() {
 
 function ChatPageInner() {
   const { t, locale } = useI18n();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
 
@@ -233,9 +237,28 @@ function ChatPageInner() {
 
   const showChips = messages.length === 0 && !isStreaming;
 
+  const pageBg = isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50';
+  const headerClass = isDark
+    ? 'border-white/10 bg-[#0A0F1E]/90 text-white'
+    : 'border-zinc-100 bg-white/90 text-zinc-900';
+  const headerSub = isDark ? 'text-zinc-400' : 'text-zinc-500';
+  const menuBtn = isDark
+    ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
+    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800';
+  const emptyTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
+  const emptyDesc = isDark ? 'text-zinc-500' : 'text-zinc-400';
+  const domainPill = isDark
+    ? 'text-blue-300 bg-blue-500/10 border-blue-500/30'
+    : 'text-blue-600 bg-blue-50 border-blue-100';
+  const inputBarClass = isDark
+    ? 'border-white/10 bg-[#0A0F1E]/90'
+    : 'border-zinc-100 bg-white/90';
+  const hintClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+
   return (
-    <div className="flex h-full bg-zinc-50/50">
+    <div className={`flex h-full ${pageBg}`}>
       <AppSidebar
+        variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
         showHistory
@@ -245,14 +268,12 @@ function ChatPageInner() {
       />
 
       <div className="flex flex-col flex-1 min-w-0 h-full">
-      {/* header */}
-      <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+      <header className={`flex-shrink-0 flex items-center justify-between px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${headerClass}`}>
         <div className="flex items-center gap-2">
-          {/* sidebar toggle — mobile only */}
           <button
             onClick={() => setSidebarOpen(true)}
-            aria-label={t('header.history')}
-            className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors lg:hidden"
+            aria-label={t('header.menu')}
+            className={`p-1.5 rounded-lg transition-colors lg:hidden ${menuBtn}`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -269,12 +290,13 @@ function ChatPageInner() {
           </button>
 
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold text-zinc-900 tracking-tight">
+            <span className="text-base font-bold tracking-tight">
               {t('header.title')}
             </span>
-            <span className="text-xs text-zinc-500">{t('header.subtitle')}</span>
+            <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
           </Link>
         </div>
+        <ThemeToggle variant={isDark ? 'dark' : 'light'} />
       </header>
 
       {/* message list */}
@@ -292,13 +314,12 @@ function ChatPageInner() {
               </svg>
             </div>
             <div className="flex flex-col gap-1">
-              <p className="text-lg font-bold text-zinc-700">NakTahu AI</p>
-              <p className="text-sm text-zinc-400 max-w-[260px] leading-relaxed">{t('chat.empty')}</p>
+              <p className={`text-lg font-bold ${emptyTitle}`}>NakTahu AI</p>
+              <p className={`text-sm max-w-[260px] leading-relaxed ${emptyDesc}`}>{t('chat.empty')}</p>
             </div>
-            {/* Quick domain pills */}
             <div className="flex flex-wrap justify-center gap-2 max-w-xs">
               {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1">
+                <span key={d} className={`text-[11px] font-medium border rounded-full px-2.5 py-1 ${domainPill}`}>
                   {t(`domain.${d}`)}
                 </span>
               ))}
@@ -331,10 +352,9 @@ function ChatPageInner() {
         <div ref={bottomRef} />
       </div>
 
-      {/* input bar */}
-      <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2">
+      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2 ${inputBarClass}`}>
         {showChips && (
-          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} />
+          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
         )}
         <ChatInput
           onSend={handleSend}
@@ -342,8 +362,9 @@ function ChatPageInner() {
           detectedLanguage={detectedLang}
           inject={injectedQuery}
           conversationChars={conversationChars}
+          variant={isDark ? 'dark' : 'light'}
         />
-        <p className="hidden sm:block text-center text-[10px] text-zinc-400">
+        <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
           {t('chat.keyboard_hint')}
         </p>
       </div>
