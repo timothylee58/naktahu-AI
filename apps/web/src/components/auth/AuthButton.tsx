@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
 
 type Tab = 'options' | 'email';
@@ -228,7 +229,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   <p className="text-xs font-medium text-zinc-500 truncate">{user.email}</p>
                   <div className="mt-1.5 flex items-center gap-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
-                      {(user.app_metadata?.plan as string | undefined) ?? 'free'}
+                      {planBadgeLabel(user)}
                     </span>
                     {credits !== null && credits > 0 && (
                       <span className="text-[10px] font-medium text-zinc-500">

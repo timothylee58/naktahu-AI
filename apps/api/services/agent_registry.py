@@ -120,6 +120,10 @@ def plan_satisfies(user_plan: str, required: str) -> bool:
     return _PLAN_RANK.get(user_plan, 0) >= _PLAN_RANK.get(required, 0)
 
 
-def is_credit_exempt(user_plan: str, agent_name: str) -> bool:
-    """Business plan gets unlimited Compliance Drafter runs."""
+def is_credit_exempt(user_plan: str, agent_name: str, *, role: Optional[str] = None) -> bool:
+    """Business plan gets unlimited Compliance Drafter; admins are fully exempt."""
+    from services.auth import is_admin_role
+
+    if is_admin_role(role):
+        return True
     return user_plan == "business" and agent_name == "compliance-drafter"

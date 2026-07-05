@@ -11,7 +11,8 @@ import { SidebarAgentsNav } from '@/components/agents/SidebarAgentsNav';
 import { LangToggle } from '@/components/LangToggle';
 import { useI18n } from '@/lib/i18n';
 
-import { fetchHistory, HistoryFetchError, type HistoryEntry } from '@/lib/history';
+import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import { canAccessHistory } from '@/lib/auth-plan';
 
 export interface AppSidebarProps {
   variant?: 'light' | 'dark';
@@ -118,15 +119,12 @@ function SidebarPanel({
   const { t } = useI18n();
   const isDark = variant === 'dark';
 
-  const fetcher = useMemo(
-    () => (accessToken ? () => fetchHistory(accessToken) : null),
-    [accessToken],
-  );
+  const historyEnabled = Boolean(showHistory && accessToken && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    showHistory && accessToken ? 'sidebar-history' : null,
-    fetcher!,
-    { revalidateOnFocus: true },
+    historyEnabled ? ['sidebar-history', accessToken] : null,
+    ([, token]) => fetchHistory(token as string),
+    HISTORY_SWR_OPTIONS,
   );
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
@@ -193,6 +191,18 @@ function SidebarPanel({
             <p className={`text-sm text-center px-4 py-6 locale-text-balance ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
               {t('history.sign_in_prompt')}
             </p>
+          ) : !canAccessHistory(user) ? (
+            <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+              <p className={`text-sm locale-text-balance ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                {t('error.history_pro_required')}
+              </p>
+              <Link
+                href="/pricing"
+                className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
+              >
+                {t('nav.pricing')}
+              </Link>
+            </div>
           ) : historyLoading ? (
             <div className="flex flex-col gap-2 px-2 py-3">
               {[1, 2, 3].map((n) => (

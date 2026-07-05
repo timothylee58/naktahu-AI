@@ -32,3 +32,11 @@ export async function fetchHistory(accessToken: string): Promise<HistoryEntry[]>
   }
   return res.json() as Promise<HistoryEntry[]>;
 }
+
+/** Stable SWR options — avoid refetch loops on focus/errors. */
+export const HISTORY_SWR_OPTIONS = {
+  revalidateOnFocus: false,
+  revalidateOnReconnect: false,
+  shouldRetryOnError: false,
+  dedupingInterval: 60_000,
+} as const;

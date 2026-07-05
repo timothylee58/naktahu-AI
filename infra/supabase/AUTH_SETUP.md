@@ -45,6 +45,17 @@ If **Site URL** is still `http://localhost:3000` in production, OAuth failures r
 
 Use the same paths your frontend passes to `signInWithOAuth({ options: { redirectTo: ... } })` (or equivalent).
 
+## 1c. Admin accounts (optional)
+
+Run `infra/supabase/migrations/013_admin_users.sql` to grant:
+
+| Email | Role | Plan |
+|-------|------|------|
+| `hwandaeplus@gmail.com` | `primary_admin` | business |
+| `apitest.tim@gmail.com` | `secondary_admin` | business |
+
+Users must **sign out and back in** after running the migration. Admins bypass Pro/Business plan gates and agent credit limits.
+
 ## 3. Email confirmation
 
 1. **Authentication** → **Providers** → **Email**.

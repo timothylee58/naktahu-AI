@@ -106,3 +106,4 @@ def test_is_credit_exempt_business() -> None:
 
     assert is_credit_exempt("business", "compliance-drafter") is True
     assert is_credit_exempt("free", "compliance-drafter") is False
+    assert is_credit_exempt("free", "compliance-drafter", role="primary_admin") is True

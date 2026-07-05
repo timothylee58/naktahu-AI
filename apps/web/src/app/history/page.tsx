@@ -8,7 +8,8 @@ import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
-import { fetchHistory, HistoryFetchError, type HistoryEntry } from '@/lib/history';
+import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import { canAccessHistory } from '@/lib/auth-plan';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 
 const DAY_MS = 86_400_000;
@@ -113,15 +114,12 @@ export default function HistoryPage() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const fetcher = useMemo(
-    () => (accessToken ? () => fetchHistory(accessToken) : null),
-    [accessToken],
-  );
+  const historyEnabled = Boolean(accessToken && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    accessToken ? 'history-page' : null,
-    fetcher!,
-    { revalidateOnFocus: true },
+    historyEnabled ? ['history-page', accessToken] : null,
+    ([, token]) => fetchHistory(token as string),
+    HISTORY_SWR_OPTIONS,
   );
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
@@ -179,6 +177,16 @@ export default function HistoryPage() {
           <p className="text-sm text-zinc-500 text-center py-12">
             {t('history.sign_in_prompt')}
           </p>
+        ) : !canAccessHistory(user) ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <p className="text-sm text-zinc-500">{t('error.history_pro_required')}</p>
+            <Link
+              href="/pricing"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+            >
+              {t('nav.pricing')}
+            </Link>
+          </div>
         ) : historyLoading ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3, 4].map((n) => (
