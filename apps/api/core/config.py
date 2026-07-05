@@ -11,8 +11,18 @@ class Settings(BaseSettings):
     )
     supabase_jwt_aud: str = "authenticated"
     redis_url: str = "redis://localhost:6379/0"
-    supabase_url: str = "http://localhost:54321"
-    supabase_service_key: str = "dev-service-role-key"
+    supabase_url: str = Field(
+        default="http://localhost:54321",
+        validation_alias=AliasChoices("SUPABASE_URL", "supabase_url"),
+    )
+    supabase_service_key: str = Field(
+        default="dev-service-role-key",
+        validation_alias=AliasChoices(
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_SERVICE_KEY",
+            "supabase_service_key",
+        ),
+    )
     # Supabase direct Postgres — LangGraph PostgresSaver (use port 5432, not pooler).
     database_url: str = Field(
         default="",

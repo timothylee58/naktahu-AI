@@ -21,7 +21,10 @@ def history_key(user_id: str) -> str:
     return HISTORY_LIST_KEY.format(user_id=user_id)
 
 
-async def fetch_history_entries(redis_client: Redis, user_id: str) -> list[dict[str, Any]]:
+async def fetch_history_entries(redis_client: Redis | None, user_id: str) -> list[dict[str, Any]]:
+    if redis_client is None:
+        logger.warning("history_redis_unavailable")
+        return []
     key = history_key(user_id)
     raw = await redis_client.lrange(key, 0, MAX_HISTORY - 1)
     out: list[dict[str, Any]] = []
@@ -35,8 +38,8 @@ async def fetch_history_entries(redis_client: Redis, user_id: str) -> list[dict[
 
 async def persist_session_entry(
     *,
-    redis_client: Redis,
-    supabase_client: Client,
+    redis_client: Redis | None,
+    supabase_client: Client | None,
     user_id: str,
     query: str,
     language: str,
@@ -54,10 +57,11 @@ async def persist_session_entry(
         "ts": int(time.time()),
     }
     key = history_key(user_id)
-    pipe = redis_client.pipeline(transaction=False)
-    pipe.lpush(key, json.dumps(entry))
-    pipe.ltrim(key, 0, MAX_HISTORY - 1)
-    await pipe.execute()
+    if redis_client is not None:
+        pipe = redis_client.pipeline(transaction=False)
+        pipe.lpush(key, json.dumps(entry))
+        pipe.ltrim(key, 0, MAX_HISTORY - 1)
+        await pipe.execute()
 
     row = {
         "user_id": user_id,
@@ -69,7 +73,10 @@ async def persist_session_entry(
     }
 
     def _insert() -> None:
+        if supabase_client is None:
+            return
         supabase_client.table("user_sessions").insert(row).execute()
 
-    await asyncio.to_thread(_insert)
+    if supabase_client is not None:
+        await asyncio.to_thread(_insert)
     logger.info("history_persisted", user_id=user_id, domain=domain)

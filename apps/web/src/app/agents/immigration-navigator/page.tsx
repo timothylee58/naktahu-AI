@@ -38,7 +38,7 @@ export default function ImmigrationNavigatorPage() {
         <h1 className="font-bold">Immigration Navigator</h1>
       </header>
       <div className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
-        {output?.visa_type && (
+        {output?.visa_type != null && (
           <section className="bg-white border rounded-2xl p-4">
             <h2 className="font-semibold text-teal-800">{String(output.visa_type)}</h2>
             <ul className="mt-2 text-sm list-disc pl-5">{checklist.map((c) => <li key={c}>{c}</li>)}</ul>

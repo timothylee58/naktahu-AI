@@ -8,16 +8,11 @@ import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
+import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import { canAccessHistory } from '@/lib/auth-plan';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-
-interface HistoryEntry {
-  query: string;
-  language: string;
-  domain: string;
-  response_summary: string;
-  citations: unknown[];
-  ts?: number;
-}
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from '@/lib/theme';
 
 const DAY_MS = 86_400_000;
 
@@ -98,6 +93,8 @@ function HistorySection({
 
 export default function HistoryPage() {
   const { t } = useI18n();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -121,31 +118,20 @@ export default function HistoryPage() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const fetcher = useMemo(
-    () =>
-      accessToken
-        ? () =>
-            fetch('/api/v1/history', {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            }).then((r) => {
-              if (!r.ok) throw new Error('Failed to fetch history');
-              return r.json() as Promise<HistoryEntry[]>;
-            })
-        : null,
-    [accessToken],
-  );
+  const historyEnabled = Boolean(accessToken && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    accessToken ? 'history-page' : null,
-    fetcher!,
-    { revalidateOnFocus: true },
+    historyEnabled ? ['history-page', accessToken] : null,
+    ([, token]) => fetchHistory(token as string),
+    HISTORY_SWR_OPTIONS,
   );
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className={`min-h-screen flex ${isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50'}`}>
       <AppSidebar
+        variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
         showHistory
@@ -154,17 +140,18 @@ export default function HistoryPage() {
       />
 
       <div className="flex flex-col flex-1 min-w-0 min-h-screen">
-      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3">
+      <header className={`border-b px-4 py-3 flex items-center justify-between gap-3 ${isDark ? 'bg-[#0A0F1E]/90 border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
+        <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={() => setSidebarOpen(true)}
-          aria-label={t('header.history')}
-          className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors lg:hidden"
+          aria-label={t('header.menu')}
+          className={`p-1.5 rounded-lg transition-colors lg:hidden ${isDark ? 'text-zinc-400 hover:bg-white/10' : 'text-zinc-500 hover:bg-zinc-100'}`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
             <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
           </svg>
         </button>
-        <Link href="/chat" className="p-1 rounded hover:bg-zinc-100 text-zinc-500 flex-shrink-0">
+        <Link href="/chat" className={`p-1 rounded flex-shrink-0 ${isDark ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-zinc-100 text-zinc-500'}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
@@ -178,7 +165,9 @@ export default function HistoryPage() {
             />
           </svg>
         </Link>
-        <h1 className="font-semibold text-zinc-900 truncate locale-nowrap">{t('history.title')}</h1>
+        <h1 className="font-semibold truncate locale-nowrap">{t('history.title')}</h1>
+        </div>
+        <ThemeToggle variant={isDark ? 'dark' : 'light'} />
       </header>
 
       {/* Content */}
@@ -196,6 +185,16 @@ export default function HistoryPage() {
           <p className="text-sm text-zinc-500 text-center py-12">
             {t('history.sign_in_prompt')}
           </p>
+        ) : !canAccessHistory(user) ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <p className="text-sm text-zinc-500">{t('error.history_pro_required')}</p>
+            <Link
+              href="/pricing"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+            >
+              {t('nav.pricing')}
+            </Link>
+          </div>
         ) : historyLoading ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3, 4].map((n) => (
@@ -212,13 +211,26 @@ export default function HistoryPage() {
                 <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
               </svg>
             </div>
-            <p className="text-sm text-zinc-500">{t('error.history_fetch')}</p>
-            <button
-              onClick={() => mutate()}
-              className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
-            >
-              {t('error.retry')}
-            </button>
+            <p className="text-sm text-zinc-500">
+              {historyError instanceof HistoryFetchError && historyError.code === 'pro_required'
+                ? t('error.history_pro_required')
+                : t('error.history_fetch')}
+            </p>
+            {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
+              <Link
+                href="/pricing"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+              >
+                {t('nav.pricing')}
+              </Link>
+            ) : (
+              <button
+                onClick={() => mutate()}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors"
+              >
+                {t('error.retry')}
+              </button>
+            )}
           </div>
         ) : entries.length === 0 ? (
           <p className="text-sm text-zinc-400 text-center py-12">

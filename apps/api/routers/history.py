@@ -26,7 +26,7 @@ async def get_history(
     response: Response,
     user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
-    redis_client = request.app.state.redis
+    redis_client = getattr(request.app.state, "redis", None)
     entries = await fetch_history_entries(redis_client, user.user_id)
     return entries
 
@@ -39,10 +39,10 @@ async def post_history(
     body: HistoryEntryPayload,
     user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
-    redis_client = request.app.state.redis
+    redis_client = getattr(request.app.state, "redis", None)
     await persist_session_entry(
         redis_client=redis_client,
-        supabase_client=request.app.state.supabase,
+        supabase_client=getattr(request.app.state, "supabase", None),
         user_id=user.user_id,
         query=body.query,
         language=body.language,

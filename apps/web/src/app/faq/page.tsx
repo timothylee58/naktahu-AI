@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppSidebar } from '@/components/layout/AppSidebar';
+import { LandingHeader } from '@/components/layout/LandingHeader';
 import { useI18n } from '@/lib/i18n';
+import { useTheme } from '@/lib/theme';
 
 interface FAQItem {
   question: string;
@@ -13,7 +14,8 @@ interface FAQItem {
 
 export default function FAQPage() {
   const { t, locale } = useI18n();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const faqs: Record<string, { title: string; subtitle: string; items: FAQItem[] }> = {
@@ -184,33 +186,11 @@ export default function FAQPage() {
   const content = locale === 'zh' ? faqs.zh : locale === 'en' ? faqs.en : faqs.ms;
 
   return (
-    <div className="flex min-h-screen bg-[#0A0F1E] text-white font-sans">
-      <AppSidebar
-        variant="dark"
-        isMobileOpen={sidebarOpen}
-        onMobileClose={() => setSidebarOpen(false)}
-      />
+    <div className={`flex flex-col min-h-screen font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+      <LandingHeader />
 
       <div className="flex flex-col flex-1 min-w-0">
-        <motion.nav
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center px-6 py-4 border-b border-white/10 lg:hidden"
-        >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label={t('header.menu')}
-            className="p-1.5 rounded-lg text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <span className="ml-3 text-lg font-bold tracking-tight locale-nowrap">NakTahu</span>
-        </motion.nav>
-
-        <main className="flex-1 overflow-y-auto px-6 py-12 max-w-3xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-10 sm:py-12 max-w-3xl mx-auto w-full">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

@@ -70,7 +70,7 @@ def _require_agent_access(agent_name: str, user: UserContext) -> Any:
 
 
 async def _ensure_credits(request: Request, user: UserContext, agent_name: str, cost: int) -> None:
-    if cost <= 0 or is_credit_exempt(user.plan, agent_name):
+    if cost <= 0 or is_credit_exempt(user.plan, agent_name, role=user.role):
         return
     sb = getattr(request.app.state, "supabase", None)
     remaining = await get_credits_remaining(sb, user.user_id)
@@ -129,7 +129,7 @@ async def agent_start(
     result = await handler(**kwargs)
 
     if agent_name in CREDIT_ON_COMPLETE_AGENTS and result.get("status") == "completed":
-        if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name):
+        if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
             remaining = await deduct_credits(sb, user.user_id, agent.credit_cost)
             if remaining < 0:
                 raise HTTPException(status_code=402, detail="Insufficient agent credits.")
@@ -167,7 +167,7 @@ async def agent_continue(
 
     if agent_name in CREDIT_ON_COMPLETE_AGENTS and result.get("status") == "completed":
         agent = get_agent(agent_name)
-        if agent and agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name):
+        if agent and agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
             remaining = await deduct_credits(sb, user.user_id, agent.credit_cost)
             result["credits_remaining"] = remaining
 
@@ -186,7 +186,7 @@ async def agent_confirm(
         raise HTTPException(status_code=501, detail=f"Agent '{agent_name}' does not support confirm.")
 
     sb = getattr(request.app.state, "supabase", None)
-    if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name):
+    if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
         remaining = await get_credits_remaining(sb, user.user_id)
         if remaining < agent.credit_cost:
             raise HTTPException(status_code=402, detail="Insufficient agent credits.")
@@ -198,7 +198,7 @@ async def agent_confirm(
         supabase_client=sb,
         checkpointer=_checkpointer(request),
     )
-    if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name):
+    if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
         remaining = await deduct_credits(sb, user.user_id, agent.credit_cost)
         if remaining < 0:
             log.warning("agent_confirm_credit_deduct_failed", user_id=user.user_id)

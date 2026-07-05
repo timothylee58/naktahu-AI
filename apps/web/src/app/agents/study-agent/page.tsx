@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { useI18n } from '@/lib/i18n';
+import { agentTitleKey } from '@/lib/agents';
 
 const SUBJECTS = ['sejarah', 'matematik', 'sains', 'bm', 'bi'];
 
 export default function StudyAgentPage() {
+  const { t } = useI18n();
   const { start, continue: cont } = useAgentApi();
   const [subject, setSubject] = useState('sejarah');
   const [paperText, setPaperText] = useState('');
@@ -49,8 +52,8 @@ export default function StudyAgentPage() {
   return (
     <main className="min-h-screen bg-zinc-50">
       <header className="bg-white border-b px-4 py-3 flex gap-3 items-center">
-        <Link href="/agents" className="text-sm text-blue-600">← Agents</Link>
-        <h1 className="font-bold">Study Agent</h1>
+        <Link href="/agents" className="text-sm text-blue-600">← {t('agents.hub.link')}</Link>
+        <h1 className="font-bold">{t(agentTitleKey('study-agent'))}</h1>
       </header>
       <div className="max-w-2xl mx-auto p-4 flex flex-col gap-4">
         {error && <p className="text-sm text-red-600">{error}</p>}
