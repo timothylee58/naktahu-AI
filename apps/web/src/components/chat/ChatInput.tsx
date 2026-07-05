@@ -29,7 +29,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
-  const { isListening, transcript, error: voiceError, startListening, stopListening, isSupported } =
+  const { isListening, transcript, error: voiceError, startListening, stopListening, available } =
     useVoiceInput({ language: voiceLang });
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export function ChatInput({
       />
 
       {/* mic button */}
-      {isSupported && (
+      {available && (
         <div className="relative flex-shrink-0">
         {voiceError && (
           <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] bg-zinc-800 text-white rounded px-2 py-0.5 pointer-events-none">

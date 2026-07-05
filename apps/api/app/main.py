@@ -14,6 +14,7 @@ from app.middleware.request_id import RequestIDMiddleware
 from app.routers.health import router as health_router
 from app.routers.query import router as query_router
 from app.routers.session import router as session_router
+from app.routers.transcribe import router as transcribe_router
 
 # Initialise Sentry + structlog before the app object is created so that
 # any import-time errors are captured too.
@@ -61,3 +62,4 @@ app.add_middleware(RequestIDMiddleware)
 app.include_router(health_router)
 app.include_router(query_router)
 app.include_router(session_router)
+app.include_router(transcribe_router)
