@@ -1,14 +1,19 @@
-"""POST /api/v1/transcribe — server-side voice transcription (Google Speech).
+"""POST /api/v1/transcribe — server-side voice transcription (Google Speech V2).
 
 Cross-browser fallback for the browser Web Speech API. The frontend records mic
 audio (WEBM/Opus via MediaRecorder), base64-encodes it, and posts it here.
+
+Optional: POST /api/v1/transcribe/stream returns SSE interim/final events via
+Chirp 3 gRPC streaming. The default /transcribe contract is unchanged.
 """
 from __future__ import annotations
 
-from typing import Literal, Optional
+import json
+from typing import AsyncIterator, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.routers.query import _extract_user_id
@@ -16,6 +21,7 @@ from app.services.speech import (
     SpeechConfigError,
     SpeechServiceError,
     transcribe as transcribe_audio,
+    transcribe_stream,
 )
 
 log = structlog.get_logger(__name__)
@@ -38,6 +44,27 @@ class TranscribeResponse(BaseModel):
     confidence: float
 
 
+def _sse(event: str, data: dict[str, object]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def _stream_events(body: TranscribeRequest) -> AsyncIterator[str]:
+    try:
+        async for event in transcribe_stream(body.audio_base64, body.language):
+            event_name = "final" if event["is_final"] else "interim"
+            payload: dict[str, object] = {
+                "text": event["transcript"],
+                "confidence": event["confidence"],
+                "detected_language": event["detected_language"],
+            }
+            yield _sse(event_name, payload)
+        yield _sse("done", {})
+    except SpeechConfigError:
+        yield _sse("error", {"message": "Voice transcription is not available."})
+    except SpeechServiceError as exc:
+        yield _sse("error", {"message": str(exc) or "Transcription failed. Please try again."})
+
+
 @router.post("/transcribe", response_model=TranscribeResponse)
 async def transcribe_endpoint(
     body: TranscribeRequest,
@@ -56,3 +83,26 @@ async def transcribe_endpoint(
         raise HTTPException(status_code=502, detail="Transcription failed. Please try again.") from exc
 
     return TranscribeResponse(**result)
+
+
+@router.post("/transcribe/stream")
+async def transcribe_stream_endpoint(
+    body: TranscribeRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StreamingResponse:
+    """Optional SSE stream with interim Chirp 3 results.
+
+    Events: interim, final, done, error — same shape as the query SSE contract.
+  """
+    user_id = _extract_user_id(authorization)
+    log.info(
+        "transcribe_stream_received",
+        user_id=user_id,
+        language=body.language,
+        b64_len=len(body.audio_base64),
+    )
+    return StreamingResponse(
+        _stream_events(body),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
