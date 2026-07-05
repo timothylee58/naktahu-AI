@@ -64,6 +64,7 @@ async def _run_pipeline(
     query: str,
     session_id: str,
     user_id: Optional[str],
+    domain: Optional[str] = None,
 ) -> dict:
     """Execute the full LangGraph pipeline and return a structured result dict.
 
@@ -83,6 +84,8 @@ async def _run_pipeline(
         "streaming_token_buffer": "",
         "error": None,
     }
+    if domain:
+        inputs["domain"] = domain
 
     tokens: list[str] = []
     final_state: AgentState = {}  # type: ignore[assignment]

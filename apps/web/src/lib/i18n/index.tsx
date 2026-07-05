@@ -97,6 +97,25 @@ const MS: Translations = {
   'pricing.processing': 'Memproses…',
   'pricing.error': 'Sesuatu tidak kena. Sila cuba lagi.',
 
+  /* ── developer API ── */
+  'nav.developer': 'API',
+  'developer.title': 'API Pembangun',
+  'developer.subtitle': 'Jana kunci API, pantau penggunaan, dan embed widget NakTahu di laman anda.',
+  'developer.sign_in': 'Daftar masuk untuk mengurus kunci API.',
+  'developer.create_key': 'Jana kunci API',
+  'developer.generate': 'Jana kunci',
+  'developer.keys': 'Kunci anda',
+  'developer.no_keys': 'Tiada kunci lagi.',
+  'developer.revoke': 'Batalkan',
+  'developer.copy': 'Salin',
+  'developer.key_once': 'Salin kunci ini sekarang — ia tidak akan dipaparkan lagi.',
+  'developer.usage': 'Penggunaan (14 hari)',
+  'developer.widget': 'Widget embed',
+  'developer.domains_placeholder': 'example.com, *.sub.example.com',
+  'developer.error.load': 'Gagal memuatkan data pembangun.',
+  'developer.error.create': 'Gagal menjana kunci.',
+  'developer.error.revoke': 'Gagal membatalkan kunci.',
+
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -348,6 +367,25 @@ const EN: Translations = {
   'pricing.processing': 'Processing…',
   'pricing.error': 'Something went wrong. Please try again.',
 
+  /* ── developer API ── */
+  'nav.developer': 'API',
+  'developer.title': 'Developer API',
+  'developer.subtitle': 'Generate API keys, monitor usage, and embed the NakTahu widget on your site.',
+  'developer.sign_in': 'Sign in to manage API keys.',
+  'developer.create_key': 'Generate API key',
+  'developer.generate': 'Generate key',
+  'developer.keys': 'Your keys',
+  'developer.no_keys': 'No keys yet.',
+  'developer.revoke': 'Revoke',
+  'developer.copy': 'Copy',
+  'developer.key_once': 'Copy this key now — it will not be shown again.',
+  'developer.usage': 'Usage (14 days)',
+  'developer.widget': 'Embed widget',
+  'developer.domains_placeholder': 'example.com, *.sub.example.com',
+  'developer.error.load': 'Failed to load developer data.',
+  'developer.error.create': 'Failed to generate key.',
+  'developer.error.revoke': 'Failed to revoke key.',
+
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -597,6 +635,25 @@ const ZH: Translations = {
   'pricing.signin_required': '请登录以订阅',
   'pricing.processing': '处理中…',
   'pricing.error': '出了点问题，请重试。',
+
+  /* ── developer API ── */
+  'nav.developer': 'API',
+  'developer.title': '开发者 API',
+  'developer.subtitle': '生成 API 密钥、监控使用量，并在您的网站嵌入 NakTahu 组件。',
+  'developer.sign_in': '登录以管理 API 密钥。',
+  'developer.create_key': '生成 API 密钥',
+  'developer.generate': '生成密钥',
+  'developer.keys': '您的密钥',
+  'developer.no_keys': '暂无密钥。',
+  'developer.revoke': '撤销',
+  'developer.copy': '复制',
+  'developer.key_once': '请立即复制此密钥——不会再次显示。',
+  'developer.usage': '使用量（14 天）',
+  'developer.widget': '嵌入组件',
+  'developer.domains_placeholder': 'example.com, *.sub.example.com',
+  'developer.error.load': '加载开发者数据失败。',
+  'developer.error.create': '生成密钥失败。',
+  'developer.error.revoke': '撤销密钥失败。',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
