@@ -25,7 +25,7 @@ function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const { supabase, user, accessToken } = useSupabaseSession();
+  const { user, accessToken } = useSupabaseSession();
   const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);

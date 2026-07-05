@@ -123,6 +123,7 @@ const MS: Translations = {
   'auth.error.title': 'Log masuk gagal',
   'auth.error.generic': 'Tidak dapat melengkapkan log masuk. Sila cuba lagi.',
   'auth.error.access_denied': 'Log masuk dibatalkan. Sila cuba lagi jika anda ingin meneruskan.',
+  'auth.error.exchange_failed': 'Sesi log masuk tidak dapat disahkan. Sila cuba lagi.',
   'auth.error.dismiss': 'Tutup',
 
   /* ── history ── */
@@ -374,6 +375,7 @@ const EN: Translations = {
   'auth.error.title': 'Sign-in failed',
   'auth.error.generic': 'Could not complete sign-in. Please try again.',
   'auth.error.access_denied': 'Sign-in was cancelled. Try again if you want to continue.',
+  'auth.error.exchange_failed': 'Could not verify your sign-in session. Please try again.',
   'auth.error.dismiss': 'Dismiss',
 
   /* ── history ── */
@@ -624,6 +626,7 @@ const ZH: Translations = {
   'auth.error.title': '登录失败',
   'auth.error.generic': '无法完成登录，请重试。',
   'auth.error.access_denied': '登录已取消。如需继续，请重试。',
+  'auth.error.exchange_failed': '无法验证登录会话，请重试。',
   'auth.error.dismiss': '关闭',
 
   /* ── history ── */

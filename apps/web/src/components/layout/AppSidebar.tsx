@@ -123,14 +123,13 @@ function SidebarPanel({
   variant,
   showHistory,
   user,
-  accessToken,
   onSelectQuery,
   onClose,
 }: {
   variant: 'light' | 'dark';
   showHistory: boolean;
   user: User | null;
-  accessToken: string | null;
+  accessToken?: string | null;
   onSelectQuery?: (query: string) => void;
   onClose?: () => void;
 }) {

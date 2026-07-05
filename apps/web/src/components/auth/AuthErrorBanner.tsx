@@ -26,7 +26,9 @@ function AuthErrorBannerInner() {
   const message =
     reason === 'access_denied'
       ? t('auth.error.access_denied')
-      : t('auth.error.generic');
+      : reason === 'exchange_failed'
+        ? t('auth.error.exchange_failed')
+        : t('auth.error.generic');
 
   return (
     <AnimatePresence>

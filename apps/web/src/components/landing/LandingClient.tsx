@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
@@ -8,7 +8,7 @@ import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
-import { pickRandomTaglineKey } from '@/lib/landing-taglines';
+import { pickRandomTaglineKey, type LandingTaglineKey } from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
 
 const DOMAINS = [
@@ -32,7 +32,12 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const { theme } = useTheme();
-  const [taglineKey] = useState(() => pickRandomTaglineKey());
+  const [taglineKey, setTaglineKey] = useState<LandingTaglineKey>('landing.tagline.01');
+
+  useEffect(() => {
+    setTaglineKey(pickRandomTaglineKey());
+  }, []);
+
   const tagline = t(taglineKey);
   const isDark = theme === 'dark';
 
