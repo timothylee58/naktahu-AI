@@ -2,14 +2,19 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
-import { fetchHistory, HistoryFetchError, HISTORY_SWR_OPTIONS, type HistoryEntry } from '@/lib/history';
+import {
+  fetchHistoryAuthed,
+  HistoryFetchError,
+  HISTORY_SWR_OPTIONS,
+  historyPageKey,
+  type HistoryEntry,
+} from '@/lib/history';
 import { canAccessHistory } from '@/lib/auth-plan';
+import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
@@ -68,20 +73,20 @@ function HistorySection({
               key={i}
               className="bg-white border border-zinc-100 rounded-xl px-4 py-3 flex flex-col gap-1.5 shadow-sm"
             >
-              <span className="text-sm font-medium text-zinc-800 leading-snug">
-                {truncate(e.query)}
+              <span className="text-sm font-medium text-zinc-800 leading-snug line-clamp-2">
+                {truncate(e.response_summary?.trim() || e.query, 80)}
               </span>
+              {e.response_summary?.trim() && (
+                <span className="text-xs text-zinc-400 line-clamp-1">
+                  {truncate(e.query, 56)}
+                </span>
+              )}
               <div className="flex items-center gap-2">
                 <span
                   className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${domainClass}`}
                 >
                   {e.domain}
                 </span>
-                {e.response_summary && (
-                  <span className="text-xs text-zinc-400 truncate">
-                    {truncate(e.response_summary, 60)}
-                  </span>
-                )}
               </div>
             </li>
           );
@@ -95,34 +100,14 @@ export default function HistoryPage() {
   const { t } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const supabase = useMemo(() => createClient(), []);
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { supabase, user, userId, accessToken, ready } = useSupabaseSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  const historyEnabled = Boolean(accessToken && user && canAccessHistory(user));
+  const historyEnabled = Boolean(userId && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    historyEnabled ? ['history-page', accessToken] : null,
-    ([, token]) => fetchHistory(token as string),
+    historyEnabled && userId ? historyPageKey(userId) : null,
+    () => fetchHistoryAuthed(supabase),
     HISTORY_SWR_OPTIONS,
   );
 
@@ -172,7 +157,7 @@ export default function HistoryPage() {
 
       {/* Content */}
       <main className="flex-1 px-4 py-6 max-w-2xl w-full mx-auto flex flex-col gap-6">
-        {loading ? (
+        {!ready ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map((n) => (
               <div
