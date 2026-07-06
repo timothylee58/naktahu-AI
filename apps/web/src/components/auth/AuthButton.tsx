@@ -340,37 +340,38 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </motion.button>
       )}
 
-      <AnimatePresence>
-        {open && mounted && createPortal(
-          <motion.div
-            key="auth-modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
-            style={{
-              paddingTop: 'max(1rem, env(safe-area-inset-top))',
-              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-            }}
-          >
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={closeModal}
-              aria-hidden
-            />
-
+      {mounted && createPortal(
+        <AnimatePresence>
+          {open && (
             <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="auth-modal-title"
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100vh-2rem))] flex flex-col overflow-hidden bg-white rounded-3xl shadow-2xl ring-1 ring-zinc-900/10"
-              onClick={(e) => e.stopPropagation()}
+              key="auth-modal-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
+              style={{
+                paddingTop: 'max(1rem, env(safe-area-inset-top))',
+                paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              }}
             >
+              <div
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={closeModal}
+                aria-hidden
+              />
+
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="auth-modal-title"
+                initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100vh-2rem))] flex flex-col overflow-hidden bg-white rounded-3xl shadow-2xl ring-1 ring-zinc-900/10"
+                onClick={(e) => e.stopPropagation()}
+              >
               {/* Header */}
               <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-zinc-100 flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -483,11 +484,12 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   </p>
                 )}
               </div>
+              </motion.div>
             </motion.div>
-          </motion.div>,
-          document.body,
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }
