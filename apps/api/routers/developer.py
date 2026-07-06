@@ -112,7 +112,7 @@ async def get_keys(
     return KeyListResponse(keys=keys)
 
 
-@router.delete("/keys/{key_id}", status_code=204)
+@router.delete("/keys/{key_id}", status_code=204, response_model=None)
 async def delete_key(
     key_id: str,
     request: Request,

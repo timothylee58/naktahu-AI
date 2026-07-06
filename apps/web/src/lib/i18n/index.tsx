@@ -97,6 +97,11 @@ const MS: Translations = {
   'pricing.processing': 'Memproses…',
   'pricing.error': 'Sesuatu tidak kena. Sila cuba lagi.',
 
+  /* ── share ── */
+  'share.cta': 'Tanya NakTahu',
+  'share.not_found': 'Jawapan yang dikongsi ini tidak wujud atau telah dipadam.',
+  'share.disclaimer': 'Dikongsi daripada NakTahu AI. Sahkan maklumat penting dengan sumber rasmi.',
+
   /* ── developer API ── */
   'nav.developer': 'API',
   'developer.title': 'API Pembangun',
@@ -367,6 +372,11 @@ const EN: Translations = {
   'pricing.processing': 'Processing…',
   'pricing.error': 'Something went wrong. Please try again.',
 
+  /* ── share ── */
+  'share.cta': 'Ask NakTahu',
+  'share.not_found': "This shared answer doesn't exist or has been removed.",
+  'share.disclaimer': 'Shared from NakTahu AI. Verify important information against official sources.',
+
   /* ── developer API ── */
   'nav.developer': 'API',
   'developer.title': 'Developer API',
@@ -635,6 +645,11 @@ const ZH: Translations = {
   'pricing.signin_required': '请登录以订阅',
   'pricing.processing': '处理中…',
   'pricing.error': '出了点问题，请重试。',
+
+  /* ── share ── */
+  'share.cta': '问问 NakTahu',
+  'share.not_found': '此分享的答案不存在或已被删除。',
+  'share.disclaimer': '来自 NakTahu AI 的分享内容。重要信息请以官方来源为准。',
 
   /* ── developer API ── */
   'nav.developer': 'API',

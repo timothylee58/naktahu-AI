@@ -18,6 +18,7 @@ interface ResponseActionsProps {
   domain?: string;
   language?: string;
   citations?: Citation[];
+  confidence?: number | null;
   accessToken?: string;
 }
 
@@ -29,11 +30,13 @@ export function ResponseActions({
   domain,
   language,
   citations,
+  confidence,
   accessToken,
 }: ResponseActionsProps) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [shareState, setShareState] = useState<'idle' | 'sharing' | 'copied' | 'error'>('idle');
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
@@ -75,6 +78,33 @@ export function ResponseActions({
     [feedback, submitting, query, content, citations, domain, language, accessToken],
   );
 
+  const handleShare = useCallback(async () => {
+    if (!query || shareState === 'sharing') return;
+    setShareState('sharing');
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          response_text: content,
+          citations: citations ?? [],
+          domain: domain ?? 'general',
+          language: language ?? 'en',
+          confidence: confidence ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create share link');
+      const data = (await res.json()) as { id: string };
+      await navigator.clipboard.writeText(`${window.location.origin}/a/${data.id}`);
+      setShareState('copied');
+      setTimeout(() => setShareState('idle'), 2000);
+    } catch {
+      setShareState('error');
+      setTimeout(() => setShareState('idle'), 2000);
+    }
+  }, [query, content, citations, domain, language, confidence, shareState]);
+
   if (isStreaming) return null;
 
   return (
@@ -100,6 +130,38 @@ export function ResponseActions({
           </svg>
         )}
       </button>
+
+      {/* Share */}
+      {query && (
+        <button
+          onClick={handleShare}
+          disabled={shareState === 'sharing'}
+          title={
+            shareState === 'copied'
+              ? 'Link copied'
+              : shareState === 'error'
+                ? 'Failed to create link'
+                : 'Copy shareable link'
+          }
+          className={`p-1.5 rounded-lg transition-colors disabled:cursor-default ${
+            shareState === 'error'
+              ? 'text-red-500'
+              : shareState === 'copied'
+                ? 'text-green-500'
+                : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
+          }`}
+        >
+          {shareState === 'copied' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+              <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+              <path d="M11.5 2a2.5 2.5 0 1 0-2.457 2.964l-3.5 2.121a2.5 2.5 0 1 0 0 3.83l3.5 2.121a2.5 2.5 0 1 0 .757-1.279l-3.5-2.121a2.51 2.51 0 0 0 0-1.272l3.5-2.121A2.5 2.5 0 0 0 11.5 2Z" />
+            </svg>
+          )}
+        </button>
+      )}
 
       {/* Regenerate */}
       {onRegenerate && (
