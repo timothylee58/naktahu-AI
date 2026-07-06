@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import { useSWRConfig } from 'swr';
 import { useI18n } from '@/lib/i18n';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
+import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import type { Message } from '@/lib/types';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -16,6 +16,8 @@ import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
+import { canAccessHistory } from '@/lib/auth-plan';
+import { sidebarHistoryKey } from '@/lib/history';
 
 let msgCounter = 0;
 function makeId() {
@@ -26,7 +28,8 @@ function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const supabase = useMemo(() => createClient(), []);
+  const { user, userId, accessToken } = useSupabaseSession();
+  const { mutate: globalMutate } = useSWRConfig();
   const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,9 +42,8 @@ function ChatPageInner() {
     if (q !== null) setInjectedQuery(q);
     else setInjectedQuery('');
   }, [q]);
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const lastUserQuery = useRef<string>('');
+  const wasStreaming = useRef(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -50,23 +52,6 @@ function ChatPageInner() {
     () => messages.reduce((sum, msg) => sum + msg.content.length, 0),
     [messages],
   );
-
-  // Auth state
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
 
   const {
     tokens,
@@ -152,6 +137,18 @@ function ChatPageInner() {
       streamingAssistantId.current = null;
     }
   }, [isStreaming]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh sidebar history after a completed answer (server persists summary on stream end).
+  useEffect(() => {
+    if (wasStreaming.current && !isStreaming && userId && user && canAccessHistory(user)) {
+      const timer = window.setTimeout(() => {
+        void globalMutate(sidebarHistoryKey(userId));
+      }, 600);
+      return () => window.clearTimeout(timer);
+    }
+    wasStreaming.current = isStreaming;
+    return undefined;
+  }, [isStreaming, userId, user, globalMutate]);
 
   // Show error as assistant message
   useEffect(() => {
