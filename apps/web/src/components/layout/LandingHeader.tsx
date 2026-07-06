@@ -27,9 +27,12 @@ export function LandingHeader() {
 
   return (
     <header className={`sticky top-0 z-30 border-b backdrop-blur-md ${shellClass}`}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        <Link href="/" className="font-bold text-lg tracking-tight locale-nowrap flex-shrink-0">
-          NakTahu
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-14 py-2 flex items-center justify-between gap-4">
+        <Link href="/" className="flex flex-col flex-shrink-0 locale-nowrap">
+          <span className="font-bold text-lg tracking-tight">NakTahu</span>
+          <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            {t('header.subtitle')}
+          </span>
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
