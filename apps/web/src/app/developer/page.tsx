@@ -134,6 +134,11 @@ export default function DeveloperPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
+  const [widgetOrigin, setWidgetOrigin] = useState('https://naktahu.netlify.app');
+
+  useEffect(() => {
+    setWidgetOrigin(window.location.origin);
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -354,7 +359,7 @@ export default function DeveloperPage() {
 
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
               <h2 className="text-sm font-semibold text-zinc-900 mb-2">{t('developer.widget')}</h2>
-              <pre className="text-xs bg-zinc-950 text-zinc-100 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap">{`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://naktahu.netlify.app'}/widget.js"
+              <pre className="text-xs bg-zinc-950 text-zinc-100 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap">{`<script src="${widgetOrigin}/widget.js"
   data-api-key="nkt_live_YOUR_KEY"
   data-domain="tax"
   data-lang="bm"
