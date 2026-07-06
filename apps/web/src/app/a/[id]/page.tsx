@@ -32,6 +32,7 @@ export default function SharedAnswerPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading');
 
   useEffect(() => {
+    if (!params?.id) return;
     let active = true;
     fetch(`${API_BASE}/api/v1/share/${params.id}`)
       .then((res) => {

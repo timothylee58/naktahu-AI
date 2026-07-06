@@ -82,9 +82,11 @@ export function ResponseActions({
     if (!query || shareState === 'sharing') return;
     setShareState('sharing');
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
       const res = await fetch(`${API_BASE}/api/v1/share`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           query,
           response_text: content,
@@ -103,7 +105,7 @@ export function ResponseActions({
       setShareState('error');
       setTimeout(() => setShareState('idle'), 2000);
     }
-  }, [query, content, citations, domain, language, confidence, shareState]);
+  }, [query, content, citations, domain, language, confidence, shareState, accessToken]);
 
   if (isStreaming) return null;
 

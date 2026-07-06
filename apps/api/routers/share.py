@@ -18,7 +18,7 @@ _UUID_RE = re.compile(
 class ShareRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     response_text: str = Field(..., min_length=1, max_length=20000)
-    citations: list[Any] = Field(default_factory=list)
+    citations: list[Any] = Field(default_factory=list, max_length=100)
     domain: str = "general"
     language: str = "en"
     confidence: Optional[float] = None

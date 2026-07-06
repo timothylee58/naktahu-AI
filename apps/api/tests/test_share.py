@@ -87,6 +87,12 @@ def test_post_share_rejects_oversized_response(client):
     assert res.status_code == 422
 
 
+def test_post_share_rejects_too_many_citations(client):
+    c, *_ = client
+    res = c.post("/api/v1/share", json=_body(citations=[{"url": "https://x.com"}] * 101))
+    assert res.status_code == 422
+
+
 def test_post_share_503_when_supabase_unavailable(client, monkeypatch):
     c, *_ = client
     monkeypatch.setattr(api_main.app.state, "supabase", None)
