@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { fetchUserCredits } from '@/lib/credits';
 import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
+import { AuthModal } from '@/components/auth/AuthModal';
 
 type Tab = 'options' | 'email';
 
@@ -42,20 +42,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [emailSent, setEmailSent] = useState(false);
   const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | 'email' | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+    if (user) setOpen(false);
+  }, [user]);
 
   useEffect(() => {
     if (!localStorage.getItem(ANON_SESSION_KEY)) {
@@ -114,40 +105,55 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     };
   }, [user?.id, supabase]);
 
-  const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
-  const closeModal = () => { setOpen(false); };
+  const openModal = () => {
+    setOpen(true);
+    setTab('options');
+    setEmailSent(false);
+    setEmail('');
+    setAuthError(null);
+  };
+  const closeModal = () => { setOpen(false); setAuthError(null); };
 
   const signInWithGoogle = async () => {
     setSigningIn('google');
+    setAuthError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-    if (error) setSigningIn(null);
+    if (error) {
+      setAuthError(error.message);
+      setSigningIn(null);
+    }
   };
 
   const signInWithMicrosoft = async () => {
     setSigningIn('microsoft');
+    setAuthError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        // Azure must return an email claim — see infra/supabase/AUTH_SETUP.md
         scopes: 'email openid profile offline_access',
       },
     });
-    if (error) setSigningIn(null);
+    if (error) {
+      setAuthError(error.message);
+      setSigningIn(null);
+    }
   };
 
   const signInWithEmail = async () => {
     if (!email) return;
     setSigningIn('email');
+    setAuthError(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setSigningIn(null);
-    if (!error) setEmailSent(true);
+    if (error) setAuthError(error.message);
+    else setEmailSent(true);
   };
 
   const signOut = async () => {
@@ -213,6 +219,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
             </div>
           </div>
           <button
+            type="button"
             onClick={signOut}
             className={`w-full text-sm font-medium rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${variant === 'dark' ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'}`}
           >
@@ -225,6 +232,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     return (
       <div className="relative">
         <button
+          type="button"
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-zinc-100 transition-colors"
         >
@@ -315,6 +323,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
       {isSidebar ? (
         <div className="flex flex-col gap-2 w-full">
           <motion.button
+            type="button"
             whileTap={{ scale: 0.98 }}
             onClick={openModal}
             className={registerButtonClass}
@@ -322,6 +331,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
             {t('header.register')}
           </motion.button>
           <motion.button
+            type="button"
             whileTap={{ scale: 0.98 }}
             onClick={openModal}
             className={loginButtonClass}
@@ -331,6 +341,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </div>
       ) : (
         <motion.button
+          type="button"
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={openModal}
@@ -340,156 +351,104 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </motion.button>
       )}
 
-      {mounted && createPortal(
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              key="auth-modal-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
-              style={{
-                paddingTop: 'max(1rem, env(safe-area-inset-top))',
-                paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-              }}
+      <AuthModal
+        open={open}
+        onClose={closeModal}
+        title={t('auth.modal.title')}
+        subtitle={t('auth.modal.subtitle')}
+      >
+        {authError && (
+          <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+            {authError}
+          </p>
+        )}
+
+        {tab === 'options' && (
+          <>
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              disabled={signingIn !== null}
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60 locale-nowrap"
             >
-              <div
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                onClick={closeModal}
-                aria-hidden
-              />
+              <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              {signingIn === 'google' ? t('auth.google.loading') : t('auth.google')}
+            </button>
 
-              <motion.div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="auth-modal-title"
-                initial={{ opacity: 0, scale: 0.96, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 8 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100vh-2rem))] flex flex-col overflow-hidden bg-white rounded-3xl shadow-2xl ring-1 ring-zinc-900/10"
-                onClick={(e) => e.stopPropagation()}
-              >
-              {/* Header */}
-              <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-zinc-100 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 id="auth-modal-title" className="text-base font-bold text-zinc-900 locale-nowrap">
-                    {t('auth.modal.title')}
-                  </h2>
-                  <p className="text-xs text-zinc-500 mt-0.5 locale-text-balance">{t('auth.modal.subtitle')}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  aria-label="Close"
-                  className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
-                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                  </svg>
-                </button>
+            <button
+              type="button"
+              onClick={signInWithMicrosoft}
+              disabled={signingIn !== null}
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60 locale-nowrap"
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
+                <path fill="#F25022" d="M1 1h10v10H1z"/>
+                <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+                <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+                <path fill="#FFB900" d="M13 13h10v10H13z"/>
+              </svg>
+              {signingIn === 'microsoft' ? t('auth.microsoft.loading') : t('auth.microsoft')}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-zinc-100" />
+              <span className="text-xs text-zinc-400 font-medium">{t('auth.or')}</span>
+              <div className="flex-1 h-px bg-zinc-100" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setTab('email')}
+              className="w-full flex items-center justify-center gap-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-sm font-medium rounded-xl px-4 py-3 transition-colors border border-zinc-200 locale-nowrap"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
+                <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z"/>
+                <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z"/>
+              </svg>
+              {t('auth.email')}
+            </button>
+
+            <p className="text-center text-xs text-zinc-400 mt-1">
+              {t('auth.terms')}{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600 transition-colors">{t('auth.terms.link')}</a>
+            </p>
+          </>
+        )}
+
+        {tab === 'email' && (
+          emailSent ? (
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-center py-4">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-6 h-6 text-green-600">
+                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd"/>
+                </svg>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
-                {/* ── Options tab ── */}
-                {tab === 'options' && (
-                  <>
-                    {/* Google */}
-                    <button
-                      onClick={signInWithGoogle}
-                      disabled={signingIn !== null}
-                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60 locale-nowrap"
-                    >
-                      <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                      {signingIn === 'google' ? t('auth.google.loading') : t('auth.google')}
-                    </button>
-
-                    {/* Microsoft */}
-                    <button
-                      onClick={signInWithMicrosoft}
-                      disabled={signingIn !== null}
-                      className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-50 text-zinc-800 font-semibold text-sm rounded-xl px-4 py-3 transition-colors border border-zinc-200 shadow-sm disabled:opacity-60 locale-nowrap"
-                    >
-                      <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0">
-                        <path fill="#F25022" d="M1 1h10v10H1z"/>
-                        <path fill="#7FBA00" d="M13 1h10v10H13z"/>
-                        <path fill="#00A4EF" d="M1 13h10v10H1z"/>
-                        <path fill="#FFB900" d="M13 13h10v10H13z"/>
-                      </svg>
-                      {signingIn === 'microsoft' ? t('auth.microsoft.loading') : t('auth.microsoft')}
-                    </button>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-px bg-zinc-100" />
-                      <span className="text-xs text-zinc-400 font-medium">{t('auth.or')}</span>
-                      <div className="flex-1 h-px bg-zinc-100" />
-                    </div>
-
-                    {/* Email */}
-                    <button
-                      onClick={() => setTab('email')}
-                      className="w-full flex items-center justify-center gap-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 text-sm font-medium rounded-xl px-4 py-3 transition-colors border border-zinc-200 locale-nowrap"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
-                        <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z"/>
-                        <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z"/>
-                      </svg>
-                      {t('auth.email')}
-                    </button>
-
-                  </>
-                )}
-
-                {/* ── Email tab ── */}
-                {tab === 'email' && (
-                  emailSent ? (
-                    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-center py-4">
-                      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-6 h-6 text-green-600">
-                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd"/>
-                        </svg>
-                      </div>
-                      <p className="text-sm font-semibold text-zinc-800">{t('auth.email.sent.title')}</p>
-                      <p className="text-xs text-zinc-500 mt-1">{t('auth.email.sent.desc')} <span className="font-medium">{email}</span></p>
-                    </motion.div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && signInWithEmail()}
-                        placeholder={t('auth.email.placeholder')}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        autoFocus />
-                      <button onClick={signInWithEmail} disabled={!email || signingIn !== null}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
-                        {signingIn === 'email' ? t('auth.email.sending') : t('auth.email.send')}
-                      </button>
-                      <button onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">
-                        {t('auth.email.back')}
-                      </button>
-                    </div>
-                  )
-                )}
-
-                {tab === 'options' && (
-                  <p className="text-center text-xs text-zinc-400 mt-1">
-                    {t('auth.terms')}{' '}
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-zinc-600 transition-colors">{t('auth.terms.link')}</a>
-                  </p>
-                )}
-              </div>
-              </motion.div>
+              <p className="text-sm font-semibold text-zinc-800">{t('auth.email.sent.title')}</p>
+              <p className="text-xs text-zinc-500 mt-1">{t('auth.email.sent.desc')} <span className="font-medium">{email}</span></p>
             </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body,
-      )}
+          ) : (
+            <div className="flex flex-col gap-2">
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && signInWithEmail()}
+                placeholder={t('auth.email.placeholder')}
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoFocus />
+              <button type="button" onClick={signInWithEmail} disabled={!email || signingIn !== null}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
+                {signingIn === 'email' ? t('auth.email.sending') : t('auth.email.send')}
+              </button>
+              <button type="button" onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">
+                {t('auth.email.back')}
+              </button>
+            </div>
+          )
+        )}
+      </AuthModal>
     </>
   );
 }
