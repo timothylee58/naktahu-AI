@@ -26,6 +26,7 @@ import sys
 import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Optional
 
@@ -40,7 +41,7 @@ if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
 from app.agents.rag_node import _embed  # noqa: E402 — reuse the live ILMU→OpenAI embedding fallback
-from app.middleware.sanitise import INJECTION_PATTERNS  # noqa: E402
+from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 
 load_dotenv()
@@ -67,15 +68,43 @@ class FeedEntry:
         return f"{self.title}\n\n{self.description}".strip()
 
 
+class _HTMLStripper(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reset()
+        self.convert_charrefs = True
+        self.text: list[str] = []
+        self.ignore = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        if tag in ("script", "style"):
+            self.ignore = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style"):
+            self.ignore = False
+
+    def handle_data(self, d: str) -> None:
+        if not self.ignore:
+            self.text.append(d)
+
+    def get_data(self) -> str:
+        return "".join(self.text)
+
+
 def _strip_html(text: str) -> str:
-    return _WHITESPACE_RE.sub(" ", _HTML_TAG_RE.sub(" ", text)).strip()
+    stripper = _HTMLStripper()
+    stripper.feed(text)
+    return _WHITESPACE_RE.sub(" ", stripper.get_data()).strip()
 
 
 def _scan_for_injection(content: str) -> Optional[str]:
     """Same pattern list applied to user queries and CSV ingestion — a
     poisoned feed entry can't smuggle an indirect prompt injection into
-    document_chunks any more than a poisoned CSV row can (scripts/ingest.py)."""
-    text = unicodedata.normalize("NFKC", content)
+    document_chunks any more than a poisoned CSV row can (scripts/ingest.py).
+    Confusables are folded first so Cyrillic/Greek lookalikes can't evade
+    the regex patterns, matching the query sanitisation middleware."""
+    text = _fold_confusables(unicodedata.normalize("NFKC", content))
     for pattern in INJECTION_PATTERNS:
         if pattern.search(text):
             return pattern.pattern
@@ -98,14 +127,37 @@ def parse_feed(xml_bytes: bytes) -> list[FeedEntry]:
         if tag not in ("item", "entry"):
             continue
 
-        children = {child.tag.rsplit("}", 1)[-1]: child for child in el}
+        children: dict[str, ET.Element] = {}
+        links: list[ET.Element] = []
+        for child in el:
+            tag_name = child.tag.rsplit("}", 1)[-1]
+            if tag_name == "link":
+                links.append(child)
+            else:
+                children[tag_name] = child
+
         title = _text(children.get("title"))
-        description = _text(children.get("description")) or _text(children.get("summary")) or _text(children.get("content"))
-        link_el = children.get("link")
-        if link_el is not None:
-            link = link_el.get("href") or _text(link_el)
-        else:
-            link = ""
+        description = (
+            _text(children.get("encoded"))
+            or _text(children.get("description"))
+            or _text(children.get("summary"))
+            or _text(children.get("content"))
+        )
+
+        link = ""
+        for link_el in links:
+            href = link_el.get("href")
+            if href:
+                rel = link_el.get("rel")
+                if not rel or rel == "alternate":
+                    link = href
+                    break
+            else:
+                val = _text(link_el)
+                if val:
+                    link = val
+        if not link and links:
+            link = links[0].get("href") or _text(links[0])
 
         if not title:
             continue
@@ -138,7 +190,11 @@ async def main_async(args: argparse.Namespace) -> None:
         print(f"ERROR: failed to fetch feed — {exc}", file=sys.stderr)
         sys.exit(1)
 
-    entries = parse_feed(xml_bytes)[: args.limit]
+    try:
+        entries = parse_feed(xml_bytes)[: args.limit]
+    except ET.ParseError as exc:
+        print(f"ERROR: failed to parse XML feed — {exc}", file=sys.stderr)
+        sys.exit(1)
     print(f"Parsed {len(entries)} entries (limit {args.limit})")
 
     skipped_injection = 0
