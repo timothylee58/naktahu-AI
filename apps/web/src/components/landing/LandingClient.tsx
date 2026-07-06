@@ -153,12 +153,6 @@ export function LandingClient() {
               />
             </svg>
           </Link>
-          <Link
-            href="/pricing"
-            className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
-          >
-            {t('nav.pricing')}
-          </Link>
         </motion.div>
       </section>
 
