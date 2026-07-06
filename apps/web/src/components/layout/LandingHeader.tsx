@@ -10,7 +10,7 @@ import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 
-const LANDING_NAV_OMIT = ['/pricing', '/agents'] as const;
+const LANDING_NAV_OMIT = ['/agents'] as const;
 
 export function LandingHeader() {
   const { t } = useI18n();
@@ -28,7 +28,7 @@ export function LandingHeader() {
   return (
     <header className={`sticky top-0 z-30 border-b backdrop-blur-md ${shellClass}`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        <Link href="/" className="font-bold text-base tracking-tight locale-nowrap flex-shrink-0">
+        <Link href="/" className="font-bold text-lg tracking-tight locale-nowrap flex-shrink-0">
           NakTahu
         </Link>
 

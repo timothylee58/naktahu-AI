@@ -60,7 +60,7 @@ export function SiteNavLinks({
 
   const itemClass =
     layout === 'horizontal'
-      ? 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors locale-nowrap'
+      ? 'px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap'
       : 'px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap';
 
   return (
