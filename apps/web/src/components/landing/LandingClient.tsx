@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
@@ -8,8 +8,10 @@ import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
-import { pickRandomTaglineKey } from '@/lib/landing-taglines';
+import { pickRandomTaglineKey, type LandingTaglineKey } from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
+
+const DEFAULT_TAGLINE_KEY: LandingTaglineKey = 'landing.tagline.01';
 
 const DOMAINS = [
   { key: 'tax' },
