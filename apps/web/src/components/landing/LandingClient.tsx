@@ -135,24 +135,66 @@ export function LandingClient() {
           animate="show"
           className="flex flex-col items-center gap-3"
         >
-          <Link
-            href="/chat"
-            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 transition-colors text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+          <motion.div
+            whileHover={{ scale: 1.02, y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
           >
-            {t('landing.hero.cta')}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="w-5 h-5"
+            <Link
+              href="/chat"
+              className="group inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 transition-colors text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
             >
-              <path
-                fillRule="evenodd"
-                d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </Link>
+              {t('landing.hero.cta')}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-0.5"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </Link>
+          </motion.div>
+
+          <motion.div
+            custom={5}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.div
+              whileHover={{ scale: 1.04, y: -1 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            >
+              <Link
+                href="/pricing"
+                className={`group inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium border locale-nowrap transition-colors ${
+                  isDark
+                    ? 'border-white/20 text-zinc-300 hover:bg-white/10 hover:border-white/30 hover:text-white'
+                    : 'border-zinc-300 text-zinc-600 hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-900'
+                }`}
+              >
+                {t('landing.hero.upgrade')}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="w-4 h-4 opacity-70 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:opacity-100"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.77a.75.75 0 0 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0 1 10 17Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </Link>
+            </motion.div>
+          </motion.div>
         </motion.div>
       </section>
 
