@@ -175,7 +175,7 @@ Netlify preview "canceled" on backend-only diffs, CodeRabbit "draft skip", and C
 
 - Develop only on the designated `claude/*` branch. `git push -u origin <branch>`; retry network failures with backoff (2s/4s/8s/16s, max 4).
 - After pushing, ensure an open PR exists for the branch; create as **draft** if not. Merged/closed PRs don't count.
-- **If the branch's PR merged:** the branch is finished. Restart it: `git fetch origin main && git checkout -B <same-branch-name> origin/main`. New work → new PR. Never stack commits on merged history. (Force-with-lease is fine when the branch holds only already-merged history.)
+- **If the branch's PR merged:** the branch is finished. If `git log origin/main..HEAD` is empty, restart it: `git fetch origin main && git checkout -B <same-branch-name> origin/main` (force-with-lease push is fine — nothing is lost). If it is NOT empty (unmerged local commits exist), `git rebase origin/main` instead — never `checkout -B`, which discards them. New work → new PR; never stack commits on merged history.
 - **If the PR is still open** and a new task arrives: continue on the same branch and explicitly tell the user the PR now carries both changes.
 
 ## 8. When uncertain — exact escalation rules

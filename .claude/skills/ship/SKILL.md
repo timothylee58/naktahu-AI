@@ -50,11 +50,12 @@ npm run typecheck
 
 Check the designated branch's PR state (GitHub MCP: `list_pull_requests` filtered by head branch):
 
-- **PR merged/closed** → the branch is finished. Restart it before committing new work:
+- **PR merged/closed** → the branch is finished. First check for commits not yet in main:
   ```bash
-  git fetch origin main && git checkout -B <branch> origin/main
+  git fetch origin main && git log origin/main..HEAD --oneline
   ```
-  (cherry-pick your new commits onto it if you committed first). Push may need `--force-with-lease` — allowed only when the branch held nothing but already-merged history.
+  - If empty (only merged history): `git checkout -B <branch> origin/main` and start fresh. `--force-with-lease` on push is fine here — nothing is lost.
+  - If NOT empty (you already committed new work): `git rebase origin/main` instead — never `checkout -B`, which would discard those commits.
 - **PR open** → continue on the branch, and explicitly tell the user the open PR now carries both changes.
 - **No PR** → normal push, then open one.
 
