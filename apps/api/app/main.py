@@ -25,7 +25,7 @@ from app.routers.transcribe import router as transcribe_router
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter
 from middleware.user_context import UserContextMiddleware
-from routers import billing, feedback, history
+from routers import billing, feedback, history, share
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
 from scripts.setup_agent_infra import ensure_storage_bucket
@@ -108,5 +108,6 @@ app.include_router(agents_router)
 app.include_router(history.router)
 app.include_router(feedback.router)
 app.include_router(billing.router)
+app.include_router(share.router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
