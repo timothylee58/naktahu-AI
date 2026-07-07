@@ -77,7 +77,7 @@ Both lifespans set `app.state.supabase = None` when the connection fails; the ap
 
 **Trap #5 — Migrations are files, not reality.**
 Nothing applies `infra/supabase/migrations/*.sql` automatically, and the Supabase MCP connector usually needs a reauth the session can't perform.
-**Rule:** when adding a migration: (a) number it sequentially after the highest existing file, (b) tell the user verbatim which file to paste into the Supabase SQL editor, (c) make backend code degrade gracefully (503, not crash) until it's applied. Never claim a migration "is applied".
+**Rule:** when adding a migration: (a) number it one above the highest file on **origin/main at push time** (not your branch — parallel PRs have already produced duplicate 007s/008s; re-check and renumber if main moved before merge), (b) tell the user verbatim which file to paste into the Supabase SQL editor, (c) make backend code degrade gracefully (503, not crash) until it's applied. Never claim a migration "is applied".
 
 **Trap #6 — Domain-list drift.**
 The valid-domain set exists in ≥3 places: `router_node`/`guard_node` `_VALID_DOMAINS`, the `valid_domain` CHECK constraint (migration 016), and `scripts/ingest_feed.py`. They drifted once and the DB silently rejected inserts for the router's own default domain.
