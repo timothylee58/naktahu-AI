@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
@@ -32,7 +32,14 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const { theme } = useTheme();
-  const [taglineKey] = useState(() => pickRandomTaglineKey());
+  // Deterministic on the server render, randomised only after mount —
+  // Math.random() during SSR caused a hydration mismatch on every load.
+  const [taglineKey, setTaglineKey] = useState<ReturnType<typeof pickRandomTaglineKey>>(
+    'landing.tagline.01',
+  );
+  useEffect(() => {
+    setTaglineKey(pickRandomTaglineKey());
+  }, []);
   const tagline = t(taglineKey);
   const isDark = theme === 'dark';
 
