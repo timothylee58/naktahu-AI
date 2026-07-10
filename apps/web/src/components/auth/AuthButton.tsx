@@ -340,8 +340,9 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </motion.button>
       )}
 
-      <AnimatePresence>
-        {open && mounted && createPortal(
+      {mounted && createPortal(
+        <AnimatePresence>
+          {open && (
           <motion.div
             key="auth-modal-overlay"
             initial={{ opacity: 0 }}
@@ -484,10 +485,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 )}
               </div>
             </motion.div>
-          </motion.div>,
-          document.body,
-        )}
-      </AnimatePresence>
+          </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }
