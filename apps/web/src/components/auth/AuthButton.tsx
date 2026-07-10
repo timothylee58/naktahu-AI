@@ -340,8 +340,12 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </motion.button>
       )}
 
-      <AnimatePresence>
-        {open && mounted && createPortal(
+      {/* AnimatePresence must live INSIDE the portal: portals fail
+          React.isValidElement, so AnimatePresence silently drops them
+          and the modal never renders. */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {open && (
           <motion.div
             key="auth-modal-overlay"
             initial={{ opacity: 0 }}
@@ -484,10 +488,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 )}
               </div>
             </motion.div>
-          </motion.div>,
-          document.body,
-        )}
-      </AnimatePresence>
+          </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }
