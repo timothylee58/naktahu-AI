@@ -28,7 +28,8 @@ _VALID_B64 = "QUJDQUJDQUJDQUJD"  # 16 chars — clears the min_length guard
 
 @pytest.mark.asyncio
 async def test_transcribe_parses_response(monkeypatch) -> None:
-    monkeypatch.setenv("GOOGLE_SPEECH_API_KEY", "test-key")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "proj")
+    monkeypatch.setattr(speech, "_get_access_token", lambda: "tok")
     monkeypatch.setattr(speech, "_call_google", AsyncMock(return_value=_FAKE_GOOGLE_RESPONSE))
 
     result = await speech.transcribe(_VALID_B64, "bm")
@@ -39,32 +40,37 @@ async def test_transcribe_parses_response(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_transcribe_builds_webm_opus_multilingual_payload(monkeypatch) -> None:
-    monkeypatch.setenv("GOOGLE_SPEECH_API_KEY", "test-key")
+async def test_transcribe_builds_v2_chirp_multilingual_payload(monkeypatch) -> None:
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "proj")
+    monkeypatch.setenv("GOOGLE_SPEECH_LOCATION", "asia-southeast1")
+    monkeypatch.setattr(speech, "_get_access_token", lambda: "tok")
     captured: dict = {}
 
-    async def fake_call(url, payload):
+    async def fake_call(url, payload, token):
         captured["url"] = url
         captured["payload"] = payload
+        captured["token"] = token
         return _FAKE_GOOGLE_RESPONSE
 
     monkeypatch.setattr(speech, "_call_google", fake_call)
     await speech.transcribe(_VALID_B64, "bm")
 
     cfg = captured["payload"]["config"]
-    assert cfg["encoding"] == "WEBM_OPUS"
-    assert cfg["sampleRateHertz"] == 48000
-    assert cfg["languageCode"] == "ms-MY"
-    assert cfg["alternativeLanguageCodes"] == ["en-MY", "cmn-Hans-CN"]
-    assert cfg["enableAutomaticPunctuation"] is True
-    assert cfg["model"] == "latest_short"
-    assert captured["payload"]["audio"]["content"] == _VALID_B64
-    assert "key=test-key" in captured["url"]
+    assert cfg["model"] == "chirp_3"
+    assert cfg["languageCodes"] == ["ms-MY", "en-MY", "cmn-Hans-CN"]
+    assert cfg["features"]["enableAutomaticPunctuation"] is True
+    assert "autoDecodingConfig" in cfg
+    assert captured["payload"]["content"] == _VALID_B64
+    assert captured["token"] == "tok"
+    # Regional (Singapore) recognizer endpoint for data residency.
+    assert captured["url"].startswith("https://asia-southeast1-speech.googleapis.com/v2/projects/proj/")
+    assert captured["url"].endswith("/recognizers/_:recognize")
 
 
 @pytest.mark.asyncio
 async def test_transcribe_detects_mandarin(monkeypatch) -> None:
-    monkeypatch.setenv("GOOGLE_SPEECH_API_KEY", "k")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "proj")
+    monkeypatch.setattr(speech, "_get_access_token", lambda: "tok")
     monkeypatch.setattr(
         speech,
         "_call_google",
@@ -80,17 +86,26 @@ async def test_transcribe_detects_mandarin(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_transcribe_raises_config_error_without_key(monkeypatch) -> None:
-    monkeypatch.delenv("GOOGLE_SPEECH_API_KEY", raising=False)
+async def test_transcribe_raises_config_error_without_project(monkeypatch) -> None:
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    with pytest.raises(speech.SpeechConfigError):
+        await speech.transcribe(_VALID_B64, "bm")
+
+
+@pytest.mark.asyncio
+async def test_transcribe_raises_config_error_without_credentials(monkeypatch) -> None:
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "proj")
+    monkeypatch.setattr(speech, "_get_access_token", lambda: None)
     with pytest.raises(speech.SpeechConfigError):
         await speech.transcribe(_VALID_B64, "bm")
 
 
 @pytest.mark.asyncio
 async def test_transcribe_wraps_upstream_error(monkeypatch) -> None:
-    monkeypatch.setenv("GOOGLE_SPEECH_API_KEY", "k")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "proj")
+    monkeypatch.setattr(speech, "_get_access_token", lambda: "tok")
 
-    async def boom(url, payload):
+    async def boom(url, payload, token):
         raise httpx.ConnectError("network down")
 
     monkeypatch.setattr(speech, "_call_google", boom)
