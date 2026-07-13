@@ -44,7 +44,7 @@ _LANG_CODES: dict[str, list[str]] = {
 }
 _DEFAULT_LANG = "bm"
 
-# Reverse map for reporting the detected language back in app terms.
+# Map the detected BCP-47 tag back to app locale terms.
 _BCP47_TO_APP: dict[str, str] = {
     "ms-my": "bm",
     "en-my": "en",
@@ -148,7 +148,7 @@ def _parse_response(data: dict[str, Any], requested_language: str) -> dict[str, 
     results = data.get("results") or []
     parts: list[str] = []
     confidence = 0.0
-    detected_bcp47: str | None = None
+    detected_bcp47: Optional[str] = None
     for result in results:
         alternatives = result.get("alternatives") or []
         if not alternatives:
