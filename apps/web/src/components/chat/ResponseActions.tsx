@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { Citation } from '@/lib/types';
 import { getAnonSessionId } from '@/lib/anon-session';
+import { useI18n } from '@/lib/i18n';
 
 const API_BASE =
   typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
@@ -33,6 +34,7 @@ export function ResponseActions({
   confidence,
   accessToken,
 }: ResponseActionsProps) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -119,7 +121,7 @@ export function ResponseActions({
       {/* Copy */}
       <button
         onClick={handleCopy}
-        title="Copy"
+        title={t('chat.actions.copy')}
         className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
       >
         {copied ? (
@@ -140,10 +142,10 @@ export function ResponseActions({
           disabled={shareState === 'sharing'}
           title={
             shareState === 'copied'
-              ? 'Link copied'
+              ? t('chat.actions.share_copied')
               : shareState === 'error'
-                ? 'Failed to create link'
-                : 'Copy shareable link'
+                ? t('chat.actions.share_error')
+                : t('chat.actions.share')
           }
           className={`p-1.5 rounded-lg transition-colors disabled:cursor-default ${
             shareState === 'error'
@@ -169,7 +171,7 @@ export function ResponseActions({
       {onRegenerate && (
         <button
           onClick={onRegenerate}
-          title="Regenerate"
+          title={t('chat.actions.regenerate')}
           className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
@@ -185,7 +187,7 @@ export function ResponseActions({
       <button
         onClick={() => handleFeedback('up')}
         disabled={!!feedback}
-        title={feedback ? 'Thanks for the feedback' : 'Helpful'}
+        title={feedback ? t('chat.actions.feedback_thanks') : t('chat.actions.helpful')}
         className={`p-1.5 rounded-lg transition-colors ${feedback === 'up' ? 'text-green-600 bg-green-50' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'} disabled:cursor-default`}
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
@@ -197,7 +199,7 @@ export function ResponseActions({
       <button
         onClick={() => handleFeedback('down')}
         disabled={!!feedback}
-        title={feedback ? 'Thanks for the feedback' : 'Not helpful'}
+        title={feedback ? t('chat.actions.feedback_thanks') : t('chat.actions.not_helpful')}
         className={`p-1.5 rounded-lg transition-colors ${feedback === 'down' ? 'text-red-500 bg-red-50' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'} disabled:cursor-default`}
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">

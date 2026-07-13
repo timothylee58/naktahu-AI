@@ -28,6 +28,14 @@ const MS: Translations = {
   'chat.suggestions_label': 'Anda mungkin ingin tanya',
   'chat.context_window': 'Tetingkap konteks 200K',
   'chat.context_usage': '{used} / 200K',
+  'chat.actions.copy': 'Salin',
+  'chat.actions.share': 'Salin pautan kongsi',
+  'chat.actions.share_copied': 'Pautan disalin',
+  'chat.actions.share_error': 'Gagal mencipta pautan',
+  'chat.actions.regenerate': 'Jana semula',
+  'chat.actions.helpful': 'Membantu',
+  'chat.actions.not_helpful': 'Tidak membantu',
+  'chat.actions.feedback_thanks': 'Terima kasih atas maklum balas',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
@@ -303,6 +311,14 @@ const EN: Translations = {
   'chat.suggestions_label': 'You might also ask',
   'chat.context_window': '200K context window',
   'chat.context_usage': '{used} / 200K',
+  'chat.actions.copy': 'Copy',
+  'chat.actions.share': 'Copy shareable link',
+  'chat.actions.share_copied': 'Link copied',
+  'chat.actions.share_error': 'Failed to create link',
+  'chat.actions.regenerate': 'Regenerate',
+  'chat.actions.helpful': 'Helpful',
+  'chat.actions.not_helpful': 'Not helpful',
+  'chat.actions.feedback_thanks': 'Thanks for the feedback',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
@@ -577,6 +593,14 @@ const ZH: Translations = {
   'chat.suggestions_label': '您可能还想问',
   'chat.context_window': '200K 上下文窗口',
   'chat.context_usage': '{used} / 200K',
+  'chat.actions.copy': '复制',
+  'chat.actions.share': '复制分享链接',
+  'chat.actions.share_copied': '链接已复制',
+  'chat.actions.share_error': '创建链接失败',
+  'chat.actions.regenerate': '重新生成',
+  'chat.actions.helpful': '有帮助',
+  'chat.actions.not_helpful': '没有帮助',
+  'chat.actions.feedback_thanks': '感谢您的反馈',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
