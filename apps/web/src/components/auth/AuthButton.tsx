@@ -340,9 +340,6 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </motion.button>
       )}
 
-      {/* AnimatePresence must live INSIDE the portal: portals fail
-          React.isValidElement, so AnimatePresence silently drops them
-          and the modal never renders. */}
       {mounted && createPortal(
         <AnimatePresence>
           {open && (
