@@ -8,7 +8,11 @@ import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
-import { pickRandomTaglineKey } from '@/lib/landing-taglines';
+import {
+  LANDING_TAGLINE_KEYS,
+  pickRandomTaglineKey,
+  type LandingTaglineKey,
+} from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
 
 const DOMAINS = [
@@ -32,11 +36,10 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const { theme } = useTheme();
-  // Deterministic on the server render, randomised only after mount —
-  // Math.random() during SSR caused a hydration mismatch on every load.
-  const [taglineKey, setTaglineKey] = useState<ReturnType<typeof pickRandomTaglineKey>>(
-    'landing.tagline.01',
-  );
+  // Start from a stable key so SSR and the first client render match, then pick
+  // a random tagline after mount. Calling Math.random() in the initial render
+  // (server vs client) caused a hydration mismatch (React #418).
+  const [taglineKey, setTaglineKey] = useState<LandingTaglineKey>(LANDING_TAGLINE_KEYS[0]);
   useEffect(() => {
     setTaglineKey(pickRandomTaglineKey());
   }, []);
