@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
@@ -8,7 +8,11 @@ import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
-import { pickRandomTaglineKey } from '@/lib/landing-taglines';
+import {
+  LANDING_TAGLINE_KEYS,
+  pickRandomTaglineKey,
+  type LandingTaglineKey,
+} from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
 
 const DOMAINS = [
@@ -32,7 +36,13 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const { theme } = useTheme();
-  const [taglineKey] = useState(() => pickRandomTaglineKey());
+  // Start from a stable key so SSR and the first client render match, then pick
+  // a random tagline after mount. Calling Math.random() in the initial render
+  // (server vs client) caused a hydration mismatch (React #418).
+  const [taglineKey, setTaglineKey] = useState<LandingTaglineKey>(LANDING_TAGLINE_KEYS[0]);
+  useEffect(() => {
+    setTaglineKey(pickRandomTaglineKey());
+  }, []);
   const tagline = t(taglineKey);
   const isDark = theme === 'dark';
 

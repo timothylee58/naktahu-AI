@@ -43,6 +43,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | 'email' | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -114,7 +115,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     };
   }, [user?.id, supabase]);
 
-  const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
+  const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); setAuthError(null); };
   const closeModal = () => { setOpen(false); };
 
   const signInWithGoogle = async () => {
@@ -142,12 +143,19 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const signInWithEmail = async () => {
     if (!email) return;
     setSigningIn('email');
+    setAuthError(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setSigningIn(null);
-    if (!error) setEmailSent(true);
+    if (error) {
+      // Surface failures (e.g. email provider disabled / redirect not allowed)
+      // instead of silently doing nothing.
+      setAuthError(error.message || t('auth.error.generic'));
+      return;
+    }
+    setEmailSent(true);
   };
 
   const signOut = async () => {
@@ -473,6 +481,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                       <button onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">
                         {t('auth.email.back')}
                       </button>
+                      {authError && (
+                        <p role="alert" className="text-xs text-red-600 text-center">
+                          {authError}
+                        </p>
+                      )}
                     </div>
                   )
                 )}
