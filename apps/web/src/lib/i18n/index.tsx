@@ -56,6 +56,7 @@ const MS: Translations = {
   'nav.contact': 'Hubungi Kami',
   'nav.pricing': 'Harga',
   'nav.agents': 'Ejen',
+  'landing.hero.secondary_cta': 'Terokai Ejen AI',
   'sidebar.collapse': 'Lipat panel',
   'sidebar.expand': 'Buka panel',
 
@@ -339,6 +340,7 @@ const EN: Translations = {
   'nav.contact': 'Contact Us',
   'nav.pricing': 'Pricing',
   'nav.agents': 'Agents',
+  'landing.hero.secondary_cta': 'Explore AI Agents',
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
 
@@ -621,6 +623,7 @@ const ZH: Translations = {
   'nav.contact': '联系我们',
   'nav.pricing': '价格',
   'nav.agents': '智能代理',
+  'landing.hero.secondary_cta': '探索 AI 智能代理',
   'sidebar.collapse': '收起侧栏',
   'sidebar.expand': '展开侧栏',
 
