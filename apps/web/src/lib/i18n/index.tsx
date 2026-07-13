@@ -56,7 +56,6 @@ const MS: Translations = {
   'nav.contact': 'Hubungi Kami',
   'nav.pricing': 'Harga',
   'nav.agents': 'Ejen',
-  'landing.hero.secondary_cta': 'Terokai Ejen AI',
   'sidebar.collapse': 'Lipat panel',
   'sidebar.expand': 'Buka panel',
 
@@ -185,6 +184,7 @@ const MS: Translations = {
   'landing.tagline.11': 'Jawapan yang anda patut dapat dari mula.',
   'landing.tagline.12': 'Kerajaan ada maklumat. Kami bawakan kepada anda.',
   'landing.hero.cta': 'Mula Bertanya',
+  'landing.hero.secondary_cta': 'Terokai Ejen AI',
   'landing.features.title': 'Kenapa NakTahu?',
   'landing.features.bilingual.title': 'Tiga Bahasa',
   'landing.features.bilingual.desc':
@@ -340,7 +340,6 @@ const EN: Translations = {
   'nav.contact': 'Contact Us',
   'nav.pricing': 'Pricing',
   'nav.agents': 'Agents',
-  'landing.hero.secondary_cta': 'Explore AI Agents',
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
 
@@ -469,6 +468,7 @@ const EN: Translations = {
   'landing.tagline.11': "The answer you should've gotten first.",
   'landing.tagline.12': 'The government has the answer. We bring it to you.',
   'landing.hero.cta': 'Start Asking',
+  'landing.hero.secondary_cta': 'Explore AI Agents',
   'landing.features.title': 'Why NakTahu?',
   'landing.features.bilingual.title': 'Trilingual BM · EN · 中文',
   'landing.features.bilingual.desc':
@@ -623,7 +623,6 @@ const ZH: Translations = {
   'nav.contact': '联系我们',
   'nav.pricing': '价格',
   'nav.agents': '智能代理',
-  'landing.hero.secondary_cta': '探索 AI 智能代理',
   'sidebar.collapse': '收起侧栏',
   'sidebar.expand': '展开侧栏',
 
@@ -751,6 +750,7 @@ const ZH: Translations = {
   'landing.tagline.11': '你本该第一时间就得到的答案。',
   'landing.tagline.12': '政府有答案，我们帮你找到它。',
   'landing.hero.cta': '开始提问',
+  'landing.hero.secondary_cta': '探索 AI 智能代理',
   'landing.features.title': '为什么选择 NakTahu？',
   'landing.features.bilingual.title': '三语 BM·EN·中文',
   'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
