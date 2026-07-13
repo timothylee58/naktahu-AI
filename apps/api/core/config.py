@@ -11,8 +11,35 @@ class Settings(BaseSettings):
     )
     supabase_jwt_aud: str = "authenticated"
     redis_url: str = "redis://localhost:6379/0"
-    supabase_url: str = "http://localhost:54321"
-    supabase_service_key: str = "dev-service-role-key"
+    supabase_url: str = Field(
+        default="http://localhost:54321",
+        validation_alias=AliasChoices("SUPABASE_URL", "supabase_url"),
+    )
+    supabase_service_key: str = Field(
+        default="dev-service-role-key",
+        validation_alias=AliasChoices(
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_SERVICE_KEY",
+            "supabase_service_key",
+        ),
+    )
+    # Supabase direct Postgres — LangGraph PostgresSaver (use port 5432, not pooler).
+    database_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
+    supabase_storage_bucket: str = Field(
+        default="generated-documents",
+        validation_alias=AliasChoices("SUPABASE_STORAGE_BUCKET", "supabase_storage_bucket"),
+    )
+    resend_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("RESEND_API_KEY", "resend_api_key"),
+    )
+    resend_from_email: str = Field(
+        default="NakTahu <noreply@naktahu.ai>",
+        validation_alias=AliasChoices("RESEND_FROM_EMAIL", "resend_from_email"),
+    )
     openai_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),

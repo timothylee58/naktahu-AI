@@ -73,6 +73,24 @@ def test_get_history_403_on_free_plan(client):
     assert res.status_code == 403
 
 
+def test_get_history_200_for_primary_admin(client):
+    c, redis_client, *_ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+    tok = jwt.encode(
+        {
+            "sub": "admin-user",
+            "aud": settings.supabase_jwt_aud,
+            "exp": int(time.time()) + 3600,
+            "app_metadata": {"plan": "business", "role": "primary_admin"},
+        },
+        settings.jwt_secret,
+        algorithm="HS256",
+    )
+    res = c.get("/api/v1/history", headers={"Authorization": f"Bearer {tok}"})
+    assert res.status_code == 200
+    assert res.json() == []
+
+
 def test_post_history_403_on_free_plan(client):
     c, *_ = client
     body = {

@@ -14,7 +14,7 @@ from core.config import settings
 from middleware.rate_limit import anonymous_limiter
 from middleware.user_context import UserContextMiddleware
 from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
-from routers import billing, feedback, history, query
+from routers import billing, feedback, history, query, share
 
 structlog.configure(
     processors=[
@@ -79,6 +79,7 @@ app.include_router(query.router)
 app.include_router(history.router)
 app.include_router(feedback.router)
 app.include_router(billing.router)
+app.include_router(share.router)
 app.include_router(rag_query.router, prefix="/rag")
 
 

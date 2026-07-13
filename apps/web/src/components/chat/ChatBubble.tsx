@@ -95,6 +95,7 @@ export function ChatBubble(props: ChatBubbleProps) {
             domain={domain}
             language={language}
             citations={citations}
+            confidence={confidence}
             accessToken={accessToken}
           />
         )}

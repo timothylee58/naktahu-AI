@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { fetchUserCredits } from '@/lib/credits';
+import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
 
 type Tab = 'options' | 'email';
@@ -38,8 +41,21 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | 'email' | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!localStorage.getItem(ANON_SESSION_KEY)) {
@@ -50,12 +66,10 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
       setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
       if (session?.user) {
         // Migrate anonymous history to authenticated account
         const anonId = localStorage.getItem(ANON_SESSION_KEY);
@@ -81,26 +95,24 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }, [supabase]);
 
   useEffect(() => {
-    if (!accessToken) {
+    const userId = user?.id;
+    if (!userId) {
       setCredits(null);
       return;
     }
     let active = true;
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
-    fetch(`${apiBase}/api/v1/billing/credits`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { credits_remaining: number } | null) => {
-        if (active && data) setCredits(data.credits_remaining);
-      })
-      .catch(() => {
+    void (async () => {
+      try {
+        const remaining = await fetchUserCredits(supabase, userId);
+        if (active && remaining !== null) setCredits(remaining);
+      } catch {
         // Non-critical — badge just won't show a credit count
-      });
+      }
+    })();
     return () => {
       active = false;
     };
-  }, [accessToken]);
+  }, [user?.id, supabase]);
 
   const openModal = () => { setOpen(true); setTab('options'); setEmailSent(false); setEmail(''); };
   const closeModal = () => { setOpen(false); };
@@ -118,7 +130,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     setSigningIn('microsoft');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Azure must return an email claim — see infra/supabase/AUTH_SETUP.md
+        scopes: 'email openid profile offline_access',
+      },
     });
     if (error) setSigningIn(null);
   };
@@ -155,26 +171,46 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   }
 
   if (user) {
+    const plan = effectivePlan(user);
+    const creditsLabel =
+      plan === 'business'
+        ? t('header.credits_unlimited')
+        : credits !== null
+          ? t('header.credits').replace('{n}', String(credits))
+          : null;
+
     if (isSidebar) {
       return (
         <div className="w-full flex flex-col gap-2">
-          <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
-            {user.user_metadata?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.user_metadata.avatar_url as string}
-                alt="avatar"
-                className="w-8 h-8 rounded-full border border-zinc-200 flex-shrink-0"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {(user.email ?? 'U')[0].toUpperCase()}
-              </div>
-            )}
-            <span className={`text-xs font-medium truncate min-w-0 ${variant === 'dark' ? 'text-zinc-300' : 'text-zinc-600'}`}>
-              {user.email}
-            </span>
+          <div className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              {user.user_metadata?.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.user_metadata.avatar_url as string}
+                  alt="avatar"
+                  className="w-8 h-8 rounded-full border border-zinc-200 flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {(user.email ?? 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <span className={`text-xs font-medium truncate min-w-0 ${variant === 'dark' ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                {user.email}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${variant === 'dark' ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
+                {planBadgeLabel(user)}
+              </span>
+              {creditsLabel && (
+                <span className={`text-[10px] font-medium ${variant === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {creditsLabel}
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={signOut}
@@ -224,11 +260,11 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   <p className="text-xs font-medium text-zinc-500 truncate">{user.email}</p>
                   <div className="mt-1.5 flex items-center gap-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
-                      {(user.app_metadata?.plan as string | undefined) ?? 'free'}
+                      {planBadgeLabel(user)}
                     </span>
-                    {credits !== null && credits > 0 && (
+                    {creditsLabel && (
                       <span className="text-[10px] font-medium text-zinc-500">
-                        {credits} credits
+                        {creditsLabel}
                       </span>
                     )}
                   </div>
@@ -304,42 +340,59 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         </motion.button>
       )}
 
-      <AnimatePresence>
-        {open && (
+      {mounted && createPortal(
+        <AnimatePresence>
+          {open && (
           <motion.div
+            key="auth-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] overflow-y-auto"
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6"
+            style={{
+              paddingTop: 'max(1rem, env(safe-area-inset-top))',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+            }}
           >
             <div
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
               onClick={closeModal}
               aria-hidden
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="auth-modal-title"
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-sm max-h-[min(90dvh,calc(100vh-2rem))] overflow-y-auto bg-white rounded-3xl shadow-2xl ring-1 ring-zinc-900/10"
+              className="relative z-10 w-full max-w-sm max-h-[min(90dvh,calc(100vh-2rem))] flex flex-col overflow-hidden bg-white rounded-3xl shadow-2xl ring-1 ring-zinc-900/10"
+              onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="px-6 pt-6 pb-4 border-b border-zinc-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-zinc-900 locale-nowrap">{t('auth.modal.title')}</h2>
+              <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-zinc-100 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 id="auth-modal-title" className="text-base font-bold text-zinc-900 locale-nowrap">
+                    {t('auth.modal.title')}
+                  </h2>
                   <p className="text-xs text-zinc-500 mt-0.5 locale-text-balance">{t('auth.modal.subtitle')}</p>
                 </div>
-                <button onClick={closeModal} className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center transition-colors">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  aria-label="Close"
+                  className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center transition-colors"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-zinc-500">
                     <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                   </svg>
                 </button>
               </div>
 
-              <div className="p-6 flex flex-col gap-3">
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">
                 {/* ── Options tab ── */}
                 {tab === 'options' && (
                   <>
@@ -433,8 +486,10 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }

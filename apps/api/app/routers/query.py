@@ -9,13 +9,16 @@ from typing import AsyncGenerator, Optional
 
 import structlog
 import weave
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
-from services.auth import _decode_supabase_jwt
+from services.auth import UserContext, _decode_supabase_jwt
+from services.agent_registry import plan_satisfies
+from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota
+from services.history import persist_session_entry
 
 log = structlog.get_logger(__name__)
 
@@ -44,18 +47,15 @@ def _sse(event: str, data: dict | str) -> str:
     return f"event: {event}\ndata: {payload}\n\n"
 
 
-def _extract_user_id(authorization: Optional[str]) -> Optional[str]:
-    """Extract the verified sub claim from a Bearer JWT.
-
-    Delegates to the shared, signature-verifying decoder used by the rest of
-    the API (services.auth._decode_supabase_jwt) so there is a single source
-    of truth for JWT verification. Returns None for missing/malformed/expired/
-    invalid-signature tokens — never trusts an unverified payload.
-    """
+def _extract_user(authorization: Optional[str]) -> Optional[UserContext]:
     if not authorization or not authorization.startswith("Bearer "):
         return None
     token = authorization.split(" ", 1)[1]
-    ctx = _decode_supabase_jwt(token)
+    return _decode_supabase_jwt(token)
+
+
+def _extract_user_id(authorization: Optional[str]) -> Optional[str]:
+    ctx = _extract_user(authorization)
     return ctx.user_id if ctx else None
 
 
@@ -64,6 +64,7 @@ async def _run_pipeline(
     query: str,
     session_id: str,
     user_id: Optional[str],
+    domain: Optional[str] = None,
 ) -> dict:
     """Execute the full LangGraph pipeline and return a structured result dict.
 
@@ -83,6 +84,8 @@ async def _run_pipeline(
         "streaming_token_buffer": "",
         "error": None,
     }
+    if domain:
+        inputs["domain"] = domain
 
     tokens: list[str] = []
     final_state: AgentState = {}  # type: ignore[assignment]
@@ -123,10 +126,12 @@ async def _run_pipeline(
 async def _sse_generator(
     query: str,
     session_id: str,
-    user_id: Optional[str],
+    user_ctx: Optional[UserContext],
+    request: Request,
+    language_hint: Optional[str],
 ) -> AsyncGenerator[str, None]:
     try:
-        result = await _run_pipeline(query, session_id, user_id)
+        result = await _run_pipeline(query, session_id, user_ctx.user_id if user_ctx else None)
         tokens = result["tokens"]
         final_state = result["final_state"]
 
@@ -154,6 +159,22 @@ async def _sse_generator(
 
         yield _sse("done", {})
 
+        if user_ctx and plan_satisfies(user_ctx.plan, "pro"):
+            full_text = "".join(tokens) or final_state.get("streaming_token_buffer", "")
+            try:
+                await persist_session_entry(
+                    redis_client=getattr(request.app.state, "redis", None),
+                    supabase_client=getattr(request.app.state, "supabase", None),
+                    user_id=user_ctx.user_id,
+                    query=query,
+                    language=str(final_state.get("language") or language_hint or "en"),
+                    domain=str(final_state.get("domain") or "government"),
+                    response_text=full_text,
+                    citations=list(final_state.get("citations") or []),
+                )
+            except Exception as exc:
+                log.warning("history_persist_failed", error=str(exc), user_id=user_ctx.user_id)
+
     except Exception as exc:
         log.error("sse_pipeline_error", error=str(exc), query=query[:80])
         yield _sse("error", {"message": "An error occurred. Please try again."})
@@ -162,10 +183,25 @@ async def _sse_generator(
 @router.post("/query")
 async def query_endpoint(
     body: QueryRequest,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ) -> StreamingResponse:
-    user_id = _extract_user_id(authorization)
+    user_ctx = _extract_user(authorization)
+    user_id = user_ctx.user_id if user_ctx else None
+    plan = user_ctx.plan if user_ctx else "free"
     rate = _AUTH_RATE if user_id else _ANON_RATE
+
+    redis_client = getattr(request.app.state, "redis", None)
+    quota_id = f"auth:{user_id}" if user_id else f"anon:{request.client.host if request.client else 'unknown'}"
+    allowed, used, limit = await check_and_increment_daily_quota(
+        redis_client, identifier=quota_id, plan=plan
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily query limit reached ({limit}/day on the free plan). Upgrade for unlimited queries.",
+            headers={"Retry-After": "86400", "X-Daily-Limit": str(limit), "X-Daily-Used": str(used)},
+        )
 
     clean_query = sanitise_query(body.query)
     session_id = body.session_id or str(uuid.uuid4())
@@ -173,11 +209,13 @@ async def query_endpoint(
     log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
 
     return StreamingResponse(
-        _sse_generator(clean_query, session_id, user_id),
+        _sse_generator(clean_query, session_id, user_ctx, request, body.language),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
             "X-RateLimit-Limit": rate,
+            "X-Daily-Limit": str(FREE_DAILY_LIMIT),
+            "X-Daily-Used": str(used),
         },
     )
