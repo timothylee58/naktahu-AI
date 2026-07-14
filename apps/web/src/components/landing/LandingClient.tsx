@@ -157,10 +157,10 @@ export function LandingClient() {
             </svg>
           </Link>
           <Link
-            href="/pricing"
+            href="/agents"
             className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
           >
-            {t('nav.pricing')}
+            {t('landing.hero.secondary_cta')}
           </Link>
         </motion.div>
       </section>
