@@ -242,6 +242,7 @@ const MS: Translations = {
   'agents.hub.subtitle':
     'Ejen LangGraph dengan RAG sumber rasmi, penapisan pelan, dan meter kredit.',
   'agents.hub.link': 'Semua ejen',
+  'agents.hub.open': 'Buka ejen',
   'agents.hub.sign_in': 'Daftar masuk untuk mengakses ejen produk.',
   'agents.badge.new': 'Baharu',
   'agents.plan.free': 'Percuma',
@@ -526,6 +527,7 @@ const EN: Translations = {
   'agents.hub.subtitle':
     'LangGraph-powered agents with official-source RAG, plan gating, and credit metering.',
   'agents.hub.link': 'All agents',
+  'agents.hub.open': 'Open agent',
   'agents.hub.sign_in': 'Sign in to access product agents.',
   'agents.badge.new': 'New',
   'agents.plan.free': 'Free',
@@ -802,6 +804,7 @@ const ZH: Translations = {
   'agents.hub.title': 'NakTahu 智能代理',
   'agents.hub.subtitle': '基于 LangGraph 的代理，官方来源 RAG、套餐门控与点数计量。',
   'agents.hub.link': '全部代理',
+  'agents.hub.open': '打开代理',
   'agents.hub.sign_in': '请登录以使用产品代理。',
   'agents.badge.new': '新',
   'agents.plan.free': '免费',
