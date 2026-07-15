@@ -33,6 +33,20 @@ def test_ignores_general_rules_question_without_personal_marker():
     assert detect_personal_data_agency("What is the EPF withdrawal age?", domain="epf") is None
 
 
+def test_ignores_malay_substring_false_positives():
+    # "sayang" ("unfortunately"/"dear") contains "saya" as a substring —
+    # the marker regex must not match without a word boundary.
+    assert detect_personal_data_agency(
+        "Sayang sekali, KWSP umur persaraan tidak dinaikkan.", domain="epf"
+    ) is None
+    assert detect_personal_data_agency(
+        "Kesayangan rakyat terhadap KWSP tinggi.", domain="epf"
+    ) is None
+    assert detect_personal_data_agency(
+        "Sayap baru bangunan LHDN dibuka tahun ini.", domain="tax"
+    ) is None
+
+
 def test_ignores_personal_marker_without_domain_keyword_or_matching_domain():
     assert detect_personal_data_agency("I have a question about weather", domain="culture") is None
 

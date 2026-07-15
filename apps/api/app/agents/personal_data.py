@@ -46,8 +46,7 @@ _AGENCY_DIRECTORY: dict[str, AgencyContact] = {
 # refund, etc. — as opposed to a general question about the rules themselves
 # ("what is the EPF withdrawal age" should NOT trigger this).
 _PERSONAL_MARKER_RE = re.compile(
-    r"\b(my|i've|i have|i am|i'm|check my|status of my)\b"
-    r"|(saya|akaun saya|baki saya|status saya)",
+    r"\b(my|i've|i have|i am|i'm|check my|status of my|saya)\b",
     re.IGNORECASE,
 )
 
