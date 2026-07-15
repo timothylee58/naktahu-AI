@@ -130,6 +130,7 @@ function ChatPageInner() {
                 domain: metadata?.domain,
                 language: metadata?.detectedLanguage,
                 suggestions,
+                agencyContact: metadata?.agency_contact,
               }
             : m,
         ),
@@ -343,6 +344,7 @@ function ChatPageInner() {
               accessToken={accessToken ?? undefined}
               suggestions={msg.suggestions ?? []}
               onSuggestionSelect={handleChipSelect}
+              agencyContact={msg.agencyContact}
             />
           ),
         )}

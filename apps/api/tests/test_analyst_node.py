@@ -385,3 +385,27 @@ async def test_analyst_max_three_citations() -> None:
     result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": chunks})
 
     assert len(result["citations"]) <= 3
+
+
+@pytest.mark.asyncio
+async def test_analyst_sets_agency_contact_for_personal_epf_query() -> None:
+    result = await analyst_node({
+        "query": "What is my EPF balance?",
+        "domain": "epf",
+        "retrieved_chunks": [],
+    })
+
+    assert result["agency_contact"] is not None
+    assert result["agency_contact"]["agency"] == "KWSP / EPF"
+
+
+@pytest.mark.asyncio
+async def test_analyst_no_agency_contact_for_general_rules_question() -> None:
+    chunk = _make_chunk(content="epf withdrawal age is 55")
+    result = await analyst_node({
+        "query": "What is the EPF withdrawal age?",
+        "domain": "epf",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["agency_contact"] is None
