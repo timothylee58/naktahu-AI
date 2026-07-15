@@ -40,3 +40,8 @@ class AgentState(TypedDict, total=False):
     # effective_date, days_since_effective) for chunks whose effective_date has
     # passed by more than the staleness window.
     stale_warnings: list[dict[str, Any]]
+    # Set when the query asks about the user's own case-specific record
+    # (e.g. "what's my EPF balance") rather than a general rules question —
+    # NakTahu has no access to any user's records, so this carries the real
+    # agency contact to show instead of attempting an answer.
+    agency_contact: Optional[dict[str, str]]

@@ -145,14 +145,15 @@ async def _sse_generator(
         for suggestion in final_state.get("suggestions", []):
             yield _sse("suggestion", {"text": suggestion})
 
-        yield _sse(
-            "metadata",
-            {
-                "confidence": final_state.get("confidence_score", 0.0),
-                "domain": final_state.get("domain", "government"),
-                "language": final_state.get("language", "en"),
-            },
-        )
+        metadata: dict = {
+            "confidence": final_state.get("confidence_score", 0.0),
+            "domain": final_state.get("domain", "government"),
+            "language": final_state.get("language", "en"),
+        }
+        agency_contact = final_state.get("agency_contact")
+        if agency_contact:
+            metadata["agency_contact"] = agency_contact
+        yield _sse("metadata", metadata)
 
         if final_state.get("needs_clarification") and final_state.get("streaming_token_buffer"):
             yield _sse("token", {"text": final_state["streaming_token_buffer"]})

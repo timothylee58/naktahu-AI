@@ -36,6 +36,8 @@ const MS: Translations = {
   'chat.actions.helpful': 'Membantu',
   'chat.actions.not_helpful': 'Tidak membantu',
   'chat.actions.feedback_thanks': 'Terima kasih atas maklum balas',
+  'chat.agency_contact.title': 'Perlukan rekod peribadi anda?',
+  'chat.agency_contact.desc': 'NakTahu tidak dapat mengakses rekod peribadi anda. Hubungi {agency} terus.',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
@@ -321,6 +323,8 @@ const EN: Translations = {
   'chat.actions.helpful': 'Helpful',
   'chat.actions.not_helpful': 'Not helpful',
   'chat.actions.feedback_thanks': 'Thanks for the feedback',
+  'chat.agency_contact.title': 'Need your personal record?',
+  'chat.agency_contact.desc': "NakTahu can't access your personal records. Contact {agency} directly.",
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',
@@ -605,6 +609,8 @@ const ZH: Translations = {
   'chat.actions.helpful': '有帮助',
   'chat.actions.not_helpful': '没有帮助',
   'chat.actions.feedback_thanks': '感谢您的反馈',
+  'chat.agency_contact.title': '需要您的个人记录?',
+  'chat.agency_contact.desc': 'NakTahu 无法访问您的个人记录。请直接联系 {agency}。',
 
   /* ── header & nav ── */
   'header.title': 'NakTahu',

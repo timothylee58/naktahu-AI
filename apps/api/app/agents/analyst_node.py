@@ -7,6 +7,7 @@ from datetime import date
 import structlog
 import weave
 
+from app.agents.personal_data import detect_personal_data_agency
 from app.models.state import AgentState, Citation
 from app.services.vector_store import ChunkResult
 
@@ -131,6 +132,7 @@ async def analyst_node(state: AgentState) -> dict:
     query = state.get("query", "")
     domain = state.get("domain")
     retrieved: list[ChunkResult] = state.get("retrieved_chunks", [])
+    agency_contact = detect_personal_data_agency(query, domain)
 
     # 1. Hard-reject superseded chunks (never cite a chunk a newer one replaces).
     #    Build a new list rather than mutating the input while iterating.
@@ -164,6 +166,7 @@ async def analyst_node(state: AgentState) -> dict:
             "stale_warning": superseded_count > 0,
             "answer_as_of": None,
             "stale_warnings": stale_warnings,
+            "agency_contact": agency_contact,
         }
 
     # (adjusted_score, recency_key, chunk). Recency-penalise stale chunks and
@@ -221,6 +224,7 @@ async def analyst_node(state: AgentState) -> dict:
         answer_as_of=answer_as_of,
         stale_warnings=len(stale_warnings),
         superseded_dropped=superseded_count,
+        agency_contact=agency_contact["agency"] if agency_contact else None,
     )
     return {
         # Persist the superseded-pruned set so the synthesiser never builds
@@ -232,4 +236,5 @@ async def analyst_node(state: AgentState) -> dict:
         "stale_warning": stale_warning,
         "answer_as_of": answer_as_of,
         "stale_warnings": stale_warnings,
+        "agency_contact": agency_contact,
     }

@@ -8,10 +8,21 @@ export interface Citation {
   stale_disclaimer?: boolean;
 }
 
+/** Real government contact for a personal-record query NakTahu can't answer
+ * (it has no access to any user's case-specific data) — see
+ * apps/api/app/agents/personal_data.py for the curated directory. */
+export interface AgencyContact {
+  agency: string;
+  domain: string;
+  hotline: string;
+  portal: string;
+}
+
 export interface SSEMetadata {
   detectedLanguage?: string;
   confidence?: number;
   domain?: string;
+  agency_contact?: AgencyContact;
   [key: string]: unknown;
 }
 
@@ -28,6 +39,7 @@ export interface Message {
   domain?: string;
   language?: string;
   suggestions?: string[];
+  agencyContact?: AgencyContact;
 }
 
 export type UILocale = 'en' | 'ms' | 'zh';

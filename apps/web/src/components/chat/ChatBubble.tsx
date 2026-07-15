@@ -3,8 +3,9 @@
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Citation } from '@/lib/types';
+import type { AgencyContact, Citation } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { AgencyContactCard } from './AgencyContactCard';
 import { CitationChip } from './CitationChip';
 import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
@@ -31,6 +32,7 @@ interface AssistantBubbleProps {
   accessToken?: string;
   suggestions?: string[];
   onSuggestionSelect?: (query: string) => void;
+  agencyContact?: AgencyContact;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -57,7 +59,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -84,6 +86,10 @@ export function ChatBubble(props: ChatBubbleProps) {
             </span>
           )}
         </motion.div>
+
+        {!isStreaming && !isThinking && agencyContact && (
+          <AgencyContactCard contact={agencyContact} />
+        )}
 
         {/* Action buttons — only after streaming completes */}
         {!isStreaming && !isThinking && content && (
