@@ -23,7 +23,7 @@ export function SuggestionChips({ suggestions, onSelect, disabled }: SuggestionC
       transition={{ ...spring, delay: 0.2 }}
       className="flex flex-col gap-2 mt-2"
     >
-      <span className="text-xs text-zinc-500 font-medium">{t('chat.suggestions_label')}</span>
+      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{t('chat.suggestions_label')}</span>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((suggestion, index) => (
           <motion.button
@@ -33,7 +33,7 @@ export function SuggestionChips({ suggestions, onSelect, disabled }: SuggestionC
             transition={{ ...spring, delay: 0.3 + index * 0.1 }}
             onClick={() => onSelect(suggestion)}
             disabled={disabled}
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-left"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-left dark:bg-blue-500/10 dark:hover:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -53,8 +53,8 @@ export function LandingClient() {
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10'
-    : 'bg-white border-zinc-200 shadow-sm';
+    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-[#2563EB]/50'
+    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-[#2563EB]/40';
   const domainPillClass = isDark
     ? 'border-[#2563EB]/40 text-[#2563EB] bg-[#2563EB]/10'
     : 'border-blue-200 text-blue-700 bg-blue-50';
@@ -62,11 +62,27 @@ export function LandingClient() {
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
 
   return (
-    <div className={`flex flex-col font-sans ${pageClass}`}>
+    <div className={`relative flex flex-col font-sans ${pageClass}`}>
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
+          isDark ? 'opacity-100' : 'opacity-70'
+        }`}
+      >
+        <div
+          className="absolute left-1/2 top-[-180px] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-3xl"
+          style={{
+            background: isDark
+              ? 'radial-gradient(closest-side, rgba(37,99,235,0.22), transparent)'
+              : 'radial-gradient(closest-side, rgba(37,99,235,0.12), transparent)',
+          }}
+        />
+      </div>
+
       <LandingHeader />
       <AuthErrorBanner />
 
-      <section className="flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full">
+      <section className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full">
         <motion.div
           custom={0}
           variants={fadeUp}
@@ -114,7 +130,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className={`w-full max-w-xl border rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 ${searchBoxClass}`}
+          className={`w-full max-w-xl border rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -140,7 +156,7 @@ export function LandingClient() {
         >
           <Link
             href="/chat"
-            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 transition-colors text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
           >
             {t('landing.hero.cta')}
             <svg
@@ -195,8 +211,9 @@ export function LandingClient() {
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
+              whileHover={{ y: -2, scale: 1.03 }}
               transition={{ delay: i * 0.06, duration: 0.3 }}
-              className={`border rounded-full px-3 sm:px-4 py-1.5 text-sm font-medium locale-nowrap ${domainPillClass}`}
+              className={`border rounded-full px-3 sm:px-4 py-1.5 text-sm font-medium locale-nowrap transition-shadow hover:shadow-md ${domainPillClass}`}
             >
               {t(`domain.${d.key}`)}
             </motion.span>
