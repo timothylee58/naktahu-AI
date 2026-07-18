@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
@@ -162,63 +164,52 @@ export default function ComplianceDrafterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50">
-      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3">
-        <Link href="/chat" className="text-sm text-blue-600 hover:underline">
-          ← {t('nav.home')}
-        </Link>
-        <h1 className="text-lg font-bold text-zinc-900">{t('agents.compliance-drafter.title')}</h1>
+    <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
+      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
+          <Link
+            href="/chat"
+            className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400 locale-nowrap"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            {t('nav.home')}
+          </Link>
+          <span className="text-zinc-300 dark:text-white/20" aria-hidden>/</span>
+          <h1 className="text-sm font-bold">{t('agents.compliance-drafter.title')}</h1>
+        </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6">
-        {/* Step progress indicator */}
-        <div className="flex items-center justify-center gap-2">
-          {(['business', 'domains', 'preview', 'done'] as Step[]).map((s, i) => {
-            const stepLabels = ['1', '2', '3', '✓'];
-            const isActive = s === step;
-            const isPast = ['business', 'domains', 'preview', 'done'].indexOf(step) > i;
-            return (
-              <div key={s} className="flex items-center gap-2">
-                <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  isActive ? 'bg-blue-600 text-white' : isPast ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 text-zinc-400'
-                }`}>
-                  {stepLabels[i]}
-                </div>
-                {i < 3 && <div className={`h-0.5 w-6 rounded ${isPast ? 'bg-blue-300' : 'bg-zinc-200'}`} />}
-              </div>
-            );
-          })}
-        </div>
-
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6"
+      >
         {error && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2 dark:text-red-300 dark:bg-red-500/10 dark:border-red-500/30">
             {error}
           </div>
         )}
 
         {step === 'business' && (
-          <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
-            <h2 className="font-semibold text-zinc-900">{t('agents.compliance-drafter.step1')}</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+          <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
+            <h2 className="font-semibold">{t('agents.compliance-drafter.step1')}</h2>
+            <div className="flex flex-col gap-2">
               {BUSINESS_TYPES.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => setBusinessType(b.id)}
-                  className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all ${
-                    businessType === b.id
-                      ? 'border-blue-500 bg-blue-50 shadow-sm'
-                      : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'
-                  }`}
-                >
-                  <span className="text-2xl" aria-hidden>{b.icon}</span>
-                  <span className="text-sm font-medium text-zinc-900">{t(b.labelKey)}</span>
-                  <span className="text-[11px] text-zinc-500">{b.desc}</span>
-                </button>
+                <label key={b.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="business"
+                    checked={businessType === b.id}
+                    onChange={() => setBusinessType(b.id)}
+                    className="accent-blue-600"
+                  />
+                  {t(b.labelKey)}
+                </label>
               ))}
             </div>
             <textarea
-              className="w-full border border-zinc-200 rounded-xl p-3 text-sm placeholder:text-zinc-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
               placeholder={t('agents.compliance-drafter.context_placeholder')}
               rows={3}
               value={context}
@@ -227,7 +218,7 @@ export default function ComplianceDrafterPage() {
             <button
               type="button"
               onClick={() => setStep('domains')}
-              className="self-end px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold transition-colors hover:bg-blue-700"
+              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold"
             >
               {t('agents.compliance-drafter.next')}
             </button>
@@ -235,41 +226,32 @@ export default function ComplianceDrafterPage() {
         )}
 
         {step === 'domains' && (
-          <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4">
-            <h2 className="font-semibold text-zinc-900">{t('agents.compliance-drafter.step2')}</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {DOMAIN_OPTIONS.map((d) => {
-                const isSelected = domains.includes(d.id);
-                const colors = DOMAIN_COLORS[d.id] ?? DOMAIN_COLORS.business;
-                return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => toggleDomain(d.id)}
-                    className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
-                      isSelected
-                        ? `${colors.border} ${colors.bg} shadow-sm`
-                        : 'border-zinc-200 bg-white hover:border-zinc-300'
-                    }`}
-                  >
-                    <span className="text-xl" aria-hidden>{d.icon}</span>
-                    <div className="text-left">
-                      <span className="text-sm font-medium text-zinc-900">{t(d.labelKey)}</span>
-                      {isSelected && <span className="ml-2 text-xs text-blue-600">✓</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+          <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
+            <h2 className="font-semibold">{t('agents.compliance-drafter.step2')}</h2>
+            {DOMAIN_OPTIONS.map((d) => (
+              <label key={d.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={domains.includes(d.id)}
+                  onChange={() => toggleDomain(d.id)}
+                  className="accent-blue-600"
+                />
+                {t(d.labelKey)}
+              </label>
+            ))}
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setStep('business')} className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900">
+              <button
+                type="button"
+                onClick={() => setStep('business')}
+                className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 transition-colors dark:text-zinc-400 dark:hover:text-white"
+              >
                 {t('agents.compliance-drafter.back')}
               </button>
               <button
                 type="button"
                 disabled={loading || domains.length === 0}
                 onClick={() => void startAgent()}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors hover:bg-blue-700"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
               >
                 {loading ? t('agents.compliance-drafter.generating') : t('agents.compliance-drafter.generate')}
               </button>
@@ -282,89 +264,32 @@ export default function ComplianceDrafterPage() {
         )}
 
         {step === 'preview' && report && (
-          <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-5">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-zinc-900 flex items-center gap-2">
-                <span aria-hidden>📋</span>
-                {t('agents.compliance-drafter.step3')}
-              </h2>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                Preview
-              </span>
-            </div>
-
-            {/* Structured domain sections */}
-            <div className="flex flex-col gap-4">
-              {parseReportSections(report).map((section, idx) => {
-                const colors = DOMAIN_COLORS[section.domain] ?? DOMAIN_COLORS.business;
-                return (
-                  <div key={idx} className={`rounded-xl border ${colors.border} ${colors.bg} p-4 flex flex-col gap-2`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${colors.badge}`}>
-                        {section.domain.toUpperCase()}
-                      </span>
-                      <h3 className={`text-sm font-semibold ${colors.text}`}>
-                        {section.title.replace(/_/g, ' ')}
-                      </h3>
-                    </div>
-                    <ul className="space-y-1.5 ml-1">
-                      {section.items.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-zinc-700">
-                          <span className="mt-0.5 text-xs">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    {section.deadlines && section.deadlines.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {section.deadlines.map((dl, i) => (
-                          <span key={i} className="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs font-medium text-zinc-700 border border-zinc-200">
-                            📅 {dl}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-between border-t border-zinc-200 pt-4">
-              <p className="text-xs text-zinc-500">{t('agents.compliance-drafter.credit_note')}</p>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => void confirmReport()}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors hover:bg-blue-700"
-              >
-                {loading ? t('agents.compliance-drafter.confirming') : t('agents.compliance-drafter.confirm')}
-              </button>
-            </div>
+          <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
+            <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
+            <pre className="text-xs bg-zinc-50 border border-zinc-100 rounded-xl p-4 overflow-auto max-h-80 dark:bg-black/30 dark:border-white/10 dark:text-zinc-300">
+              {JSON.stringify(report, null, 2)}
+            </pre>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('agents.compliance-drafter.credit_note')}</p>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void confirmReport()}
+              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+            >
+              {loading ? t('agents.compliance-drafter.confirming') : t('agents.compliance-drafter.confirm')}
+            </button>
           </section>
         )}
 
         {step === 'done' && (
-          <section className="bg-white rounded-2xl border border-green-200 p-6 flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-                <span className="text-lg" aria-hidden>✓</span>
-              </div>
-              <div>
-                <h2 className="font-semibold text-green-800">{t('agents.compliance-drafter.step4')}</h2>
-                <p className="text-xs text-zinc-500">Laporan PDF anda telah dijana</p>
-              </div>
-            </div>
+          <section className="bg-white rounded-2xl border border-green-200 p-6 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-green-500/30">
+            <h2 className="font-semibold text-green-800 dark:text-green-400">{t('agents.compliance-drafter.step4')}</h2>
             {downloadUrl ? (
-              <a
-                href={downloadUrl}
-                className="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
-                target="_blank"
-                rel="noreferrer"
-              >
-                📄 {t('agents.compliance-drafter.download')}
+              <a href={downloadUrl} className="text-blue-600 underline text-sm dark:text-blue-400" target="_blank" rel="noreferrer">
+                {t('agents.compliance-drafter.download')}
               </a>
             ) : (
-              <p className="text-sm text-zinc-600 bg-zinc-50 rounded-xl px-4 py-3">{t('agents.compliance-drafter.email_hint')}</p>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('agents.compliance-drafter.email_hint')}</p>
             )}
             <button
               type="button"
@@ -375,7 +300,7 @@ export default function ComplianceDrafterPage() {
             </button>
           </section>
         )}
-      </div>
+      </motion.div>
     </main>
   );
 }

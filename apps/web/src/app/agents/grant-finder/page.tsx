@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
@@ -94,135 +96,63 @@ export default function GrantFinderPage() {
   const canSearch = sector.length > 0;
 
   return (
-    <main className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 backdrop-blur px-4 py-3 flex gap-3 items-center">
-        <Link href="/agents" className="text-sm text-blue-600 hover:underline">← Agents</Link>
-        <h1 className="font-bold text-zinc-900">Grant Finder</h1>
-        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Percuma</span>
+    <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
+      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
+          <Link href="/agents" className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400">
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Agents
+          </Link>
+          <span className="text-zinc-300 dark:text-white/20" aria-hidden>/</span>
+          <h1 className="text-sm font-bold">Grant Finder</h1>
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold dark:bg-blue-500/15 dark:text-blue-300">Recommended</span>
+        </div>
       </header>
-
-      <div className="max-w-2xl mx-auto p-4 flex flex-col gap-5">
-        <p className="text-sm text-zinc-600 leading-relaxed">
-          Padankan profil perniagaan anda dengan geran kerajaan Malaysia — MDEC, TEKUN, MARA, Cradle, dan banyak lagi.
-        </p>
-
-        {/* Sector selector */}
-        <section className="rounded-2xl border border-zinc-200 bg-white p-5 flex flex-col gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-900">Sektor perniagaan</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Pilih sektor utama anda</p>
-          </div>
-          <ChipSelector
-            options={SECTOR_OPTIONS}
-            selected={sector}
-            onToggle={(id) => setSector([id])}
-            multiple={false}
-          />
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="max-w-2xl mx-auto p-4 flex flex-col gap-4"
+      >
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">Match your profile to Malaysian government grants — MDEC, TEKUN, MARA, Cradle, and more.</p>
+        <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
+          <input className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Sector" />
+          <input className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10" value={stage} onChange={(e) => setStage(e.target.value)} placeholder="Stage (early/growth)" />
+          <input className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10" value={need} onChange={(e) => setNeed(e.target.value)} placeholder="Funding need" />
+          <button type="button" disabled={loading} onClick={() => void search()} className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50">
+            {loading ? 'Searching…' : 'Find grants'}
+          </button>
         </section>
-
-        {/* Stage selector */}
-        {sector.length > 0 && (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-zinc-900">Peringkat perniagaan</h2>
-            <ChipSelector
-              options={STAGE_OPTIONS}
-              selected={stage}
-              onToggle={(id) => setStage([id])}
-              multiple={false}
-            />
-          </section>
-        )}
-
-        {/* Funding need */}
-        {stage.length > 0 && (
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-zinc-900">Jumlah dana diperlukan</h2>
-            <ChipSelector
-              options={FUNDING_OPTIONS}
-              selected={funding}
-              onToggle={(id) => setFunding([id])}
-              multiple={false}
-              size="sm"
-            />
-            <button
-              type="button"
-              disabled={loading || !canSearch}
-              onClick={() => void search()}
-              className="self-end mt-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors hover:bg-emerald-700"
-            >
-              {loading ? 'Mencari…' : 'Cari geran'}
-            </button>
-          </section>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Loading */}
-        {loading && <AgentLoadingSkeleton message="Memadankan profil anda dengan geran…" />}
-
-        {/* Results */}
-        {grants.length > 0 && !loading && (
-          <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-zinc-900">
-              {grants.length} geran dijumpai
-            </h2>
-            {grants.map((g, i) => (
-              <div
+        {grants.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {grants.map((g) => (
+              <motion.li
                 key={g.name}
-                className="rounded-2xl border border-zinc-200 bg-white p-5 flex flex-col gap-3 transition-shadow hover:shadow-md"
+                whileHover={{ y: -2 }}
+                className="bg-white border border-zinc-200 rounded-2xl p-4 text-sm shadow-sm transition-shadow hover:shadow-md dark:bg-white/5 dark:border-white/10"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                      <span className="text-base" aria-hidden>🏛</span>
-                    </div>
-                    <h3 className="text-sm font-semibold text-zinc-900">{g.name}</h3>
-                  </div>
-                  {g.match_score != null && (
-                    <span className="flex-shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
-                      {Math.round(g.match_score * 100)}% padanan
-                    </span>
-                  )}
-                </div>
-
-                {g.amount_hint && (
-                  <p className="text-lg font-bold text-emerald-700">{g.amount_hint}</p>
-                )}
-
-                {g.eligibility && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs mt-0.5">✅</span>
-                    <p className="text-sm text-zinc-600">{g.eligibility}</p>
-                  </div>
-                )}
-
-                {g.deadline_hint && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs mt-0.5">📅</span>
-                    <p className="text-xs text-zinc-500">{g.deadline_hint}</p>
-                  </div>
-                )}
-
+                <p className="font-semibold">{g.name}</p>
+                <p className="text-zinc-600 mt-1 dark:text-zinc-400">{g.eligibility}</p>
+                <p className="text-xs text-zinc-500 mt-1 dark:text-zinc-500">
+                  {g.amount_hint}
+                  {g.amount_hint && g.deadline_hint ? ' · ' : ''}
+                  {g.deadline_hint}
+                </p>
                 {g.url && (
                   <a
                     href={g.url}
-                    className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline"
+                    className="text-blue-600 text-xs mt-2 inline-block dark:text-blue-400"
                     target="_blank"
                     rel="noreferrer"
                   >
                     Mohon sekarang →
                   </a>
                 )}
-              </div>
+              </motion.li>
             ))}
           </div>
         )}
-      </div>
+      </motion.div>
     </main>
   );
 }

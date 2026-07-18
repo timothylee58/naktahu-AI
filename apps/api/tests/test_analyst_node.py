@@ -59,7 +59,7 @@ async def test_analyst_scores_gov_url() -> None:
 
 @pytest.mark.asyncio
 async def test_analyst_needs_clarification_when_low_confidence() -> None:
-    """needs_clarification=True when all chunks score < 0.4."""
+    """needs_clarification=True when all chunks score < 0.6."""
     low_chunk = _make_chunk(
         source_url="",           # no gov.my → no URL bonus
         source_title="",         # no title → no title bonus
@@ -71,14 +71,14 @@ async def test_analyst_needs_clarification_when_low_confidence() -> None:
     })
 
     assert result["needs_clarification"] is True
-    assert result["confidence_score"] < 0.4
+    assert result["confidence_score"] < 0.6
 
 
 @pytest.mark.asyncio
 async def test_analyst_single_high_scoring_chunk_still_needs_clarification() -> None:
     """A single lucky/keyword-stuffed chunk must not suppress clarification.
 
-    Even though this one chunk scores ≥0.4 on its own (gov.my URL + title +
+    Even though this one chunk scores ≥0.6 on its own (gov.my URL + title +
     full keyword overlap), only 1 chunk clears the 0.3 supporting-chunk bar,
     so the evidentiary gate should force needs_clarification=True.
     """
@@ -92,7 +92,7 @@ async def test_analyst_single_high_scoring_chunk_still_needs_clarification() -> 
         "retrieved_chunks": [good_chunk],
     })
 
-    assert result["confidence_score"] >= 0.4
+    assert result["confidence_score"] >= 0.6
     assert result["needs_clarification"] is True
 
 
@@ -101,7 +101,7 @@ async def test_analyst_no_clarification_with_multiple_solid_chunks() -> None:
     """needs_clarification=False when ≥2 chunks individually score > 0.3.
 
     With two (or more) corroborating chunks that each clear the supporting
-    bar, the aggregate confidence ≥0.4 should be trusted and clarification
+    bar, the aggregate confidence ≥0.6 should be trusted and clarification
     should not be forced.
     """
     chunk_a = _make_chunk(
@@ -119,8 +119,33 @@ async def test_analyst_no_clarification_with_multiple_solid_chunks() -> None:
         "retrieved_chunks": [chunk_a, chunk_b],
     })
 
-    assert result["confidence_score"] >= 0.4
+    assert result["confidence_score"] >= 0.6
     assert result["needs_clarification"] is False
+
+
+@pytest.mark.asyncio
+async def test_analyst_clarification_threshold_boundary() -> None:
+    """A confidence score of 0.5 (between the old 0.4 and new 0.6 gate)
+    must trigger clarification — the other tests only exercise near-0 /
+    near-1 confidence and would pass unchanged at either threshold value.
+    Tests the observable behaviour rather than the private constant."""
+    chunk_a = _make_chunk(
+        source_url="",
+        source_title="",
+        content="cukai pendapatan",
+    )
+    chunk_b = _make_chunk(
+        source_url="",
+        source_title="",
+        content="cukai pendapatan",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan",
+        "retrieved_chunks": [chunk_a, chunk_b],
+    })
+
+    assert result["confidence_score"] == 0.5
+    assert result["needs_clarification"] is True
 
 
 @pytest.mark.asyncio

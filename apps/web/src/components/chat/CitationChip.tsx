@@ -22,7 +22,7 @@ export function CitationChip({ citation }: CitationChipProps) {
       rel={hasUrl ? 'noopener noreferrer' : undefined}
       whileHover={hasUrl ? { scale: 1.03 } : undefined}
       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-      className={`inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline transition-colors ${hasUrl ? 'cursor-pointer hover:bg-blue-100' : 'cursor-default'}`}
+      className={`inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline transition-colors dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300 ${hasUrl ? 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20' : 'cursor-default'}`}
       title={title}
     >
       <span className="font-semibold truncate max-w-[6rem]">

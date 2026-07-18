@@ -18,7 +18,7 @@ _GOV_DOMAIN_RE = re.compile(
     re.IGNORECASE,
 )
 
-_CLARIFICATION_THRESHOLD = 0.4
+_CLARIFICATION_THRESHOLD = 0.6
 # Domain-aware staleness windows. Kept in sync with the temporal_accuracy eval
 # metric (scripts/evals/temporal_scorer.py) so runtime flagging and the deploy
 # gate agree: policy domains that change often get a tighter window. Using
