@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { AuthButton } from '@/components/auth/AuthButton';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
-import { LandingHeader } from '@/components/layout/LandingHeader';
+import { LangToggle } from '@/components/LangToggle';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
 import { useI18n } from '@/lib/i18n';
@@ -35,69 +35,34 @@ const fadeUp = {
 
 export function LandingClient() {
   const { t } = useI18n();
-  const { theme } = useTheme();
-  // Start from a stable key so SSR and the first client render match, then pick
-  // a random tagline after mount. Calling Math.random() in the initial render
-  // (server vs client) caused a hydration mismatch (React #418).
-  const [taglineKey, setTaglineKey] = useState<LandingTaglineKey>(LANDING_TAGLINE_KEYS[0]);
-  useEffect(() => {
-    setTaglineKey(pickRandomTaglineKey());
-  }, []);
-  const tagline = t(taglineKey);
-  const isDark = theme === 'dark';
-
-  const pageClass = isDark
-    ? 'min-h-screen bg-[#0A0F1E] text-white'
-    : 'min-h-screen bg-zinc-50 text-zinc-900';
-  const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
-  const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
-  const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10'
-    : 'bg-white border-zinc-200 shadow-sm';
-  const domainPillClass = isDark
-    ? 'border-[#2563EB]/40 text-[#2563EB] bg-[#2563EB]/10'
-    : 'border-blue-200 text-blue-700 bg-blue-50';
-  const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
-  const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
 
   return (
-    <div className={`flex flex-col font-sans ${pageClass}`}>
-      <LandingHeader />
+    <div className="flex flex-col min-h-screen bg-[#0A0F1E] text-white font-sans">
+      <motion.nav
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center justify-between px-6 py-4 border-b border-white/10"
+      >
+        <span className="text-lg font-bold tracking-tight locale-nowrap">NakTahu</span>
+        <div className="flex items-center gap-3">
+          <LangToggle variant="dark" />
+          <AuthButton variant="dark" />
+        </div>
+      </motion.nav>
+
       <AuthErrorBanner />
 
-      <section className="flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full">
-        <motion.div
-          custom={0}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#2563EB] uppercase border border-[#2563EB]/30 rounded-full px-4 py-1.5 locale-nowrap"
-        >
-          🇲🇾 {t('landing.badge')}
-        </motion.div>
-
-        <motion.h1
-          custom={1}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance"
-        >
-          {(() => {
-            const headline = t('landing.hero.headline');
-            const highlight = t('landing.hero.headline.highlight');
-            const idx = headline.indexOf(highlight);
-            if (idx === -1) return headline;
-            return (
-              <>
-                {headline.slice(0, idx)}
-                <span className="text-[#2563EB]">{highlight}</span>
-                {headline.slice(idx + highlight.length)}
-              </>
-            );
-          })()}
-        </motion.h1>
+        <section className="flex flex-col items-center justify-center flex-1 text-center px-6 py-24 gap-8">
+          <motion.div
+            custom={0}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#2563EB] uppercase border border-[#2563EB]/30 rounded-full px-4 py-1.5 locale-nowrap"
+          >
+            🇲🇾 {t('landing.badge')}
+          </motion.div>
 
         <motion.p
           custom={2}
@@ -226,11 +191,7 @@ export function LandingClient() {
               {t('footer.privacy')}
             </Link>
           </div>
-          <span className="text-xs max-w-xs locale-text-balance">
-            {t('landing.footer.disclaimer')}
-          </span>
-        </div>
-      </footer>
+        </footer>
     </div>
   );
 }

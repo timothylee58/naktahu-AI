@@ -35,7 +35,23 @@ function ChatPageInner() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
+
+  // Hydrate the desktop collapse preference after mount (avoids SSR mismatch)
+  useEffect(() => {
+    if (localStorage.getItem('naktahu_sidebar_collapsed') === '1') {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem('naktahu_sidebar_collapsed', next ? '1' : '0');
+      return next;
+    });
+  }, []);
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -259,6 +275,8 @@ function ChatPageInner() {
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapsed}
         showHistory
         user={user}
         accessToken={accessToken}
@@ -266,42 +284,57 @@ function ChatPageInner() {
       />
 
       <div className="flex flex-col flex-1 min-w-0 h-full">
-      <header className={`flex-shrink-0 flex items-center justify-between px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${headerClass}`}>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label={t('header.menu')}
-            className={`p-1.5 rounded-lg transition-colors lg:hidden ${menuBtn}`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="w-5 h-5"
+        {/* header */}
+        <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* sidebar toggle — mobile only */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label={t('header.history')}
+              className="p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors lg:hidden flex-shrink-0"
             >
-              <path
-                fillRule="evenodd"
-                d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="w-5 h-5"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
 
-          <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">
-              {t('header.title')}
-            </span>
-            <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
-          </Link>
-        </div>
-        <ThemeToggle variant={isDark ? 'dark' : 'light'} />
-      </header>
+            {/* expand sidebar — desktop only, when the panel is collapsed */}
+            {sidebarCollapsed && (
+              <button
+                onClick={toggleSidebarCollapsed}
+                aria-label={t('sidebar.expand')}
+                title={t('sidebar.expand')}
+                className="hidden lg:inline-flex p-1.5 rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 transition-colors flex-shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                  <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
 
-      {/* message list */}
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
-      >
+            <Link href="/" className="flex flex-col min-w-0">
+              <span className="text-base font-bold text-zinc-900 tracking-tight truncate">
+                {t('header.title')}
+              </span>
+              <span className="text-xs text-zinc-500 truncate">{t('header.subtitle')}</span>
+            </Link>
+          </div>
+        </header>
+
+        {/* message list */}
+        <div
+          ref={listRef}
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
+        >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6">
             {/* Logo mark */}
@@ -312,12 +345,13 @@ function ChatPageInner() {
               </svg>
             </div>
             <div className="flex flex-col gap-1">
-              <p className={`text-lg font-bold ${emptyTitle}`}>NakTahu AI</p>
-              <p className={`text-sm max-w-[260px] leading-relaxed ${emptyDesc}`}>{t('chat.empty')}</p>
+              <p className="text-lg font-bold text-zinc-700">NakTahu AI</p>
+              <p className="text-sm text-zinc-400 max-w-[280px] leading-relaxed">{t('chat.empty')}</p>
             </div>
-            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+            {/* Quick domain pills */}
+            <div className="flex flex-wrap justify-center gap-2 max-w-sm">
               {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span key={d} className={`text-[11px] font-medium border rounded-full px-2.5 py-1 ${domainPill}`}>
+                <span key={d} className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1 whitespace-nowrap">
                   {t(`domain.${d}`)}
                 </span>
               ))}
@@ -351,22 +385,21 @@ function ChatPageInner() {
         <div ref={bottomRef} />
       </div>
 
-      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2 ${inputBarClass}`}>
-        {showChips && (
-          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
-        )}
-        <ChatInput
-          onSend={handleSend}
-          isStreaming={isStreaming}
-          detectedLanguage={detectedLang}
-          inject={injectedQuery}
-          conversationChars={conversationChars}
-          variant={isDark ? 'dark' : 'light'}
-        />
-        <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
-          {t('chat.keyboard_hint')}
-        </p>
-      </div>
+        {/* input bar */}
+        <div className="flex-shrink-0 border-t border-zinc-100 bg-white/90 backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2">
+          {showChips && (
+            <PromptChips onSelect={handleChipSelect} disabled={isStreaming} />
+          )}
+          <ChatInput
+            onSend={handleSend}
+            isStreaming={isStreaming}
+            detectedLanguage={detectedLang}
+            inject={injectedQuery}
+          />
+          <p className="hidden sm:block text-center text-[10px] text-zinc-400">
+            {t('chat.keyboard_hint')}
+          </p>
+        </div>
       </div>
     </div>
   );
