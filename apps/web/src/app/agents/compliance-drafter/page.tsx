@@ -6,21 +6,91 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
+import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { useI18n } from '@/lib/i18n';
 
 type Step = 'business' | 'domains' | 'preview' | 'done';
 
 const BUSINESS_TYPES = [
-  { id: 'sole_proprietor', labelKey: 'agents.compliance-drafter.business.sole' },
-  { id: 'sdn_bhd', labelKey: 'agents.compliance-drafter.business.sdn' },
-  { id: 'partnership', labelKey: 'agents.compliance-drafter.business.partnership' },
+  { id: 'sole_proprietor', labelKey: 'agents.compliance-drafter.business.sole', icon: '🏪', desc: 'Enterprise Perseorangan' },
+  { id: 'sdn_bhd', labelKey: 'agents.compliance-drafter.business.sdn', icon: '🏢', desc: 'Syarikat Sendirian Berhad' },
+  { id: 'partnership', labelKey: 'agents.compliance-drafter.business.partnership', icon: '🤝', desc: 'Perkongsian / LLP' },
 ] as const;
 
 const DOMAIN_OPTIONS = [
-  { id: 'tax', labelKey: 'agents.compliance-drafter.domain.tax' },
-  { id: 'business', labelKey: 'agents.compliance-drafter.domain.business' },
-  { id: 'epf', labelKey: 'agents.compliance-drafter.domain.epf' },
+  { id: 'tax', labelKey: 'agents.compliance-drafter.domain.tax', icon: '🧾', color: 'red' },
+  { id: 'business', labelKey: 'agents.compliance-drafter.domain.business', icon: '📋', color: 'blue' },
+  { id: 'epf', labelKey: 'agents.compliance-drafter.domain.epf', icon: '💰', color: 'amber' },
 ] as const;
+
+const DOMAIN_COLORS: Record<string, { bg: string; border: string; badge: string; text: string }> = {
+  tax: { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', text: 'text-red-800' },
+  business: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', text: 'text-blue-800' },
+  epf: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', text: 'text-amber-800' },
+};
+
+interface DomainSection {
+  domain: string;
+  title: string;
+  items: string[];
+  deadlines?: string[];
+}
+
+function parseReportSections(report: Record<string, unknown>): DomainSection[] {
+  const sections: DomainSection[] = [];
+
+  // Try to parse structured report formats
+  for (const [key, value] of Object.entries(report)) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'session_id' || lowerKey === 'status' || lowerKey === 'turns_count') continue;
+
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      const items: string[] = [];
+      const deadlines: string[] = [];
+
+      for (const [subKey, subVal] of Object.entries(obj)) {
+        if (typeof subVal === 'string' && subVal.trim()) {
+          if (subKey.toLowerCase().includes('deadline') || subKey.toLowerCase().includes('tarikh')) {
+            deadlines.push(subVal);
+          } else {
+            items.push(subVal);
+          }
+        } else if (Array.isArray(subVal)) {
+          items.push(...subVal.filter((v): v is string => typeof v === 'string'));
+        }
+      }
+
+      if (items.length > 0 || deadlines.length > 0) {
+        const domain = lowerKey.includes('tax') || lowerKey.includes('cukai') ? 'tax'
+          : lowerKey.includes('epf') || lowerKey.includes('kwsp') ? 'epf'
+          : 'business';
+        sections.push({ domain, title: key, items, deadlines });
+      }
+    } else if (Array.isArray(value)) {
+      const items = value.filter((v): v is string => typeof v === 'string');
+      if (items.length > 0) {
+        const domain = lowerKey.includes('tax') ? 'tax' : lowerKey.includes('epf') ? 'epf' : 'business';
+        sections.push({ domain, title: key, items });
+      }
+    } else if (typeof value === 'string' && value.trim().length > 20) {
+      // Long string values treated as a single-item section
+      const domain = lowerKey.includes('tax') ? 'tax' : lowerKey.includes('epf') ? 'epf' : 'business';
+      sections.push({ domain, title: key, items: [value] });
+    }
+  }
+
+  // If no structured sections found, create a single section from the entire report
+  if (sections.length === 0) {
+    sections.push({
+      domain: 'business',
+      title: 'Compliance Report',
+      items: [JSON.stringify(report, null, 2)],
+    });
+  }
+
+  return sections;
+}
 
 function resolveAgentError(message: string, t: (key: string) => string): string {
   if (message === 'sign-in-required') return t('agents.error.sign_in');
@@ -189,6 +259,10 @@ export default function ComplianceDrafterPage() {
           </section>
         )}
 
+        {loading && step === 'domains' && (
+          <AgentLoadingSkeleton message="Menjana laporan pematuhan…" />
+        )}
+
         {step === 'preview' && report && (
           <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
             <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
@@ -217,6 +291,13 @@ export default function ComplianceDrafterPage() {
             ) : (
               <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('agents.compliance-drafter.email_hint')}</p>
             )}
+            <button
+              type="button"
+              onClick={() => { setStep('business'); setReport(null); setSessionId(null); setDownloadUrl(null); }}
+              className="self-start text-sm text-blue-600 hover:underline"
+            >
+              ← Jana laporan baru
+            </button>
           </section>
         )}
       </motion.div>

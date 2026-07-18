@@ -1,37 +1,85 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { ChatBubbles, QuickReplies, type ChatMessage } from '@/components/agents/ChatBubbles';
+import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { useI18n } from '@/lib/i18n';
+
+const INITIAL_QUICK_REPLIES = [
+  'I want to work in Malaysia',
+  'Student visa for university',
+  'Visit family for 3 months',
+  'Start a business in Kuala Lumpur',
+  'Extend my current visa',
+];
+
 
 export default function ImmigrationNavigatorPage() {
+  const { t } = useI18n();
   const { start, continue: cont } = useAgentApi();
   const [message, setMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [output, setOutput] = useState<Record<string, unknown> | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: 'welcome', role: 'bot', content: 'Selamat datang! Saya boleh bantu anda dengan maklumat visa dan imigresen Malaysia. Dari mana anda berasal, dan jenis visa apa yang anda perlukan?' },
+  ]);
   const [nextPrompt, setNextPrompt] = useState<string | null>(null);
+  const [quickReplies, setQuickReplies] = useState<string[]>(INITIAL_QUICK_REPLIES);
+  const [checklist, setChecklist] = useState<string[]>([]);
+  const [visaType, setVisaType] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const send = async () => {
-    if (!message.trim()) return;
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+
+  const send = async (text?: string) => {
+    const msg = text ?? message;
+    if (!msg.trim()) return;
+    const userMsg: ChatMessage = { id: `u_${Date.now()}`, role: 'user', content: msg };
+    setMessages((prev) => [...prev, userMsg]);
+    setMessage('');
+    setQuickReplies([]);
     setLoading(true);
+
     try {
       const res = sessionId
-        ? await cont('immigration-navigator', { session_id: sessionId, message })
-        : await start('immigration-navigator', { message, language: 'bm' });
-      if (!sessionId) setSessionId(String(res.session_id));
-      setOutput((res.output as Record<string, unknown>) ?? res);
-      setNextPrompt((res.next_prompt as string) ?? null);
-      setMessage('');
+        ? await cont('immigration-navigator', { session_id: sessionId, message: msg })
+        : await start('immigration-navigator', { message: msg, language: 'bm' });
+
+      if (!sessionId && res.session_id) setSessionId(String(res.session_id));
+
+      const out = (res.output as Record<string, unknown>) ?? res;
+      const botText = String(out.response ?? out.summary ?? out.output ?? JSON.stringify(out));
+      const botMsg: ChatMessage = { id: `b_${Date.now()}`, role: 'bot', content: botText };
+      setMessages((prev) => [...prev, botMsg]);
+
+      // Extract structured data
+      if (out.visa_type) setVisaType(String(out.visa_type));
+      if (Array.isArray(out.checklist)) setChecklist(out.checklist as string[]);
+      if (Array.isArray(out.warnings)) setWarnings(out.warnings as string[]);
+      setNextPrompt((res.next_prompt as string) ?? (out.next_prompt as string) ?? null);
+
+      // Generate contextual quick replies
+      if (res.next_prompt || out.next_prompt) {
+        setQuickReplies(['Yes', 'No', 'I need more details', 'What documents do I need?']);
+      } else {
+        setQuickReplies([]);
+      }
+    } catch {
+      const errMsg: ChatMessage = { id: `e_${Date.now()}`, role: 'bot', content: 'Maaf, ralat berlaku. Sila cuba lagi.' };
+      setMessages((prev) => [...prev, errMsg]);
     } finally {
       setLoading(false);
     }
   };
 
-  const checklist = (output?.checklist as string[]) ?? [];
-  const warnings = (output?.warnings as string[]) ?? [];
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
@@ -66,7 +114,7 @@ export default function ImmigrationNavigatorPage() {
             rows={3}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="I'm from India, want to work in KL for 2 years…"
+            placeholder="I'm from Mainland China, want to work in KL for 2 years…"
           />
           <button
             type="button"

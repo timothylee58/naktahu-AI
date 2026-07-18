@@ -5,6 +5,34 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
+import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { useI18n } from '@/lib/i18n';
+
+const SECTOR_OPTIONS: ChipOption[] = [
+  { id: 'technology', label: 'Teknologi', icon: '🖥' },
+  { id: 'fnb', label: 'F&B', icon: '🍜' },
+  { id: 'manufacturing', label: 'Pembuatan', icon: '🏭' },
+  { id: 'retail', label: 'Runcit', icon: '🛒' },
+  { id: 'agriculture', label: 'Pertanian', icon: '🌾' },
+  { id: 'creative', label: 'Kreatif', icon: '📐' },
+  { id: 'healthcare', label: 'Kesihatan', icon: '⚕️' },
+  { id: 'education', label: 'Pendidikan', icon: '📚' },
+];
+
+const STAGE_OPTIONS: ChipOption[] = [
+  { id: 'idea', label: 'Idea', icon: '💡' },
+  { id: 'early', label: 'Permulaan', icon: '🌱' },
+  { id: 'growth', label: 'Pertumbuhan', icon: '📈' },
+  { id: 'established', label: 'Stabil', icon: '🏢' },
+];
+
+const FUNDING_OPTIONS: ChipOption[] = [
+  { id: 'under_10k', label: '< RM10k' },
+  { id: '10k_50k', label: 'RM10k–50k' },
+  { id: '50k_200k', label: 'RM50k–200k' },
+  { id: 'above_200k', label: '> RM200k' },
+];
 
 type Grant = {
   name: string;
@@ -12,6 +40,7 @@ type Grant = {
   amount_hint: string;
   deadline_hint: string;
   url: string | null;
+  match_score?: number;
 };
 
 function parseGrant(raw: unknown): Grant | null {
@@ -25,6 +54,7 @@ function parseGrant(raw: unknown): Grant | null {
     amount_hint: typeof row.amount_hint === 'string' ? row.amount_hint : '',
     deadline_hint: typeof row.deadline_hint === 'string' ? row.deadline_hint : '',
     url: typeof row.url === 'string' && row.url.length > 0 ? row.url : null,
+    match_score: typeof row.match_score === 'number' ? row.match_score : undefined,
   };
 }
 
@@ -34,28 +64,36 @@ function parseGrants(raw: unknown): Grant[] {
 }
 
 export default function GrantFinderPage() {
+  const { t } = useI18n();
   const { start } = useAgentApi();
-  const [sector, setSector] = useState('technology');
-  const [stage, setStage] = useState('early');
-  const [need, setNeed] = useState('RM 50,000 working capital');
+  const [sector, setSector] = useState<string[]>([]);
+  const [stage, setStage] = useState<string[]>([]);
+  const [funding, setFunding] = useState<string[]>([]);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const search = async () => {
     setLoading(true);
+    setError(null);
     try {
+      const fundingLabel = FUNDING_OPTIONS.find((o) => o.id === funding[0])?.label ?? '';
       const res = await start('grant-finder', {
-        sector,
-        business_stage: stage,
-        funding_need: need,
+        sector: sector[0] ?? 'technology',
+        business_stage: stage[0] ?? 'early',
+        funding_need: fundingLabel || 'RM 50,000 working capital',
         language: 'bm',
       });
       const out = (res.output as Record<string, unknown>) ?? res;
-      setGrants(parseGrants(out.grants));
+      setGrants(parseGrants(out.grants ?? out.recommendations));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gagal mendapatkan hasil');
     } finally {
       setLoading(false);
     }
   };
+
+  const canSearch = sector.length > 0;
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
@@ -107,12 +145,12 @@ export default function GrantFinderPage() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Official source
+                    Mohon sekarang →
                   </a>
                 )}
               </motion.li>
             ))}
-          </ul>
+          </div>
         )}
       </motion.div>
     </main>
