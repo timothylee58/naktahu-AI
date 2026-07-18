@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { useSWRConfig } from 'swr';
 import { useI18n } from '@/lib/i18n';
@@ -303,9 +304,14 @@ function ChatPageInner() {
         className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6"
+          >
             {/* Logo mark */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/20">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/30 ring-1 ring-white/10">
               <svg viewBox="0 0 32 32" className="w-9 h-9" fill="none" aria-hidden>
                 <circle cx="16" cy="16" r="12" fill="white" fillOpacity="0.15" />
                 <path d="M9 12h14M9 16h9M9 20h11" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
@@ -317,12 +323,15 @@ function ChatPageInner() {
             </div>
             <div className="flex flex-wrap justify-center gap-2 max-w-xs">
               {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span key={d} className={`text-[11px] font-medium border rounded-full px-2.5 py-1 ${domainPill}`}>
+                <span
+                  key={d}
+                  className={`text-[11px] font-medium border rounded-full px-2.5 py-1 transition-colors hover:shadow-sm ${domainPill}`}
+                >
                   {t(`domain.${d}`)}
                 </span>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
         {messages.map((msg) =>
           msg.role === 'user' ? (
@@ -351,7 +360,7 @@ function ChatPageInner() {
         <div ref={bottomRef} />
       </div>
 
-      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2 ${inputBarClass}`}>
+      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
         {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
         )}

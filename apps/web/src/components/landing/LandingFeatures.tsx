@@ -36,8 +36,9 @@ interface LandingFeaturesProps {
 export function LandingFeatures({ isDark = true }: LandingFeaturesProps) {
   const { t } = useI18n();
   const cardClass = isDark
-    ? 'bg-white/5 border-white/10'
-    : 'bg-white border-zinc-200 shadow-sm';
+    ? 'bg-white/5 border-white/10 hover:border-white/20'
+    : 'bg-white border-zinc-200 shadow-sm hover:shadow-md';
+  const tileClass = isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600';
   const titleClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const descClass = isDark ? 'text-zinc-400' : 'text-zinc-600';
 
@@ -48,9 +49,11 @@ export function LandingFeatures({ isDark = true }: LandingFeaturesProps) {
           key={f.titleKey}
           whileHover={{ y: -4 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          className={`flex flex-col gap-4 border rounded-2xl p-5 sm:p-6 ${cardClass}`}
+          className={`flex flex-col gap-4 border rounded-2xl p-5 sm:p-6 transition-colors duration-200 ${cardClass}`}
         >
-          <span className="text-[#2563EB]">{FEATURE_ICONS[i]}</span>
+          <span className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${tileClass}`}>
+            {FEATURE_ICONS[i]}
+          </span>
           <h3 className={`font-semibold locale-nowrap ${titleClass}`}>{t(f.titleKey)}</h3>
           <p className={`text-sm leading-relaxed locale-text-balance ${descClass}`}>{t(f.descKey)}</p>
         </motion.div>
