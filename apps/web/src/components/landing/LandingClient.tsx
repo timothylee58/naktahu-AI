@@ -70,12 +70,11 @@ export function LandingClient() {
         }`}
       >
         <div
-          className="absolute left-1/2 top-[-180px] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-3xl"
-          style={{
-            background: isDark
-              ? 'radial-gradient(closest-side, rgba(37,99,235,0.22), transparent)'
-              : 'radial-gradient(closest-side, rgba(37,99,235,0.12), transparent)',
-          }}
+          className={`absolute left-1/2 top-[-180px] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-3xl ${
+            isDark
+              ? 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.22),transparent)]'
+              : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
+          }`}
         />
       </div>
 
