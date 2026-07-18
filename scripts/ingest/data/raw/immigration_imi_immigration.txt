@@ -4,6 +4,7 @@ MINISTRY: Jabatan Imigresen Malaysia
 DOMAIN: immigration
 SOURCE_DATE: 
 EXPIRY_AWARE: true
+EFFECTIVE_DATE: 2024-01-01
 ---
 ## Passport Renewal
 Pembaharuan pasport Malaysia boleh dilakukan secara dalam talian melalui portal MyOnlinePassport di online.imi.gov.my atau di pejabat imigresen. Yuran pasport: Pasport 5 tahun (dewasa) RM200, Pasport 5 tahun (kanak-kanak di bawah 12 tahun) RM100, Pasport 2 tahun (kanak-kanak di bawah 5 tahun) RM100. Proses dalam talian memerlukan 3–5 hari bekerja dan penghantaran ke rumah tersedia.

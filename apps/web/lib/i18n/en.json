@@ -6,7 +6,8 @@
   "chat": {
     "thinking": "Thinking...",
     "error": "Something went wrong. Please try again.",
-    "citation_label": "Sources"
+    "citation_label": "Sources",
+    "suggestions_label": "Related questions"
   },
   "history": {
     "title": "History",

@@ -5,15 +5,19 @@ export const dynamic = 'force-dynamic';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
+import { useSWRConfig } from 'swr';
 import { useI18n } from '@/lib/i18n';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
+import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import type { Message } from '@/lib/types';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from '@/lib/theme';
+import { canAccessHistory } from '@/lib/auth-plan';
+import { sidebarHistoryKey } from '@/lib/history';
 
 let msgCounter = 0;
 function makeId() {
@@ -22,7 +26,10 @@ function makeId() {
 
 function ChatPageInner() {
   const { t, locale } = useI18n();
-  const supabase = useMemo(() => createClient(), []);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const { user, userId, accessToken } = useSupabaseSession();
+  const { mutate: globalMutate } = useSWRConfig();
   const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,34 +58,22 @@ function ChatPageInner() {
     if (q !== null) setInjectedQuery(q);
     else setInjectedQuery('');
   }, [q]);
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const lastUserQuery = useRef<string>('');
+  const wasStreaming = useRef(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Auth state
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAccessToken(data.session?.access_token ?? null);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setAccessToken(session?.access_token ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
+  const conversationChars = useMemo(
+    () => messages.reduce((sum, msg) => sum + msg.content.length, 0),
+    [messages],
+  );
 
   const {
     tokens,
     citations,
     metadata,
+    suggestions,
     isStreaming,
     error,
     startStream,
@@ -147,6 +142,11 @@ function ChatPageInner() {
                 citations,
                 confidence,
                 isStreaming: false,
+                query: lastUserQuery.current,
+                domain: metadata?.domain,
+                language: metadata?.detectedLanguage,
+                suggestions,
+                agencyContact: metadata?.agency_contact,
               }
             : m,
         ),
@@ -154,6 +154,18 @@ function ChatPageInner() {
       streamingAssistantId.current = null;
     }
   }, [isStreaming]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh sidebar history after a completed answer (server persists summary on stream end).
+  useEffect(() => {
+    if (wasStreaming.current && !isStreaming && userId && user && canAccessHistory(user)) {
+      const timer = window.setTimeout(() => {
+        void globalMutate(sidebarHistoryKey(userId));
+      }, 600);
+      return () => window.clearTimeout(timer);
+    }
+    wasStreaming.current = isStreaming;
+    return undefined;
+  }, [isStreaming, userId, user, globalMutate]);
 
   // Show error as assistant message
   useEffect(() => {
@@ -239,9 +251,28 @@ function ChatPageInner() {
 
   const showChips = messages.length === 0 && !isStreaming;
 
+  const pageBg = isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50';
+  const headerClass = isDark
+    ? 'border-white/10 bg-[#0A0F1E]/90 text-white'
+    : 'border-zinc-100 bg-white/90 text-zinc-900';
+  const headerSub = isDark ? 'text-zinc-400' : 'text-zinc-500';
+  const menuBtn = isDark
+    ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
+    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800';
+  const emptyTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
+  const emptyDesc = isDark ? 'text-zinc-500' : 'text-zinc-400';
+  const domainPill = isDark
+    ? 'text-blue-300 bg-blue-500/10 border-blue-500/30'
+    : 'text-blue-600 bg-blue-50 border-blue-100';
+  const inputBarClass = isDark
+    ? 'border-white/10 bg-[#0A0F1E]/90'
+    : 'border-zinc-100 bg-white/90';
+  const hintClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+
   return (
-    <div className="flex h-full bg-zinc-50/50">
+    <div className={`flex h-full ${pageBg}`}>
       <AppSidebar
+        variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
         collapsed={sidebarCollapsed}
@@ -341,6 +372,13 @@ function ChatPageInner() {
               isStreaming={msg.isStreaming}
               isThinking={msg.isStreaming && (msg.tokens?.length ?? 0) === 0}
               onRegenerate={!msg.isStreaming ? handleRegenerate : undefined}
+              query={msg.query}
+              domain={msg.domain}
+              language={msg.language}
+              accessToken={accessToken ?? undefined}
+              suggestions={msg.suggestions ?? []}
+              onSuggestionSelect={handleChipSelect}
+              agencyContact={msg.agencyContact}
             />
           ),
         )}

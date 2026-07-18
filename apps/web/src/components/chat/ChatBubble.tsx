@@ -3,12 +3,14 @@
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Citation } from '@/lib/types';
+import type { AgencyContact, Citation } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { AgencyContactCard } from './AgencyContactCard';
 import { CitationChip } from './CitationChip';
 import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ResponseActions } from './ResponseActions';
+import { SuggestionChips } from './SuggestionChips';
 
 interface UserBubbleProps {
   role: 'user';
@@ -24,6 +26,13 @@ interface AssistantBubbleProps {
   isStreaming: boolean;
   isThinking?: boolean;
   onRegenerate?: () => void;
+  query?: string;
+  domain?: string;
+  language?: string;
+  accessToken?: string;
+  suggestions?: string[];
+  onSuggestionSelect?: (query: string) => void;
+  agencyContact?: AgencyContact;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -50,7 +59,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -78,9 +87,23 @@ export function ChatBubble(props: ChatBubbleProps) {
           )}
         </motion.div>
 
+        {!isStreaming && !isThinking && agencyContact && (
+          <AgencyContactCard contact={agencyContact} />
+        )}
+
         {/* Action buttons — only after streaming completes */}
         {!isStreaming && !isThinking && content && (
-          <ResponseActions content={content} onRegenerate={onRegenerate} isStreaming={isStreaming} />
+          <ResponseActions
+            content={content}
+            onRegenerate={onRegenerate}
+            isStreaming={isStreaming}
+            query={query}
+            domain={domain}
+            language={language}
+            citations={citations}
+            confidence={confidence}
+            accessToken={accessToken}
+          />
         )}
 
         {hasLowConfidence && (
@@ -117,6 +140,15 @@ export function ChatBubble(props: ChatBubbleProps) {
               </motion.div>
             ))}
           </motion.div>
+        )}
+
+        {/* Suggestions — only show after streaming completes and if we have suggestions */}
+        {!isStreaming && !isThinking && suggestions.length > 0 && onSuggestionSelect && (
+          <SuggestionChips
+            suggestions={suggestions}
+            onSelect={onSuggestionSelect}
+            disabled={false}
+          />
         )}
       </div>
     </div>

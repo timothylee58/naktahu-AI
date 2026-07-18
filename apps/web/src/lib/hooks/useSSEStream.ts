@@ -13,6 +13,7 @@ export interface UseSSEStreamReturn {
   tokens: string[];
   citations: Citation[];
   metadata: SSEMetadata | null;
+  suggestions: string[];
   isStreaming: boolean;
   error: string | null;
   startStream: (query: string, language?: string) => void;
@@ -66,6 +67,7 @@ export function useSSEStream({
   const [tokens, setTokens] = useState<string[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
   const [metadata, setMetadata] = useState<SSEMetadata | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +78,7 @@ export function useSSEStream({
     setTokens([]);
     setCitations([]);
     setMetadata(null);
+    setSuggestions([]);
     setIsStreaming(false);
     setError(null);
   }, []);
@@ -89,6 +92,7 @@ export function useSSEStream({
       setTokens([]);
       setCitations([]);
       setMetadata(null);
+      setSuggestions([]);
       setError(null);
       setIsStreaming(true);
 
@@ -136,6 +140,13 @@ export function useSSEStream({
               } catch {
                 /* ignore malformed */
               }
+            } else if (event === 'suggestion') {
+              try {
+                const parsed = JSON.parse(data) as { text: string };
+                setSuggestions((prev) => [...prev, parsed.text]);
+              } catch {
+                /* ignore malformed */
+              }
             } else if (event === 'metadata') {
               try {
                 const parsed = JSON.parse(data) as SSEMetadata;
@@ -175,5 +186,5 @@ export function useSSEStream({
     [defaultLanguage, sessionId, accessToken],
   );
 
-  return { tokens, citations, metadata, isStreaming, error, startStream, reset };
+  return { tokens, citations, metadata, suggestions, isStreaming, error, startStream, reset };
 }

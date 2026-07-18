@@ -38,6 +38,11 @@ async def router_node(state: AgentState) -> dict:
     """Classify query intent, language, and domain."""
     query = state.get("query", "")
 
+    preset_domain = state.get("domain")
+    if isinstance(preset_domain, str):
+        preset_domain = preset_domain.strip().lower()
+        preset_domain = _DOMAIN_ALIASES.get(preset_domain, preset_domain)
+
     # Deterministic script check before calling the LLM — CJK is unambiguous
     script_lang = _script_detect(query)
 
@@ -74,7 +79,9 @@ async def router_node(state: AgentState) -> dict:
     if isinstance(domain, str):
         domain = domain.strip().lower()
     domain = _DOMAIN_ALIASES.get(domain, domain)
-    if domain not in _VALID_DOMAINS:
+    if preset_domain in _VALID_DOMAINS:
+        domain = preset_domain
+    elif domain not in _VALID_DOMAINS:
         domain = "government"
 
     intent = parsed.get("intent", "")

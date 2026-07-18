@@ -6,7 +6,8 @@
   "chat": {
     "thinking": "Sedang berfikir...",
     "error": "Sesuatu telah berlaku. Sila cuba lagi.",
-    "citation_label": "Sumber"
+    "citation_label": "Sumber",
+    "suggestions_label": "Soalan berkaitan"
   },
   "history": {
     "title": "Sejarah",

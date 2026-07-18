@@ -3,7 +3,11 @@
 import { useI18n } from '@/lib/i18n';
 import { TypewriterQuery } from './TypewriterQuery';
 
-export function TypewriterQueryWrapper() {
+interface TypewriterQueryWrapperProps {
+  isDark?: boolean;
+}
+
+export function TypewriterQueryWrapper({ isDark = true }: TypewriterQueryWrapperProps) {
   const { locale } = useI18n();
-  return <TypewriterQuery locale={locale} />;
+  return <TypewriterQuery locale={locale} isDark={isDark} />;
 }

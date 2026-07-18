@@ -29,3 +29,19 @@ class AgentState(TypedDict, total=False):
     error: Optional[str]
     output_flagged: bool
     skip_history_persist: bool
+    suggestions: list[str]
+    # Freshness signals. faithfulness/confidence only measure answer-to-chunk
+    # consistency, not whether the chunk is still current — these carry the
+    # recency verdict from analyst_node to synthesiser_node so a stale-but-
+    # faithful answer is date-stamped and hedged rather than stated as current.
+    stale_warning: bool
+    answer_as_of: Optional[str]
+    # Structured per-chunk staleness records (chunk_id, source_title,
+    # effective_date, days_since_effective) for chunks whose effective_date has
+    # passed by more than the staleness window.
+    stale_warnings: list[dict[str, Any]]
+    # Set when the query asks about the user's own case-specific record
+    # (e.g. "what's my EPF balance") rather than a general rules question —
+    # NakTahu has no access to any user's records, so this carries the real
+    # agency contact to show instead of attempting an answer.
+    agency_contact: Optional[dict[str, str]]

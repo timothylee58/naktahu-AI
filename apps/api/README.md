@@ -68,7 +68,7 @@ Before querying Supabase, checks Redis for a cached result using the key `cache:
 
 ### 3. `analyst_node` — `app/agents/analyst_node.py`
 
-Scores the relevance of each retrieved chunk (0.0–1.0) and sets `confidence_score` on state. Maps `source_url` from chunk metadata to build citation objects. If `confidence_score < 0.4`, sets `needs_clarification = True`.
+Scores the relevance of each retrieved chunk (0.0–1.0) and sets `confidence_score` on state. Maps `source_url` from chunk metadata to build citation objects. If `confidence_score < 0.6`, sets `needs_clarification = True`.
 
 ### 4. `synthesiser_node` — `app/agents/synthesiser_node.py`
 

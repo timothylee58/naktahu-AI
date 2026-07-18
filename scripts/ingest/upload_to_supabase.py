@@ -17,6 +17,11 @@ import structlog
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
+try:  # works both as `python scripts/ingest/upload_to_supabase.py` and `-m`
+    from scripts.ingest.metadata import build_supersession_map
+except ImportError:  # pragma: no cover - script run with scripts/ingest on sys.path
+    from metadata import build_supersession_map
+
 load_dotenv(Path(__file__).parent.parent.parent / "apps" / "api" / ".env")
 
 CHUNKS_FILE = Path(__file__).parent / "data" / "processed" / "chunks.jsonl"
@@ -25,11 +30,13 @@ TABLE = "document_chunks"
 
 log = structlog.get_logger(__name__)
 
-# Columns accepted by the document_chunks table
+# Columns accepted by the document_chunks table. Note: "supersedes" is
+# intentionally excluded — it is ingest-only metadata (a list of old source
+# URLs) applied to existing rows' superseded_by after upload, not a column.
 _ALLOWED_COLS = {
     "id", "content", "content_hash", "language", "domain",
     "source_title", "source_url", "ministry", "embedding",
-    "expiry_aware", "source_date",
+    "expiry_aware", "source_date", "effective_date",
 }
 
 
@@ -53,10 +60,43 @@ def _prepare_row(chunk: dict) -> dict:
         row["embedding"] = "[" + ",".join(str(v) for v in row["embedding"]) + "]"
     # Ensure booleans are correct type
     row["expiry_aware"] = bool(row.get("expiry_aware", False))
-    # source_date: keep as ISO string or None — Supabase accepts both
+    # source_date / effective_date: keep as ISO string or None
     if not row.get("source_date"):
         row["source_date"] = None
+    if not row.get("effective_date"):
+        row["effective_date"] = None
     return row
+
+
+def apply_supersessions(client: Client, chunks: list[dict]) -> int:
+    """Mark old chunks superseded by newly-ingested ones.
+
+    For each old source_url declared via a raw file's SUPERSEDES header, set
+    superseded_by on all existing document_chunks with that source_url to a
+    representative new chunk id (so analyst_node hard-rejects them). Idempotent:
+    only rows not already superseded are updated. Returns rows updated.
+    """
+    mapping = build_supersession_map(chunks)
+    if not mapping:
+        return 0
+
+    updated = 0
+    for old_url, new_id in mapping.items():
+        try:
+            result = (
+                client.table(TABLE)
+                .update({"superseded_by": new_id})
+                .eq("source_url", old_url)
+                .is_("superseded_by", "null")
+                .neq("id", new_id)  # never point a chunk at itself
+                .execute()
+            )
+            n = len(result.data) if result.data else 0
+            updated += n
+            log.info("supersession_applied", old_url=old_url, new_id=new_id, rows=n)
+        except Exception as exc:
+            log.error("supersession_failed", old_url=old_url, error=str(exc))
+    return updated
 
 
 def upload(client: Client, chunks: list[dict]) -> tuple[int, int]:
@@ -109,6 +149,11 @@ def main() -> None:
 
     inserted, errors = upload(client, chunks)
     log.info("upload_complete", inserted=inserted, errors=errors, total=len(chunks))
+
+    # After the new chunks exist, mark any chunks they supersede.
+    superseded = apply_supersessions(client, chunks)
+    if superseded:
+        log.info("supersessions_complete", rows_superseded=superseded)
 
     if errors > 0:
         sys.exit(1)
