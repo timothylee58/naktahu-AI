@@ -28,6 +28,10 @@ from middleware.user_context import UserContextMiddleware
 from routers import billing, feedback, history, share
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
+from app.orchestration.adapters import ALL_ADAPTERS
+from app.orchestration.context_bus import ContextBus
+from app.orchestration.registry import load_enhanced_registry, register_adapter
+from app.routers.orchestration import router as orchestration_router
 from scripts.setup_agent_infra import ensure_storage_bucket
 from services.agent_registry import load_agent_registry
 
@@ -63,6 +67,13 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
     application.state.checkpointer = await init_checkpointer()
     ensure_storage_bucket(application.state.supabase)
     load_agent_registry(application.state.supabase)
+
+    # ── Orchestration layer bootstrap ──────────────────────────────────────
+    load_enhanced_registry(application.state.supabase)
+    application.state.context_bus = ContextBus(application.state.redis)
+    for adapter_cls in ALL_ADAPTERS:
+        register_adapter(adapter_cls())
+    log.info("orchestration_ready", adapters=len(ALL_ADAPTERS))
 
     log.info("startup", version=application.version)
     yield
@@ -111,3 +122,4 @@ app.include_router(billing.router)
 app.include_router(share.router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
+app.include_router(orchestration_router)
