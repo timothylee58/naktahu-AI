@@ -50,7 +50,7 @@ infra/supabase/migrations/   Numbered SQL migrations 001–016 (NOT auto-applied
 - Never expose `SUPABASE_SERVICE_ROLE_KEY` to the frontend, in any form, ever.
 - Secrets by env-var name only. Never hardcode, never commit, never echo values into logs or PR bodies.
 - Never store raw query text in Redis keys — always `sha256(query.lower().strip() + "|" + language + "|" + domain)`. Query-result TTL 3600s; session history TTL 30 days.
-- Never skip or weaken the `analyst_node` confidence check — it is the trust layer. Confidence < 0.4 sets `needs_clarification`.
+- Never skip or weaken the `analyst_node` confidence check — it is the trust layer. Confidence < 0.6 sets `needs_clarification`.
 - Never render a citation chip with a fabricated URL. Real `gov.my`-family URLs from chunk metadata only; if none exists, omit the citation.
 - Never change LLM provider order (ILMU primary; Anthropic fallback for synthesis only) without an explicit architecture decision from the user.
 - Never use raw `fetch()`/`httpx` for LLM or DB calls in agent nodes — official SDKs (`anthropic`, `supabase-py`, OpenAI-compatible client) only. (`httpx` is fine in standalone scripts like `ingest_feed.py`.)
