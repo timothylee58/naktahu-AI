@@ -28,6 +28,7 @@ from middleware.user_context import UserContextMiddleware
 from routers import billing, feedback, history, share
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
+from app.routers.observability import router as observability_router
 from app.orchestration.adapters import ALL_ADAPTERS
 from app.orchestration.context_bus import ContextBus
 from app.orchestration.registry import load_enhanced_registry, register_adapter
@@ -69,6 +70,12 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
     ensure_storage_bucket(application.state.supabase)
     load_agent_registry(application.state.supabase)
 
+    # ── Observability: cleanup abandoned sessions on startup ───────────────
+    from app.orchestration.session_manager import cleanup_abandoned_sessions
+    if application.state.supabase:
+        cleanup_result = await cleanup_abandoned_sessions(application.state.supabase)
+        if cleanup_result.deleted_count > 0:
+            log.info("startup_session_cleanup", deleted=cleanup_result.deleted_count)
     # ── Orchestration layer bootstrap ──────────────────────────────────────
     load_enhanced_registry(application.state.supabase)
     application.state.context_bus = ContextBus(application.state.redis)
@@ -123,5 +130,6 @@ app.include_router(billing.router)
 app.include_router(share.router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
+app.include_router(observability_router)
 app.include_router(orchestration_router)
 app.include_router(orchestrate_router)
