@@ -31,6 +31,7 @@ from routers.developer import router as developer_router
 from app.orchestration.adapters import ALL_ADAPTERS
 from app.orchestration.context_bus import ContextBus
 from app.orchestration.registry import load_enhanced_registry, register_adapter
+from app.routers.orchestrate import router as orchestrate_router
 from app.routers.orchestration import router as orchestration_router
 from scripts.setup_agent_infra import ensure_storage_bucket
 from services.agent_registry import load_agent_registry
@@ -123,3 +124,4 @@ app.include_router(share.router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
 app.include_router(orchestration_router)
+app.include_router(orchestrate_router)
