@@ -27,7 +27,8 @@ async def get_history(
     user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
     redis_client = getattr(request.app.state, "redis", None)
-    entries = await fetch_history_entries(redis_client, user.user_id)
+    supabase_client = getattr(request.app.state, "supabase", None)
+    entries = await fetch_history_entries(redis_client, supabase_client, user.user_id)
     return entries
 
 

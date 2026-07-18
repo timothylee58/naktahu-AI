@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import jwt
@@ -35,7 +36,8 @@ def client(monkeypatch):
     pipe = MagicMock()
     pipe.lpush.return_value = pipe
     pipe.ltrim.return_value = pipe
-    pipe.execute = AsyncMock(return_value=[1, True])
+    pipe.expire.return_value = pipe
+    pipe.execute = AsyncMock(return_value=[1, True, True])
     redis_client.pipeline = MagicMock(return_value=pipe)
 
     def fake_from_url(*args, **kwargs):
@@ -47,6 +49,8 @@ def client(monkeypatch):
     insert_mock.execute.return_value = MagicMock(data=[{"id": "1"}])
     table_mock = MagicMock()
     table_mock.select.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+    # user_sessions fallback-read chain: .select(...).eq(...).order(...).limit(...).execute()
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
     table_mock.insert.return_value = insert_mock
 
     sb = MagicMock()
@@ -130,9 +134,74 @@ def test_post_history_persists_redis_and_supabase(client):
     pipe = redis_client.pipeline.return_value
     pipe.lpush.assert_called_once()
     pipe.ltrim.assert_called_once()
+    pipe.expire.assert_called_once()
     pipe.execute.assert_called_once()
     sb.table.assert_called_with("user_sessions")
     insert_mock.execute.assert_called_once()
+
+
+def test_get_history_falls_back_to_supabase_when_redis_empty(client):
+    """Redis restarts/evicts without warning — a registered user's history
+    must not appear to vanish just because the Redis cache is cold."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+
+    supabase_rows = [
+        {
+            "query": "What is VAT?",
+            "language": "ms",
+            "domain": "tax",
+            "response_summary": "VAT is a consumption tax.",
+            "citations": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+    ]
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=supabase_rows
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["query"] == "What is VAT?"
+    assert body[0]["ts"] == int(datetime.fromisoformat("2026-01-01T00:00:00+00:00").timestamp())
+
+
+def test_get_history_prefers_redis_when_present(client):
+    """Redis is checked first — Supabase is only consulted as a fallback."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(
+        return_value=[
+            json.dumps(
+                {
+                    "query": "Redis-sourced query",
+                    "language": "en",
+                    "domain": "tax",
+                    "response_summary": "From cache",
+                    "citations": [],
+                    "ts": 1700000000,
+                }
+            )
+        ]
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["query"] == "Redis-sourced query"
+    sb.table.return_value.select.return_value.eq.assert_not_called()
+
+
+def test_get_history_returns_empty_when_both_redis_and_supabase_empty(client):
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    assert res.json() == []
 
 
 def test_history_authenticated_rate_limit_201st_returns_429(client):
