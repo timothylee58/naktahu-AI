@@ -124,12 +124,28 @@ async def test_analyst_no_clarification_with_multiple_solid_chunks() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analyst_clarification_threshold_is_point_six() -> None:
-    """Locks in the actual gate value — the other tests only exercise
-    near-0 / near-1 confidence and would pass unchanged at 0.4 or 0.6."""
-    from app.agents import analyst_node as analyst_node_module
+async def test_analyst_clarification_threshold_boundary() -> None:
+    """A confidence score of 0.5 (between the old 0.4 and new 0.6 gate)
+    must trigger clarification — the other tests only exercise near-0 /
+    near-1 confidence and would pass unchanged at either threshold value.
+    Tests the observable behaviour rather than the private constant."""
+    chunk_a = _make_chunk(
+        source_url="",
+        source_title="",
+        content="cukai pendapatan",
+    )
+    chunk_b = _make_chunk(
+        source_url="",
+        source_title="",
+        content="cukai pendapatan",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan",
+        "retrieved_chunks": [chunk_a, chunk_b],
+    })
 
-    assert analyst_node_module._CLARIFICATION_THRESHOLD == 0.6
+    assert result["confidence_score"] == 0.5
+    assert result["needs_clarification"] is True
 
 
 @pytest.mark.asyncio
