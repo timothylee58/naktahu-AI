@@ -78,25 +78,46 @@ async def _fetch_history_from_supabase(
 async def fetch_history_entries(
     redis_client: Redis | None, supabase_client: Client | None, user_id: str
 ) -> list[dict[str, Any]]:
+    key = history_key(user_id)
     if redis_client is not None:
-        key = history_key(user_id)
-        raw = await redis_client.lrange(key, 0, MAX_HISTORY - 1)
-        out: list[dict[str, Any]] = []
-        for item in raw:
-            try:
-                out.append(json.loads(item))
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("history_decode_skip", key=key)
-        if out:
-            return out
-        logger.info("history_redis_empty_falling_back_to_supabase", user_id=user_id)
+        try:
+            raw = await redis_client.lrange(key, 0, MAX_HISTORY - 1)
+            out: list[dict[str, Any]] = []
+            for item in raw:
+                try:
+                    out.append(json.loads(item))
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning("history_decode_skip", key=key)
+            if out:
+                return out
+            logger.info("history_redis_empty_falling_back_to_supabase", user_id=user_id)
+        except Exception as exc:
+            # A live Redis outage (not just a cold/missing key) must not 500
+            # the route — that would defeat the whole point of the fallback.
+            logger.warning("history_redis_query_failed", error=str(exc))
     else:
         logger.warning("history_redis_unavailable")
 
-    # Redis had nothing (cold cache, eviction, or genuinely no history yet) —
-    # Supabase is authoritative either way, so always confirm against it
-    # rather than trusting an empty Redis read as "no history".
-    return await _fetch_history_from_supabase(supabase_client, user_id)
+    # Redis had nothing (cold cache, eviction, outage, or genuinely no
+    # history yet) — Supabase is authoritative either way, so always confirm
+    # against it rather than trusting an empty Redis read as "no history".
+    entries = await _fetch_history_from_supabase(supabase_client, user_id)
+
+    if entries and redis_client is not None:
+        # Warm the cache so the next read for this user hits the fast path
+        # instead of Supabase again. Supabase returns newest-first, and
+        # rpush appends in the order given, so pushing newest-first onto an
+        # empty list reproduces the same index-0-is-newest layout lpush
+        # normally builds one entry at a time.
+        try:
+            pipe = redis_client.pipeline(transaction=False)
+            pipe.rpush(key, *[json.dumps(e) for e in entries])
+            pipe.expire(key, HISTORY_TTL_SECONDS)
+            await pipe.execute()
+        except Exception as exc:
+            logger.warning("history_redis_warm_failed", error=str(exc))
+
+    return entries
 
 
 async def persist_session_entry(
