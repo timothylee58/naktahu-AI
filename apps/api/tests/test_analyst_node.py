@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from app.agents.analyst_node import analyst_node
+from app.agents.analyst_node import _relevance_signal, _score_chunk, analyst_node
 from app.services.vector_store import ChunkResult
 
 _STALE_DATE = (date.today() - timedelta(days=400)).isoformat()
@@ -19,6 +19,7 @@ def _make_chunk(
     content: str = "cukai pendapatan individu kadar 2024",
     ministry: str = "LHDN",
     *,
+    similarity: float = 0.8,
     expiry_aware: bool = False,
     source_date: str | None = None,
     effective_date: str | None = None,
@@ -32,7 +33,7 @@ def _make_chunk(
         source_url=source_url,
         ministry=ministry,
         language="bm",
-        similarity=0.8,
+        similarity=similarity,
         expiry_aware=expiry_aware,
         source_date=source_date,
         effective_date=effective_date,
@@ -145,6 +146,67 @@ async def test_analyst_clarification_threshold_boundary() -> None:
     })
 
     assert result["confidence_score"] == 0.5
+    assert result["needs_clarification"] is True
+
+
+@pytest.mark.asyncio
+async def test_analyst_semantic_match_survives_zero_lexical_overlap() -> None:
+    """Cross-lingual matches must not be clarified away.
+
+    English query, Bahasa Malaysia chunks: essentially no shared keyword tokens,
+    but the retriever returned them with high semantic similarity. With lexical
+    overlap alone these would score url+title only (0.5) → confidence 0.5 <0.6 →
+    clarification. Folding similarity in should lift them over the bar.
+    """
+    bm_a = _make_chunk(
+        source_url="https://www.kwsp.gov.my/a",
+        source_title="Umur Pengeluaran KWSP",
+        content="umur pengeluaran penuh caruman kwsp ialah lima puluh lima tahun",
+        similarity=0.9,
+        chunk_id="a",
+    )
+    bm_b = _make_chunk(
+        source_url="https://www.kwsp.gov.my/b",
+        source_title="Panduan Pengeluaran",
+        content="ahli boleh mengeluarkan simpanan penuh pada umur lima puluh lima",
+        similarity=0.88,
+        chunk_id="b",
+    )
+    query = "what is the epf withdrawal age"
+
+    # Sanity check the premise: lexical overlap really is ~0.
+    q_tokens = set(query.lower().split())
+    assert not (q_tokens & set(bm_a.content.lower().split()))
+    # Semantic signal drives relevance now.
+    assert _relevance_signal(bm_a, query) == 0.9
+    # Old lexical-only score would have been 0.5; new score reflects similarity.
+    assert _score_chunk(bm_a, query) > 0.6
+
+    result = await analyst_node({"query": query, "domain": "epf", "retrieved_chunks": [bm_a, bm_b]})
+
+    assert result["confidence_score"] >= 0.6
+    assert result["needs_clarification"] is False
+    assert len(result["citations"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_analyst_low_similarity_unrelated_chunk_still_clarifies() -> None:
+    """The similarity boost must not rescue genuinely irrelevant chunks: a chunk
+    the retriever scored low (and with no lexical overlap or authority) stays
+    below the clarification bar."""
+    weak = _make_chunk(
+        source_url="",
+        source_title="",
+        content="zucchini pasta recipe with garlic",
+        similarity=0.15,
+        chunk_id="weak",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal age",
+        "retrieved_chunks": [weak],
+    })
+
+    assert result["confidence_score"] < 0.6
     assert result["needs_clarification"] is True
 
 

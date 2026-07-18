@@ -95,6 +95,28 @@ def _recency_key(chunk: ChunkResult) -> str:
     return chunk.effective_date or chunk.source_date or ""
 
 
+def _relevance_signal(chunk: ChunkResult, query: str) -> float:
+    """Relevance in [0, 1]: the stronger of lexical keyword overlap and the
+    retriever's semantic similarity.
+
+    Keyword overlap alone under-scores cross-lingual and paraphrased matches:
+    an English query against a Bahasa Malaysia chunk shares almost no tokens, so
+    a semantically perfect chunk the retriever ranked highly (high cosine
+    similarity) would score ~0 on overlap and get clarified away. Folding in
+    ``chunk.similarity`` (the hybrid_search combined cosine+BM25 score) fixes
+    that. ``max()`` — rather than a blend — keeps the change monotonic: every
+    chunk scores at least as high as lexical overlap alone, so anything that
+    answers today keeps answering; only semantic-only matches are lifted.
+    """
+    query_tokens = set(re.findall(r"\w+", query.lower()))
+    content_tokens = set(re.findall(r"\w+", chunk.content.lower()))
+    overlap = 0.0
+    if query_tokens:
+        overlap = len(query_tokens & content_tokens) / len(query_tokens)
+    similarity = min(max(chunk.similarity, 0.0), 1.0)
+    return min(max(overlap, similarity), 1.0)
+
+
 def _score_chunk(chunk: ChunkResult, query: str) -> float:
     score = 0.0
 
@@ -106,12 +128,9 @@ def _score_chunk(chunk: ChunkResult, query: str) -> float:
     if chunk.source_title and chunk.source_title.strip():
         score += 0.2
 
-    # Keyword overlap between chunk content and query (+0.5 max)
-    query_tokens = set(re.findall(r"\w+", query.lower()))
-    content_tokens = set(re.findall(r"\w+", chunk.content.lower()))
-    if query_tokens:
-        overlap = len(query_tokens & content_tokens) / len(query_tokens)
-        score += min(overlap, 1.0) * 0.5
+    # Relevance — lexical overlap OR semantic similarity, whichever is stronger
+    # (+0.5 max).
+    score += _relevance_signal(chunk, query) * 0.5
 
     return round(min(score, 1.0), 4)
 
