@@ -29,6 +29,11 @@ from routers import billing, feedback, history, share
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
 from app.routers.observability import router as observability_router
+from app.orchestration.adapters import ALL_ADAPTERS
+from app.orchestration.context_bus import ContextBus
+from app.orchestration.registry import load_enhanced_registry, register_adapter
+from app.routers.orchestrate import router as orchestrate_router
+from app.routers.orchestration import router as orchestration_router
 from scripts.setup_agent_infra import ensure_storage_bucket
 from services.agent_registry import load_agent_registry
 
@@ -71,6 +76,12 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
         cleanup_result = await cleanup_abandoned_sessions(application.state.supabase)
         if cleanup_result.deleted_count > 0:
             log.info("startup_session_cleanup", deleted=cleanup_result.deleted_count)
+    # ── Orchestration layer bootstrap ──────────────────────────────────────
+    load_enhanced_registry(application.state.supabase)
+    application.state.context_bus = ContextBus(application.state.redis)
+    for adapter_cls in ALL_ADAPTERS:
+        register_adapter(adapter_cls())
+    log.info("orchestration_ready", adapters=len(ALL_ADAPTERS))
 
     log.info("startup", version=application.version)
     yield
@@ -120,3 +131,5 @@ app.include_router(share.router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
 app.include_router(observability_router)
+app.include_router(orchestration_router)
+app.include_router(orchestrate_router)

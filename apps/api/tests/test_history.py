@@ -1,5 +1,7 @@
+import asyncio
 import json
 import time
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import jwt
@@ -9,6 +11,7 @@ from fastapi.testclient import TestClient
 import main as api_main
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
+from services.history import fetch_history_entries
 
 
 def _auth_header(sub: str = "hist-user", plan: str = "pro") -> dict[str, str]:
@@ -34,8 +37,10 @@ def client(monkeypatch):
 
     pipe = MagicMock()
     pipe.lpush.return_value = pipe
+    pipe.rpush.return_value = pipe
     pipe.ltrim.return_value = pipe
-    pipe.execute = AsyncMock(return_value=[1, True])
+    pipe.expire.return_value = pipe
+    pipe.execute = AsyncMock(return_value=[1, True, True])
     redis_client.pipeline = MagicMock(return_value=pipe)
 
     def fake_from_url(*args, **kwargs):
@@ -47,6 +52,8 @@ def client(monkeypatch):
     insert_mock.execute.return_value = MagicMock(data=[{"id": "1"}])
     table_mock = MagicMock()
     table_mock.select.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+    # user_sessions fallback-read chain: .select(...).eq(...).order(...).limit(...).execute()
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
     table_mock.insert.return_value = insert_mock
 
     sb = MagicMock()
@@ -130,9 +137,213 @@ def test_post_history_persists_redis_and_supabase(client):
     pipe = redis_client.pipeline.return_value
     pipe.lpush.assert_called_once()
     pipe.ltrim.assert_called_once()
+    pipe.expire.assert_called_once()
     pipe.execute.assert_called_once()
     sb.table.assert_called_with("user_sessions")
     insert_mock.execute.assert_called_once()
+
+
+def test_get_history_falls_back_to_supabase_when_redis_empty(client):
+    """Redis restarts/evicts without warning — a registered user's history
+    must not appear to vanish just because the Redis cache is cold."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+
+    supabase_rows = [
+        {
+            "query": "What is VAT?",
+            "language": "ms",
+            "domain": "tax",
+            "response_summary": "VAT is a consumption tax.",
+            "citations": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+    ]
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=supabase_rows
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["query"] == "What is VAT?"
+    assert body[0]["ts"] == int(datetime.fromisoformat("2026-01-01T00:00:00+00:00").timestamp())
+
+    # Cache warming: the Supabase-sourced entries should be written back to
+    # Redis so the next request for this user hits the fast path.
+    pipe = redis_client.pipeline.return_value
+    pipe.rpush.assert_called_once()
+    warmed_key, *warmed_items = pipe.rpush.call_args[0]
+    assert warmed_key == "session_history:hist-user"
+    assert len(warmed_items) == 1
+    assert json.loads(warmed_items[0])["query"] == "What is VAT?"
+    pipe.expire.assert_called_once()
+    assert pipe.expire.call_args[0][1] == 30 * 24 * 60 * 60
+
+
+def test_get_history_survives_redis_connection_error(client):
+    """A live Redis outage (not just an empty/cold key) must fall back to
+    Supabase and return 200 — not surface as a 500 to the user."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(side_effect=ConnectionError("connection refused"))
+
+    supabase_rows = [
+        {
+            "query": "Redis is down but this still works",
+            "language": "en",
+            "domain": "government",
+            "response_summary": "Fallback path",
+            "citations": [],
+            "created_at": "2026-01-02T00:00:00+00:00",
+        }
+    ]
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=supabase_rows
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["query"] == "Redis is down but this still works"
+
+
+def test_get_history_cache_warm_failure_does_not_break_the_response(client):
+    """If Redis is unreachable for the warm-back write too, the user still
+    gets their (correct) Supabase-sourced history — warming is best-effort."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+    pipe = redis_client.pipeline.return_value
+    pipe.execute = AsyncMock(side_effect=ConnectionError("connection refused"))
+
+    supabase_rows = [
+        {
+            "query": "Warm write fails but read still succeeds",
+            "language": "en",
+            "domain": "government",
+            "response_summary": "ok",
+            "citations": [],
+            "created_at": "2026-01-03T00:00:00+00:00",
+        }
+    ]
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=supabase_rows
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    assert res.json()[0]["query"] == "Warm write fails but read still succeeds"
+
+
+def test_get_history_survives_supabase_exception(client):
+    """Both stores unavailable at once must degrade to an empty list, not a
+    500 — matches the existing history_redis_unavailable degrade pattern."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.side_effect = (
+        Exception("Supabase unreachable")
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    assert res.json() == []
+
+
+def test_get_history_skips_row_with_malformed_created_at(client):
+    """A malformed timestamp must not crash the whole response — just that
+    entry's ts falls back to None rather than poisoning the request."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[
+            {
+                "query": "Bad timestamp",
+                "language": "en",
+                "domain": "government",
+                "response_summary": "ok",
+                "citations": [],
+                "created_at": "not-a-real-timestamp",
+            }
+        ]
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["ts"] is None
+
+
+def test_get_history_preserves_newest_first_order_from_supabase(client):
+    """Supabase already orders newest-first; the response (and the warmed
+    Redis list) must preserve that order, not reverse or reshuffle it."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+    rows = [
+        {
+            "query": f"query-{i}",
+            "language": "en",
+            "domain": "government",
+            "response_summary": "ok",
+            "citations": [],
+            "created_at": f"2026-01-{10 - i:02d}T00:00:00+00:00",
+        }
+        for i in range(3)
+    ]
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=rows
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    body = res.json()
+    assert [e["query"] for e in body] == ["query-0", "query-1", "query-2"]
+
+    pipe = redis_client.pipeline.return_value
+    _, *warmed_items = pipe.rpush.call_args[0]
+    warmed_queries = [json.loads(item)["query"] for item in warmed_items]
+    assert warmed_queries == ["query-0", "query-1", "query-2"]
+
+
+def test_get_history_prefers_redis_when_present(client):
+    """Redis is checked first — Supabase is only consulted as a fallback."""
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(
+        return_value=[
+            json.dumps(
+                {
+                    "query": "Redis-sourced query",
+                    "language": "en",
+                    "domain": "tax",
+                    "response_summary": "From cache",
+                    "citations": [],
+                    "ts": 1700000000,
+                }
+            )
+        ]
+    )
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["query"] == "Redis-sourced query"
+    sb.table.return_value.select.return_value.eq.assert_not_called()
+
+
+def test_get_history_returns_empty_when_both_redis_and_supabase_empty(client):
+    c, redis_client, sb, _ = client
+    redis_client.lrange = AsyncMock(return_value=[])
+
+    res = c.get("/api/v1/history", headers=_auth_header())
+    assert res.status_code == 200
+    assert res.json() == []
 
 
 def test_history_authenticated_rate_limit_201st_returns_429(client):
@@ -145,3 +356,142 @@ def test_history_authenticated_rate_limit_201st_returns_429(client):
     assert blocked.status_code == 429
     lowered = {k.lower(): v for k, v in blocked.headers.items()}
     assert "retry-after" in lowered
+
+
+# ---------------------------------------------------------------------------
+# Stress / concurrency: cold-cache thundering herd on fetch_history_entries.
+# Calls the service function directly — HTTP-layer concurrency isn't
+# meaningfully exercised by TestClient's synchronous request cycle, but the
+# race this fix cares about (many concurrent readers all hitting Supabase
+# while Redis is cold, then all trying to warm the cache) lives entirely in
+# the service function.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_fetch_history_entries_concurrent_cold_cache_reads_stable():
+    """50 concurrent readers hitting a cold cache simultaneously must each
+    get the correct data, and the concurrent cache-warming writes must not
+    raise even though they race each other."""
+    redis_client = AsyncMock()
+    redis_client.lrange = AsyncMock(return_value=[])
+
+    pipe = MagicMock()
+    pipe.rpush.return_value = pipe
+    pipe.expire.return_value = pipe
+    pipe.execute = AsyncMock(return_value=[1, True])
+    redis_client.pipeline = MagicMock(return_value=pipe)
+
+    supabase_rows = [
+        {
+            "query": "Concurrent read query",
+            "language": "en",
+            "domain": "government",
+            "response_summary": "ok",
+            "citations": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+    ]
+    table_mock = MagicMock()
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=supabase_rows
+    )
+    sb = MagicMock()
+    sb.table.return_value = table_mock
+
+    results = await asyncio.gather(
+        *[fetch_history_entries(redis_client, sb, "stress-user") for _ in range(50)]
+    )
+
+    assert len(results) == 50
+    for r in results:
+        assert len(r) == 1
+        assert r[0]["query"] == "Concurrent read query"
+    # Every concurrent caller independently warmed the cache — wasteful but
+    # harmless (idempotent overwrite), and critically: none of them raised.
+    assert pipe.rpush.call_count == 50
+
+
+@pytest.mark.asyncio
+async def test_fetch_history_entries_concurrent_reads_survive_flaky_redis():
+    """Under concurrent load, some readers hit a Redis that's mid-outage and
+    some don't (real-world restart/failover) — every caller must still get
+    correct data via the Supabase fallback, none may raise."""
+    redis_client = AsyncMock()
+    call_count = {"n": 0}
+
+    async def _flaky_lrange(*args, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] % 2 == 0:
+            raise ConnectionError("intermittent connection refused")
+        return []
+
+    redis_client.lrange = _flaky_lrange
+
+    pipe = MagicMock()
+    pipe.rpush.return_value = pipe
+    pipe.expire.return_value = pipe
+    pipe.execute = AsyncMock(return_value=[1, True])
+    redis_client.pipeline = MagicMock(return_value=pipe)
+
+    supabase_rows = [
+        {
+            "query": "Flaky redis query",
+            "language": "en",
+            "domain": "government",
+            "response_summary": "ok",
+            "citations": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+    ]
+    table_mock = MagicMock()
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=supabase_rows
+    )
+    sb = MagicMock()
+    sb.table.return_value = table_mock
+
+    results = await asyncio.gather(
+        *[fetch_history_entries(redis_client, sb, "flaky-user") for _ in range(20)],
+        return_exceptions=True,
+    )
+
+    assert len(results) == 20
+    for r in results:
+        assert not isinstance(r, Exception), f"fetch_history_entries raised: {r}"
+        assert r[0]["query"] == "Flaky redis query"
+
+
+@pytest.mark.asyncio
+async def test_fetch_history_entries_large_supabase_result_is_capped():
+    """Even if Supabase somehow returns more than MAX_HISTORY rows (e.g. a
+    future query change), the caller must not choke on an oversized list —
+    the limit is enforced at the query level, but defend the shape here too."""
+    redis_client = AsyncMock()
+    redis_client.lrange = AsyncMock(return_value=[])
+    redis_client.pipeline = MagicMock(return_value=MagicMock(
+        rpush=MagicMock(return_value=MagicMock(
+            expire=MagicMock(return_value=MagicMock(execute=AsyncMock(return_value=[])))
+        )),
+    ))
+
+    rows = [
+        {
+            "query": f"query-{i}",
+            "language": "en",
+            "domain": "government",
+            "response_summary": "ok",
+            "citations": [],
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+        for i in range(100)
+    ]
+    table_mock = MagicMock()
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=rows
+    )
+    sb = MagicMock()
+    sb.table.return_value = table_mock
+
+    result = await fetch_history_entries(redis_client, sb, "large-user")
+    assert len(result) == 100  # documents current behaviour: no client-side cap
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.assert_called_with(20)

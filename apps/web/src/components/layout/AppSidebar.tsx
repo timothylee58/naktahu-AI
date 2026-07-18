@@ -193,6 +193,10 @@ function SidebarPanel({
           variant={variant}
           layout="vertical"
           onNavigate={onClose}
+          // SidebarAgentsNav below renders its own "All agents" link to the
+          // same route whenever it's visible (showHistory && user) — omit
+          // the duplicate here rather than showing "Agents" twice.
+          excludeHrefs={showHistory && user ? ['/agents'] : []}
         />
       </div>
 

@@ -88,7 +88,7 @@ registration, EPF/KWSP, income tax, MyKad renewal, PTPTN, SOCSO, healthcare,
 JPJ licensing, immigration, land title transfer, etc.):
 
 ```json
-{"query": "...", "expected_topic": "government", "min_confidence": 0.4}
+{"query": "...", "expected_topic": "government", "min_confidence": 0.6}
 ```
 
 No expected answer text is included by design — per `CLAUDE.md`, this eval

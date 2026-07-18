@@ -16,6 +16,8 @@ from middleware.user_context import UserContextMiddleware
 from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
 from routers import billing, feedback, history, query, share
 from routers.observability import router as observability_router
+from routers.orchestrate import router as orchestrate_router
+from routers.orchestration import router as orchestration_router
 
 structlog.configure(
     processors=[
@@ -82,6 +84,8 @@ app.include_router(feedback.router)
 app.include_router(billing.router)
 app.include_router(share.router)
 app.include_router(observability_router)
+app.include_router(orchestration_router)
+app.include_router(orchestrate_router)
 app.include_router(rag_query.router, prefix="/rag")
 
 
