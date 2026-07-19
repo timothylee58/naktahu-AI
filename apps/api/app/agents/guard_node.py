@@ -114,7 +114,7 @@ async def _is_harmful_by_llm(query: str) -> bool:
         parsed = json.loads(m.group(0)) if m else {}
         return bool(parsed.get("harmful", False))
     except Exception as exc:
-        log.warning("guard_llm_check_failed_open", error=str(exc), query=query[:80])
+        log.warning("guard_llm_check_failed_open", error=str(exc), query_len=len(query))
         return False
 
 

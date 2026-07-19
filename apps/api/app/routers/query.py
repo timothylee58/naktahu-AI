@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
+from routers._request_fields import Language
 from services.auth import UserContext, _decode_supabase_jwt
 from services.agent_registry import plan_satisfies
 from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota
@@ -31,7 +32,7 @@ _AUTH_RATE = os.environ.get("AUTH_RATE_LIMIT", "200/hour")
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=1000)
     session_id: Optional[str] = Field(default=None, max_length=128)
-    language: Optional[str] = None
+    language: Optional[Language] = None
 
     @field_validator("session_id")
     @classmethod
@@ -177,7 +178,7 @@ async def _sse_generator(
                 log.warning("history_persist_failed", error=str(exc), user_id=user_ctx.user_id)
 
     except Exception as exc:
-        log.error("sse_pipeline_error", error=str(exc), query=query[:80])
+        log.error("sse_pipeline_error", error=str(exc), query_len=len(query))
         yield _sse("error", {"message": "An error occurred. Please try again."})
 
 

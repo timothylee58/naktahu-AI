@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from middleware.rate_limit import apply_query_rate_limit
+from routers._request_fields import Domain, Language
 from services.auth import UserContext, get_optional_user
 from services.feedback import submit_feedback
 
@@ -14,9 +15,9 @@ class FeedbackPayload(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=128)
     query: str = Field(..., min_length=1, max_length=2000)
     response_summary: str = Field(..., min_length=1, max_length=2000)
-    citations: list[Any] = Field(default_factory=list)
-    domain: str = "general"
-    language: str = "en"
+    citations: list[Any] = Field(default_factory=list, max_length=100)
+    domain: Domain = "general"
+    language: Language = "en"
     rating: Literal[-1, 1]
 
 

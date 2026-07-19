@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from middleware.rate_limit import apply_query_rate_limit
+from routers._request_fields import Domain, Language
 from services.auth import UserContext, get_optional_user
 from services.history import persist_session_entry
 
@@ -30,10 +31,10 @@ class AgentState:
 
 
 class QueryBody(BaseModel):
-    query: str = Field(..., min_length=1)
-    language: str = "en"
-    domain: str = "general"
-    session_id: Optional[str] = None
+    query: str = Field(..., min_length=1, max_length=1000)
+    language: Language = "en"
+    domain: Domain = "general"
+    session_id: Optional[str] = Field(default=None, max_length=128, pattern=r"^[\w\-]+$")
 
 
 @router.post("/query")

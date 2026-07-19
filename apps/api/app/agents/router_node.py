@@ -61,7 +61,7 @@ async def router_node(state: AgentState) -> dict:
         m = _JSON_RE.search(raw)
         parsed = json.loads(m.group(0)) if m else {}
     except Exception as exc:
-        log.warning("router_node_error", error=str(exc), query=query[:80])
+        log.warning("router_node_error", error=str(exc), query_len=len(query))
         parsed = {}
 
     language = parsed.get("language", "en")

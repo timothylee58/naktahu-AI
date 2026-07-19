@@ -1,12 +1,26 @@
+import secrets
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Used only when JWT_SECRET isn't set in the environment. A previous fixed
+# string default here ("dev-jwt-secret-change-me-min-32-chars!!") was a
+# critical vulnerability: if a deployment ever forgot to set JWT_SECRET, that
+# exact string — public in this repo's history — could forge a JWT with
+# app_metadata.role=primary_admin (services/auth.py effective_plan() promotes
+# that straight to the business tier) and get free unlimited access. A
+# per-process random secret instead fails closed: tokens signed before a
+# restart become invalid, but no fixed secret is ever guessable. Tests and
+# local dev still work with zero config since encode/decode both read the
+# same settings singleton within a process.
+_INSECURE_DEFAULT_JWT_SECRET = secrets.token_urlsafe(32)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     jwt_secret: str = Field(
-        default="dev-jwt-secret-change-me-min-32-chars!!",
+        default_factory=lambda: _INSECURE_DEFAULT_JWT_SECRET,
         validation_alias=AliasChoices("JWT_SECRET", "jwt_secret"),
     )
     supabase_jwt_aud: str = "authenticated"

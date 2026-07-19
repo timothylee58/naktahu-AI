@@ -113,3 +113,21 @@ def test_post_feedback_returns_503_when_supabase_unavailable(client, monkeypatch
     monkeypatch.setattr(api_main.app.state, "supabase", None)
     res = c.post("/api/v1/feedback", json=_body())
     assert res.status_code == 503
+
+
+def test_post_feedback_rejects_unknown_domain(client):
+    c, *_ = client
+    res = c.post("/api/v1/feedback", json=_body(domain="not-a-real-domain"))
+    assert res.status_code == 422
+
+
+def test_post_feedback_rejects_unknown_language(client):
+    c, *_ = client
+    res = c.post("/api/v1/feedback", json=_body(language="klingon"))
+    assert res.status_code == 422
+
+
+def test_post_feedback_rejects_oversized_citations_list(client):
+    c, *_ = client
+    res = c.post("/api/v1/feedback", json=_body(citations=[{"url": "https://x.com"}] * 101))
+    assert res.status_code == 422

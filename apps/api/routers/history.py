@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from middleware.plan_gate import require_plan
 from middleware.rate_limit import apply_query_rate_limit
+from routers._request_fields import Domain, Language
 from services.auth import UserContext
 from services.history import fetch_history_entries, persist_session_entry
 
@@ -12,11 +13,11 @@ router = APIRouter(prefix="/api/v1", tags=["history"])
 
 
 class HistoryEntryPayload(BaseModel):
-    query: str
-    language: str = "en"
-    domain: str = "general"
+    query: str = Field(..., min_length=1, max_length=2000)
+    language: Language = "en"
+    domain: Domain = "general"
     response_summary: str = Field(..., max_length=150)
-    citations: list[Any] = Field(default_factory=list)
+    citations: list[Any] = Field(default_factory=list, max_length=100)
 
 
 @router.get("/history")

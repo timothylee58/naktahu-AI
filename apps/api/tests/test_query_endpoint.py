@@ -86,6 +86,16 @@ async def test_query_endpoint_returns_sse_events() -> None:
 
 
 @pytest.mark.asyncio
+async def test_query_endpoint_rejects_unknown_language() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post(
+            "/api/v1/query",
+            json={"query": "Berapa kadar cukai?", "language": "klingon"},
+        )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_query_endpoint_token_text_present() -> None:
     """Token events must carry a non-empty 'text' field."""
     with patch("app.routers.query.pipeline") as mock_pipeline:

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from middleware.rate_limit import anonymous_limiter, apply_query_rate_limit
+from routers._request_fields import Domain, Language
 from services.auth import UserContext, get_optional_user
 from services.share import create_shared_answer, get_shared_answer
 
@@ -19,8 +20,8 @@ class ShareRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     response_text: str = Field(..., min_length=1, max_length=20000)
     citations: list[Any] = Field(default_factory=list, max_length=100)
-    domain: str = "general"
-    language: str = "en"
+    domain: Domain = "general"
+    language: Language = "en"
     confidence: Optional[float] = None
 
 
