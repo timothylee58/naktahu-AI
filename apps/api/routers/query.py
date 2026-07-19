@@ -8,10 +8,10 @@ from typing import Annotated, Any, AsyncIterator, Optional
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from middleware.rate_limit import apply_query_rate_limit
-from routers._request_fields import Domain, Language
+from routers._request_fields import Domain, Language, normalise_language
 from services.auth import UserContext, get_optional_user
 from services.history import persist_session_entry
 
@@ -35,6 +35,11 @@ class QueryBody(BaseModel):
     language: Language = "en"
     domain: Domain = "general"
     session_id: Optional[str] = Field(default=None, max_length=128, pattern=r"^[\w\-]+$")
+
+    @field_validator("language")
+    @classmethod
+    def _normalise_language(cls, v: Language) -> Language:
+        return normalise_language(v)
 
 
 @router.post("/query")

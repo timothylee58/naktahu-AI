@@ -1,11 +1,11 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from middleware.plan_gate import require_plan
 from middleware.rate_limit import apply_query_rate_limit
-from routers._request_fields import Domain, Language
+from routers._request_fields import Domain, Language, normalise_language
 from services.auth import UserContext
 from services.history import fetch_history_entries, persist_session_entry
 
@@ -18,6 +18,11 @@ class HistoryEntryPayload(BaseModel):
     domain: Domain = "general"
     response_summary: str = Field(..., max_length=150)
     citations: list[Any] = Field(default_factory=list, max_length=100)
+
+    @field_validator("language")
+    @classmethod
+    def _normalise_language(cls, v: Language) -> Language:
+        return normalise_language(v)
 
 
 @router.get("/history")

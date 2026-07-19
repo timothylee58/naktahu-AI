@@ -12,8 +12,23 @@ from __future__ import annotations
 
 from typing import Literal
 
+# "ms" is accepted as an input alias (some existing callers/tests send it),
+# but router_node.py's classification check and guard_node.py's refusal
+# message only special-case "bm" — an unnormalised "ms" would silently take
+# the "en" fallback path in router_node and the wrong-language refusal copy
+# in guard_node. Callers should run normalise_language() as a field
+# validator so "bm" is the only value that ever reaches the pipeline.
 Language = Literal["bm", "en", "ms", "zh"]
 Domain = Literal[
     "government", "education", "legal", "finance", "healthcare",
     "epf", "tax", "business", "immigration", "culture", "general",
 ]
+
+
+def normalise_language(v: str) -> str:
+    """Fold the "ms" input alias to "bm" after Literal validation.
+
+    Use as `@field_validator("language") @classmethod def _normalise(cls,
+    v): return normalise_language(v)` in any model with a `Language` field.
+    """
+    return "bm" if v == "ms" else v

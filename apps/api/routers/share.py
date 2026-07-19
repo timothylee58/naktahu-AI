@@ -2,10 +2,10 @@ import re
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from middleware.rate_limit import anonymous_limiter, apply_query_rate_limit
-from routers._request_fields import Domain, Language
+from routers._request_fields import Domain, Language, normalise_language
 from services.auth import UserContext, get_optional_user
 from services.share import create_shared_answer, get_shared_answer
 
@@ -23,6 +23,11 @@ class ShareRequest(BaseModel):
     domain: Domain = "general"
     language: Language = "en"
     confidence: Optional[float] = None
+
+    @field_validator("language")
+    @classmethod
+    def _normalise_language(cls, v: Language) -> Language:
+        return normalise_language(v)
 
 
 @router.post("", status_code=201)

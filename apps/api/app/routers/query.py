@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
-from routers._request_fields import Language
+from routers._request_fields import Language, normalise_language
 from services.auth import UserContext, _decode_supabase_jwt
 from services.agent_registry import plan_satisfies
 from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota
@@ -41,6 +41,11 @@ class QueryRequest(BaseModel):
         if v is not None and not re.match(r"^[\w\-]+$", v):
             raise ValueError("session_id must contain only alphanumeric, hyphens, or underscores")
         return v
+
+    @field_validator("language")
+    @classmethod
+    def _normalise_language(cls, v: Optional[Language]) -> Optional[Language]:
+        return normalise_language(v) if v is not None else v
 
 
 def _sse(event: str, data: dict | str) -> str:

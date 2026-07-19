@@ -1,10 +1,10 @@
 from typing import Annotated, Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from middleware.rate_limit import apply_query_rate_limit
-from routers._request_fields import Domain, Language
+from routers._request_fields import Domain, Language, normalise_language
 from services.auth import UserContext, get_optional_user
 from services.feedback import submit_feedback
 
@@ -19,6 +19,11 @@ class FeedbackPayload(BaseModel):
     domain: Domain = "general"
     language: Language = "en"
     rating: Literal[-1, 1]
+
+    @field_validator("language")
+    @classmethod
+    def _normalise_language(cls, v: Language) -> Language:
+        return normalise_language(v)
 
 
 @router.post("/feedback", status_code=201)

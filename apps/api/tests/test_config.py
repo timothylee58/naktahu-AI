@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib
 
+import pytest
+
 from core.config import Settings
 
 
@@ -36,3 +38,40 @@ def test_jwt_secret_stable_within_a_single_process(monkeypatch):
     a = config_module.Settings()
     b = config_module.Settings()
     assert a.jwt_secret == b.jwt_secret
+
+
+def test_jwt_secret_raises_in_production_when_unset(monkeypatch):
+    """A random per-process secret is fine for a single test/dev process,
+    but Railway runs multiple workers/containers in production — each
+    minting its own random secret would reject tokens signed by the
+    others (intermittent 401s). Production must fail loudly at startup
+    instead of failing open OR failing randomly-per-worker.
+
+    _IS_PRODUCTION is computed once at module import time, so the reload
+    itself — not a later Settings() call — is what re-evaluates ENV and
+    triggers the module-level `settings = Settings()` line; that's where
+    the RuntimeError actually raises.
+    """
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    import core.config as config_module
+    try:
+        with pytest.raises(RuntimeError, match="JWT_SECRET is not set"):
+            importlib.reload(config_module)
+    finally:
+        # Leave the module in a working state for every test that runs
+        # after this one in the same process.
+        monkeypatch.undo()
+        importlib.reload(config_module)
+
+
+def test_jwt_secret_production_with_explicit_secret_does_not_raise(monkeypatch):
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("JWT_SECRET", "a-real-production-secret-value")
+    import core.config as config_module
+    try:
+        importlib.reload(config_module)
+        assert config_module.settings.jwt_secret == "a-real-production-secret-value"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config_module)
