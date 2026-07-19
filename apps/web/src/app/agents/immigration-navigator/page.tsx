@@ -96,9 +96,9 @@ export default function ImmigrationNavigatorPage() {
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="max-w-2xl mx-auto p-4 flex flex-col gap-4"
       >
-        {output?.visa_type != null && (
+        {visaType != null && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
-            <h2 className="font-semibold text-teal-800 dark:text-teal-300">{String(output.visa_type)}</h2>
+            <h2 className="font-semibold text-teal-800 dark:text-teal-300">{visaType}</h2>
             <ul className="mt-2 text-sm list-disc pl-5 space-y-1 text-zinc-700 dark:text-zinc-300">{checklist.map((c) => <li key={c}>{c}</li>)}</ul>
             {warnings.length > 0 && (
               <div className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-100 p-2 rounded-lg space-y-1 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">

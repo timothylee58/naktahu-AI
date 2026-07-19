@@ -116,12 +116,13 @@ export default function GrantFinderPage() {
       >
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Match your profile to Malaysian government grants — MDEC, TEKUN, MARA, Cradle, and more.</p>
         <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-          <input className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Sector" />
-          <input className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10" value={stage} onChange={(e) => setStage(e.target.value)} placeholder="Stage (early/growth)" />
-          <input className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10" value={need} onChange={(e) => setNeed(e.target.value)} placeholder="Funding need" />
-          <button type="button" disabled={loading} onClick={() => void search()} className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50">
+          <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} />
+          <ChipSelector options={STAGE_OPTIONS} selected={stage} onToggle={(id) => setStage([id])} multiple={false} size="sm" />
+          <ChipSelector options={FUNDING_OPTIONS} selected={funding} onToggle={(id) => setFunding([id])} multiple={false} size="sm" />
+          <button type="button" disabled={loading || !canSearch} onClick={() => void search()} className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50">
             {loading ? 'Searching…' : 'Find grants'}
           </button>
+          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
         </section>
         {grants.length > 0 && (
           <ul className="flex flex-col gap-3">
@@ -150,7 +151,7 @@ export default function GrantFinderPage() {
                 )}
               </motion.li>
             ))}
-          </div>
+          </ul>
         )}
       </motion.div>
     </main>
