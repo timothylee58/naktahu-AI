@@ -111,6 +111,77 @@ def test_post_history_403_on_free_plan(client):
     assert res.status_code == 403
 
 
+def test_post_history_rejects_unknown_domain(client):
+    c, *_ = client
+    body = {
+        "query": "What is VAT?",
+        "language": "en",
+        "domain": "not-a-real-domain",
+        "response_summary": "VAT is a consumption tax.",
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_post_history_rejects_unknown_language(client):
+    c, *_ = client
+    body = {
+        "query": "What is VAT?",
+        "language": "klingon",
+        "domain": "tax",
+        "response_summary": "VAT is a consumption tax.",
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_post_history_normalises_ms_alias_to_bm(client):
+    """router_node/guard_node only special-case "bm", not "ms" — the "ms"
+    input alias must be normalised before it reaches persisted storage or
+    any downstream pipeline code that only checks for "bm"."""
+    c, redis_client, sb, _ = client
+    body = {
+        "query": "What is VAT?",
+        "language": "ms",
+        "domain": "tax",
+        "response_summary": "VAT is a consumption tax.",
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header())
+    assert res.status_code == 201
+    pipe = redis_client.pipeline.return_value
+    stored = json.loads(pipe.lpush.call_args[0][1])
+    assert stored["language"] == "bm"
+
+
+def test_post_history_rejects_empty_query(client):
+    c, *_ = client
+    body = {
+        "query": "",
+        "language": "en",
+        "domain": "tax",
+        "response_summary": "VAT is a consumption tax.",
+        "citations": [],
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_post_history_rejects_oversized_citations_list(client):
+    c, *_ = client
+    body = {
+        "query": "What is VAT?",
+        "language": "en",
+        "domain": "tax",
+        "response_summary": "VAT is a consumption tax.",
+        "citations": [{"url": "https://x.com"}] * 101,
+    }
+    res = c.post("/api/v1/history", json=body, headers=_auth_header())
+    assert res.status_code == 422
+
+
 def test_post_history_persists_redis_and_supabase(client):
     c, redis_client, sb, insert_mock = client
     stored = json.dumps(

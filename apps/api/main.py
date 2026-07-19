@@ -12,6 +12,7 @@ from supabase import create_client
 
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter
+from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
 from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
 from routers import billing, feedback, history, query, share
@@ -77,6 +78,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(UserContextMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(query.router)
 app.include_router(history.router)

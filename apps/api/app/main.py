@@ -24,6 +24,7 @@ from app.routers.session import router as session_router
 from app.routers.transcribe import router as transcribe_router
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter
+from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
 from routers import billing, feedback, history, share
 from routers.api_v1_public import router as public_api_router
@@ -118,6 +119,7 @@ app.state.limiter = anonymous_limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(UserContextMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(health_router)
 app.include_router(query_router)

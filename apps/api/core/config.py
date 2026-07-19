@@ -1,12 +1,46 @@
+import os
+import secrets
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Used only when JWT_SECRET isn't set in the environment. A previous fixed
+# string default here ("dev-jwt-secret-change-me-min-32-chars!!") was a
+# critical vulnerability: if a deployment ever forgot to set JWT_SECRET, that
+# exact string — public in this repo's history — could forge a JWT with
+# app_metadata.role=primary_admin (services/auth.py effective_plan() promotes
+# that straight to the business tier) and get free unlimited access.
+#
+# A per-process random secret closes that hole for a single-process run
+# (tests, local dev), but Railway's Dockerfile sets ENV=production and runs
+# multiple workers/containers — each would mint its own random secret and
+# reject tokens signed by the others, an intermittent-401 outage that's
+# worse than the vulnerability it replaces. So in production this fails
+# loudly at startup instead: an operator missing JWT_SECRET should see a
+# crash-on-boot, not silent multi-worker auth breakage or a forgeable token.
+def _fallback_jwt_secret() -> str:
+    """Computed once at import time (not per Settings() call) so multiple
+    instantiations within the same process — this module's own `settings`
+    singleton plus any test that constructs Settings() directly — agree on
+    the same fallback value instead of each minting a different one."""
+    is_production = os.environ.get("ENV", "development") == "production"
+    if is_production and not os.environ.get("JWT_SECRET"):
+        raise RuntimeError(
+            "JWT_SECRET is not set. Refusing to start in production (ENV=production) "
+            "with a random per-process secret, which would cause other workers/"
+            "containers to reject each other's tokens. Set JWT_SECRET explicitly."
+        )
+    return secrets.token_urlsafe(32)
+
+
+_FALLBACK_JWT_SECRET = _fallback_jwt_secret()
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     jwt_secret: str = Field(
-        default="dev-jwt-secret-change-me-min-32-chars!!",
+        default_factory=lambda: _FALLBACK_JWT_SECRET,
         validation_alias=AliasChoices("JWT_SECRET", "jwt_secret"),
     )
     supabase_jwt_aud: str = "authenticated"
