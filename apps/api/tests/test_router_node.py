@@ -86,6 +86,20 @@ async def test_router_node_invalid_domain_coerced() -> None:
 
 
 @pytest.mark.asyncio
+async def test_router_node_non_string_domain_does_not_crash() -> None:
+    """A malformed LLM response with a list/dict for "domain" must not
+    raise TypeError from _DOMAIN_ALIASES.get(domain, domain) — dicts
+    require hashable keys, and a list/dict domain value isn't one."""
+    completion = _mock_completion('{"language": "en", "domain": ["tax", "epf"], "intent": "x"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "Something"})
+
+    assert result["domain"] is None
+
+
+@pytest.mark.asyncio
 async def test_router_node_json_in_markdown_fence() -> None:
     """JSON wrapped in markdown fences is extracted correctly."""
     content = '```json\n{"language": "bm", "domain": "health", "intent": "hospital services"}\n```'

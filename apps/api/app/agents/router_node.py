@@ -85,7 +85,11 @@ async def router_node(state: AgentState) -> dict:
     domain = parsed.get("domain")
     if isinstance(domain, str):
         domain = domain.strip().lower()
-    domain = _DOMAIN_ALIASES.get(domain, domain)
+        domain = _DOMAIN_ALIASES.get(domain, domain)
+    else:
+        # A malformed LLM response could put a list/dict here — unhashable,
+        # so _DOMAIN_ALIASES.get(domain, domain) would raise TypeError.
+        domain = None
     if preset_domain in _VALID_DOMAINS:
         domain = preset_domain
     elif domain not in _VALID_DOMAINS:
