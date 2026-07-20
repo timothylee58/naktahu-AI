@@ -75,14 +75,21 @@ async def router_node(state: AgentState) -> dict:
     if script_lang:
         language = script_lang
 
-    domain = parsed.get("domain", "government")
+    # Unset (not "government") when the classifier didn't return a usable
+    # domain — "government" is a legitimate classification outcome for a
+    # query the LLM actually placed there, but it must never be a stand-in
+    # for "couldn't classify". hybrid_search treats domain=None as
+    # search-everything; defaulting to a specific domain here risks
+    # silently confining retrieval to whichever domain is currently
+    # emptiest (has happened — CLAUDE.md Trap #6).
+    domain = parsed.get("domain")
     if isinstance(domain, str):
         domain = domain.strip().lower()
     domain = _DOMAIN_ALIASES.get(domain, domain)
     if preset_domain in _VALID_DOMAINS:
         domain = preset_domain
     elif domain not in _VALID_DOMAINS:
-        domain = "government"
+        domain = None
 
     intent = parsed.get("intent", "")
     if not isinstance(intent, str):

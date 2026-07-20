@@ -153,7 +153,11 @@ async def _sse_generator(
 
         metadata: dict = {
             "confidence": final_state.get("confidence_score", 0.0),
-            "domain": final_state.get("domain", "government"),
+            # "general" (not "government") when unclassified — the query
+            # searched the whole corpus, not the government domain
+            # specifically, so labelling it "government" would misreport
+            # what actually happened. See app/models/state.py.
+            "domain": final_state.get("domain") or "general",
             "language": final_state.get("language", "en"),
         }
         agency_contact = final_state.get("agency_contact")
@@ -175,7 +179,7 @@ async def _sse_generator(
                     user_id=user_ctx.user_id,
                     query=query,
                     language=str(final_state.get("language") or language_hint or "en"),
-                    domain=str(final_state.get("domain") or "government"),
+                    domain=str(final_state.get("domain") or "general"),
                     response_text=full_text,
                     citations=list(final_state.get("citations") or []),
                 )

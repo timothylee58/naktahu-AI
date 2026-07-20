@@ -58,6 +58,49 @@ async def test_rag_node_cache_miss_calls_search() -> None:
 
 
 @pytest.mark.asyncio
+async def test_rag_node_unclassified_domain_searches_everything() -> None:
+    """A None domain (router couldn't classify — ILMU down, malformed
+    response, etc.) must be passed through to hybrid_search as None, not
+    coerced to a specific domain. hybrid_search treats domain=None as
+    search-everything; silently substituting a specific domain here has
+    caused every misclassified query to retrieve zero chunks whenever
+    that domain happened to be empty (this exact bug shipped to
+    production — see CLAUDE.md Trap #6)."""
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        result = await rag_node({"query": "Something unclassifiable", "language": "en", "domain": None})
+
+    assert mock_search.call_args.kwargs["domain"] is None
+    assert len(result["retrieved_chunks"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_rag_node_missing_domain_key_searches_everything() -> None:
+    """Same as above, but for state that never had a domain key set at
+    all (not just explicitly None) — must not default to a specific
+    domain."""
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        await rag_node({"query": "Something unclassifiable", "language": "en"})
+
+    assert mock_search.call_args.kwargs["domain"] is None
+
+
+@pytest.mark.asyncio
 async def test_rag_node_cache_hit_skips_search() -> None:
     """On cache hit: return cached chunks without calling embed or search."""
     cached_data = [

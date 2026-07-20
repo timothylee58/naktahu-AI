@@ -22,8 +22,8 @@ log = structlog.get_logger(__name__)
 _CACHE_TTL = 3600
 
 
-def _cache_key(query: str, language: str, domain: str) -> str:
-    raw = f"{query.lower().strip()}|{language}|{domain}"
+def _cache_key(query: str, language: str, domain: str | None) -> str:
+    raw = f"{query.lower().strip()}|{language}|{domain or '_any'}"
     return "cache:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -74,7 +74,9 @@ async def rag_node(state: AgentState) -> dict:
     """Check Redis cache, then fall through to hybrid search on miss."""
     query = state.get("query", "")
     language = state.get("language", "en")
-    domain = state.get("domain", "government")
+    # None (not "government") when unclassified — see app/models/state.py's
+    # domain field docstring for why a specific-domain default is a trap.
+    domain = state.get("domain")
 
     key = _cache_key(query, language, domain)
 
