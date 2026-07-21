@@ -88,6 +88,30 @@ async def test_guard_node_passes_both_checks_proceeds_normally() -> None:
 
 
 @pytest.mark.asyncio
+async def test_guard_node_general_domain_not_blocked() -> None:
+    """The app's default "general" domain sentinel is in-scope, not off-topic.
+
+    Regression: a legitimate query (even a suggested prompt like "Lost MyKad")
+    arriving with domain="general" was refused with the scope message before
+    retrieval ever ran, so no document chunks could be shown.
+    """
+    completion = _mock_completion('{"harmful": false, "reason": "benign query"}')
+
+    with patch("app.services.llm_client.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await guard_node(
+            {
+                "domain": "general",
+                "intent": "replace a lost national identity card",
+                "language": "en",
+                "query": "What should I do if I lose my MyKad?",
+            }
+        )
+
+    assert result == {}
+
+
+@pytest.mark.asyncio
 async def test_guard_node_llm_exception_fails_open() -> None:
     """If the LLM call itself raises, the guard fails open and the query
     proceeds rather than being blocked."""
