@@ -347,59 +347,59 @@ SOURCES: list[Source] = [
     ),
 
     # ─────────────────────────────────────────────────────────────────
-    # DOMAIN: health  (Kesihatan)
+    # DOMAIN: healthcare  (Kesihatan)
     # ─────────────────────────────────────────────────────────────────
     Source(
-        domain="health",
+        domain="healthcare",
         slug="moh_public_health",
         url="https://www.moh.gov.my/index.php/pages/view/43",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="moh_hospital_list",
         url="https://www.moh.gov.my/index.php/pages/view/2",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="moh_immunisation",
         url="https://www.moh.gov.my/index.php/pages/view/43",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="kkm_chronic_disease",
         url="https://www.moh.gov.my/index.php/pages/view/3629",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="mysejahtera",
         url="https://mysejahtera.malaysia.gov.my/",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", ".hero", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="moh_mental_health",
         url="https://www.moh.gov.my/index.php/pages/view/286",
         ministry="Kementerian Kesihatan Malaysia",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="oku_jkm",
         url="https://www.jkm.gov.my/jkm/index.php?r=portal/content&id=2&lang=en",
         ministry="Jabatan Kebajikan Masyarakat",
         selectors=["main", ".content", "article", "#main-content", "body"],
     ),
     Source(
-        domain="health",
+        domain="healthcare",
         slug="moh_maternal_health",
         url="https://www.moh.gov.my/index.php/pages/view/170",
         ministry="Kementerian Kesihatan Malaysia",

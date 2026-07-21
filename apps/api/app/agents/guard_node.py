@@ -5,13 +5,21 @@ before RAG retrieval is attempted. Returns a refusal message written via
 get_stream_writer() so the SSE endpoint receives it like any other token stream.
 
 Two layers of defense:
-1. A static domain whitelist + harmful-intent keyword list (hard, fast, free).
+1. A harmful-intent keyword list (hard, fast, free).
 2. A best-effort LLM intent classifier (ILMU chat model) for queries that pass
    the keyword check, to catch novel jailbreak/harmful-intent phrasings that
    don't contain any of the listed keywords. This second pass is soft: any
    failure (timeout, API error, malformed JSON) fails OPEN — the query
    proceeds to rag_node rather than being blocked, so an ILMU outage never
    becomes an availability incident or a source of false positives.
+
+The query's ``domain`` label is deliberately NOT used as a block reason. The
+router forces every real classification into a valid domain, so a
+domain-whitelist check could only ever fire on the app's ``"general"`` default
+sentinel (an unclassified — but perfectly in-scope — query), refusing legitimate
+questions like "What should I do if I lose my MyKad?". Off-topic queries instead
+fall through to rag_node and surface a low-confidence clarification, never a hard
+scope refusal.
 """
 from __future__ import annotations
 
@@ -26,11 +34,6 @@ from app.models.state import AgentState
 from core.config import settings
 
 log = structlog.get_logger(__name__)
-
-_VALID_DOMAINS = {
-    "government", "education", "legal", "finance",
-    "healthcare", "epf", "tax", "business", "immigration", "culture",
-}
 
 # Intents that signal out-of-scope requests regardless of domain label
 _BLOCKED_INTENT_KEYWORDS = [
@@ -140,10 +143,12 @@ async def guard_node(state: AgentState) -> dict:
     lang: str = state.get("language", "en")
     query: str = state.get("query", "")
 
-    blocked = domain not in _VALID_DOMAINS or _is_blocked_intent(intent, query)
+    # Only harmful intent blocks a query. The domain label is intentionally not
+    # a block reason — see module docstring (the "general" sentinel is in-scope).
+    blocked = _is_blocked_intent(intent, query)
 
-    # Second-pass LLM check only runs if the keyword/domain check didn't
-    # already block the query — the hard keyword pass always short-circuits.
+    # Second-pass LLM check only runs if the keyword check didn't already block
+    # the query — the hard keyword pass always short-circuits.
     if not blocked and query:
         blocked = await _is_harmful_by_llm(query)
 

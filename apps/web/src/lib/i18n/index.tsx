@@ -25,21 +25,9 @@ const MS: Translations = {
   'chat.empty':
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
   'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
-  'chat.suggestions_label': 'Anda mungkin ingin tanya',
-  'chat.context_window': 'Tetingkap konteks 200K',
-  'chat.context_usage': '{used} / 200K',
-  'chat.actions.copy': 'Salin',
-  'chat.actions.share': 'Salin pautan kongsi',
-  'chat.actions.share_copied': 'Pautan disalin',
-  'chat.actions.share_error': 'Gagal mencipta pautan',
-  'chat.actions.regenerate': 'Jana semula',
-  'chat.actions.helpful': 'Membantu',
-  'chat.actions.not_helpful': 'Tidak membantu',
-  'chat.actions.feedback_thanks': 'Terima kasih atas maklum balas',
-  'chat.agency_contact.title': 'Perlukan rekod peribadi anda?',
-  'chat.agency_contact.desc': 'NakTahu tidak dapat mengakses rekod peribadi anda. Hubungi {agency} terus.',
+  'chat.new_chat': 'Soalan baharu',
 
-  /* ── header & nav ── */
+  /* ── header ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Soal tentang kerajaan',
   'header.lang_toggle': 'EN',
@@ -130,6 +118,10 @@ const MS: Translations = {
   'developer.error.load': 'Gagal memuatkan data pembangun.',
   'developer.error.create': 'Gagal menjana kunci.',
   'developer.error.revoke': 'Gagal membatalkan kunci.',
+
+  /* ── sidebar ── */
+  'sidebar.collapse': 'Lipat panel',
+  'sidebar.expand': 'Buka panel',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -342,21 +334,9 @@ const EN: Translations = {
   'chat.language_indicator': 'EN',
   'chat.empty': 'Ask me anything about Malaysian government services.',
   'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
-  'chat.suggestions_label': 'You might also ask',
-  'chat.context_window': '200K context window',
-  'chat.context_usage': '{used} / 200K',
-  'chat.actions.copy': 'Copy',
-  'chat.actions.share': 'Copy shareable link',
-  'chat.actions.share_copied': 'Link copied',
-  'chat.actions.share_error': 'Failed to create link',
-  'chat.actions.regenerate': 'Regenerate',
-  'chat.actions.helpful': 'Helpful',
-  'chat.actions.not_helpful': 'Not helpful',
-  'chat.actions.feedback_thanks': 'Thanks for the feedback',
-  'chat.agency_contact.title': 'Need your personal record?',
-  'chat.agency_contact.desc': "NakTahu can't access your personal records. Contact {agency} directly.",
+  'chat.new_chat': 'New chat',
 
-  /* ── header & nav ── */
+  /* ── header ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Ask about government',
   'header.lang_toggle': 'BM',
@@ -447,6 +427,10 @@ const EN: Translations = {
   'developer.error.load': 'Failed to load developer data.',
   'developer.error.create': 'Failed to generate key.',
   'developer.error.revoke': 'Failed to revoke key.',
+
+  /* ── sidebar ── */
+  'sidebar.collapse': 'Collapse sidebar',
+  'sidebar.expand': 'Expand sidebar',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -658,21 +642,9 @@ const ZH: Translations = {
   'chat.language_indicator': '中文',
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
   'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
-  'chat.suggestions_label': '您可能还想问',
-  'chat.context_window': '200K 上下文窗口',
-  'chat.context_usage': '{used} / 200K',
-  'chat.actions.copy': '复制',
-  'chat.actions.share': '复制分享链接',
-  'chat.actions.share_copied': '链接已复制',
-  'chat.actions.share_error': '创建链接失败',
-  'chat.actions.regenerate': '重新生成',
-  'chat.actions.helpful': '有帮助',
-  'chat.actions.not_helpful': '没有帮助',
-  'chat.actions.feedback_thanks': '感谢您的反馈',
-  'chat.agency_contact.title': '需要您的个人记录?',
-  'chat.agency_contact.desc': 'NakTahu 无法访问您的个人记录。请直接联系 {agency}。',
+  'chat.new_chat': '新对话',
 
-  /* ── header & nav ── */
+  /* ── header ── */
   'header.title': 'NakTahu',
   'header.subtitle': '询问政府事务',
   'header.lang_toggle': 'BM',
@@ -764,6 +736,10 @@ const ZH: Translations = {
   'developer.error.create': '生成密钥失败。',
   'developer.error.revoke': '撤销密钥失败。',
 
+  /* ── sidebar ── */
+  'sidebar.collapse': '收起侧栏',
+  'sidebar.expand': '展开侧栏',
+
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -802,7 +778,7 @@ const ZH: Translations = {
 
   /* ── landing ── */
   'landing.badge': '专为马来西亚打造',
-  'landing.hero.headline': '关于马来西亚政策，尽管问',
+  'landing.hero.headline': '为您解答关于马来西亚政策问题',
   'landing.hero.headline.highlight': '马来西亚',
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.tagline.01': '问一次，马上知道。',
@@ -868,7 +844,7 @@ const ZH: Translations = {
 
   /* ── agents ── */
   'agents.hub.title': 'NakTahu 智能代理',
-  'agents.hub.subtitle': '基于 LangGraph 的代理，官方来源 RAG、套餐门控与点数计量。',
+  'agents.hub.subtitle': '基于 LangGraph 的智能代理agent，官方来源 RAG、套餐门控与点数计量。',
   'agents.hub.link': '全部代理',
   'agents.hub.open': '打开代理',
   'agents.hub.sign_in': '请登录以使用产品代理。',
