@@ -119,10 +119,6 @@ const MS: Translations = {
   'developer.error.create': 'Gagal menjana kunci.',
   'developer.error.revoke': 'Gagal membatalkan kunci.',
 
-  /* ── sidebar ── */
-  'sidebar.collapse': 'Lipat panel',
-  'sidebar.expand': 'Buka panel',
-
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -428,10 +424,6 @@ const EN: Translations = {
   'developer.error.create': 'Failed to generate key.',
   'developer.error.revoke': 'Failed to revoke key.',
 
-  /* ── sidebar ── */
-  'sidebar.collapse': 'Collapse sidebar',
-  'sidebar.expand': 'Expand sidebar',
-
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
   'lang.en': 'English',
@@ -735,10 +727,6 @@ const ZH: Translations = {
   'developer.error.load': '加载开发者数据失败。',
   'developer.error.create': '生成密钥失败。',
   'developer.error.revoke': '撤销密钥失败。',
-
-  /* ── sidebar ── */
-  'sidebar.collapse': '收起侧栏',
-  'sidebar.expand': '展开侧栏',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
