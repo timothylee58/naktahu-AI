@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
@@ -86,29 +86,96 @@ function HistoryRow({
   onClick: () => void;
   isDark: boolean;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [starred, setStarred] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const colors = isDark ? DOMAIN_COLORS_DARK : DOMAIN_COLORS_LIGHT;
   const domainClass = colors[entry.domain] ?? colors['general'];
   const hoverClass = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
   const textClass = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const mutedClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+  const menuBg = isDark ? 'bg-[#1a1f2e] border-white/15' : 'bg-white border-zinc-200';
+  const menuItemHover = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
+  const menuText = isDark ? 'text-zinc-200' : 'text-zinc-700';
+
   const summary = entry.response_summary?.trim();
   const headline = summary || entry.query;
 
+  // Close menu on click outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-1 ${hoverClass}`}
-    >
-      <span className={`text-sm leading-snug line-clamp-2 ${textClass}`}>{truncate(headline, 72)}</span>
-      {summary && (
-        <span className={`text-[11px] leading-snug line-clamp-1 ${mutedClass}`}>
-          {truncate(entry.query, 48)}
+    <div className="relative group">
+      <button
+        onClick={onClick}
+        className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 ${hoverClass}`}
+      >
+        <div className="flex items-start justify-between gap-1">
+          <span className={`text-sm leading-snug line-clamp-2 ${textClass}`}>
+            {starred && <span className="text-amber-400 mr-1">★</span>}
+            {truncate(headline, 68)}
+          </span>
+        </div>
+        {summary && (
+          <span className={`text-[11px] leading-snug line-clamp-1 ${mutedClass}`}>
+            {truncate(entry.query, 48)}
+          </span>
+        )}
+        <span className={`self-start text-[10px] font-semibold px-1.5 py-0.5 rounded locale-nowrap mt-0.5 ${domainClass}`}>
+          {entry.domain}
         </span>
+      </button>
+
+      {/* Context menu trigger */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+        className={`absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/15 text-zinc-400' : 'hover:bg-zinc-200 text-zinc-400'}`}
+        aria-label="Options"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+          <path d="M8 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 6.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM9.5 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+        </svg>
+      </button>
+
+      {/* Context menu dropdown */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className={`absolute top-8 right-2 z-50 w-40 rounded-lg border shadow-lg py-1 ${menuBg}`}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setStarred(!starred); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
+          >
+            <span>{starred ? '★' : '☆'}</span>
+            <span>{starred ? 'Unstar' : 'Star'}</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
+          >
+            <span>✏️</span>
+            <span>Rename</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 ${menuItemHover} transition-colors`}
+          >
+            <span>🗑</span>
+            <span>Delete</span>
+          </button>
+        </div>
       )}
-      <span className={`self-start text-[10px] font-semibold px-1.5 py-0.5 rounded locale-nowrap ${domainClass}`}>
-        {entry.domain}
-      </span>
-    </button>
+    </div>
   );
 }
 
