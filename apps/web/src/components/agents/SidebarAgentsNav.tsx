@@ -31,7 +31,6 @@ export function SidebarAgentsNav({
 
   return (
     <>
-      <div className={`my-2 border-t ${dividerClass}`} />
       <p className={sectionLabelClass}>{t('nav.agents')}</p>
       <Link
         href="/agents"
