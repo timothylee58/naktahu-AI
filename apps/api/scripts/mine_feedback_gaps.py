@@ -65,12 +65,20 @@ def _fetch_domain_chunks(supabase, domain: str) -> list[dict]:
 
 
 class _Chunk:
-    """Minimal stand-in with just the fields _score_chunk reads."""
+    """Minimal stand-in with just the fields _score_chunk reads.
+
+    similarity is fixed at 0.0 — this script re-scores chunks already
+    pulled from document_chunks directly, not via hybrid_search, so there
+    is no real cosine/BM25 similarity to report. _relevance_signal takes
+    max(overlap, similarity), so 0.0 just falls back to lexical overlap
+    alone rather than fabricating a semantic score.
+    """
 
     def __init__(self, source_url: str, source_title: str, content: str):
         self.source_url = source_url
         self.source_title = source_title
         self.content = content
+        self.similarity = 0.0
 
 
 def _best_score(query: str, chunks: list[dict]) -> tuple[float, str | None]:
