@@ -11,6 +11,7 @@ from app.orchestration.adapters.health_triage import HealthTriageAdapter
 from app.orchestration.adapters.immigration_navigator import ImmigrationNavigatorAdapter
 from app.orchestration.adapters.knowledge_qa import KnowledgeQAAdapter
 from app.orchestration.adapters.research_synthesiser import ResearchSynthesiserAdapter
+from app.orchestration.adapters.sme_compliance_navigator import SMEComplianceNavigatorAdapter
 from app.orchestration.adapters.study_agent import StudyAgentAdapter
 
 ALL_ADAPTERS = [
@@ -20,6 +21,7 @@ ALL_ADAPTERS = [
     ImmigrationNavigatorAdapter,
     KnowledgeQAAdapter,
     ResearchSynthesiserAdapter,
+    SMEComplianceNavigatorAdapter,
     StudyAgentAdapter,
 ]
 
@@ -30,6 +32,7 @@ __all__ = [
     "ImmigrationNavigatorAdapter",
     "KnowledgeQAAdapter",
     "ResearchSynthesiserAdapter",
+    "SMEComplianceNavigatorAdapter",
     "StudyAgentAdapter",
     "ALL_ADAPTERS",
 ]

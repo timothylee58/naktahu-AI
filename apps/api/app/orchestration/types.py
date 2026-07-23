@@ -35,6 +35,7 @@ class AgentCapability(str, Enum):
     # Domain knowledge
     tax_knowledge = "tax_knowledge"
     epf_knowledge = "epf_knowledge"
+    payroll_knowledge = "payroll_knowledge"
     business_knowledge = "business_knowledge"
     immigration_knowledge = "immigration_knowledge"
     education_knowledge = "education_knowledge"

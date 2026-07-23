@@ -77,6 +77,13 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=0,
         ),
+        "sme-compliance-navigator": AgentDefinition(
+            name="sme-compliance-navigator",
+            description="PatuhiKu — cross-references LHDN, EPF/SOCSO/EIS, and SSM compliance obligations for a specific SME.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=1,
+        ),
     }
 
 
