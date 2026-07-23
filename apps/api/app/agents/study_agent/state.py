@@ -1,7 +1,7 @@
 """Study Agent state."""
 from __future__ import annotations
 
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 
 class StudyAgentState(TypedDict, total=False):

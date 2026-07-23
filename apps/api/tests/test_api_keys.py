@@ -13,7 +13,6 @@ from app.main import app
 from core.config import settings
 from services.api_key_service import (
     API_KEY_RAW_PREFIX,
-    ApiKeyContext,
     generate_api_key,
     hash_api_key,
 )

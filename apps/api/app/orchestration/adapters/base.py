@@ -7,7 +7,6 @@ from typing import Any
 
 import structlog
 
-from app.orchestration.context import OrchestratorContext
 from app.orchestration.types import AgentResult, AgentStatusEnum
 
 log = structlog.get_logger(__name__)

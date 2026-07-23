@@ -4,11 +4,9 @@ from __future__ import annotations
 import base64
 import binascii
 import io
-import json
-import os
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import structlog

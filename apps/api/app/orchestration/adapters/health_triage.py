@@ -1,8 +1,6 @@
 """HealthTriageAdapter — BM symptom intake with KKM facility recommendations."""
 from __future__ import annotations
 
-from typing import Optional
-
 import structlog
 
 from app.orchestration.adapters.base import TimedExecution, generate_session_id, make_result

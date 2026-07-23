@@ -6,14 +6,14 @@ SSE contract.
 """
 from __future__ import annotations
 
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 import structlog
 
 from app.orchestration.adapters.base import TimedExecution, generate_session_id, make_result
 from app.orchestration.context import OrchestratorContext
 from app.orchestration.protocol import AgentProtocol
-from app.orchestration.types import AgentCapability, AgentResult, AgentStatus, AgentStatusEnum
+from app.orchestration.types import AgentCapability, AgentResult, AgentStatusEnum
 
 log = structlog.get_logger(__name__)
 
