@@ -72,7 +72,16 @@ jobs:
           cache-dependency-path: apps/api/pyproject.toml
 
       - name: Install dependencies
-        run: pip install --ignore-installed PyJWT -e ".[dev]"
+        run: pip install --ignore-installed PyJWT -e ".[dev]" pyflakes
+
+      - name: Lint Python (pyflakes — unused imports, undefined names, Trap #1)
+        run: |
+          pyflakes main.py app/main.py \
+                    routers app/routers \
+                    services app/services \
+                    middleware app/middleware \
+                    app/agents app/orchestration \
+                    tests
 
       - name: Run pytest
         run: pytest tests/ -q
