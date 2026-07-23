@@ -8,7 +8,7 @@ import uuid
 from typing import Annotated, Any, AsyncGenerator, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 

@@ -1,14 +1,12 @@
 """GrantFinderAdapter — government grant matching for SMEs and students."""
 from __future__ import annotations
 
-from typing import Optional
-
 import structlog
 
 from app.orchestration.adapters.base import TimedExecution, generate_session_id, make_result
 from app.orchestration.context import OrchestratorContext
 from app.orchestration.protocol import AgentProtocol
-from app.orchestration.types import AgentCapability, AgentResult, AgentStatus, AgentStatusEnum
+from app.orchestration.types import AgentCapability, AgentResult, AgentStatusEnum
 
 log = structlog.get_logger(__name__)
 
@@ -84,8 +82,6 @@ class GrantFinderAdapter(AgentProtocol):
                 )
 
         output = result.get("output", {})
-        # Extract grant recommendations from structured output
-        recommendations = output.get("recommendations", []) if isinstance(output, dict) else []
 
         return make_result(
             session_id=result.get("session_id", generate_session_id()),

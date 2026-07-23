@@ -76,7 +76,6 @@ def _build_parallel_groups(tasks: list[SubTaskState]) -> list[list[str]]:
     Returns a list of groups, each containing task_ids that can execute
     concurrently within the group.
     """
-    task_map = {t["task_id"]: t for t in tasks}
     assigned: dict[str, int] = {}  # task_id -> group index
     groups: list[list[str]] = []
 

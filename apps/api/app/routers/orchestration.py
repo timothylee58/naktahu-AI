@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Annotated, Any, Optional
 
 import structlog
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query
 
 from app.orchestration.circuit_breaker import get_all_breaker_metrics
 from app.orchestration.registry import (

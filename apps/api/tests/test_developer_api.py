@@ -12,7 +12,6 @@ Pattern notes (Merlion OS):
 4. Each test is independent (uses autouse reset_shared_state fixture)
 5. Status codes and error messages are explicit
 """
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -257,8 +256,6 @@ def test_public_api_openai_compatible_schema(client: TestClient, api_key_headers
     }
     """
     # Mock the LLM to avoid network call
-    from unittest.mock import AsyncMock, patch
-
     async def fake_query(*args, **kwargs):
         return "This is a test response."
 

@@ -32,9 +32,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.middleware.sanitise import sanitise_query
-from app.orchestration.context import OrchestratorContext
 from app.orchestration.context_bus import ContextBus
-from app.orchestration.orchestrator.executor_node import _build_agent_context, _execute_single_task
+from app.orchestration.orchestrator.executor_node import _execute_single_task
 from app.orchestration.orchestrator.merger_node import (
     _aggregate_suggestions,
     _compute_overall_confidence,
@@ -48,9 +47,7 @@ from app.orchestration.orchestrator.state import (
     OrchestratorState,
     SubTaskState,
 )
-from app.orchestration.registry import get_adapter, plan_satisfies
-from middleware.rate_limit import apply_query_rate_limit
-from services.auth import UserContext, get_current_user, get_optional_user
+from services.auth import UserContext, get_optional_user
 
 log = structlog.get_logger(__name__)
 

@@ -195,7 +195,7 @@ class CircuitBreaker:
         # Execute outside the lock so we don't block other callers
         try:
             result = await func(*args, **kwargs)
-        except Exception as exc:
+        except Exception:
             async with self._lock:
                 self._record_failure()
             raise

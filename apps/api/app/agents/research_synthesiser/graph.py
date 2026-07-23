@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import operator
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import structlog
 from langgraph.graph import END, START, StateGraph
