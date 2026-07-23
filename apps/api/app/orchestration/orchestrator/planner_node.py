@@ -39,6 +39,7 @@ AGENTS AVAILABLE:
 - immigration-navigator: Visa/immigration guidance with conversational intake
 - study-agent: SPM exam prep with education RAG
 - research-synthesiser: Parallel multi-domain research synthesis
+- sme-compliance-navigator: PatuhiKu — cross-references LHDN/EPF-SOCSO-EIS/SSM obligations for a specific SME
 
 COMPLEXITY RULES:
 - SIMPLE: Single factual question about one domain. Example: "What is EPF withdrawal age?"
@@ -91,6 +92,11 @@ _AGENT_KEYWORDS: dict[str, tuple[list[str], list[str]]] = {
     "research-synthesiser": (
         ["research", "compare", "banding", "comprehensive", "menyeluruh", "all aspects"],
         ["multi_domain_rag"],
+    ),
+    "sme-compliance-navigator": (
+        ["patuhiku", "sme compliance", "compliance checklist", "sdn bhd", "epf socso",
+         "e-invoice", "annual return", "senarai semak pematuhan"],
+        ["compliance_analysis", "tax_knowledge", "payroll_knowledge", "business_knowledge"],
     ),
 }
 

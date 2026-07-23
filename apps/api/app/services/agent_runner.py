@@ -15,6 +15,7 @@ from app.agents.grant_finder.graph import get_grant_finder_graph
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
+from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
 from app.agents.study_agent.graph import get_study_agent_graph
 
 log = structlog.get_logger(__name__)
@@ -365,10 +366,38 @@ async def start_research_synthesiser(*, user_id: str, payload: dict[str, Any], s
     }
 
 
+# ── SME Compliance Navigator (PatuhiKu) ─────────────────────────────────────
+
+
+async def start_sme_compliance_navigator(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_sme_compliance_navigator_graph()
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "business_profile": payload.get("business_profile", ""),
+        "language": payload.get("language", "bm"),
+        "domain_results": [],
+    }
+    t0 = time.monotonic()
+    values = await graph.ainvoke(inputs)
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    _log_run(supabase_client, user_id, "sme-compliance-navigator", session_id, payload, values, values.get("latency_ms", 0), "completed")
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "output": _public_output(values),
+        "checklist": values.get("checklist") or [],
+        "stale_warnings": values.get("stale_warnings") or [],
+        "triggered_domains": values.get("triggered_domains") or [],
+    }
+
+
 # ── Dispatch table ────────────────────────────────────────────────────────────
 
 AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "compliance-drafter": start_compliance_drafter,
+    "sme-compliance-navigator": start_sme_compliance_navigator,
     "study-agent": start_study_agent,
     "immigration-navigator": start_immigration_navigator,
     "health-triage": start_health_triage,
