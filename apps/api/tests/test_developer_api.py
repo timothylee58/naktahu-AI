@@ -1,385 +1,226 @@
-"""Tests for Developer API (API key management + public Knowledge API).
+"""Tests for Developer API key management (routers/developer.py).
 
-This file covers:
-- routers/developer.py (key creation, list, revoke)
-- routers/api_v1_public.py (public query endpoint)
-- middleware/api_key_auth.py (API key validation)
-
-Pattern notes (Merlion OS):
-1. Imports from conftest: auth_headers, api_key_headers (never create locally)
-2. Uses TestClient directly (no custom fixtures)
-3. Organized by feature/endpoint, not module
-4. Each test is independent (uses autouse reset_shared_state fixture)
-5. Status codes and error messages are explicit
-
-XFAIL: this file assumes an API contract that doesn't match the real,
-live routers/developer.py (route shapes, response field names, the
-X-API-Key vs X-NakTahu-Key header, /api/v1/query vs /api/v1/public/query,
-and a per-plan key quota that isn't implemented — MAX_KEYS_PER_USER is a
-flat 3 for every plan). It also hits a conftest.py bug where
-auth_headers_free/auth_headers_business call auth_headers(...) as a
-factory, but it's a plain dict fixture. Rather than guess at the intended
-contract or delete real test intent, every test here is xfailed until
-someone confirms the intended design and rewrites this file against it.
+Rewritten against the real, live, frontend-verified contract — see git
+history for the original version, which asserted an API shape that never
+existed (different route paths, response field names, auth header, and a
+per-plan quota that isn't implemented). This file complements
+tests/test_api_keys.py (public-query API-key auth boundary, key format,
+openapi/docs) rather than duplicating it — this file covers the
+authenticated developer-facing key CRUD flow: list, create, quota, revoke.
 """
+from __future__ import annotations
+
+import time
+from unittest.mock import AsyncMock, MagicMock
+
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-pytestmark = pytest.mark.xfail(
-    reason="assumes an API contract that doesn't match routers/developer.py — see module docstring",
-    strict=False,
-)
+from app.main import app
+from core.config import settings
+from services.api_key_service import API_KEY_RAW_PREFIX, MAX_KEYS_PER_USER
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Authentication Boundary Tests
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_api_keys_list_requires_authentication(client: TestClient, auth_headers_anonymous: dict):
-    """Unauthenticated users cannot list API keys.
-
-    Rule: Any endpoint touching user data needs authentication.
-    Expectation: 401 Unauthorized
-    """
-    resp = client.get("/api/v1/keys", headers=auth_headers_anonymous)
-    assert resp.status_code == 401
-    assert "Unauthorized" in resp.json()["detail"]
-
-
-def test_api_keys_list_authenticated(client: TestClient, auth_headers: dict):
-    """Authenticated users can list their API keys.
-
-    Happy path: Valid JWT, endpoint responds with user's keys.
-    Expectation: 200 OK with list of key metadata
-    """
-    resp = client.get("/api/v1/keys", headers=auth_headers)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert isinstance(data, list)
-    # Each key has metadata but NOT the raw key (never expose in GET)
-    for key_obj in data:
-        assert "key_id" in key_obj
-        assert "created_at" in key_obj
-        assert "name" in key_obj
-        assert "raw_key" not in key_obj, "Raw key should never be in response"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Key Creation Tests
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_api_key_create_returns_raw_key_once(client: TestClient, auth_headers: dict):
-    """Creating a key returns raw key ONCE; future calls mask it.
-
-    Reasoning: Raw key is secret, only shown at creation time.
-    User must save it immediately; future list operations don't show it.
-
-    Expectation:
-    - POST /keys/create returns raw_key in response
-    - GET /keys/{id} returns key without raw_key
-    """
-    # Create key
-    create_resp = client.post(
-        "/api/v1/keys/create",
-        json={"name": "Test Key for Creation"},
-        headers=auth_headers
+def _auth_header(sub: str = "dev-user-1") -> dict[str, str]:
+    token = jwt.encode(
+        {"sub": sub, "aud": settings.supabase_jwt_aud, "exp": int(time.time()) + 3600},
+        settings.jwt_secret,
+        algorithm="HS256",
     )
-    assert create_resp.status_code == 201
-    data = create_resp.json()
-
-    # Raw key is present at creation
-    assert "raw_key" in data
-    assert data["raw_key"].startswith("sk_")  # Correct prefix
-    assert "key_id" in data
-    key_id = data["key_id"]
-
-    # Fetch same key: raw_key should NOT be in response
-    fetch_resp = client.get(f"/api/v1/keys/{key_id}", headers=auth_headers)
-    assert fetch_resp.status_code == 200
-    assert "raw_key" not in fetch_resp.json()
-    assert fetch_resp.json()["key_id"] == key_id
+    return {"Authorization": f"Bearer {token}"}
 
 
-def test_api_key_create_requires_name(client: TestClient, auth_headers: dict):
-    """Creating a key without a name fails validation.
+@pytest.fixture
+def client(monkeypatch):
+    redis_client = AsyncMock()
+    redis_client.ping = AsyncMock(return_value=True)
+    redis_client.aclose = AsyncMock(return_value=None)
+    redis_client.incr = AsyncMock(return_value=1)
+    redis_client.expire = AsyncMock(return_value=True)
+    redis_client.get = AsyncMock(return_value=None)
 
-    Expectation: 422 Unprocessable Entity
-    """
-    resp = client.post(
-        "/api/v1/keys/create",
-        json={},  # Missing 'name'
-        headers=auth_headers
-    )
-    assert resp.status_code == 422
-    assert "name" in resp.json()["detail"][0]["loc"]
+    def fake_from_url(*args, **kwargs):
+        return redis_client
 
+    import app.main as api_main
 
-def test_api_key_create_name_bounds(client: TestClient, auth_headers: dict):
-    """API key name must be 1–100 characters (no empty, no excess).
+    monkeypatch.setattr(api_main.redis_ai, "from_url", fake_from_url)
 
-    Expectation: 422 on invalid length
-    """
-    # Empty name
-    resp = client.post(
-        "/api/v1/keys/create",
-        json={"name": ""},
-        headers=auth_headers
-    )
-    assert resp.status_code == 422
+    sb = MagicMock()
+    monkeypatch.setattr(api_main, "create_client", lambda url, key: sb)
 
-    # Oversized name (>100 chars)
-    resp = client.post(
-        "/api/v1/keys/create",
-        json={"name": "a" * 101},
-        headers=auth_headers
-    )
-    assert resp.status_code == 422
+    with TestClient(app) as c:
+        yield c, sb
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Key Validation Tests (Middleware)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_api_key_invalid_format_rejected(client: TestClient):
-    """Invalid API key format is rejected before DB lookup.
-
-    Reasoning: Don't waste DB query on malformed keys.
-    Format: sk_test_* or sk_live_*
-
-    Expectation: 401 with clear message
-    """
-    resp = client.post(
-        "/api/v1/query",
-        json={"query": "test query"},
-        headers={"X-API-Key": "not_a_valid_key_at_all"}
-    )
-    assert resp.status_code == 401
-    assert "invalid" in resp.json()["detail"].lower() or \
-           "format" in resp.json()["detail"].lower()
-
-
-def test_api_key_unknown_key_rejected(client: TestClient):
-    """Unknown API key (valid format, but not in DB) is rejected.
-
-    Expectation: 401
-    """
-    resp = client.post(
-        "/api/v1/query",
-        json={"query": "tax brackets"},
-        headers={"X-API-Key": "sk_test_this_key_does_not_exist_xyz"}
-    )
-    assert resp.status_code == 401
-
-
-def test_public_query_endpoint_requires_api_key(client: TestClient):
-    """Public query endpoint (/api/v1/query) requires API key.
-
-    Reasoning: Protects quota and billing.
-    Note: This is DIFFERENT from /api/v1/query over authenticated user (different endpoint).
-
-    Expectation: 401 without key
-    """
-    resp = client.post(
-        "/api/v1/query",
-        json={"query": "What is CPF?"}
-    )
-    assert resp.status_code == 401
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Key Revocation Tests
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_api_key_revocation_prevents_future_use(client: TestClient, auth_headers: dict):
-    """After revocation, the key is immediately unusable.
-
-    Flow:
-    1. Create key
-    2. Revoke it
-    3. Attempt to use it → 401
-
-    Expectation: Key shows revoked_at timestamp after revocation
-    """
-    # Create key
-    create_resp = client.post(
-        "/api/v1/keys/create",
-        json={"name": "Key to Revoke"},
-        headers=auth_headers
-    )
-    key_id = create_resp.json()["key_id"]
-
-    # Revoke it
-    revoke_resp = client.post(
-        f"/api/v1/keys/{key_id}/revoke",
-        headers=auth_headers
-    )
-    assert revoke_resp.status_code == 200
-
-    # Check key is marked revoked
-    get_resp = client.get(f"/api/v1/keys/{key_id}", headers=auth_headers)
-    assert get_resp.status_code == 200
-    assert "revoked_at" in get_resp.json()
-    assert get_resp.json()["revoked_at"] is not None
-
-
-def test_api_key_revocation_not_owned_by_user_fails(client: TestClient, auth_headers_free: dict, auth_headers_business: dict):
-    """Users cannot revoke keys they don't own.
-
-    Expectation: 403 Forbidden (or 404 if we hide the key's existence)
-    """
-    # Business user creates key
-    create_resp = client.post(
-        "/api/v1/keys/create",
-        json={"name": "Business Key"},
-        headers=auth_headers_business
-    )
-    key_id = create_resp.json()["key_id"]
-
-    # Free user tries to revoke it
-    revoke_resp = client.post(
-        f"/api/v1/keys/{key_id}/revoke",
-        headers=auth_headers_free
-    )
-    # Should be 404 (not found) or 403 (forbidden); not 200
-    assert revoke_resp.status_code in [403, 404]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Public API Schema Tests (OpenAI Compatible)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_public_api_openai_compatible_schema(client: TestClient, api_key_headers: dict, monkeypatch):
-    """Public API /api/v1/query response matches OpenAI chat completions schema.
-
-    OpenAI schema structure:
-    {
-      "id": "...",
-      "object": "text_completion",
-      "created": 1234567890,
-      "model": "...",
-      "choices": [
-        {
-          "index": 0,
-          "message": {"role": "assistant", "content": "..."},
-          "finish_reason": "stop"
-        }
-      ],
-      "usage": {
-        "prompt_tokens": 10,
-        "completion_tokens": 20,
-        "total_tokens": 30
-      }
+def _key_row(**overrides) -> dict:
+    row = {
+        "id": "key-uuid-1",
+        "key_hash": "hash-value",
+        "key_prefix": f"{API_KEY_RAW_PREFIX}abc12345",
+        "plan": "starter",
+        "calls_used": 0,
+        "calls_limit": 5500,
+        "rate_limit_per_min": 10,
+        "domain_whitelist": [],
+        "active": True,
+        "last_used_at": None,
+        "created_at": "2026-01-01T00:00:00Z",
     }
-    """
-    # Mock the LLM to avoid network call
-    async def fake_query(*args, **kwargs):
-        return "This is a test response."
+    row.update(overrides)
+    return row
 
-    monkeypatch.setattr("app.agents.rag_node.invoke", fake_query)
 
-    resp = client.post(
-        "/api/v1/query",
-        json={"query": "What is BTO?", "language": "en"},
-        headers=api_key_headers
+# ── Authentication boundary ─────────────────────────────────────────────────
+
+
+def test_list_keys_requires_authentication(client) -> None:
+    c, _ = client
+    res = c.get("/api/v1/developer/keys")
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Not authenticated"
+
+
+def test_create_key_requires_authentication(client) -> None:
+    c, _ = client
+    res = c.post("/api/v1/developer/keys", json={"plan": "starter"})
+    assert res.status_code == 401
+
+
+def test_revoke_key_requires_authentication(client) -> None:
+    c, _ = client
+    res = c.delete("/api/v1/developer/keys/key-uuid-1")
+    assert res.status_code == 401
+
+
+# ── List ─────────────────────────────────────────────────────────────────────
+
+
+def test_list_keys_authenticated_returns_rows_without_raw_key(client) -> None:
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(
+        data=[_key_row()]
     )
 
-    # Status should be 200 (or possibly 503 if Supabase is mocked as down)
-    if resp.status_code == 200:
-        data = resp.json()
+    res = c.get("/api/v1/developer/keys", headers=_auth_header())
 
-        # Validate OpenAI schema
-        assert "choices" in data
-        assert isinstance(data["choices"], list)
-        assert len(data["choices"]) > 0
-
-        choice = data["choices"][0]
-        assert "message" in choice
-        assert "content" in choice["message"]
-        assert "role" in choice["message"]
-        assert choice["role"] == "assistant"
-
-        # Usage stats
-        assert "usage" in data
-        assert "prompt_tokens" in data["usage"]
-        assert "completion_tokens" in data["usage"]
-        assert isinstance(data["usage"]["prompt_tokens"], int)
-        assert isinstance(data["usage"]["completion_tokens"], int)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["keys"][0]["id"] == "key-uuid-1"
+    assert data["keys"][0]["key_prefix"].startswith(API_KEY_RAW_PREFIX)
+    assert "raw_key" not in data["keys"][0]
+    assert "key_hash" not in data["keys"][0]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Rate Limiting Tests
-# ─────────────────────────────────────────────────────────────────────────────
+def test_list_keys_empty(client) -> None:
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(data=[])
 
-def test_api_key_rate_limit_headers_present(client: TestClient, api_key_headers: dict):
-    """Responses include rate-limit headers (even on 401).
+    res = c.get("/api/v1/developer/keys", headers=_auth_header())
 
-    Headers:
-    - X-RateLimit-Limit: Total requests allowed
-    - X-RateLimit-Remaining: Requests left
-    - X-RateLimit-Reset: Unix timestamp when limit resets
+    assert res.status_code == 200
+    assert res.json()["keys"] == []
 
-    These headers inform clients about their quota.
-    """
-    resp = client.post(
-        "/api/v1/query",
-        json={"query": "test"},
-        headers=api_key_headers
+
+# ── Create ───────────────────────────────────────────────────────────────────
+
+
+def test_create_key_returns_raw_key_once(client) -> None:
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
+    sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(data=[_key_row()])
+
+    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header())
+
+    assert res.status_code == 201
+    data = res.json()
+    assert data["raw_key"].startswith(API_KEY_RAW_PREFIX)
+    assert "key_hash" not in data["key"]
+    assert data["key"]["id"] == "key-uuid-1"
+
+
+def test_create_key_invalid_plan_rejected(client) -> None:
+    c, _ = client
+    res = c.post("/api/v1/developer/keys", json={"plan": "not-a-real-plan"}, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_create_key_default_plan_is_starter(client) -> None:
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
+    sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(
+        data=[_key_row(plan="starter")]
     )
 
-    # Check headers are present (regardless of status code)
-    # Note: may not be present on 401 for unknown key; that's acceptable
-    if resp.status_code != 401:
-        assert "X-RateLimit-Limit" in resp.headers
-        assert "X-RateLimit-Remaining" in resp.headers
-        assert "X-RateLimit-Reset" in resp.headers
+    res = c.post("/api/v1/developer/keys", json={}, headers=_auth_header())
 
-        # Verify they're numeric
-        assert resp.headers["X-RateLimit-Limit"].isdigit()
-        assert resp.headers["X-RateLimit-Remaining"].isdigit()
-        assert resp.headers["X-RateLimit-Reset"].isdigit()
+    assert res.status_code == 201
+    assert res.json()["key"]["plan"] == "starter"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Plan-Gating Tests
-# ─────────────────────────────────────────────────────────────────────────────
-
-def test_free_tier_limited_api_key_quota(client: TestClient, auth_headers_free: dict):
-    """Free-tier users are limited in how many API keys they can create.
-
-    Rule: free tier ≤ 3 keys, student ≤ 10, pro/business unlimited
-
-    Expectation: After 3rd key, 4th create returns 403
-    """
-    # Free user creates keys
-    for i in range(3):
-        resp = client.post(
-            "/api/v1/keys/create",
-            json={"name": f"Free Key {i+1}"},
-            headers=auth_headers_free
-        )
-        assert resp.status_code == 201
-
-    # 4th key: should fail
-    resp = client.post(
-        "/api/v1/keys/create",
-        json={"name": "Free Key 4 (should fail)"},
-        headers=auth_headers_free
+def test_create_key_quota_enforced_flat_across_plans(client) -> None:
+    """MAX_KEYS_PER_USER is a flat cap for every plan today — no per-plan tiering."""
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        count=MAX_KEYS_PER_USER
     )
-    assert resp.status_code == 403
-    assert "quota" in resp.json()["detail"].lower() or \
-           "limit" in resp.json()["detail"].lower()
+
+    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header())
+
+    assert res.status_code == 400
+    assert "Maximum" in res.json()["detail"]
 
 
-def test_business_tier_unlimited_api_keys(client: TestClient, auth_headers_business: dict):
-    """Business users have unlimited API keys.
+def test_create_widget_key_accepts_domain_whitelist(client) -> None:
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
+    sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(
+        data=[_key_row(plan="widget", domain_whitelist=["example.com"])]
+    )
 
-    Expectation: 10 creates all succeed (no quota error)
-    """
-    for i in range(10):
-        resp = client.post(
-            "/api/v1/keys/create",
-            json={"name": f"Biz Key {i+1}"},
-            headers=auth_headers_business
-        )
-        assert resp.status_code == 201, \
-            f"Business user should not be quota-limited; failed at key {i+1}"
+    res = c.post(
+        "/api/v1/developer/keys",
+        json={"plan": "widget", "domain_whitelist": ["example.com"]},
+        headers=_auth_header(),
+    )
+
+    assert res.status_code == 201
+    assert res.json()["key"]["domain_whitelist"] == ["example.com"]
+
+
+# ── Revoke ───────────────────────────────────────────────────────────────────
+
+
+def test_revoke_key_succeeds(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=[{"id": "key-uuid-1"}]
+    )
+
+    res = c.delete("/api/v1/developer/keys/key-uuid-1", headers=_auth_header())
+
+    assert res.status_code == 204
+
+
+def test_revoke_key_not_owned_returns_404_not_403(client) -> None:
+    """Ownership is enforced by filtering the UPDATE on user_id — a key that
+    exists but belongs to someone else looks identical to a nonexistent key,
+    which is deliberate: don't reveal to a caller probing key IDs that a
+    given ID exists but isn't theirs."""
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+    res = c.delete("/api/v1/developer/keys/someone-elses-key", headers=_auth_header())
+
+    assert res.status_code == 404
+    assert res.json()["detail"] == "API key not found"
+
+
+def test_revoke_unknown_key_returns_404(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+    res = c.delete("/api/v1/developer/keys/does-not-exist", headers=_auth_header())
+
+    assert res.status_code == 404
