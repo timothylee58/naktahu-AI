@@ -15,8 +15,14 @@ from core.config import settings
 
 
 def test_metrics_route_mounted_in_both_mains() -> None:
-    assert "/metrics" in [r.path for r in api_main.app.routes]
-    assert "/metrics" in [r.path for r in deploy_app.routes]
+    # app.routes can contain route types without a .path attribute (e.g. a
+    # mounted sub-router wrapper), depending on the installed
+    # FastAPI/Starlette version — filter with getattr rather than assuming
+    # every entry is a plain APIRoute.
+    api_paths = [getattr(r, "path", None) for r in api_main.app.routes]
+    deploy_paths = [getattr(r, "path", None) for r in deploy_app.routes]
+    assert "/metrics" in api_paths
+    assert "/metrics" in deploy_paths
 
 
 # ── Auth boundary ────────────────────────────────────────────────────────────
