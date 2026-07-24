@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from fastapi.testclient import TestClient
+
 import main as api_main
 from app.main import app as deploy_app
 from app.orchestration.metrics import record_agent_call
@@ -15,14 +17,15 @@ from core.config import settings
 
 
 def test_metrics_route_mounted_in_both_mains() -> None:
-    # app.routes can contain route types without a .path attribute (e.g. a
-    # mounted sub-router wrapper), depending on the installed
-    # FastAPI/Starlette version — filter with getattr rather than assuming
-    # every entry is a plain APIRoute.
-    api_paths = [getattr(r, "path", None) for r in api_main.app.routes]
-    deploy_paths = [getattr(r, "path", None) for r in deploy_app.routes]
-    assert "/metrics" in api_paths
-    assert "/metrics" in deploy_paths
+    # A live request, not app.routes introspection: app.routes' internal
+    # shape (whether entries expose .path directly, are nested, etc.) is a
+    # FastAPI/Starlette-version implementation detail — this repo pins no
+    # exact version (pyproject.toml: "fastapi>=0.115.0,<1.0"), so CI can
+    # resolve a different one than a local sandbox. A 404 means the route
+    # isn't mounted; anything else (401 here, since no token is sent) means
+    # it is — that's true regardless of internal representation.
+    assert TestClient(api_main.app).get("/metrics").status_code != 404
+    assert TestClient(deploy_app).get("/metrics").status_code != 404
 
 
 # ── Auth boundary ────────────────────────────────────────────────────────────
