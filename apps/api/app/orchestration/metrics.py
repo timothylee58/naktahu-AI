@@ -25,6 +25,15 @@ from typing import Any
 
 import structlog
 
+from app.core.prometheus_metrics import (
+    agent_cache_hits_total,
+    agent_call_duration_seconds,
+    agent_calls_total,
+    agent_confidence,
+    agent_safety_flags_total,
+    agent_tokens_total,
+)
+
 log = structlog.get_logger(__name__)
 
 
@@ -153,6 +162,21 @@ def record_agent_call(
         cache_hit=cache_hit,
         tokens_used=tokens_used,
     )
+
+    # Dual-write into the Prometheus registry (app/core/prometheus_metrics.py)
+    # so the same call site feeds both the in-memory JSON metrics endpoint
+    # and the Prometheus /metrics endpoint — no other caller needs to change.
+    result_label = "timeout" if timeout else ("success" if success else "failure")
+    agent_calls_total.labels(agent_name=agent_name, result=result_label).inc()
+    agent_call_duration_seconds.labels(agent_name=agent_name).observe(latency_ms / 1000.0)
+    if confidence > 0:
+        agent_confidence.labels(agent_name=agent_name).observe(confidence)
+    if tokens_used:
+        agent_tokens_total.labels(agent_name=agent_name).inc(tokens_used)
+    if cache_hit:
+        agent_cache_hits_total.labels(agent_name=agent_name).inc()
+    if flagged:
+        agent_safety_flags_total.labels(agent_name=agent_name).inc()
 
 
 def get_all_metrics() -> list[dict[str, Any]]:

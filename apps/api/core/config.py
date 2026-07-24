@@ -66,6 +66,13 @@ class Settings(BaseSettings):
         default="generated-documents",
         validation_alias=AliasChoices("SUPABASE_STORAGE_BUCKET", "supabase_storage_bucket"),
     )
+    # Static bearer token required to scrape GET /metrics (Prometheus can't do
+    # the JWT login flow get_current_user uses). Empty = endpoint always 401s
+    # — fail closed on an unconfigured environment, never fail open.
+    metrics_auth_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("METRICS_AUTH_TOKEN", "metrics_auth_token"),
+    )
     resend_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("RESEND_API_KEY", "resend_api_key"),
