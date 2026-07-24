@@ -1,10 +1,10 @@
 """Tests for the Prometheus /metrics endpoint and its dual-write wiring."""
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from fastapi.testclient import TestClient
 
 import main as api_main
@@ -28,29 +28,36 @@ def test_metrics_route_mounted_in_both_mains() -> None:
     assert TestClient(deploy_app).get("/metrics").status_code != 404
 
 
+def test_metrics_also_mounted_under_api_v1(client: TestClient) -> None:
+    """Dual-mounted like app/routers/health.py: bare /metrics for the default
+    Prometheus scrape convention, /api/v1/metrics for this repo's "every
+    route under /api/v1" convention."""
+    assert client.get("/api/v1/metrics").status_code != 404
+
+
 # ── Auth boundary ────────────────────────────────────────────────────────────
 
 
-def test_metrics_requires_token(client, monkeypatch) -> None:
+def test_metrics_requires_token(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "metrics_auth_token", "sekret-token")
     resp = client.get("/metrics")
     assert resp.status_code == 401
 
 
-def test_metrics_rejects_wrong_token(client, monkeypatch) -> None:
+def test_metrics_rejects_wrong_token(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "metrics_auth_token", "sekret-token")
     resp = client.get("/metrics", headers={"Authorization": "Bearer wrong-token"})
     assert resp.status_code == 401
 
 
-def test_metrics_fails_closed_when_unconfigured(client, monkeypatch) -> None:
+def test_metrics_fails_closed_when_unconfigured(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """An empty/unset token means the endpoint always 401s — never fail open."""
     monkeypatch.setattr(settings, "metrics_auth_token", "")
     resp = client.get("/metrics", headers={"Authorization": "Bearer anything"})
     assert resp.status_code == 401
 
 
-def test_metrics_accepts_correct_token(client, monkeypatch) -> None:
+def test_metrics_accepts_correct_token(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "metrics_auth_token", "sekret-token")
     resp = client.get("/metrics", headers={"Authorization": "Bearer sekret-token"})
     assert resp.status_code == 200
@@ -59,7 +66,7 @@ def test_metrics_accepts_correct_token(client, monkeypatch) -> None:
 # ── Content ──────────────────────────────────────────────────────────────────
 
 
-def test_metrics_response_shape(client, monkeypatch) -> None:
+def test_metrics_response_shape(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "metrics_auth_token", "sekret-token")
     resp = client.get("/metrics", headers={"Authorization": "Bearer sekret-token"})
 
@@ -70,7 +77,7 @@ def test_metrics_response_shape(client, monkeypatch) -> None:
     assert "naktahu_circuit_breaker_state" in body
 
 
-def test_metrics_reflects_recorded_agent_call(client, monkeypatch) -> None:
+def test_metrics_reflects_recorded_agent_call(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Confirms the dual-write wiring, not just that the module imports cleanly."""
     monkeypatch.setattr(settings, "metrics_auth_token", "sekret-token")
     record_agent_call("probe-agent-xyz", success=True, latency_ms=42.0, confidence=0.9)
@@ -81,7 +88,9 @@ def test_metrics_reflects_recorded_agent_call(client, monkeypatch) -> None:
     assert 'naktahu_agent_calls_total{agent_name="probe-agent-xyz",result="success"}' in body
 
 
-def test_metrics_circuit_breaker_collector_fires_without_activity(client, monkeypatch) -> None:
+def test_metrics_circuit_breaker_collector_fires_without_activity(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The lazy Collector must yield a value even for a breaker that's never tripped."""
     monkeypatch.setattr(settings, "metrics_auth_token", "sekret-token")
     resp = client.get("/metrics", headers={"Authorization": "Bearer sekret-token"})
@@ -90,11 +99,41 @@ def test_metrics_circuit_breaker_collector_fires_without_activity(client, monkey
     assert 'naktahu_circuit_breaker_state{provider="ilmu"}' in body
 
 
+# ── PrometheusMiddleware: records failed requests too ───────────────────────
+
+
+def test_middleware_records_5xx_on_unhandled_exception() -> None:
+    """An unhandled endpoint exception must still be counted — otherwise the
+    RED metrics silently miss every request that actually failed hardest."""
+    from fastapi import FastAPI
+
+    from app.core.prometheus_metrics import http_requests_total
+    from middleware.prometheus_middleware import PrometheusMiddleware
+
+    app = FastAPI()
+    app.add_middleware(PrometheusMiddleware)
+
+    @app.get("/boom")
+    def boom() -> None:
+        raise RuntimeError("deliberate failure")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.get("/boom")
+
+    assert resp.status_code == 500
+    body = http_requests_total.collect()[0]
+    matching = [
+        s for s in body.samples if s.name == "naktahu_http_requests_total" and s.labels.get("route") == "/boom"
+    ]
+    assert matching, "expected a naktahu_http_requests_total sample for the /boom route"
+    assert matching[0].labels["status_code"] == "500"
+
+
 # ── Executor wiring: record_agent_call actually gets invoked ────────────────
 
 
 @pytest.mark.asyncio
-async def test_executor_records_metric_on_no_adapter(monkeypatch) -> None:
+async def test_executor_records_metric_on_no_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.orchestration.orchestrator.executor_node import _execute_single_task
 
     recorded = MagicMock()
@@ -107,9 +146,7 @@ async def test_executor_records_metric_on_no_adapter(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_executor_records_metric_on_timeout(monkeypatch) -> None:
-    import asyncio
-
+async def test_executor_records_metric_on_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.orchestration.orchestrator.executor_node import _execute_single_task
 
     recorded = MagicMock()
@@ -117,7 +154,7 @@ async def test_executor_records_metric_on_timeout(monkeypatch) -> None:
 
     adapter = MagicMock()
 
-    async def _hang(context):
+    async def _hang(context: MagicMock) -> None:
         await asyncio.sleep(10)
 
     adapter.start = _hang
@@ -136,7 +173,7 @@ async def test_executor_records_metric_on_timeout(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_executor_records_metric_on_success(monkeypatch) -> None:
+async def test_executor_records_metric_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.orchestration.orchestrator.executor_node import _execute_single_task
     from app.orchestration.types import AgentResult, AgentStatusEnum
 
@@ -168,7 +205,41 @@ async def test_executor_records_metric_on_success(monkeypatch) -> None:
         success=True,
         latency_ms=15.0,
         confidence=0.8,
+        timeout=False,
         flagged=False,
         cache_hit=True,
         tokens_used=100,
     )
+
+
+@pytest.mark.asyncio
+async def test_executor_preserves_adapter_reported_timeout_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An adapter can report AgentStatusEnum.timed_out itself (distinct from
+    the executor's own asyncio.wait_for timeout) — that must still land in
+    the Prometheus "timeout" bucket, not get lumped into "failure"."""
+    from app.orchestration.orchestrator.executor_node import _execute_single_task
+    from app.orchestration.types import AgentResult, AgentStatusEnum
+
+    recorded = MagicMock()
+    monkeypatch.setattr("app.orchestration.orchestrator.executor_node.record_agent_call", recorded)
+
+    adapter = MagicMock()
+    adapter.start = AsyncMock(
+        return_value=AgentResult(
+            session_id="s1",
+            agent_name="flaky-agent",
+            status=AgentStatusEnum.timed_out,
+            latency_ms=9999.0,
+        )
+    )
+    monkeypatch.setattr("app.orchestration.orchestrator.executor_node.get_adapter", lambda name: adapter)
+    monkeypatch.setattr(
+        "app.orchestration.orchestrator.executor_node._build_agent_context",
+        lambda task, state, shared: MagicMock(timeout_seconds=30.0),
+    )
+
+    await _execute_single_task({"target_agent": "flaky-agent", "task_id": "t1"}, {})
+
+    args, kwargs = recorded.call_args
+    assert kwargs["success"] is False
+    assert kwargs["timeout"] is True

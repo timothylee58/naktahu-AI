@@ -184,6 +184,7 @@ async def _execute_single_task(
         success=(result.status == AgentStatusEnum.completed),
         latency_ms=result.latency_ms,
         confidence=result.confidence,
+        timeout=(result.status == AgentStatusEnum.timed_out),
         flagged=result.output_flagged,
         cache_hit=result.cache_hit,
         tokens_used=result.tokens_used,
