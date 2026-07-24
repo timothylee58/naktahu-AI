@@ -29,6 +29,7 @@ from typing import Any
 import structlog
 
 from app.orchestration.context import OrchestratorContext
+from app.orchestration.metrics import record_agent_call
 from app.orchestration.orchestrator.state import (
     AgentExecutionResult,
     OrchestratorState,
@@ -113,6 +114,7 @@ async def _execute_single_task(
     adapter = get_adapter(agent_name)
     if not adapter:
         log.warning("executor_no_adapter", agent=agent_name, task_id=task_id)
+        record_agent_call(agent_name, success=False, latency_ms=0.0)
         return AgentExecutionResult(
             task_id=task_id,
             agent_name=agent_name,
@@ -138,6 +140,7 @@ async def _execute_single_task(
     except asyncio.TimeoutError:
         elapsed = round((time.monotonic() - t0) * 1000, 1)
         log.warning("executor_task_timeout", agent=agent_name, task_id=task_id, ms=elapsed)
+        record_agent_call(agent_name, success=False, latency_ms=elapsed, timeout=True)
         return AgentExecutionResult(
             task_id=task_id,
             agent_name=agent_name,
@@ -154,6 +157,7 @@ async def _execute_single_task(
     except Exception as exc:
         elapsed = round((time.monotonic() - t0) * 1000, 1)
         log.error("executor_task_failed", agent=agent_name, task_id=task_id, error=str(exc))
+        record_agent_call(agent_name, success=False, latency_ms=elapsed)
         return AgentExecutionResult(
             task_id=task_id,
             agent_name=agent_name,
@@ -174,6 +178,15 @@ async def _execute_single_task(
         task_id=task_id,
         status=result.status.value,
         latency_ms=result.latency_ms,
+    )
+    record_agent_call(
+        agent_name,
+        success=(result.status == AgentStatusEnum.completed),
+        latency_ms=result.latency_ms,
+        confidence=result.confidence,
+        flagged=result.output_flagged,
+        cache_hit=result.cache_hit,
+        tokens_used=result.tokens_used,
     )
     return _result_to_execution_result(task, result)
 

@@ -23,12 +23,14 @@ from app.routers.query import router as query_router
 from app.routers.session import router as session_router
 from app.routers.transcribe import router as transcribe_router
 from core.config import settings
+from middleware.prometheus_middleware import PrometheusMiddleware
 from middleware.rate_limit import anonymous_limiter
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
 from routers import billing, feedback, history, share
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
+from app.routers.metrics import router as metrics_router
 from app.routers.observability import router as observability_router
 from app.orchestration.adapters import ALL_ADAPTERS
 from app.orchestration.context_bus import ContextBus
@@ -120,6 +122,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(UserContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(PrometheusMiddleware)
 
 app.include_router(health_router)
 app.include_router(query_router)
@@ -132,6 +135,7 @@ app.include_router(billing.router)
 app.include_router(share.router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
+app.include_router(metrics_router)
 app.include_router(observability_router)
 app.include_router(orchestration_router)
 app.include_router(orchestrate_router)
