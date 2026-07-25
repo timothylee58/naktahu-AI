@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -86,6 +85,16 @@ async def test_query_endpoint_returns_sse_events() -> None:
 
 
 @pytest.mark.asyncio
+async def test_query_endpoint_rejects_unknown_language() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.post(
+            "/api/v1/query",
+            json={"query": "Berapa kadar cukai?", "language": "klingon"},
+        )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_query_endpoint_token_text_present() -> None:
     """Token events must carry a non-empty 'text' field."""
     with patch("app.routers.query.pipeline") as mock_pipeline:
@@ -144,6 +153,47 @@ async def test_query_endpoint_metadata_emitted() -> None:
     assert "confidence" in meta
     assert "domain" in meta
     assert "language" in meta
+    assert "agency_contact" not in meta  # _fake_astream sets none
+
+
+async def _fake_astream_with_agency_contact(inputs, stream_mode):  # type: ignore[no-untyped-def]
+    yield ("custom", "Saya tidak boleh mengakses baki akaun peribadi anda.")
+    yield (
+        "updates",
+        {
+            "analyst": {
+                "citations": [],
+                "confidence_score": 0.5,
+                "domain": "epf",
+                "language": "en",
+                "needs_clarification": False,
+                "agency_contact": {
+                    "agency": "KWSP / EPF",
+                    "domain": "epf",
+                    "hotline": "03-8922 6000",
+                    "portal": "https://www.kwsp.gov.my",
+                },
+            }
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_query_endpoint_metadata_includes_agency_contact_when_present() -> None:
+    """A personal-data query's agency_contact must reach the client via metadata."""
+    with patch("app.routers.query.pipeline") as mock_pipeline:
+        mock_pipeline.astream = _fake_astream_with_agency_contact
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post(
+                "/api/v1/query",
+                json={"query": "What is my EPF balance?", "session_id": "sess-agency"},
+            )
+
+    events = _parse_sse(resp.text)
+    meta = [e for e in events if e.get("event") == "metadata"][0]["data"]
+    assert meta["agency_contact"]["agency"] == "KWSP / EPF"
+    assert meta["agency_contact"]["portal"] == "https://www.kwsp.gov.my"
 
 
 @pytest.mark.asyncio

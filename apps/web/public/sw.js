@@ -1,7 +1,10 @@
-const CACHE_NAME = 'naktahu-v1';
+// naktahu-v2: v1 pre-cached '/' and '/chat' HTML under a never-changing
+// cache name and served it cache-first, so after every deploy returning
+// visitors got stale HTML pointing at deleted _next chunks (ChunkLoadError,
+// text/plain MIME refusals). HTML must never be served cache-first; the
+// name bump makes existing clients drop the poisoned v1 cache.
+const CACHE_NAME = 'naktahu-v2';
 const STATIC_ASSETS = [
-  '/',
-  '/chat',
   '/manifest.json',
   '/icons/icon.svg',
 ];
@@ -29,12 +32,24 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests for same-origin or static assets
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  // Skip API routes — always network-first
+  // API routes and cross-origin requests: always straight to network.
+  if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
+  // Navigations (HTML): network-first so a new deploy is picked up
+  // immediately; fall back to cache only when offline.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        caches.match(event.request).then((cached) => cached ?? Response.error()),
+      ),
+    );
+    return;
+  }
+
+  // Immutable hashed build assets and pre-cached statics: cache-first.
   event.respondWith(
     caches.match(event.request).then(
       (cached) => cached ?? fetch(event.request),

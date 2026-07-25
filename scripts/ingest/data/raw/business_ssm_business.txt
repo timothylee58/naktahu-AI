@@ -4,6 +4,7 @@ MINISTRY: Suruhanjaya Syarikat Malaysia
 DOMAIN: business
 SOURCE_DATE: 
 EXPIRY_AWARE: false
+EFFECTIVE_DATE: 2024-01-01
 ---
 ## Business Registration (ROB)
 Pendaftaran perniagaan di Malaysia di bawah Akta Pendaftaran Perniagaan 1956 (ROB) untuk perniagaan milikan tunggal dan perkongsian. Yuran pendaftaran: nama perniagaan tunggal RM30 setahun (1 tahun) atau RM60 (5 tahun). Perniagaan boleh didaftarkan secara dalam talian melalui portal EzBiz SSM di ezbiz.ssm.com.my atau di kaunter SSM.

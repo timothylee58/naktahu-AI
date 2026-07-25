@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Make Tailwind's dark: variant follow the app's ThemeProvider
+   (data-theme on <html>) instead of prefers-color-scheme. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

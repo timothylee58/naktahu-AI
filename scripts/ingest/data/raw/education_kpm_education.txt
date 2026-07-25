@@ -4,6 +4,7 @@ MINISTRY: Kementerian Pendidikan Malaysia
 DOMAIN: education
 SOURCE_DATE: 
 EXPIRY_AWARE: false
+EFFECTIVE_DATE: 2024-01-01
 ---
 ## SPM Examination Guide
 Sijil Pelajaran Malaysia (SPM) ialah peperiksaan awam bagi pelajar Tingkatan 5. Mata pelajaran wajib SPM: Bahasa Malaysia (wajib lulus), Bahasa Inggeris, Sejarah (wajib lulus), Matematik, Pendidikan Islam/Pendidikan Moral. Pelajar perlu menduduki sekurang-kurangnya Bahasa Malaysia dan Sejarah. Peperiksaan SPM diadakan setiap November/Disember. Keputusan diumumkan Mac tahun berikutnya.

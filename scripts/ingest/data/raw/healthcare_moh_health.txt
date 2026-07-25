@@ -4,6 +4,7 @@ MINISTRY: Kementerian Kesihatan Malaysia
 DOMAIN: healthcare
 SOURCE_DATE: 
 EXPIRY_AWARE: true
+EFFECTIVE_DATE: 2024-01-01
 ---
 ## Klinik Kesihatan Services
 Klinik Kesihatan kerajaan menyediakan perkhidmatan penjagaan kesihatan primer percuma atau berharga rendah untuk rakyat Malaysia. Perkhidmatan yang ditawarkan: rawatan penyakit biasa, kawalan penyakit kronik (kencing manis, darah tinggi), imunisasi kanak-kanak, kesihatan ibu dan anak, antenatal, perancangan keluarga, kesihatan pergigian asas. Cari klinik terdekat di sini: klik.moh.gov.my

@@ -4,6 +4,7 @@ MINISTRY: Lembaga Hasil Dalam Negeri Malaysia
 DOMAIN: tax
 SOURCE_DATE: 
 EXPIRY_AWARE: false
+EFFECTIVE_DATE: 2024-01-01
 ---
 ## Income Tax Rate Schedule YA2023
 Cukai pendapatan individu di Malaysia dikenakan secara progresif. Bagi Tahun Taksiran 2023, kadar cukai adalah seperti berikut: Pendapatan bercukai RM0–RM5,000 dikenakan cukai 0%. RM5,001–RM20,000 dikenakan 1%. RM20,001–RM35,000 dikenakan 3%. RM35,001–RM50,000 dikenakan 6%. RM50,001–RM70,000 dikenakan 11%. RM70,001–RM100,000 dikenakan 19%. RM100,001–RM400,000 dikenakan 25%. RM400,001–RM600,000 dikenakan 26%. RM600,001–RM2,000,000 dikenakan 28%. Melebihi RM2,000,000 dikenakan 30%.

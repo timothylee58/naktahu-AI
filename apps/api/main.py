@@ -11,10 +11,17 @@ from slowapi.middleware import SlowAPIMiddleware
 from supabase import create_client
 
 from core.config import settings
+from middleware.prometheus_middleware import PrometheusMiddleware
 from middleware.rate_limit import anonymous_limiter
+from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
 from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
-from routers import history, query
+from routers import billing, feedback, history, query, share
+from routers.developer import router as developer_router
+from routers.metrics import router as metrics_router
+from routers.observability import router as observability_router
+from routers.orchestrate import router as orchestrate_router
+from routers.orchestration import router as orchestration_router
 
 structlog.configure(
     processors=[
@@ -74,9 +81,19 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(UserContextMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(PrometheusMiddleware)
 
 app.include_router(query.router)
 app.include_router(history.router)
+app.include_router(feedback.router)
+app.include_router(billing.router)
+app.include_router(share.router)
+app.include_router(developer_router)
+app.include_router(metrics_router)
+app.include_router(observability_router)
+app.include_router(orchestration_router)
+app.include_router(orchestrate_router)
 app.include_router(rag_query.router, prefix="/rag")
 
 

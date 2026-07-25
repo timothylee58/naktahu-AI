@@ -1,22 +1,26 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
+import { SidebarAgentsNav } from '@/components/agents/SidebarAgentsNav';
 import { LangToggle } from '@/components/LangToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
-
-interface HistoryEntry {
-  query: string;
-  language: string;
-  domain: string;
-  response_summary: string;
-  citations: unknown[];
-  ts?: number;
-}
+import {
+  fetchHistoryAuthed,
+  HistoryFetchError,
+  HISTORY_SWR_OPTIONS,
+  sidebarHistoryKey,
+  type HistoryEntry,
+} from '@/lib/history';
+import { canAccessHistory } from '@/lib/auth-plan';
 
 export interface AppSidebarProps {
   variant?: 'light' | 'dark';
@@ -26,6 +30,9 @@ export interface AppSidebarProps {
   user?: User | null;
   accessToken?: string | null;
   onSelectQuery?: (query: string) => void;
+  /** Desktop-only: whether the persistent panel is collapsed (hidden). */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const DAY_MS = 86_400_000;
@@ -50,7 +57,7 @@ function truncate(s: string, n = 40) {
   return s.length <= n ? s : `${s.slice(0, n)}…`;
 }
 
-const DOMAIN_COLORS: Record<string, string> = {
+const DOMAIN_COLORS_LIGHT: Record<string, string> = {
   tax: 'bg-orange-100 text-orange-700',
   epf: 'bg-green-100 text-green-700',
   business: 'bg-purple-100 text-purple-700',
@@ -60,24 +67,115 @@ const DOMAIN_COLORS: Record<string, string> = {
   general: 'bg-zinc-100 text-zinc-600',
 };
 
+const DOMAIN_COLORS_DARK: Record<string, string> = {
+  tax: 'bg-orange-500/20 text-orange-300',
+  epf: 'bg-green-500/20 text-green-300',
+  business: 'bg-purple-500/20 text-purple-300',
+  education: 'bg-blue-500/20 text-blue-300',
+  health: 'bg-red-500/20 text-red-300',
+  immigration: 'bg-teal-500/20 text-teal-300',
+  general: 'bg-white/10 text-zinc-300',
+};
+
 function HistoryRow({
   entry,
   onClick,
+  isDark,
 }: {
   entry: HistoryEntry;
   onClick: () => void;
+  isDark: boolean;
 }) {
-  const domainClass = DOMAIN_COLORS[entry.domain] ?? DOMAIN_COLORS['general'];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [starred, setStarred] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const colors = isDark ? DOMAIN_COLORS_DARK : DOMAIN_COLORS_LIGHT;
+  const domainClass = colors[entry.domain] ?? colors['general'];
+  const hoverClass = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
+  const textClass = isDark ? 'text-zinc-200' : 'text-zinc-800';
+  const mutedClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+  const menuBg = isDark ? 'bg-[#1a1f2e] border-white/15' : 'bg-white border-zinc-200';
+  const menuItemHover = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
+  const menuText = isDark ? 'text-zinc-200' : 'text-zinc-700';
+
+  const summary = entry.response_summary?.trim();
+  const headline = summary || entry.query;
+
+  // Close menu on click outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-100 transition-colors flex flex-col gap-1"
-    >
-      <span className="text-sm text-zinc-800 leading-snug line-clamp-2">{truncate(entry.query, 56)}</span>
-      <span className={`self-start text-[10px] font-semibold px-1.5 py-0.5 rounded locale-nowrap ${domainClass}`}>
-        {entry.domain}
-      </span>
-    </button>
+    <div className="relative group">
+      <button
+        onClick={onClick}
+        className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 ${hoverClass}`}
+      >
+        <div className="flex items-start justify-between gap-1">
+          <span className={`text-sm leading-snug line-clamp-2 ${textClass}`}>
+            {starred && <span className="text-amber-400 mr-1">★</span>}
+            {truncate(headline, 68)}
+          </span>
+        </div>
+        {summary && (
+          <span className={`text-[11px] leading-snug line-clamp-1 ${mutedClass}`}>
+            {truncate(entry.query, 48)}
+          </span>
+        )}
+        <span className={`self-start text-[10px] font-semibold px-1.5 py-0.5 rounded locale-nowrap mt-0.5 ${domainClass}`}>
+          {entry.domain}
+        </span>
+      </button>
+
+      {/* Context menu trigger */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+        className={`absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/15 text-zinc-400' : 'hover:bg-zinc-200 text-zinc-400'}`}
+        aria-label="Options"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+          <path d="M8 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 6.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM9.5 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+        </svg>
+      </button>
+
+      {/* Context menu dropdown */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className={`absolute top-8 right-2 z-50 w-40 rounded-lg border shadow-lg py-1 ${menuBg}`}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setStarred(!starred); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
+          >
+            <span>{starred ? '★' : '☆'}</span>
+            <span>{starred ? 'Unstar' : 'Star'}</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
+          >
+            <span>✏️</span>
+            <span>Rename</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 ${menuItemHover} transition-colors`}
+          >
+            <span>🗑</span>
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -85,19 +183,21 @@ function HistoryGroup({
   label,
   entries,
   onSelect,
+  isDark,
 }: {
   label: string;
   entries: HistoryEntry[];
   onSelect: (q: string) => void;
+  isDark: boolean;
 }) {
   if (entries.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider px-3 locale-nowrap">
+      <span className={`text-[11px] font-semibold uppercase tracking-wider px-3 locale-nowrap ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
         {label}
       </span>
       {entries.map((e, i) => (
-        <HistoryRow key={i} entry={e} onClick={() => onSelect(e.query)} />
+        <HistoryRow key={i} entry={e} onClick={() => onSelect(e.query)} isDark={isDark} />
       ))}
     </div>
   );
@@ -110,6 +210,7 @@ function SidebarPanel({
   accessToken,
   onSelectQuery,
   onClose,
+  onCollapse,
 }: {
   variant: 'light' | 'dark';
   showHistory: boolean;
@@ -117,28 +218,18 @@ function SidebarPanel({
   accessToken: string | null;
   onSelectQuery?: (query: string) => void;
   onClose?: () => void;
+  onCollapse?: () => void;
 }) {
   const { t } = useI18n();
   const isDark = variant === 'dark';
+  const supabase = useMemo(() => createClient(), []);
 
-  const fetcher = useMemo(
-    () =>
-      accessToken
-        ? () =>
-            fetch('/api/v1/history', {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            }).then((r) => {
-              if (!r.ok) throw new Error('history fetch failed');
-              return r.json() as Promise<HistoryEntry[]>;
-            })
-        : null,
-    [accessToken],
-  );
+  const historyEnabled = Boolean(showHistory && user && canAccessHistory(user));
 
   const { data: entries = [], isLoading: historyLoading, error: historyError, mutate } = useSWR<HistoryEntry[]>(
-    showHistory && accessToken ? 'sidebar-history' : null,
-    fetcher!,
-    { revalidateOnFocus: true },
+    historyEnabled && user ? sidebarHistoryKey(user.id) : null,
+    () => fetchHistoryAuthed(supabase),
+    HISTORY_SWR_OPTIONS,
   );
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
@@ -147,35 +238,85 @@ function SidebarPanel({
   const footerBorder = isDark ? 'border-white/10 bg-[#0A0F1E]/80' : 'border-zinc-100 bg-zinc-50/80';
   const titleClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const closeHover = isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-zinc-200' : 'hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700';
+  const dividerClass = isDark ? 'border-white/10' : 'border-zinc-200';
+  const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-500';
 
   return (
     <>
       <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${headerBorder}`}>
-        <Link href="/" className={`font-bold text-sm tracking-tight locale-nowrap ${titleClass}`}>
+        <Link href="/chat" className={`font-bold text-sm tracking-tight locale-nowrap ${titleClass}`}>
           NakTahu
         </Link>
-        {onClose && (
-          <button
-            onClick={onClose}
-            aria-label="Close sidebar"
-            className={`p-1 rounded lg:hidden ${closeHover}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-            </svg>
-          </button>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* collapse — desktop persistent panel only */}
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              aria-label={t('sidebar.collapse')}
+              title={t('sidebar.collapse')}
+              className={`hidden lg:inline-flex p-1 rounded ${closeHover}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
+          {/* close — mobile overlay only */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close sidebar"
+              className={`p-1 rounded lg:hidden ${closeHover}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className={`flex-shrink-0 px-2 py-3 border-b ${headerBorder}`}>
+        <SiteNavLinks
+          variant={variant}
+          layout="vertical"
+          onNavigate={onClose}
+          // SidebarAgentsNav below renders its own "All agents" link to the
+          // same route whenever it's visible (showHistory && user) — omit
+          // the duplicate here rather than showing "Agents" twice.
+          excludeHrefs={showHistory && user ? ['/agents'] : []}
+        />
       </div>
 
       {showHistory && (
         <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-4 min-h-0">
+          <DeadlineWidget accessToken={accessToken} variant={variant} />
+          <SidebarAgentsNav
+            user={user}
+            isDark={isDark}
+            navLinkClass={isDark ? 'text-zinc-300 hover:text-white hover:bg-white/10' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
+            dividerClass={dividerClass}
+            onClose={onClose}
+          />
           <p className={`text-xs font-semibold uppercase tracking-wider px-3 locale-nowrap ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
             {t('history.title')}
           </p>
           {!user ? (
-            <p className={`text-sm text-center px-4 py-6 locale-text-balance ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            <p className={`text-sm text-center px-4 py-6 locale-text-balance ${mutedText}`}>
               {t('history.sign_in_prompt')}
             </p>
+          ) : !canAccessHistory(user) ? (
+            <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+              <p className={`text-sm locale-text-balance ${mutedText}`}>
+                {t('error.history_pro_required')}
+              </p>
+              <Link
+                href="/pricing"
+                className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
+              >
+                {t('nav.pricing')}
+              </Link>
+            </div>
           ) : historyLoading ? (
             <div className="flex flex-col gap-2 px-2 py-3">
               {[1, 2, 3].map((n) => (
@@ -184,13 +325,26 @@ function SidebarPanel({
             </div>
           ) : historyError ? (
             <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-              <p className={`text-sm locale-text-balance ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('error.history_fetch')}</p>
-              <button
-                onClick={() => mutate()}
-                className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
-              >
-                {t('error.retry')}
-              </button>
+              <p className={`text-sm locale-text-balance ${mutedText}`}>
+                {historyError instanceof HistoryFetchError && historyError.code === 'pro_required'
+                  ? t('error.history_pro_required')
+                  : t('error.history_fetch')}
+              </p>
+              {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
+                <Link
+                  href="/pricing"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
+                >
+                  {t('nav.pricing')}
+                </Link>
+              ) : (
+                <button
+                  onClick={() => mutate()}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
+                >
+                  {t('error.retry')}
+                </button>
+              )}
             </div>
           ) : entries.length === 0 ? (
             <p className={`text-sm text-center px-4 py-6 locale-text-balance ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
@@ -202,25 +356,31 @@ function SidebarPanel({
                 label={t('history.group.today')}
                 entries={groups.today}
                 onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                isDark={isDark}
               />
               <HistoryGroup
                 label={t('history.group.yesterday')}
                 entries={groups.yesterday}
                 onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                isDark={isDark}
               />
               <HistoryGroup
                 label={t('history.group.earlier')}
                 entries={groups.earlier}
                 onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                isDark={isDark}
               />
             </>
           )}
         </div>
       )}
 
-      {!showHistory && <div className="flex-1 min-h-0" />}
+      {!showHistory && (
+        <div className="flex-1 min-h-0" />
+      )}
 
       <div className={`flex-shrink-0 border-t px-4 py-4 flex flex-col gap-3 ${footerBorder}`}>
+        <ThemeToggle variant={variant} layout="sidebar" />
         <LangToggle variant={variant} layout="sidebar" />
         <AuthButton variant={variant} layout="sidebar" />
       </div>
@@ -236,6 +396,8 @@ export function AppSidebar({
   user = null,
   accessToken = null,
   onSelectQuery,
+  collapsed = false,
+  onToggleCollapse,
 }: AppSidebarProps) {
   const isDark = variant === 'dark';
   const shellClass = isDark
@@ -252,33 +414,26 @@ export function AppSidebar({
 
   return (
     <>
-      <aside className={`hidden lg:flex w-72 flex-shrink-0 flex-col border-r h-full ${shellClass}`}>
-        <SidebarPanel {...panelProps} />
+      {/* Persistent panel — desktop (hidden when collapsed) */}
+      <aside
+        className={`${collapsed ? 'hidden' : 'hidden lg:flex'} w-72 flex-shrink-0 flex-col border-r h-full ${shellClass}`}
+      >
+        <SidebarPanel {...panelProps} onCollapse={onToggleCollapse} />
       </aside>
 
+      {/* Full-page overlay — mobile only */}
       <AnimatePresence>
         {isMobileOpen && (
-          <>
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-              onClick={onMobileClose}
-            />
-            <motion.aside
-              key="sidebar"
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-              className={`fixed top-0 left-0 h-full w-72 z-50 flex flex-col shadow-xl border-r lg:hidden ${shellClass}`}
-            >
-              <SidebarPanel {...panelProps} onClose={onMobileClose} />
-            </motion.aside>
-          </>
+          <motion.aside
+            key="sidebar"
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            className={`fixed inset-0 h-full w-full z-50 flex flex-col lg:hidden ${shellClass}`}
+          >
+            <SidebarPanel {...panelProps} onClose={onMobileClose} />
+          </motion.aside>
         )}
       </AnimatePresence>
     </>

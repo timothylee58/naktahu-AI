@@ -16,7 +16,7 @@ ilmu_client = AsyncOpenAI(
     base_url=os.environ.get("ILMU_BASE_URL", "https://api.ilmu.gov.my/v1"),
 )
 
-# Anthropic client — fallback for synthesiser when ILMU fails or confidence < 0.4
+# Anthropic client — fallback for synthesiser when ILMU fails or confidence < 0.6
 anthropic_client = anthropic.AsyncAnthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY", "placeholder"),
 )

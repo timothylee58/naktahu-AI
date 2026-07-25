@@ -4,6 +4,7 @@ MINISTRY: Jabatan Perangkaan Malaysia
 DOMAIN: business
 SOURCE_DATE: 
 EXPIRY_AWARE: false
+EFFECTIVE_DATE: 2023-01-01
 ---
 ## Population Malaysia 2023
 Penduduk Malaysia pada 2023 dianggarkan 33.4 juta orang. Ini termasuk 30.4 juta warganegara Malaysia dan 3.0 juta bukan warganegara. Pecahan mengikut kumpulan etnik: Bumiputera 69.6%, Cina 22.6%, India 6.8%, lain-lain 1.0%.

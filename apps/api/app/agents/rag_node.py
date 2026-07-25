@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 
 import structlog
 import weave
@@ -22,12 +21,16 @@ log = structlog.get_logger(__name__)
 _CACHE_TTL = 3600
 
 
-def _cache_key(query: str, language: str, domain: str) -> str:
-    raw = f"{query.lower().strip()}|{language}|{domain}"
+def _cache_key(query: str, language: str, domain: str | None) -> str:
+    raw = f"{query.lower().strip()}|{language}|{domain or '_any'}"
     return "cache:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
 def _serialize_chunks(chunks: list[ChunkResult]) -> list[dict]:
+    # Persist every ChunkResult field. Dropping the freshness columns here
+    # (effective_date/superseded_by/expiry_aware/source_date) silently disables
+    # analyst_node's staleness + superseded-chunk checks on every cache hit, so
+    # a superseded or stale chunk would be cited unchecked once cached.
     return [
         {
             "id": c.id,
@@ -37,12 +40,18 @@ def _serialize_chunks(chunks: list[ChunkResult]) -> list[dict]:
             "ministry": c.ministry,
             "language": c.language,
             "similarity": c.similarity,
+            "expiry_aware": c.expiry_aware,
+            "source_date": c.source_date,
+            "effective_date": c.effective_date,
+            "superseded_by": c.superseded_by,
         }
         for c in chunks
     ]
 
 
 def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
+    # .get() with defaults keeps older cache entries (written before the
+    # freshness columns existed) readable instead of raising KeyError.
     return [
         ChunkResult(
             id=r["id"],
@@ -52,6 +61,10 @@ def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
             ministry=r["ministry"],
             language=r["language"],
             similarity=float(r["similarity"]),
+            expiry_aware=bool(r.get("expiry_aware", False)),
+            source_date=r.get("source_date"),
+            effective_date=r.get("effective_date"),
+            superseded_by=r.get("superseded_by"),
         )
         for r in raw
     ]
@@ -74,7 +87,9 @@ async def rag_node(state: AgentState) -> dict:
     """Check Redis cache, then fall through to hybrid search on miss."""
     query = state.get("query", "")
     language = state.get("language", "en")
-    domain = state.get("domain", "government")
+    # None (not "government") when unclassified — see app/models/state.py's
+    # domain field docstring for why a specific-domain default is a trap.
+    domain = state.get("domain")
 
     key = _cache_key(query, language, domain)
 
@@ -89,6 +104,15 @@ async def rag_node(state: AgentState) -> dict:
     try:
         embedding = await _embed(query)
         chunks = await hybrid_search(query, embedding, domain=domain, limit=5)
+        # Recall fallback: hybrid_search hard-filters on dc.domain = domain_filter,
+        # so a single misclassified domain from router_node (e.g. a tax question
+        # tagged "government") returns zero chunks — the user then sees a
+        # clarification prompt with no sources at all. When a domain-scoped search
+        # comes back empty, retry once unfiltered so relevant chunks in another
+        # domain can still surface and be ranked by vector similarity.
+        if not chunks and domain is not None:
+            log.info("rag_domain_fallback", domain=domain)
+            chunks = await hybrid_search(query, embedding, domain=None, limit=5)
     except Exception as exc:
         log.warning("rag_retrieval_failed", error=str(exc))
         return {"retrieved_chunks": []}

@@ -28,6 +28,7 @@ COPY rag/ ./rag/
 COPY routers/ ./routers/
 COPY routes/ ./routes/
 COPY services/ ./services/
+COPY scripts/ ./scripts/
 
 COPY start.sh ./
 RUN chmod +x start.sh

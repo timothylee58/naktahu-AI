@@ -29,21 +29,33 @@ const FEATURE_ICONS = [
   ),
 ];
 
-export function LandingFeatures() {
+interface LandingFeaturesProps {
+  isDark?: boolean;
+}
+
+export function LandingFeatures({ isDark = true }: LandingFeaturesProps) {
   const { t } = useI18n();
+  const cardClass = isDark
+    ? 'bg-white/5 border-white/10 hover:border-white/20'
+    : 'bg-white border-zinc-200 shadow-sm hover:shadow-md';
+  const tileClass = isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600';
+  const titleClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
+  const descClass = isDark ? 'text-zinc-400' : 'text-zinc-600';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto w-full">
       {FEATURE_KEYS.map((f, i) => (
         <motion.div
           key={f.titleKey}
           whileHover={{ y: -4 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          className="flex flex-col gap-4 bg-white/5 border border-white/10 rounded-2xl p-6"
+          className={`flex flex-col gap-4 border rounded-2xl p-5 sm:p-6 transition-colors duration-200 ${cardClass}`}
         >
-          <span className="text-[#2563EB]">{FEATURE_ICONS[i]}</span>
-          <h3 className="font-semibold text-zinc-100 locale-nowrap">{t(f.titleKey)}</h3>
-          <p className="text-sm text-zinc-400 leading-relaxed locale-text-balance">{t(f.descKey)}</p>
+          <span className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${tileClass}`}>
+            {FEATURE_ICONS[i]}
+          </span>
+          <h3 className={`font-semibold locale-nowrap ${titleClass}`}>{t(f.titleKey)}</h3>
+          <p className={`text-sm leading-relaxed locale-text-balance ${descClass}`}>{t(f.descKey)}</p>
         </motion.div>
       ))}
     </div>

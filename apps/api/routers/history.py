@@ -1,21 +1,28 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from middleware.plan_gate import require_plan
 from middleware.rate_limit import apply_query_rate_limit
-from services.auth import UserContext, get_current_user
+from routers._request_fields import Domain, Language, normalise_language
+from services.auth import UserContext
 from services.history import fetch_history_entries, persist_session_entry
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
 
 
 class HistoryEntryPayload(BaseModel):
-    query: str
-    language: str = "en"
-    domain: str = "general"
+    query: str = Field(..., min_length=1, max_length=2000)
+    language: Language = "en"
+    domain: Domain = "general"
     response_summary: str = Field(..., max_length=150)
-    citations: list[Any] = Field(default_factory=list)
+    citations: list[Any] = Field(default_factory=list, max_length=100)
+
+    @field_validator("language")
+    @classmethod
+    def _normalise_language(cls, v: Language) -> Language:
+        return normalise_language(v)
 
 
 @router.get("/history")
@@ -23,10 +30,11 @@ class HistoryEntryPayload(BaseModel):
 async def get_history(
     request: Request,
     response: Response,
-    user: Annotated[UserContext, Depends(get_current_user)],
+    user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
-    redis_client = request.app.state.redis
-    entries = await fetch_history_entries(redis_client, user.user_id)
+    redis_client = getattr(request.app.state, "redis", None)
+    supabase_client = getattr(request.app.state, "supabase", None)
+    entries = await fetch_history_entries(redis_client, supabase_client, user.user_id)
     return entries
 
 
@@ -36,12 +44,12 @@ async def post_history(
     request: Request,
     response: Response,
     body: HistoryEntryPayload,
-    user: Annotated[UserContext, Depends(get_current_user)],
+    user: Annotated[UserContext, Depends(require_plan("pro"))],
 ):
-    redis_client = request.app.state.redis
+    redis_client = getattr(request.app.state, "redis", None)
     await persist_session_entry(
         redis_client=redis_client,
-        supabase_client=request.app.state.supabase,
+        supabase_client=getattr(request.app.state, "supabase", None),
         user_id=user.user_id,
         query=body.query,
         language=body.language,

@@ -1,18 +1,86 @@
+import os
+import secrets
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Used only when JWT_SECRET isn't set in the environment. A previous fixed
+# string default here ("dev-jwt-secret-change-me-min-32-chars!!") was a
+# critical vulnerability: if a deployment ever forgot to set JWT_SECRET, that
+# exact string — public in this repo's history — could forge a JWT with
+# app_metadata.role=primary_admin (services/auth.py effective_plan() promotes
+# that straight to the business tier) and get free unlimited access.
+#
+# A per-process random secret closes that hole for a single-process run
+# (tests, local dev), but Railway's Dockerfile sets ENV=production and runs
+# multiple workers/containers — each would mint its own random secret and
+# reject tokens signed by the others, an intermittent-401 outage that's
+# worse than the vulnerability it replaces. So in production this fails
+# loudly at startup instead: an operator missing JWT_SECRET should see a
+# crash-on-boot, not silent multi-worker auth breakage or a forgeable token.
+def _fallback_jwt_secret() -> str:
+    """Computed once at import time (not per Settings() call) so multiple
+    instantiations within the same process — this module's own `settings`
+    singleton plus any test that constructs Settings() directly — agree on
+    the same fallback value instead of each minting a different one."""
+    is_production = os.environ.get("ENV", "development") == "production"
+    if is_production and not os.environ.get("JWT_SECRET"):
+        raise RuntimeError(
+            "JWT_SECRET is not set. Refusing to start in production (ENV=production) "
+            "with a random per-process secret, which would cause other workers/"
+            "containers to reject each other's tokens. Set JWT_SECRET explicitly."
+        )
+    return secrets.token_urlsafe(32)
+
+
+_FALLBACK_JWT_SECRET = _fallback_jwt_secret()
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     jwt_secret: str = Field(
-        default="dev-jwt-secret-change-me-min-32-chars!!",
+        default_factory=lambda: _FALLBACK_JWT_SECRET,
         validation_alias=AliasChoices("JWT_SECRET", "jwt_secret"),
     )
     supabase_jwt_aud: str = "authenticated"
     redis_url: str = "redis://localhost:6379/0"
-    supabase_url: str = "http://localhost:54321"
-    supabase_service_key: str = "dev-service-role-key"
+    supabase_url: str = Field(
+        default="http://localhost:54321",
+        validation_alias=AliasChoices("SUPABASE_URL", "supabase_url"),
+    )
+    supabase_service_key: str = Field(
+        default="dev-service-role-key",
+        validation_alias=AliasChoices(
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_SERVICE_KEY",
+            "supabase_service_key",
+        ),
+    )
+    # Supabase direct Postgres — LangGraph PostgresSaver (use port 5432, not pooler).
+    database_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("DATABASE_URL", "database_url"),
+    )
+    supabase_storage_bucket: str = Field(
+        default="generated-documents",
+        validation_alias=AliasChoices("SUPABASE_STORAGE_BUCKET", "supabase_storage_bucket"),
+    )
+    # Static bearer token required to scrape GET /metrics (Prometheus can't do
+    # the JWT login flow get_current_user uses). Empty = endpoint always 401s
+    # — fail closed on an unconfigured environment, never fail open.
+    metrics_auth_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("METRICS_AUTH_TOKEN", "metrics_auth_token"),
+    )
+    resend_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("RESEND_API_KEY", "resend_api_key"),
+    )
+    resend_from_email: str = Field(
+        default="NakTahu <noreply@naktahu.ai>",
+        validation_alias=AliasChoices("RESEND_FROM_EMAIL", "resend_from_email"),
+    )
     openai_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
@@ -20,6 +88,70 @@ class Settings(BaseSettings):
     guard_llm_check_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices("GUARD_LLM_CHECK_ENABLED", "guard_llm_check_enabled"),
+    )
+
+    frontend_url: str = Field(
+        default="http://localhost:3000",
+        validation_alias=AliasChoices("FRONTEND_URL", "frontend_url"),
+    )
+    # This API's own public URL — needed to hand HitPay a webhook callback
+    # address per-request (Stripe's webhook URL is configured once in its
+    # dashboard instead, so it has no equivalent setting here).
+    public_api_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias=AliasChoices("PUBLIC_API_URL", "public_api_url"),
+    )
+    stripe_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_SECRET_KEY", "stripe_secret_key"),
+    )
+    stripe_webhook_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_WEBHOOK_SECRET", "stripe_webhook_secret"),
+    )
+    # Stripe Price IDs — one per checkout item. Configured in the Stripe
+    # dashboard; referenced by name only, never hardcoded here.
+    stripe_price_pro_individu: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_PRO_INDIVIDU", "stripe_price_pro_individu"),
+    )
+    stripe_price_pro_perniagaan: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_PRO_PERNIAGAAN", "stripe_price_pro_perniagaan"),
+    )
+    stripe_price_student: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_STUDENT", "stripe_price_student"),
+    )
+    stripe_price_credits_5: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_CREDITS_5", "stripe_price_credits_5"),
+    )
+    stripe_price_credits_20: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_CREDITS_20", "stripe_price_credits_20"),
+    )
+    stripe_price_credits_50: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_CREDITS_50", "stripe_price_credits_50"),
+    )
+
+    # HitPay — FPX/DuitNow QR checkout for agent-credit top-ups only (see
+    # services/billing.py). Not used for subscription plans; HitPay's
+    # recurring billing surface hasn't been evaluated yet.
+    hitpay_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("HITPAY_API_KEY", "hitpay_api_key"),
+    )
+    # The webhook HMAC secret — a separate value from the API key, found
+    # under Payment Gateway > Payment Requests > Webhook in the dashboard.
+    hitpay_salt: str = Field(
+        default="",
+        validation_alias=AliasChoices("HITPAY_SALT", "hitpay_salt"),
+    )
+    hitpay_base_url: str = Field(
+        default="https://api.sandbox.hit-pay.com/v1",
+        validation_alias=AliasChoices("HITPAY_BASE_URL", "hitpay_base_url"),
     )
 
 

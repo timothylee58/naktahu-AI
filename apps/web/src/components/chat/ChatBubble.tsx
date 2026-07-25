@@ -3,12 +3,14 @@
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Citation } from '@/lib/types';
+import type { AgencyContact, Citation } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { AgencyContactCard } from './AgencyContactCard';
 import { CitationChip } from './CitationChip';
 import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ResponseActions } from './ResponseActions';
+import { SuggestionChips } from './SuggestionChips';
 
 interface UserBubbleProps {
   role: 'user';
@@ -24,6 +26,13 @@ interface AssistantBubbleProps {
   isStreaming: boolean;
   isThinking?: boolean;
   onRegenerate?: () => void;
+  query?: string;
+  domain?: string;
+  language?: string;
+  accessToken?: string;
+  suggestions?: string[];
+  onSuggestionSelect?: (query: string) => void;
+  agencyContact?: AgencyContact;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -42,7 +51,7 @@ export function ChatBubble(props: ChatBubbleProps) {
           initial={{ opacity: 0, y: 8, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={spring}
-          className="max-w-[75%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-sm"
+          className="max-w-[75%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-md shadow-blue-900/10"
         >
           {props.content}
         </motion.div>
@@ -50,7 +59,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -65,7 +74,7 @@ export function ChatBubble(props: ChatBubbleProps) {
           initial={{ opacity: 0, y: 8, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={spring}
-          className="bg-white border border-zinc-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-zinc-800 shadow-sm ring-1 ring-zinc-900/5"
+          className="bg-white border border-zinc-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-zinc-800 shadow-sm ring-1 ring-zinc-900/5 dark:bg-white/5 dark:border-white/10 dark:text-zinc-100 dark:ring-white/5"
         >
           {isThinking ? (
             <ThinkingIndicator />
@@ -78,9 +87,23 @@ export function ChatBubble(props: ChatBubbleProps) {
           )}
         </motion.div>
 
+        {!isStreaming && !isThinking && agencyContact && (
+          <AgencyContactCard contact={agencyContact} />
+        )}
+
         {/* Action buttons — only after streaming completes */}
         {!isStreaming && !isThinking && content && (
-          <ResponseActions content={content} onRegenerate={onRegenerate} isStreaming={isStreaming} />
+          <ResponseActions
+            content={content}
+            onRegenerate={onRegenerate}
+            isStreaming={isStreaming}
+            query={query}
+            domain={domain}
+            language={language}
+            citations={citations}
+            confidence={confidence}
+            accessToken={accessToken}
+          />
         )}
 
         {hasLowConfidence && (
@@ -88,7 +111,7 @@ export function ChatBubble(props: ChatBubbleProps) {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5"
+            className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
               <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
@@ -117,6 +140,15 @@ export function ChatBubble(props: ChatBubbleProps) {
               </motion.div>
             ))}
           </motion.div>
+        )}
+
+        {/* Suggestions — only show after streaming completes and if we have suggestions */}
+        {!isStreaming && !isThinking && suggestions.length > 0 && onSuggestionSelect && (
+          <SuggestionChips
+            suggestions={suggestions}
+            onSelect={onSuggestionSelect}
+            disabled={false}
+          />
         )}
       </div>
     </div>
