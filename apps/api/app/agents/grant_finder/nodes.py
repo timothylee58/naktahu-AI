@@ -6,6 +6,7 @@ from typing import Any
 
 from app.agents.grant_finder.state import GrantFinderState
 from app.agents.tools import llm_complete, query_rag_findings
+from app.services.grant_programmes import get_grant_programmes_by_urls
 
 
 async def profile_node(state: GrantFinderState) -> dict[str, Any]:
@@ -60,9 +61,57 @@ async def match_node(state: GrantFinderState) -> dict[str, Any]:
                 "deadline_hint": "Check agency website",
                 "url": f.get("source_url", ""),
             })
+
+    grants = await _enrich_with_structured_facts(grants)
+
     citations = [
         {"title": g.get("name", ""), "url": g.get("url", ""), "ministry": "Kerajaan Malaysia", "confidence": 0.7}
         for g in grants
         if g.get("url")
     ]
     return {"grants": grants, "citations": citations, "status": "completed"}
+
+
+def _format_amount(programme: dict[str, Any]) -> str | None:
+    amount = programme.get("grant_amount_myr")
+    if amount is None:
+        return None
+    return f"Up to RM{amount:,.0f}" if float(amount) == int(amount) else f"Up to RM{amount:,.2f}"
+
+
+async def _enrich_with_structured_facts(grants: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Overlay real grant_programmes facts onto the LLM's amount_hint/
+    deadline_hint text where a structured record exists for that URL —
+    replaces a guess with a real figure instead of asking the model to
+    invent one. Grants with no matching programme record are returned
+    unchanged; this must never fabricate a match."""
+    urls = [g.get("url", "") for g in grants if g.get("url")]
+    programmes = await get_grant_programmes_by_urls(urls)
+    if not programmes:
+        return grants
+
+    enriched: list[dict[str, Any]] = []
+    for g in grants:
+        programme = programmes.get(g.get("url", ""))
+        if not programme:
+            enriched.append(g)
+            continue
+
+        merged = dict(g)
+        amount_text = _format_amount(programme)
+        if amount_text:
+            merged["amount_hint"] = amount_text
+            merged["amount_myr"] = programme["grant_amount_myr"]
+        if programme.get("application_deadline"):
+            merged["deadline_hint"] = programme["application_deadline"]
+            merged["deadline"] = programme["application_deadline"]
+        if programme.get("eligible_sectors"):
+            merged["eligible_sectors"] = programme["eligible_sectors"]
+        if programme.get("bumiputera_requirement") is not None:
+            merged["bumiputera_requirement"] = programme["bumiputera_requirement"]
+        if programme.get("company_age_min_months") is not None:
+            merged["company_age_min_months"] = programme["company_age_min_months"]
+        merged["is_verified"] = True
+        enriched.append(merged)
+
+    return enriched
