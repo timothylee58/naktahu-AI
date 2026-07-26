@@ -2,7 +2,7 @@
 
 Analyzes query complexity and decides:
 - SIMPLE: single-domain factual question → fast-path to knowledge-qa
-- MODERATE: requires one specific vertical agent (grant-finder, health-triage, etc.)
+- MODERATE: requires one specific vertical agent (eligibility-agent, health-triage, etc.)
 - COMPLEX: multi-domain or multi-step → decomposes into parallel/sequential sub-tasks
 
 The planner uses ILMU chat with structured JSON output. On failure it falls
@@ -34,7 +34,7 @@ DOMAINS: government, education, legal, finance, healthcare, epf, tax, business, 
 AGENTS AVAILABLE:
 - knowledge-qa: General factual Q&A about Malaysian public services (any domain)
 - compliance-drafter: Multi-domain compliance reports for businesses (tax, business, epf)
-- grant-finder: Government grant matching for SMEs and students
+- eligibility-agent: Multi-turn business grant-eligibility matching (scoring, near-miss, stacking)
 - health-triage: Symptom intake with KKM facility recommendations
 - immigration-navigator: Visa/immigration guidance with conversational intake
 - study-agent: SPM exam prep with education RAG
@@ -77,7 +77,7 @@ _AGENT_KEYWORDS: dict[str, tuple[list[str], list[str]]] = {
         ["visa", "pasport", "passport", "immigration", "imigresen", "work permit", "pas kerja"],
         ["immigration_knowledge", "conversational_intake"],
     ),
-    "grant-finder": (
+    "eligibility-agent": (
         ["grant", "geran", "funding", "bantuan", "subsidi", "pinjaman perniagaan"],
         ["grant_matching", "government_knowledge"],
     ),

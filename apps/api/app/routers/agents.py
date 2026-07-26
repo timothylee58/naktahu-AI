@@ -38,10 +38,11 @@ class AgentStartRequest(BaseModel):
     subject: str = "sejarah"
     paper_text: str = ""
     document_base64: str = ""
-    # grant-finder
+    # eligibility-agent (business_type/message/language shared with other agents above)
     sector: str = ""
-    business_stage: str = "early"
-    funding_need: str = ""
+    annual_revenue_myr: Optional[float] = None
+    is_bumiputera: Optional[bool] = None
+    registered_months: Optional[int] = None
 
 
 class AgentContinueRequest(BaseModel):

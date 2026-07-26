@@ -11,7 +11,7 @@ from langgraph.types import Command
 
 from app.agents.compliance_drafter.graph import get_compliance_drafter_graph
 from app.agents.compliance_drafter.state import ComplianceDrafterState
-from app.agents.grant_finder.graph import get_grant_finder_graph
+from app.agents.eligibility_agent.graph import get_eligibility_agent_graph
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
@@ -321,25 +321,68 @@ async def get_health_status(session_id: str, checkpointer: Any) -> dict[str, Any
     return {"session_id": session_id, "status": "completed", "output": _public_output(dict(snapshot.values))}
 
 
-# ── Grant Finder ──────────────────────────────────────────────────────────────
+# ── Eligibility Agent ────────────────────────────────────────────────────────
+# Multi-turn: intake spans several turns before the graph reaches grant_rag +
+# analyst, so this agent needs both a start and a continue handler (unlike
+# the single-shot grant-finder it replaces).
 
 
-async def start_grant_finder(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+async def start_eligibility_agent(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
     session_id = str(uuid.uuid4())
-    graph = get_grant_finder_graph(checkpointer=checkpointer)
+    graph = get_eligibility_agent_graph(checkpointer=checkpointer)
+    business_profile: dict[str, Any] = {}
+    for key in ("business_type", "sector", "annual_revenue_myr", "is_bumiputera", "registered_months"):
+        if payload.get(key) is not None:
+            business_profile[key] = payload[key]
     inputs = {
         "session_id": session_id,
         "user_id": user_id,
-        "sector": payload.get("sector", ""),
-        "business_stage": payload.get("business_stage", ""),
-        "funding_need": payload.get("funding_need", ""),
-        "message": payload.get("message", ""),
         "language": payload.get("language", "bm"),
-        "tool_calls": [],
+        "current_turn": 0,
+        "messages": [],
+        "latest_user_input": payload.get("message", ""),
+        "business_profile": business_profile or None,
+        "intake_complete": False,
+        "needs_more_info": True,
+        "needs_clarification": False,
+        "_supabase": supabase_client,
     }
-    values, _ = await _run_graph(graph, session_id, inputs)
-    _log_run(supabase_client, user_id, "grant-finder", session_id, payload, values, values.get("latency_ms", 0), "completed")
-    return _base_response(session_id, values)
+    values, awaiting = await _run_graph(graph, session_id, inputs)
+    status = "completed" if values.get("intake_complete") else "awaiting_hitl"
+    _log_run(supabase_client, user_id, "eligibility-agent", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values, awaiting=awaiting)
+    resp["status"] = status
+    resp["awaiting_hitl"] = not values.get("intake_complete", False)
+    resp["output"] = {
+        "next_question": values.get("next_question"),
+        "matched_grants": values.get("matched_grants", []),
+        "near_miss_grants": values.get("near_miss_grants", []),
+        "stacking_matrix": values.get("stacking_matrix"),
+    }
+    return resp
+
+
+async def continue_eligibility_agent(*, session_id: str, payload: dict[str, Any], checkpointer: Any) -> dict[str, Any]:
+    graph = get_eligibility_agent_graph(checkpointer=checkpointer)
+    await graph.aupdate_state(_thread_config(session_id), {"latest_user_input": payload.get("message", "")})
+    t0 = time.monotonic()
+    await graph.ainvoke(None, config=_thread_config(session_id))
+    latency_ms = round((time.monotonic() - t0) * 1000)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    values = dict(snapshot.values) if snapshot else {}
+    values["latency_ms"] = latency_ms
+    awaiting = snapshot.next if snapshot else ()
+    status = "completed" if values.get("intake_complete") else "awaiting_hitl"
+    resp = _base_response(session_id, values, awaiting=awaiting)
+    resp["status"] = status
+    resp["awaiting_hitl"] = not values.get("intake_complete", False)
+    resp["output"] = {
+        "next_question": values.get("next_question"),
+        "matched_grants": values.get("matched_grants", []),
+        "near_miss_grants": values.get("near_miss_grants", []),
+        "stacking_matrix": values.get("stacking_matrix"),
+    }
+    return resp
 
 
 # ── Research Synthesiser ──────────────────────────────────────────────────────
@@ -401,7 +444,7 @@ AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "study-agent": start_study_agent,
     "immigration-navigator": start_immigration_navigator,
     "health-triage": start_health_triage,
-    "grant-finder": start_grant_finder,
+    "eligibility-agent": start_eligibility_agent,
     "research-synthesiser": start_research_synthesiser,
 }
 
@@ -409,6 +452,7 @@ AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
     "compliance-drafter": continue_compliance_drafter,
     "study-agent": continue_study_agent,
     "immigration-navigator": continue_immigration_navigator,
+    "eligibility-agent": continue_eligibility_agent,
 }
 
 AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {

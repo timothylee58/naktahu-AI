@@ -70,9 +70,9 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=0,
         ),
-        "grant-finder": AgentDefinition(
-            name="grant-finder",
-            description="Government grant matching for SMEs and students.",
+        "eligibility-agent": AgentDefinition(
+            name="eligibility-agent",
+            description="Multi-turn business grant-eligibility matching with scoring, near-miss detection, and stacking analysis.",
             input_schema={},
             plan_required="free",
             credit_cost=0,
