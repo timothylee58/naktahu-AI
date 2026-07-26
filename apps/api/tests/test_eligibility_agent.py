@@ -13,7 +13,7 @@ import pytest
 
 from app.agents.eligibility_agent.analyst_node import _build_stacking_matrix, _score_grant, analyst_node
 from app.agents.eligibility_agent.grant_rag_node import grant_rag_node
-from app.agents.eligibility_agent.intake_node import _extract_profile_fields, _missing_required, intake_node
+from app.agents.eligibility_agent.intake_node import _missing_required, intake_node
 from app.agents.eligibility_agent.state import BusinessProfile, EligibilityState
 
 
