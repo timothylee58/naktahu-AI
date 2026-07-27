@@ -23,14 +23,15 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.agents.checkpointer import get_checkpointer
+from app.agents.eligibility_agent.compatibility import grant_compatibility_check
 from app.agents.eligibility_agent.graph import get_eligibility_agent_graph
 from app.agents.eligibility_agent.state import EligibilityState
 from app.agents.eligibility_agent.synthesiser_node import synthesiser_node
@@ -60,6 +61,49 @@ class SessionResult(BaseModel):
     near_miss_grants: list[dict[str, Any]]
     stacking_matrix: Optional[dict[str, Any]]
     business_profile: Optional[dict[str, Any]]
+
+
+class CompatibilityRequest(BaseModel):
+    programme_names: list[str] = Field(..., min_length=2, max_length=10)
+    language: Language = "en"
+
+    @field_validator("programme_names")
+    @classmethod
+    def _bound_items(cls, v: list[str]) -> list[str]:
+        for name in v:
+            if not (1 <= len(name.strip()) <= 200):
+                raise ValueError("each programme name must be 1-200 characters")
+        return v
+
+    @field_validator("language")
+    @classmethod
+    def _normalise(cls, v: str) -> str:
+        return normalise_language(v)
+
+
+class CompatibilityPair(BaseModel):
+    programme_a: str = Field(..., max_length=200)
+    programme_b: str = Field(..., max_length=200)
+    verdict: Literal["stackable", "partial_overlap", "conflict", "unknown"]
+    overlap_scope: Optional[str] = Field(None, max_length=64)
+    explanation: str = Field("", max_length=4000)
+    source_url: Optional[str] = Field(None, max_length=500)
+    last_verified: Optional[str] = Field(None, max_length=32)
+    source: Literal["rules_table", "legacy_array", "none"]
+
+
+class CompatibilityResponse(BaseModel):
+    programmes: list[str] = Field(..., max_length=10)
+    pairs: list[CompatibilityPair] = Field(..., max_length=45)
+    has_conflicts: bool
+    conflict_count: int = Field(..., ge=0, le=45)
+    partial_overlap_count: int = Field(..., ge=0, le=45)
+    stackable_count: int = Field(..., ge=0, le=45)
+    unknown_count: int = Field(..., ge=0, le=45)
+    unrecognised_programmes: list[str] = Field(default_factory=list, max_length=10)
+    advice: list[str] = Field(default_factory=list, max_length=10)
+    degraded: bool = False
+    language: Literal["bm", "en"] = "en"
 
 
 def _checkpointer(request: Request) -> Any:
@@ -209,6 +253,37 @@ async def send_message(
             log.warning("eligibility_session_finalise_failed", error=str(exc))
 
     return StreamingResponse(_sse_stream(_emit_grants()), media_type="text/event-stream")
+
+
+@router.post("/compatibility", response_model=CompatibilityResponse)
+async def check_compatibility(
+    body: CompatibilityRequest,
+    request: Request,
+    user: Optional[UserContext] = Depends(get_optional_user),
+) -> CompatibilityResponse:
+    """Grant stacking compatibility matrix for 2-10 programmes.
+
+    Synchronous JSON lookup (not SSE) — usable directly from the UI without
+    running a full intake session. Auth tier matches the sibling eligibility
+    endpoints (get_optional_user): this is public-value reference data.
+    No slowapi decorator here for the same reason the sibling endpoints have
+    none; the global middleware rate limiter still applies.
+    """
+    supabase = getattr(request.app.state, "supabase", None)
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Eligibility Agent is temporarily unavailable.")
+
+    result = await grant_compatibility_check(
+        body.programme_names, supabase, language=body.language
+    )
+    log.info(
+        "grant_compatibility_checked",
+        n=len(result["programmes"]),
+        conflicts=result["conflict_count"],
+        degraded=result["degraded"],
+        authed=bool(user),
+    )
+    return CompatibilityResponse(**result)
 
 
 @router.get("/{session_id}/result", response_model=SessionResult)
