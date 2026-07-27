@@ -1,6 +1,6 @@
 """
-Ingest an RSS/Atom feed into document_chunks — the table rag_node's
-hybrid_search actually queries (distinct from dosm_documents, which
+Ingest an RSS/Atom feed or a plain HTML page into document_chunks — the table
+rag_node's hybrid_search actually queries (distinct from dosm_documents, which
 scripts/ingest.py feeds via a separate CSV pipeline).
 
 Intended for periodic sources like Parliament Hansard or a ministry's
@@ -15,6 +15,21 @@ Usage:
 
     python -m scripts.ingest_feed --feed-url ... --domain government \
         --ministry "..." --dry-run
+
+Some government portals (notably the MIDA InvestMalaysia sites) publish no
+feed at all — they are HTML pages. `--kind html` runs the same dedup,
+injection-scan, embed and insert path over text extracted from the page,
+chunked so each row is a usable RAG chunk rather than one giant blob:
+
+    python -m scripts.ingest_feed --kind html \
+        --feed-url https://www.investmalaysia.gov.my \
+        --domain business --ministry "Malaysian Investment Development Authority (MIDA)" \
+        --language en --dry-run
+
+Registered sources (scripts/sources.py) can be selected by name instead of
+repeating the metadata; --source fills in url/kind/domain/ministry/language:
+
+    python -m scripts.ingest_feed --source invest-malaysia-gov --dry-run
 """
 from __future__ import annotations
 
@@ -43,6 +58,7 @@ if str(_API_ROOT) not in sys.path:
 from app.agents.rag_node import _embed  # noqa: E402 — reuse the live ILMU→OpenAI embedding fallback
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
+from scripts.sources import SOURCES_BY_NAME, get_source  # noqa: E402
 
 load_dotenv()
 
@@ -55,6 +71,23 @@ _VALID_DOMAINS = {
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
+
+# HTML page extraction. There is no pre-existing chunk-size convention in the
+# repo (scripts/ingest.py embeds whole CSV rows), so these are declared here as
+# the one place to tune them.
+_CHUNK_MAX_CHARS = 1200   # roughly 250-350 tokens — a usable hybrid-search unit
+_MIN_BLOCK_CHARS = 40     # generic boilerplate filter: nav/footer links are short
+_MIN_CHUNK_CHARS = 80     # don't emit a chunk too small to answer anything
+
+# Block-level tags whose boundaries become paragraph breaks during extraction.
+_BLOCK_TAGS = frozenset({
+    "p", "div", "br", "li", "tr", "td", "th", "section", "article", "header",
+    "footer", "nav", "main", "aside", "h1", "h2", "h3", "h4", "h5", "h6",
+    "table", "ul", "ol", "blockquote", "pre", "form", "option",
+})
+
+_TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_HEADING_RE = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
 
 
 @dataclass
@@ -96,6 +129,86 @@ def _strip_html(text: str) -> str:
     stripper = _HTMLStripper()
     stripper.feed(text)
     return _WHITESPACE_RE.sub(" ", stripper.get_data()).strip()
+
+
+class _HTMLBlockStripper(_HTMLStripper):
+    """_HTMLStripper (which already drops <script>/<style>) plus paragraph
+    breaks at block-level tag boundaries, so a page can be split into text
+    blocks instead of collapsing into one unbroken line."""
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        super().handle_starttag(tag, attrs)
+        if tag in _BLOCK_TAGS:
+            self.text.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        super().handle_endtag(tag)
+        if tag in _BLOCK_TAGS:
+            self.text.append("\n")
+
+
+def extract_blocks(html: str) -> list[str]:
+    """Extract visible text blocks from an HTML page.
+
+    Deliberately generic: no site-specific CSS selectors, because the two MIDA
+    portals this was written for are unreachable from CI/sandbox (proxy 403),
+    so any selector would be an unverifiable guess. Nav/footer boilerplate is
+    filtered only by the length heuristic (_MIN_BLOCK_CHARS), which will keep
+    some menu text and drop some genuinely short content."""
+    stripper = _HTMLBlockStripper()
+    stripper.feed(html)
+    blocks: list[str] = []
+    for raw in stripper.get_data().split("\n"):
+        block = _WHITESPACE_RE.sub(" ", raw).strip()
+        if len(block) >= _MIN_BLOCK_CHARS:
+            blocks.append(block)
+    return blocks
+
+
+def _chunk_blocks(blocks: list[str]) -> list[str]:
+    """Pack text blocks into chunks of at most _CHUNK_MAX_CHARS, never splitting
+    a block across chunks unless the block alone exceeds the limit."""
+    chunks: list[str] = []
+    current: list[str] = []
+    size = 0
+    for block in blocks:
+        while len(block) > _CHUNK_MAX_CHARS:
+            if current:
+                chunks.append("\n\n".join(current))
+                current, size = [], 0
+            chunks.append(block[:_CHUNK_MAX_CHARS])
+            block = block[_CHUNK_MAX_CHARS:]
+        if size and size + len(block) + 2 > _CHUNK_MAX_CHARS:
+            chunks.append("\n\n".join(current))
+            current, size = [], 0
+        current.append(block)
+        size += len(block) + 2
+    if current:
+        chunks.append("\n\n".join(current))
+    return [c for c in chunks if len(c) >= _MIN_CHUNK_CHARS]
+
+
+def extract_page_title(html: str, fallback: str) -> str:
+    """<title>, else the first <h1>, else the registry/source name."""
+    for pattern in (_TITLE_RE, _HEADING_RE):
+        match = pattern.search(html)
+        if match:
+            title = _strip_html(match.group(1))
+            if title:
+                return title
+    return fallback
+
+
+def parse_html_page(html_bytes: bytes, page_url: str, fallback_title: str) -> list[FeedEntry]:
+    """Turn one HTML page into FeedEntry chunks so the HTML path can reuse the
+    RSS path's injection scan, content_hash dedup, embedding and insert logic
+    unchanged. Every chunk carries the page title and the page URL."""
+    html = html_bytes.decode("utf-8", errors="replace")
+    title = extract_page_title(html, fallback_title)
+    return [
+        FeedEntry(title=title, description=chunk, link=page_url)
+        for chunk in _chunk_blocks(extract_blocks(html))
+    ]
 
 
 def _scan_for_injection(content: str) -> Optional[str]:
@@ -183,18 +296,27 @@ def _existing_hashes(supabase, hashes: list[str]) -> set[str]:
 async def main_async(args: argparse.Namespace) -> None:
     supabase = None if args.dry_run else create_client(settings.supabase_url, settings.supabase_service_key)
 
-    print(f"Fetching feed: {args.feed_url}")
+    # getattr default keeps callers that predate --kind (and existing tests)
+    # on the RSS path unchanged.
+    kind = getattr(args, "kind", "rss")
+    is_html = kind == "html"
+
+    print(f"Fetching {'page' if is_html else 'feed'}: {args.feed_url}")
     try:
-        xml_bytes = fetch_feed(args.feed_url)
+        raw_bytes = fetch_feed(args.feed_url)
     except httpx.HTTPError as exc:
-        print(f"ERROR: failed to fetch feed — {exc}", file=sys.stderr)
+        print(f"ERROR: failed to fetch {'page' if is_html else 'feed'} — {exc}", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        entries = parse_feed(xml_bytes)[: args.limit]
-    except ET.ParseError as exc:
-        print(f"ERROR: failed to parse XML feed — {exc}", file=sys.stderr)
-        sys.exit(1)
+    if is_html:
+        fallback_title = getattr(args, "source_title", None) or args.feed_url
+        entries = parse_html_page(raw_bytes, args.feed_url, fallback_title)[: args.limit]
+    else:
+        try:
+            entries = parse_feed(raw_bytes)[: args.limit]
+        except ET.ParseError as exc:
+            print(f"ERROR: failed to parse XML feed — {exc}", file=sys.stderr)
+            sys.exit(1)
     print(f"Parsed {len(entries)} entries (limit {args.limit})")
 
     skipped_injection = 0
@@ -265,14 +387,40 @@ async def main_async(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest an RSS/Atom feed into document_chunks")
-    parser.add_argument("--feed-url", required=True, help="RSS or Atom feed URL")
-    parser.add_argument("--domain", required=True, choices=sorted(_VALID_DOMAINS))
-    parser.add_argument("--ministry", required=True, help="Attributed source, e.g. 'Parliament of Malaysia'")
+    parser = argparse.ArgumentParser(
+        description="Ingest an RSS/Atom feed or an HTML page into document_chunks"
+    )
+    parser.add_argument(
+        "--source",
+        choices=sorted(SOURCES_BY_NAME),
+        help="Registered source from scripts/sources.py — fills in url/kind/domain/ministry/language",
+    )
+    parser.add_argument("--feed-url", help="RSS/Atom feed URL, or page URL with --kind html")
+    parser.add_argument("--kind", default="rss", choices=["rss", "html"], help="Source type (default: rss)")
+    parser.add_argument("--domain", choices=sorted(_VALID_DOMAINS))
+    parser.add_argument("--ministry", help="Attributed source, e.g. 'Parliament of Malaysia'")
     parser.add_argument("--language", default="bm", choices=["bm", "en", "zh"])
-    parser.add_argument("--limit", type=int, default=50, help="Max entries per run")
+    parser.add_argument("--limit", type=int, default=50, help="Max entries/chunks per run")
     parser.add_argument("--dry-run", action="store_true", help="Parse and embed but do not write to Supabase")
+    parser.add_argument("--source-title", help="Fallback title for HTML pages with no <title>/<h1>")
     args = parser.parse_args()
+
+    if args.source:
+        source = get_source(args.source)
+        args.feed_url = args.feed_url or source.url
+        args.kind = source.kind
+        args.domain = args.domain or source.domain
+        args.ministry = args.ministry or source.ministry
+        args.language = source.language if args.language == "bm" else args.language
+        args.source_title = args.source_title or source.name
+
+    missing = [n for n in ("feed_url", "domain", "ministry") if not getattr(args, n)]
+    if missing:
+        parser.error(
+            "missing required argument(s): "
+            + ", ".join("--" + n.replace("_", "-") for n in missing)
+            + " (or pass --source)"
+        )
 
     asyncio.run(main_async(args))
 
