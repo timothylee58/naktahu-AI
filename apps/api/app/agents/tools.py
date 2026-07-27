@@ -202,3 +202,24 @@ async def send_email(
             log.warning("send_email_failed", status=resp.status_code)
             return False
     return True
+
+
+async def grant_compatibility_check(
+    programme_names: list[str],
+    supabase: Any,
+    *,
+    language: str = "en",
+) -> dict[str, Any]:
+    """Grant stacking compatibility matrix (stackable / partial_overlap /
+    conflict / unknown) for a set of programmes a founder plans to apply for
+    simultaneously.
+
+    Thin delegation to app.agents.eligibility_agent.compatibility so this
+    module stays the single import surface for agent-callable tools. Imported
+    lazily to keep tools.py free of an eligibility-agent import cycle.
+    """
+    from app.agents.eligibility_agent.compatibility import (
+        grant_compatibility_check as _check,
+    )
+
+    return await _check(programme_names, supabase, language=language)

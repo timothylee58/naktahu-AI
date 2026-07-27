@@ -13,6 +13,7 @@ from typing import Any
 
 import structlog
 
+from app.agents.eligibility_agent.compatibility import _load_rules, canonical_name
 from app.agents.eligibility_agent.state import EligibilityState
 
 log = structlog.get_logger(__name__)
@@ -166,8 +167,34 @@ def _score_grant(grant: dict[str, Any], profile: dict[str, Any]) -> dict[str, An
     return result
 
 
-def _build_stacking_matrix(grants: list[dict[str, Any]]) -> dict[str, Any]:
+async def _load_compatibility_rules(
+    supabase: Any, names: list[str]
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """Fetch grant_compatibility_rules rows for `names`, keyed by sorted pair.
+
+    Returns an empty mapping (never raises) when supabase is absent or
+    migration 021 has not been applied — the matrix then falls back to the
+    binary text[] arrays exactly as before (Trap #4 / Trap #5).
+    """
+    if supabase is None or len(names) < 2:
+        return {}
+    rules = await _load_rules(supabase, names)
+    if not rules:
+        return {}
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    for rule in rules:
+        a = canonical_name(rule.get("programme_a", ""))
+        b = canonical_name(rule.get("programme_b", ""))
+        out[(a, b) if a <= b else (b, a)] = rule
+    return out
+
+
+def _build_stacking_matrix(
+    grants: list[dict[str, Any]],
+    rules_by_pair: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     names = [g.get("programme_name") for g in grants]
+    rules_by_pair = rules_by_pair or {}
 
     conflict_pairs: list[list[str]] = []
     seen_conflicts: set[tuple[str, str]] = set()
@@ -189,6 +216,41 @@ def _build_stacking_matrix(grants: list[dict[str, Any]]) -> dict[str, Any]:
                     seen_stackable.add(pair)
                     stackable_pairs.append(list(pair))
 
+    # ── Three-state upgrade: rules-table verdicts override / extend the arrays ──
+    # The text[] arrays can only say compatible/incompatible. Where migration
+    # 021's rules table has a row for a pair, it is authoritative — including
+    # the third state (partial_overlap) the arrays cannot express.
+    partial_overlap_pairs: list[dict[str, Any]] = []
+    seen_partial: set[tuple[str, str]] = set()
+    for rule_key, rule in rules_by_pair.items():
+        a, b = rule_key
+        if a not in names or b not in names:
+            continue
+        rule_type = rule.get("rule_type")
+        if rule_type == "partial_overlap":
+            if rule_key in seen_partial:
+                continue
+            seen_partial.add(rule_key)
+            partial_overlap_pairs.append({
+                "pair": [a, b],
+                "overlap_scope": rule.get("overlap_scope"),
+                "explanation_en": rule.get("explanation_en"),
+                "explanation_bm": rule.get("explanation_bm"),
+                "source_url": rule.get("source_url"),
+            })
+            # A partial overlap is not a clean stack — don't also advertise it
+            # as stackable if a legacy array claimed so.
+            if list(rule_key) in stackable_pairs:
+                stackable_pairs.remove(list(rule_key))
+        elif rule_type == "conflict" and rule_key not in seen_conflicts:
+            seen_conflicts.add(rule_key)
+            conflict_pairs.append(list(rule_key))
+            if list(rule_key) in stackable_pairs:
+                stackable_pairs.remove(list(rule_key))
+        elif rule_type == "stackable" and rule_key not in seen_stackable:
+            seen_stackable.add(rule_key)
+            stackable_pairs.append(list(rule_key))
+
     ordered = sorted(
         grants,
         key=lambda g: (
@@ -202,12 +264,38 @@ def _build_stacking_matrix(grants: list[dict[str, Any]]) -> dict[str, Any]:
     total_min = sum(g.get("amount_min_myr") or 0 for g in grants)
     total_max = sum(g.get("amount_max_myr") or 0 for g in grants)
 
+    # `total_potential_myr_*` keep their original (naive: sum-of-everything)
+    # meaning — the synthesiser and /result already read them and existing
+    # tests assert on them. `realistic_total_myr_max` is the honest number:
+    # walk recommended_sequence and drop any grant that conflicts with one
+    # already accepted. Partial overlaps are NOT dropped — both grants can
+    # genuinely be held; the restriction is per-expense-line, not per-total,
+    # and is surfaced through partial_overlap_pairs instead.
+    conflict_lookup: set[tuple[str, str]] = {tuple(p) for p in conflict_pairs}  # type: ignore[misc]
+    accepted: list[dict[str, Any]] = []
+    excluded: list[str] = []
+    for grant in ordered:
+        name = grant.get("programme_name")
+        clashes = any(
+            (min(name, other) if name and other else name, max(name, other) if name and other else other)
+            in conflict_lookup
+            for other in (g.get("programme_name") for g in accepted)
+        )
+        if clashes:
+            excluded.append(name)
+        else:
+            accepted.append(grant)
+    realistic_total_max = sum(g.get("amount_max_myr") or 0 for g in accepted)
+
     return {
         "conflict_pairs": conflict_pairs,
         "stackable_pairs": stackable_pairs,
+        "partial_overlap_pairs": partial_overlap_pairs,
         "recommended_sequence": recommended_sequence,
         "total_potential_myr_min": total_min,
         "total_potential_myr_max": total_max,
+        "realistic_total_myr_max": realistic_total_max,
+        "excluded_from_realistic_total": excluded,
     }
 
 
@@ -226,7 +314,16 @@ async def analyst_node(state: EligibilityState) -> dict[str, Any]:
         key=lambda g: g["eligibility_score"],
         reverse=True,
     )
-    stacking_matrix = _build_stacking_matrix(matched) if matched else None
+    stacking_matrix = None
+    if matched:
+        # analyst_node reads its Supabase client off state["_supabase"], the
+        # same way graph.py threads it into grant_rag_node. Absent client or
+        # unapplied migration 021 -> empty rules -> binary-array behaviour.
+        rules_by_pair = await _load_compatibility_rules(
+            state.get("_supabase"),
+            [g.get("programme_name") for g in matched if g.get("programme_name")],
+        )
+        stacking_matrix = _build_stacking_matrix(matched, rules_by_pair)
 
     return {
         "matched_grants": matched,
