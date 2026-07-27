@@ -6,6 +6,18 @@
 -- This is a deliberate user-directed architecture replacement, not a bug fix.
 -- =============================================================================
 
+-- ── 0. Defensive guard: ensure agents-table orchestration columns exist ────
+-- Migration 017_agent_orchestration_columns.sql adds these, but migrations
+-- are pasted manually (Trap #5) and are not guaranteed to have run yet on
+-- every environment. These ADD COLUMN IF NOT EXISTS statements are no-ops
+-- if 017 already applied, so this migration works regardless of order.
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS version text NOT NULL DEFAULT '1.0.0';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS capabilities jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS supported_domains jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS supports_multi_turn boolean NOT NULL DEFAULT false;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS supports_streaming boolean NOT NULL DEFAULT false;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS max_timeout_seconds real NOT NULL DEFAULT 30.0;
+
 -- ── 1. Retire the grant-finder agent row, register eligibility-agent ───────
 DELETE FROM agents WHERE name = 'grant-finder';
 
