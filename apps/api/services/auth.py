@@ -14,8 +14,16 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/ignored", auto_error=False)
 # the admin API (services/billing.py, on checkout.session.completed). No
 # separate plan/subscriptions table needed — the JWT claim is the source of
 # truth, refreshed client-side after checkout completes.
-VALID_PLANS = {"free", "student", "pro", "business"}
+VALID_PLANS = {"free", "student", "pro", "business", "investor"}
 ADMIN_ROLES = frozenset({"primary_admin", "secondary_admin"})
+
+# Parallel entitlements — capability flags that are NOT rungs on the plan
+# ladder (see middleware/plan_gate._PLAN_RANK). An entitlement is granted
+# either by app_metadata.entitlements (a list of strings) or implicitly by
+# holding the same-named plan. "investor" is the first: a VC firm on the
+# investor plan is a different market segment from a business-plan SME, so
+# neither inherits the other's features by ordinal comparison.
+VALID_ENTITLEMENTS = frozenset({"investor"})
 
 
 @dataclass(frozen=True)
@@ -25,6 +33,7 @@ class UserContext:
     plan: str = "free"
     email: Optional[str] = None
     role: Optional[str] = None
+    entitlements: tuple[str, ...] = ()
 
 
 def effective_plan(plan: str, role: Optional[str]) -> str:
@@ -65,13 +74,34 @@ def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
         if isinstance(raw_role, str) and raw_role in ADMIN_ROLES:
             role = raw_role
 
+    # Entitlements are resolved from the RAW plan, before effective_plan()
+    # collapses admins to "business" — otherwise an admin on the investor
+    # plan would silently lose the investor entitlement.
+    granted: set[str] = set()
+    if plan in VALID_ENTITLEMENTS:
+        granted.add(plan)
+    if isinstance(app_metadata, dict):
+        raw_entitlements = app_metadata.get("entitlements")
+        if isinstance(raw_entitlements, list):
+            granted.update(
+                e for e in raw_entitlements
+                if isinstance(e, str) and e in VALID_ENTITLEMENTS
+            )
+
     plan = effective_plan(plan, role)
 
     email = payload.get("email")
     if not isinstance(email, str):
         email = None
 
-    return UserContext(user_id=sub, is_anonymous=False, plan=plan, email=email, role=role)
+    return UserContext(
+        user_id=sub,
+        is_anonymous=False,
+        plan=plan,
+        email=email,
+        role=role,
+        entitlements=tuple(sorted(granted)),
+    )
 
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> UserContext:
