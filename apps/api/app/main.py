@@ -19,6 +19,7 @@ from app.core.weave_tracing import init_weave
 from app.middleware.request_id import RequestIDMiddleware
 from app.routers.agents import router as agents_router
 from app.routers.eligibility import router as eligibility_router
+from app.routers.investor import router as investor_router
 from app.routers.health import router as health_router
 from app.routers.query import router as query_router
 from app.routers.session import router as session_router
@@ -135,6 +136,7 @@ app.include_router(feedback.router)
 app.include_router(billing.router)
 app.include_router(share.router)
 app.include_router(eligibility_router)
+app.include_router(investor_router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
 app.include_router(metrics_router)
