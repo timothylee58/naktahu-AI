@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.agents.checkpointer import reset_checkpointer_for_tests
-from app.agents.grant_finder.graph import build_grant_finder_graph
+from app.agents.eligibility_agent.graph import build_eligibility_agent_graph
 from app.agents.health_triage.graph import build_health_triage_graph
 from app.agents.immigration_navigator.graph import build_immigration_navigator_graph
 from app.agents.study_agent.graph import build_study_agent_graph
@@ -34,7 +34,7 @@ def test_extract_questions_from_text() -> None:
     build_study_agent_graph,
     build_immigration_navigator_graph,
     build_health_triage_graph,
-    build_grant_finder_graph,
+    build_eligibility_agent_graph,
 ])
 def test_agent_graphs_compile(builder) -> None:
     from langgraph.checkpoint.memory import MemorySaver
@@ -70,7 +70,7 @@ def test_list_agents_endpoint() -> None:
     res = _client().get("/api/v1/agents", headers=_auth_header("pro"))
     assert res.status_code == 200
     names = {a["name"] for a in res.json()}
-    assert "grant-finder" in names
+    assert "eligibility-agent" in names
     assert "health-triage" in names
 
 
@@ -98,16 +98,17 @@ def test_study_agent_requires_student_plan() -> None:
     assert res.status_code == 403
 
 
-def test_grant_finder_start() -> None:
+def test_eligibility_agent_start() -> None:
     fake = AsyncMock(return_value={
-        "session_id": "g1",
-        "status": "completed",
-        "output": {"grants": [{"name": "TEKUN", "url": "https://www.tekun.gov.my"}]},
+        "session_id": "e1",
+        "status": "awaiting_hitl",
+        "awaiting_hitl": True,
+        "output": {"next_question": "What type of business do you have?"},
     })
-    with patch.object(agents_router, "AGENT_START_HANDLERS", {"grant-finder": fake}):
+    with patch.object(agents_router, "AGENT_START_HANDLERS", {"eligibility-agent": fake}):
         res = _client().post(
-            "/api/v1/agents/grant-finder/start",
-            json={"sector": "fnb", "funding_need": "RM 20000"},
+            "/api/v1/agents/eligibility-agent/start",
+            json={"sector": "fnb", "message": "I run a small restaurant"},
             headers=_auth_header("free"),
         )
     assert res.status_code == 200

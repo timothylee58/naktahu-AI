@@ -1,4 +1,13 @@
-"""GrantFinderAdapter — government grant matching for SMEs and students."""
+"""EligibilityAgentAdapter — multi-turn business grant-eligibility matching.
+
+Replaces GrantFinderAdapter (deliberate architecture decision — see PR body).
+Multi-turn: intake spans several turns before the graph produces
+matched/near-miss grants and a stacking matrix, so orchestrator callers
+should expect an `awaiting_hitl`-style continuation via
+app.services.agent_runner.continue_eligibility_agent for turns after the
+first, or use the dedicated app/routers/eligibility.py SSE endpoints for the
+full streamed experience.
+"""
 from __future__ import annotations
 
 import structlog
@@ -11,16 +20,17 @@ from app.orchestration.types import AgentCapability, AgentResult, AgentStatusEnu
 log = structlog.get_logger(__name__)
 
 
-class GrantFinderAdapter(AgentProtocol):
-    """Adapter for the Grant Finder vertical agent.
+class EligibilityAgentAdapter(AgentProtocol):
+    """Adapter for the Eligibility Agent vertical agent.
 
-    Single-shot agent: takes user profile (sector, stage, need) and matches
-    against government grant knowledge base.
+    Multi-turn agent: intake_node asks up to 3 follow-up questions to build a
+    business profile, then grant_rag_node + analyst_node match against the
+    grant_database and produce a scored, stacking-aware result.
     """
 
     @property
     def name(self) -> str:
-        return "grant-finder"
+        return "eligibility-agent"
 
     @property
     def version(self) -> str:
@@ -28,7 +38,7 @@ class GrantFinderAdapter(AgentProtocol):
 
     @property
     def description(self) -> str:
-        return "Government grant matching for SMEs and students."
+        return "Multi-turn business grant-eligibility matching with scoring, near-miss detection, and stacking analysis."
 
     @property
     def capabilities(self) -> list[AgentCapability]:
@@ -36,7 +46,8 @@ class GrantFinderAdapter(AgentProtocol):
             AgentCapability.grant_matching,
             AgentCapability.government_knowledge,
             AgentCapability.finance_knowledge,
-            AgentCapability.single_shot,
+            AgentCapability.conversational_intake,
+            AgentCapability.multi_turn,
         ]
 
     @property
@@ -52,27 +63,29 @@ class GrantFinderAdapter(AgentProtocol):
         return 0
 
     async def start(self, context: OrchestratorContext) -> AgentResult:
-        """Run the grant finder agent."""
-        from app.services.agent_runner import start_grant_finder
+        """Run the eligibility agent's first intake turn."""
+        from app.services.agent_runner import start_eligibility_agent
 
         payload = {
+            "business_type": context.extra.get("business_type", ""),
             "sector": context.extra.get("sector", ""),
-            "business_stage": context.extra.get("business_stage", "early"),
-            "funding_need": context.extra.get("funding_need", context.query),
+            "annual_revenue_myr": context.extra.get("annual_revenue_myr"),
+            "is_bumiputera": context.extra.get("is_bumiputera"),
+            "registered_months": context.extra.get("registered_months"),
             "message": context.query,
             "language": context.language,
         }
 
         with TimedExecution() as timer:
             try:
-                result = await start_grant_finder(
+                result = await start_eligibility_agent(
                     user_id=context.user_id,
                     payload=payload,
                     supabase_client=context.extra.get("supabase_client"),
                     checkpointer=context.extra.get("checkpointer"),
                 )
             except Exception as exc:
-                log.error("grant_finder_failed", error=str(exc))
+                log.error("eligibility_agent_failed", error=str(exc))
                 return make_result(
                     session_id=generate_session_id(),
                     agent_name=self.name,
@@ -86,7 +99,7 @@ class GrantFinderAdapter(AgentProtocol):
         return make_result(
             session_id=result.get("session_id", generate_session_id()),
             agent_name=self.name,
-            output=str(output.get("summary", "")) if isinstance(output, dict) else str(output),
+            output=str(output.get("next_question", "")) if isinstance(output, dict) else str(output),
             structured_output=output if isinstance(output, dict) else {"raw": output},
             latency_ms=timer.elapsed_ms,
         )
