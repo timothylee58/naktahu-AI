@@ -164,12 +164,14 @@ def test_no_auth_required_for_mp_lookup(client):
     assert res.status_code == 200, res.text
 
 
-def test_hansard_domain_not_in_canonical_domain_list():
-    """Regression guard for the Trap #6 decision recorded in
-    025_parliament_watch.sql: 'hansard' is deliberately NOT added to the
-    canonical RAG domain list in this PR (no content is ingested yet).
-    If a future change adds it here without also widening the
-    valid_domain CHECK constraint (and vice versa), this test should be
-    the trigger to check both sites are updated together.
+def test_hansard_domain_now_in_canonical_domain_list():
+    """Migration 026 resolves the Trap #6 deferral recorded in
+    025_parliament_watch.sql: now that scripts/ingest_parliament/ actually
+    writes document_chunks rows with domain='hansard', 'hansard' is a
+    canonical domain everywhere router_node/guard_node classify against.
+    This is the inverse of the old
+    test_hansard_domain_not_in_canonical_domain_list (removed here) — see
+    026_hansard_ingestion.sql for the corresponding CHECK-constraint widen
+    and scripts/ingest_feed.py for its copy of the same list.
     """
-    assert "hansard" not in _VALID_DOMAINS
+    assert "hansard" in _VALID_DOMAINS

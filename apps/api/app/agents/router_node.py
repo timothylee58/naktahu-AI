@@ -19,7 +19,7 @@ _SYSTEM_PROMPT = (
     "Detect language from the query text itself, not from any metadata."
 )
 
-_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture"}
+_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "hansard"}
 # Map common LLM outputs to stored domain values
 _DOMAIN_ALIASES = {"health": "healthcare", "epf": "epf", "pension": "epf", "kwsp": "epf", "tax": "tax", "cukai": "tax"}
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
