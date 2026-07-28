@@ -37,6 +37,7 @@ dependencies = [
     "stripe>=11.5.0,<12.0",
     "python-multipart>=0.0.18",
     "pypdf>=5.1.0",
+    "python-docx>=1.1.0",
 ]
 
 [project.optional-dependencies]

@@ -84,6 +84,21 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=1,
         ),
+        "grant-draft-generator": AgentDefinition(
+            name="grant-draft-generator",
+            description=(
+                "Grant application draft: executive summary, use-of-funds narrative, "
+                "financial projection skeleton, and required-document checklist for a "
+                "selected grant + business profile. Export as PDF or Word (.docx)."
+            ),
+            input_schema={
+                "programme_name": {"type": "string", "required": True},
+                "business_profile": {"type": "object", "required": True},
+                "export_format": {"type": "string", "enum": ["pdf", "docx"], "default": "pdf"},
+            },
+            plan_required="free",
+            credit_cost=3,
+        ),
     }
 
 
@@ -127,10 +142,14 @@ def plan_satisfies(user_plan: str, required: str) -> bool:
     return _PLAN_RANK.get(user_plan, 0) >= _PLAN_RANK.get(required, 0)
 
 
+_BUSINESS_UNLIMITED_AGENTS = frozenset({"compliance-drafter", "grant-draft-generator"})
+
+
 def is_credit_exempt(user_plan: str, agent_name: str, *, role: Optional[str] = None) -> bool:
-    """Business plan gets unlimited Compliance Drafter; admins are fully exempt."""
+    """Business plan gets unlimited Compliance Drafter + Grant Draft Generator;
+    admins are fully exempt."""
     from services.auth import is_admin_role
 
     if is_admin_role(role):
         return True
-    return user_plan == "business" and agent_name == "compliance-drafter"
+    return user_plan == "business" and agent_name in _BUSINESS_UNLIMITED_AGENTS

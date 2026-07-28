@@ -9,11 +9,11 @@ from pydantic import BaseModel, Field
 
 from app.agents.checkpointer import get_checkpointer
 from app.services.agent_runner import (
+    AGENT_CONFIRM_HANDLERS,
     AGENT_CONTINUE_HANDLERS,
     AGENT_START_HANDLERS,
     AGENT_STATUS_HANDLERS,
     CREDIT_ON_COMPLETE_AGENTS,
-    confirm_compliance_drafter,
     get_compliance_status,
 )
 from middleware.plan_gate import require_plan
@@ -43,6 +43,10 @@ class AgentStartRequest(BaseModel):
     annual_revenue_myr: Optional[float] = None
     is_bumiputera: Optional[bool] = None
     registered_months: Optional[int] = None
+    # grant-draft-generator
+    programme_name: str = ""
+    business_profile: dict[str, Any] = Field(default_factory=dict)
+    export_format: Literal["pdf", "docx"] = "pdf"
 
 
 class AgentContinueRequest(BaseModel):
@@ -183,7 +187,8 @@ async def agent_confirm(
     user: Annotated[UserContext, Depends(get_current_user)],
 ) -> dict[str, Any]:
     agent = _require_agent_access(agent_name, user)
-    if agent_name != "compliance-drafter":
+    handler = AGENT_CONFIRM_HANDLERS.get(agent_name)
+    if not handler:
         raise HTTPException(status_code=501, detail=f"Agent '{agent_name}' does not support confirm.")
 
     sb = getattr(request.app.state, "supabase", None)
@@ -192,7 +197,7 @@ async def agent_confirm(
         if remaining < agent.credit_cost:
             raise HTTPException(status_code=402, detail="Insufficient agent credits.")
 
-    result = await confirm_compliance_drafter(
+    result = await handler(
         session_id=body.session_id,
         user_id=user.user_id,
         user_email=user.email,
