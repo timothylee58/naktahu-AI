@@ -12,6 +12,8 @@ from langgraph.types import Command
 from app.agents.compliance_drafter.graph import get_compliance_drafter_graph
 from app.agents.compliance_drafter.state import ComplianceDrafterState
 from app.agents.eligibility_agent.graph import get_eligibility_agent_graph
+from app.agents.grant_draft_generator.graph import get_grant_draft_generator_graph
+from app.agents.grant_draft_generator.state import GrantDraftState
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
@@ -194,6 +196,89 @@ def _persist_document(supabase_client: Any, user_id: str, agent_type: str, value
         }).execute()
     except Exception as exc:
         log.warning("generated_document_persist_failed", error=str(exc))
+
+
+# ── Grant Draft Generator ────────────────────────────────────────────────────
+# Single-shot intake (programme_name + business_profile arrive together in
+# the start payload), same billing-on-confirm HITL shape as compliance-drafter:
+# credits are deducted only after the user approves the draft preview (see
+# confirm_grant_draft_generator + agents.py's generalised /confirm dispatch).
+
+
+async def start_grant_draft_generator(
+    *,
+    user_id: str,
+    payload: dict[str, Any],
+    supabase_client: Any,
+    checkpointer: Any,
+) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    inputs: GrantDraftState = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "programme_name": payload.get("programme_name", ""),
+        "business_profile": payload.get("business_profile") or {},
+        "language": payload.get("language", "bm"),
+        "export_format": payload.get("export_format", "pdf"),
+        "turns_count": 0,
+        "tool_calls": [],
+        "_supabase": supabase_client,
+    }
+    values, awaiting = await _run_graph(graph, session_id, inputs)
+    status = "error" if values.get("error") else ("awaiting_hitl" if awaiting else "completed")
+    _log_run(supabase_client, user_id, "grant-draft-generator", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values, awaiting=awaiting)
+    resp["status"] = status
+    resp["awaiting_hitl"] = bool(awaiting) and not values.get("error")
+    resp["report_json"] = values.get("report_json")
+    if values.get("error"):
+        resp["error"] = values["error"]
+    return resp
+
+
+async def confirm_grant_draft_generator(
+    *,
+    session_id: str,
+    user_id: str,
+    user_email: Optional[str],
+    supabase_client: Any,
+    checkpointer: Any,
+) -> dict[str, Any]:
+    graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    await graph.aupdate_state(_thread_config(session_id), {"_supabase": supabase_client, "_user_email": user_email})
+    values, _ = await _run_graph(graph, session_id, {}, resume=True)
+    status = "error" if values.get("error") else "completed"
+    _log_run(supabase_client, user_id, "grant-draft-generator", session_id, {"confirm": True}, values, values.get("latency_ms", 0), status)
+    if supabase_client and (values.get("pdf_storage_path") or values.get("docx_storage_path")):
+        _persist_document(supabase_client, user_id, "grant-draft-generator", {
+            "pdf_storage_path": values.get("pdf_storage_path") or values.get("docx_storage_path"),
+            "signed_url": values.get("signed_url"),
+            "url_expires_at": values.get("url_expires_at"),
+        })
+    resp = _base_response(session_id, values)
+    resp["status"] = status
+    resp["signed_url"] = values.get("signed_url")
+    resp["url_expires_at"] = values.get("url_expires_at")
+    resp["email_sent"] = values.get("email_sent", False)
+    if values.get("error"):
+        resp["error"] = values["error"]
+    return resp
+
+
+async def get_grant_draft_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
+    graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        return {"session_id": session_id, "status": "not_found"}
+    values = dict(snapshot.values)
+    awaiting = snapshot.next
+    return {
+        "session_id": session_id,
+        "status": "awaiting_hitl" if awaiting else values.get("status", "completed"),
+        "report_json": values.get("report_json"),
+        "output": _public_output(values),
+    }
 
 
 # ── Study Agent ───────────────────────────────────────────────────────────────
@@ -446,6 +531,7 @@ AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "health-triage": start_health_triage,
     "eligibility-agent": start_eligibility_agent,
     "research-synthesiser": start_research_synthesiser,
+    "grant-draft-generator": start_grant_draft_generator,
 }
 
 AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -460,6 +546,17 @@ AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
     "study-agent": get_study_status,
     "immigration-navigator": get_immigration_status,
     "health-triage": get_health_status,
+    "grant-draft-generator": get_grant_draft_status,
+}
+
+# agent_name -> confirm handler. Every entry here is dispatched generically
+# by agents.py's /confirm endpoint (billing happens here, after HITL preview
+# approval — never at start). Keep the kwargs shape (session_id, user_id,
+# user_email, supabase_client, checkpointer) identical across entries so the
+# router can call them uniformly.
+AGENT_CONFIRM_HANDLERS: dict[str, Callable[..., Any]] = {
+    "compliance-drafter": confirm_compliance_drafter,
+    "grant-draft-generator": confirm_grant_draft_generator,
 }
 
 CREDIT_ON_COMPLETE_AGENTS = frozenset({"immigration-navigator"})

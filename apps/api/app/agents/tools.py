@@ -179,6 +179,106 @@ async def generate_pdf(
         return storage_path, "", ""
 
 
+async def generate_docx(
+    report_json: dict[str, Any],
+    *,
+    user_id: str,
+    agent_type: str = "grant-draft-generator",
+    supabase_client: Any = None,
+) -> tuple[str, str, str]:
+    """Render a structured report to a real Word document (headings per
+    section, not HTML dumped into a text run), upload to Supabase Storage.
+    Returns (path, signed_url, expires_at). Same storage/signed-URL pattern
+    as generate_pdf, namespaced by agent_type."""
+    docx_bytes: bytes
+    try:
+        from docx import Document  # type: ignore[import-untyped]
+
+        doc = Document()
+        doc.add_heading(
+            f"Grant Application Draft — {report_json.get('programme_name', '')}", level=0
+        )
+        disclaimer = report_json.get("disclaimer", "")
+        if disclaimer:
+            p = doc.add_paragraph()
+            run = p.add_run(disclaimer)
+            run.italic = True
+
+        doc.add_heading("Executive Summary", level=1)
+        doc.add_paragraph(report_json.get("executive_summary", ""))
+
+        doc.add_heading("Use of Funds", level=1)
+        doc.add_paragraph(report_json.get("use_of_funds_narrative", ""))
+
+        doc.add_heading("Financial Projection Skeleton", level=1)
+        skeleton = report_json.get("financial_projection_skeleton") or {}
+        skeleton_disclaimer = skeleton.get("disclaimer", "")
+        if skeleton_disclaimer:
+            p = doc.add_paragraph()
+            run = p.add_run(skeleton_disclaimer)
+            run.italic = True
+            run.bold = True
+
+        doc.add_heading("Revenue Projection (template)", level=2)
+        for row in skeleton.get("revenue_projection", []):
+            doc.add_paragraph(f"{row.get('period')}: RM_____ ({row.get('notes', '')})", style="List Bullet")
+
+        doc.add_heading("Cost Breakdown (template)", level=2)
+        for row in skeleton.get("cost_breakdown", []):
+            doc.add_paragraph(f"{row.get('category')}: RM_____", style="List Bullet")
+
+        doc.add_heading("Funding Allocation (template)", level=2)
+        for row in skeleton.get("funding_allocation", []):
+            doc.add_paragraph(f"{row.get('use_of_funds')}: RM_____", style="List Bullet")
+
+        doc.add_heading("Required Document Checklist", level=1)
+        for item in report_json.get("document_checklist", []) or []:
+            required = "Required" if item.get("required") else "Optional"
+            doc.add_paragraph(
+                f"{item.get('item')} ({required}): {item.get('description')}",
+                style="List Bullet",
+            )
+
+        if disclaimer:
+            doc.add_paragraph()
+            p = doc.add_paragraph()
+            run = p.add_run(disclaimer)
+            run.italic = True
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        docx_bytes = buf.getvalue()
+    except Exception as exc:
+        log.warning("python_docx_unavailable", error=str(exc))
+        docx_bytes = str(report_json).encode("utf-8")
+
+    storage_path = f"agents/{agent_type}/{user_id}/{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.docx"
+    bucket = settings.supabase_storage_bucket
+
+    if not supabase_client:
+        return storage_path, "", ""
+
+    try:
+        supabase_client.storage.from_(bucket).upload(
+            storage_path,
+            docx_bytes,
+            {
+                "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "upsert": "true",
+            },
+        )
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        signed = supabase_client.storage.from_(bucket).create_signed_url(
+            storage_path,
+            86_400,
+        )
+        url = signed.get("signedURL") or signed.get("signedUrl") or ""
+        return storage_path, url, expires_at.isoformat()
+    except Exception as exc:
+        log.warning("docx_upload_failed", error=str(exc))
+        return storage_path, "", ""
+
+
 async def send_email(
     *,
     to: str,
