@@ -18,7 +18,7 @@ from middleware.user_context import UserContextMiddleware
 from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
 from app.routers.eligibility import router as eligibility_router
 from app.routers.investor import router as investor_router
-from routers import billing, feedback, history, query, share
+from routers import billing, feedback, history, parliament, query, share
 from routers.developer import router as developer_router
 from routers.metrics import router as metrics_router
 from routers.observability import router as observability_router
@@ -91,6 +91,7 @@ app.include_router(history.router)
 app.include_router(feedback.router)
 app.include_router(billing.router)
 app.include_router(share.router)
+app.include_router(parliament.router)
 app.include_router(eligibility_router)
 app.include_router(investor_router)
 app.include_router(developer_router)
