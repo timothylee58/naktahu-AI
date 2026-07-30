@@ -193,3 +193,98 @@ async def test_guard_node_llm_exception_fails_open() -> None:
         )
 
     assert result == {}
+
+
+# ── Every suggested question shipped in the frontend (PromptChips.tsx +
+# DOMAIN_PILL_QUERIES in chat/page.tsx), across all three languages. Two
+# separate production incidents (lost MyKad, then "who is my MP and how do
+# I contact them") were each caused by this exact refusal message firing on
+# a shipped example query — patching one phrase at a time already proved
+# insufficient, so this suite checks the whole set at once, in one place,
+# so a third one doesn't slip through the same way. If a chip/pill query
+# changes, this list must be updated to match (no shared source of truth
+# with the TS frontend today — see module docstring note below).
+_ALL_SUGGESTED_QUERIES = [
+    "How do I pay income tax in Malaysia?",
+    "Bagaimana cara untuk membayar cukai pendapatan di Malaysia?",
+    "在马来西亚如何缴纳所得税？",
+    "How do I withdraw EPF for first home purchase?",
+    "Bagaimana cara mengeluarkan wang KWSP untuk pembelian rumah pertama?",
+    "如何提取公积金用于购买首套房屋？",
+    "What are the steps to register a company with SSM Malaysia?",
+    "Apakah langkah-langkah untuk mendaftarkan syarikat di SSM Malaysia?",
+    "在马来西亚SSM注册公司的步骤是什么？",
+    "What should I do if I lose my MyKad?",
+    "Apa yang perlu dilakukan jika MyKad hilang?",
+    "如果我的身份证遗失了该怎么办？",
+    "How do I apply for a work permit in Malaysia?",
+    "Bagaimana cara memohon permit kerja atau pas pekerjaan di Malaysia?",
+    "如何在马来西亚申请工作准证？",
+    "What financial aid is available for university students in Malaysia?",
+    "Apakah bantuan kewangan yang tersedia untuk pelajar universiti di Malaysia?",
+    "马来西亚大学生有哪些经济援助可以申请？",
+    "What grants am I eligible for as a small business owner?",
+    "Apakah geran kerajaan yang saya layak mohon sebagai pemilik perniagaan kecil?",
+    "作为小型企业主，我可以申请哪些政府资助？",
+    "Can I apply for two different government grants at the same time?",
+    "Bolehkah saya memohon dua geran kerajaan yang berbeza pada masa yang sama?",
+    "我可以同时申请两项不同的政府资助吗？",
+    "When does this grant's application window close, and how do I get a reminder?",
+    "Bila tarikh tutup permohonan geran ini dan bagaimana saya boleh dapat peringatan?",
+    "这项资助的申请截止日期是什么时候？我该如何收到提醒？",
+    "Who is the Member of Parliament for my constituency and how do I contact them?",
+    "Siapakah ahli parlimen bagi kawasan saya dan bagaimana saya boleh hubungi mereka?",
+    "我的选区议员是谁？我该如何联系他们？",
+    "What benefits are covered under the government healthcare scheme?",
+    "Apakah faedah yang dilindungi di bawah skim kesihatan kerajaan?",
+    "政府医疗保健计划涵盖哪些福利？",
+]
+
+
+@pytest.mark.parametrize("query", _ALL_SUGGESTED_QUERIES)
+def test_all_suggested_queries_never_trip_keyword_layer(query: str) -> None:
+    """Deterministic, no network: every shipped example query must pass the
+    hard keyword layer regardless of what intent summary the router might
+    generate for it. This is the fast, always-on check — the LLM layer
+    below is soft/best-effort and can only be exercised with a mock."""
+    from app.agents.guard_node import _is_blocked_intent
+
+    assert _is_blocked_intent(query, query) is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "domain,intent,language,query",
+    [
+        ("general", "replace a lost national identity card", "en",
+         "What should I do if I lose my MyKad?"),
+        ("general", "ganti kad pengenalan yang hilang", "bm",
+         "Apa yang perlu dilakukan jika MyKad hilang?"),
+        ("general", "replace a lost identity card", "zh",
+         "如果我的身份证遗失了该怎么办？"),
+        ("parliament", "find and contact my elected representative", "en",
+         "Who is the Member of Parliament for my constituency and how do I contact them?"),
+        ("parliament", "cari dan hubungi wakil rakyat saya", "bm",
+         "Siapakah ahli parlimen bagi kawasan saya dan bagaimana saya boleh hubungi mereka?"),
+    ],
+)
+async def test_llm_false_positive_on_shipped_queries_overridden(
+    domain: str, intent: str, language: str, query: str
+) -> None:
+    """Regression for both production incidents: even if the soft LLM
+    classifier incorrectly returns harmful=true for one of these shipped
+    example queries, the benign-context safety net must recover it. This
+    directly reproduces each incident by forcing the same bad verdict that
+    was observed live, rather than relying on the (unverifiable in this
+    test suite) improved system prompt alone to avoid it in the first
+    place — the code-level safety net must not depend on prompt tuning
+    holding forever."""
+    completion = _mock_completion('{"harmful": true, "reason": "false positive"}')
+
+    with patch("app.services.llm_client.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await guard_node(
+            {"domain": domain, "intent": intent, "language": language, "query": query}
+        )
+
+    assert result == {}
