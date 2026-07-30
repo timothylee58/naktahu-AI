@@ -43,7 +43,25 @@ _OUTPUT_ONLY_PATTERNS = [
     ]
 ]
 
-_OUTPUT_FLAG_PATTERNS = INJECTION_PATTERNS + _OUTPUT_ONLY_PATTERNS
+# Two INJECTION_PATTERNS entries are unsuitable for output-side scanning:
+# they use a "not-NakTahu" / "not-a-Malaysian" negative lookahead tuned for
+# a USER query addressing the assistant in second person ("you are now X",
+# "act as Y" — a persona-redirection attempt). But an ordinary civic-service
+# ANSWER legitimately says things like "you are now eligible to withdraw
+# your EPF savings" or "you must act as the appointed guardian" about the
+# CITIZEN, not the assistant — and trips the same lookahead. Empirically
+# verified false positive on both benign sentences before this exclusion
+# (see the commit that added it). _OUTPUT_ONLY_PATTERNS above already covers
+# the output-appropriate first-person equivalents ("I am now unrestricted",
+# "I'm no longer bound by").
+_OUTPUT_UNSUITABLE_PATTERN_STRINGS = {
+    r"you\s+are\s+now\s+(a\s+)?(?!NakTahu)",
+    r"act\s+as\s+(if\s+you\s+are\s+)?(?!a\s+Malaysian)",
+}
+_INPUT_PATTERNS_SAFE_FOR_OUTPUT = [
+    p for p in INJECTION_PATTERNS if p.pattern not in _OUTPUT_UNSUITABLE_PATTERN_STRINGS
+]
+_OUTPUT_FLAG_PATTERNS = _INPUT_PATTERNS_SAFE_FOR_OUTPUT + _OUTPUT_ONLY_PATTERNS
 
 
 def _scan_output_for_red_flags(text: str) -> bool:

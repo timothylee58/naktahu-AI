@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agents.router_node import router_node
+from app.agents.router_node import _SYSTEM_PROMPT, _VALID_DOMAINS, router_node
 
 
 def _mock_completion(content: str) -> MagicMock:
@@ -111,3 +111,59 @@ async def test_router_node_json_in_markdown_fence() -> None:
 
     assert result["language"] == "bm"
     assert result["domain"] == "healthcare"
+
+
+@pytest.mark.asyncio
+async def test_router_node_json_with_trailing_commentary_containing_brace() -> None:
+    """Regression: a naive greedy regex (r'\\{.*\\}') matches from the first
+    '{' to the LAST '}' anywhere in the completion, so if the model appends
+    ANY trailing text containing a brace, the match spans past the actual
+    JSON object and json.loads fails with "Extra data" — silently
+    discarding an otherwise-correct classification and falling back to
+    domain=None. router_node now uses extract_json_object() (JSONDecoder.
+    raw_decode from the first '{'), which parses only the first balanced
+    object and ignores anything after it."""
+    content = (
+        '{"language": "en", "domain": "government", "intent": "register company SSM"} '
+        "Let me know if you need more info {happy to help}"
+    )
+    completion = _mock_completion(content)
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "How do I register a company with SSM?"})
+
+    assert result["language"] == "en"
+    assert result["domain"] == "government"
+
+
+@pytest.mark.asyncio
+async def test_router_node_parliament_domain_classified() -> None:
+    """'parliament' must be a reachable classification — it was added to
+    _VALID_DOMAINS in the hansard->parliament rename, but the LLM
+    classifier's own system prompt text never listed it as an option,
+    so the model could never actually choose it. Regression for that
+    prompt/domain-list drift (a 4th site beyond what Trap #6 tracks:
+    a hardcoded domain list embedded in a prompt string, not just a
+    Python set/DB constraint)."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "parliament", "intent": "find MP contact"}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node(
+            {"query": "Who is the Member of Parliament for my constituency?"}
+        )
+
+    assert result["domain"] == "parliament"
+
+
+def test_system_prompt_lists_every_valid_domain() -> None:
+    """The classifier can only choose a domain the prompt text tells it
+    about. Regression guard against the exact drift that made 'parliament'
+    unreachable: _VALID_DOMAINS was updated in the rename but the prompt's
+    own domain-list sentence was not. Every domain in _VALID_DOMAINS must
+    appear in the prompt text, not just in the Python set."""
+    for domain in _VALID_DOMAINS:
+        assert domain in _SYSTEM_PROMPT, f"{domain!r} missing from router_node._SYSTEM_PROMPT"

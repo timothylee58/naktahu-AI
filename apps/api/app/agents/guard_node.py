@@ -23,7 +23,6 @@ scope refusal.
 """
 from __future__ import annotations
 
-import json
 import re
 
 import structlog
@@ -80,7 +79,18 @@ _BENIGN_CONTEXT_RE = re.compile(
     r"apply for a (?:firearm|gun|weapon) licen[cs]e|"
     r"legal(?:ly)? (?:own|possess) a weapon|"
     r"sport shooting|"
-    r"legal penalty|legal punishment|under the .* act)",
+    r"legal penalty|legal punishment|under the .* act|"
+    # Chinese-script equivalents. The app is trilingual (bm/en/zh — see
+    # CLAUDE.md and test_guard_node.py's _ALL_SUGGESTED_QUERIES), and
+    # router_node's classifier prompt does not force the `intent` summary
+    # to be in English for a zh query, so this override must not depend on
+    # a Latin substring being present anywhere in the combined
+    # intent+query string — see the audit finding that flagged this gap.
+    r"(?:身份证|护照|证件).{0,15}(?:遗失|丢失|不见了|弄丢)|"
+    r"(?:遗失|丢失|弄丢).{0,15}(?:身份证|护照|证件)|"
+    r"(?:议员|国会议员|州议员).{0,20}(?:联系|联络|联络方式)|"
+    r"(?:联系|联络).{0,20}(?:议员|国会议员|州议员)|"
+    r"选区议员是谁|我的议员)",
     re.IGNORECASE,
 )
 
@@ -109,7 +119,6 @@ _GUARD_LLM_SYSTEM_PROMPT = (
     "happen to mention a sensitive-sounding noun. "
     'Return JSON only: {"harmful": true or false, "reason": "short reason"}.'
 )
-_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
 def _is_blocked_intent(intent: str, query: str = "") -> bool:
@@ -137,7 +146,7 @@ async def _is_harmful_by_llm(query: str) -> bool:
 
     # Imported lazily so tests can patch app.agents.guard_node.ilmu_client
     # without requiring ILMU credentials at import time.
-    from app.services.llm_client import ILMU_CHAT_MODEL, ilmu_client
+    from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
 
     try:
         resp = await ilmu_client.chat.completions.create(
@@ -150,8 +159,11 @@ async def _is_harmful_by_llm(query: str) -> bool:
             temperature=0,
         )
         raw = resp.choices[0].message.content or ""
-        m = _JSON_RE.search(raw)
-        parsed = json.loads(m.group(0)) if m else {}
+        # extract_json_object handles trailing commentary after the JSON —
+        # a naive greedy regex here previously matched through to the LAST
+        # '}' anywhere in the completion, corrupting the parse the moment
+        # the model appended any text containing a brace.
+        parsed = extract_json_object(raw)
         return bool(parsed.get("harmful", False))
     except Exception as exc:
         log.warning("guard_llm_check_failed_open", error=str(exc), query_len=len(query))
@@ -164,6 +176,11 @@ def _refusal_message(lang: str) -> str:
             "Maaf, NakTahu AI hanya boleh menjawab soalan berkaitan perkhidmatan awam, "
             "undang-undang, pendidikan, kewangan, kesihatan, dan hal ehwal rakyat Malaysia. "
             "Soalan anda berada di luar skop sistem ini."
+        )
+    if lang == "zh":
+        return (
+            "抱歉，NakTahu AI 只能回答与马来西亚公共服务、法律、教育、金融、"
+            "医疗保健及公民事务相关的问题。您的问题超出本系统的范围。"
         )
     return (
         "Sorry, NakTahu AI is designed to answer questions about Malaysian public services, "

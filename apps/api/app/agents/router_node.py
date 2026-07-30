@@ -1,14 +1,13 @@
 """router_node — fast intent/language/domain classifier using ILMU chat model."""
 from __future__ import annotations
 
-import json
 import re
 
 import structlog
 import weave
 
 from app.models.state import AgentState
-from app.services.llm_client import ILMU_CHAT_MODEL, ilmu_client
+from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
 
 log = structlog.get_logger(__name__)
 
@@ -23,7 +22,6 @@ _SYSTEM_PROMPT = (
 _VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament"}
 # Map common LLM outputs to stored domain values
 _DOMAIN_ALIASES = {"health": "healthcare", "epf": "epf", "pension": "epf", "kwsp": "epf", "tax": "tax", "cukai": "tax"}
-_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 # Unicode ranges that unambiguously identify script
 _CJK_RE = re.compile(r'[一-鿿㐀-䶿豈-﫿]')
@@ -58,9 +56,11 @@ async def router_node(state: AgentState) -> dict:
             temperature=0,
         )
         raw = resp.choices[0].message.content or ""
-        # Extract JSON even when the model wraps it in markdown fences
-        m = _JSON_RE.search(raw)
-        parsed = json.loads(m.group(0)) if m else {}
+        # Extract JSON even when the model wraps it in markdown fences or
+        # appends trailing commentary (extract_json_object handles both —
+        # see its docstring for why a greedy regex here silently corrupts
+        # correct classifications).
+        parsed = extract_json_object(raw)
     except Exception as exc:
         log.warning("router_node_error", error=str(exc), query_len=len(query))
         parsed = {}

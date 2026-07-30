@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agents.guard_node import guard_node
+from app.agents.guard_node import _refusal_message, guard_node
 
 
 def _mock_completion(content: str) -> MagicMock:
@@ -239,6 +239,53 @@ _ALL_SUGGESTED_QUERIES = [
     "Apakah faedah yang dilindungi di bawah skim kesihatan kerajaan?",
     "政府医疗保健计划涵盖哪些福利？",
 ]
+
+
+def test_refusal_message_has_all_three_languages() -> None:
+    """Regression: _refusal_message only special-cased 'bm', so a blocked
+    zh query got the English refusal text — inconsistent with this being
+    a trilingual app (bm/en/zh, per CLAUDE.md and _ALL_SUGGESTED_QUERIES
+    below). Each language's message must actually be in that language,
+    not just non-empty."""
+    bm = _refusal_message("bm")
+    en = _refusal_message("en")
+    zh = _refusal_message("zh")
+
+    assert bm != en
+    assert zh != en
+    assert zh != bm
+    # Cheap script check rather than asserting exact copy — catches the
+    # regression (zh falling through to the English string) without
+    # over-constraining future wording changes.
+    assert any("一" <= ch <= "鿿" for ch in zh), "zh refusal message contains no Chinese characters"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "intent,query",
+    [
+        ("身份证遗失需要补办", "如果我的身份证遗失了该怎么办？"),
+        ("查找并联系我的议员", "我的选区议员是谁？我该如何联系他们？"),
+    ],
+)
+async def test_llm_false_positive_on_zh_shipped_queries_overridden(intent: str, query: str) -> None:
+    """Regression for the audit finding that _BENIGN_CONTEXT_RE had zero
+    CJK patterns: the existing false-positive-recovery test for the zh
+    MyKad query used an ENGLISH intent fixture, which is why it passed —
+    it never actually exercised the case where router_node's LLM returns
+    a CHINESE-language intent summary for a zh query (which the classifier
+    prompt does not forbid). This reproduces that combination directly:
+    a Chinese intent AND a Chinese query, with the LLM (incorrectly)
+    flagging it harmful, and asserts the safety net still recovers it."""
+    completion = _mock_completion('{"harmful": true, "reason": "false positive"}')
+
+    with patch("app.services.llm_client.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await guard_node(
+            {"domain": "general", "intent": intent, "language": "zh", "query": query}
+        )
+
+    assert result == {}
 
 
 @pytest.mark.parametrize("query", _ALL_SUGGESTED_QUERIES)
