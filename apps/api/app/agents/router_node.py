@@ -15,7 +15,8 @@ log = structlog.get_logger(__name__)
 _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
     "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
-    "legal, finance, healthcare, epf, tax, business, immigration, culture), intent (string summary max 10 words). "
+    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament), intent (string summary max 10 words). "
+    "Use 'parliament' for questions about Members of Parliament, constituencies, voting records, bills, or Hansard. "
     "Detect language from the query text itself, not from any metadata."
 )
 
