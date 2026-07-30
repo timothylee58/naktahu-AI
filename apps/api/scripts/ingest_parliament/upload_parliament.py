@@ -9,7 +9,7 @@ What it does:
      match_confidence/match_strategy from link_mp_profiles.py).
   2. Inserts mp_votes rows (source_verified is ALWAYS false — this pipeline
      ingests unverified scraped data; verification is a human step).
-  3. Chunks mp_statements into document_chunks for RAG (domain='hansard'),
+  3. Chunks mp_statements into document_chunks for RAG (domain='parliament'),
      after an injection scan and content_hash dedup identical in mechanism
      to scripts/ingest_feed.py's.
   4. Generates embeddings via the shared app.agents.rag_node._embed
@@ -223,7 +223,7 @@ async def upload_statements(
                 "content": text,
                 "content_hash": content_hash,
                 "language": "bm",
-                "domain": "hansard",
+                "domain": "parliament",
                 "source_title": f"Hansard DR {meta['sitting_date']} — {meta['mp_name']}",
                 "source_url": meta["source_url"],
                 "ministry": "Parlimen Malaysia",

@@ -253,7 +253,7 @@ async def test_document_chunks_insert_never_contains_bill_number(fake_supabase, 
     inserted_rows = insert_calls[0].args[0]
     for row in inserted_rows:
         assert "bill_number" not in row
-        assert row["domain"] == "hansard"
+        assert row["domain"] == "parliament"
         assert "content_hash" in row
         assert row["effective_date"] == "2025-07-07"
         assert row["expiry_aware"] is False

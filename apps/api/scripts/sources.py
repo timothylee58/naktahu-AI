@@ -17,9 +17,10 @@ Usage:
     python -m scripts.ingest_feed --source invest-malaysia-gov --dry-run
 
 Adding a source: append a Source(...) below. Domain MUST be one of the
-canonical domains in migration 016 as widened by migration 026 (Trap #6:
-government, education, legal, finance, healthcare, epf, tax, business,
-immigration, culture, hansard) — never invent a new one here.
+canonical domains in migration 016 as widened by migration 026 and renamed
+by migration 027 (Trap #6: government, education, legal, finance,
+healthcare, epf, tax, business, immigration, culture, parliament) — never
+invent a new one here.
 URLs must be real, verified pages; never guess a feed URL.
 """
 from __future__ import annotations

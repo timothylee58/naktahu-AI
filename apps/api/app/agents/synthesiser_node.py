@@ -221,7 +221,7 @@ async def _generate_suggestions(query: str, domain: str, language: str) -> list[
             "zh": ["近期有哪些相关的活动或节庆？", "我可以从哪里了解更多这项文化遗产？", "有没有文化项目的资助？"],
             "en": ["Are there any related upcoming events or festivals?", "Where can I learn more about this heritage topic?", "Are there grants available for cultural projects?"],
         },
-        "hansard": {
+        "parliament": {
             "bm": ["Siapakah ahli parlimen bagi kawasan ini?", "Bilakah perbahasan ini berlaku di Dewan Rakyat?", "Bagaimana cara mengakses Hansard penuh?"],
             "zh": ["该选区的国会议员是谁？", "这场辩论是何时在国会举行的？", "如何查阅完整的国会议事录？"],
             "en": ["Who is the MP for this constituency?", "When did this debate take place in Parliament?", "How do I access the full Hansard record?"],

@@ -198,6 +198,7 @@ const MS: Translations = {
   'domain.education': 'Pendidikan & SPM',
   'domain.health': 'Kesihatan',
   'domain.immigration': 'Imigresen',
+  'domain.parliament': 'Parlimen',
 
   /* ── career wizard ── */
   'career.badge': 'Perancang Kerjaya',
@@ -503,6 +504,7 @@ const EN: Translations = {
   'domain.education': 'Education & SPM',
   'domain.health': 'Healthcare',
   'domain.immigration': 'Immigration',
+  'domain.parliament': 'Parliament',
 
   /* ── career wizard ── */
   'career.badge': 'Career Planner',
@@ -802,6 +804,7 @@ const ZH: Translations = {
   'domain.education': '教育与大马教育文凭',
   'domain.health': '医疗卫生',
   'domain.immigration': '移民事务',
+  'domain.parliament': '国会',
 
   /* ── career wizard ── */
   'career.badge': '职业规划',
