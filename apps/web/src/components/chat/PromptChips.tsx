@@ -60,6 +60,38 @@ const CHIPS: Chip[] = [
     queryEn: 'What financial aid is available for university students in Malaysia?',
     queryZh: '马来西亚大学生有哪些经济援助可以申请？',
   },
+  {
+    labelMs: 'Geran perniagaan',
+    labelEn: 'Grants I qualify for',
+    labelZh: '符合资格的资助',
+    queryMs: 'Apakah geran kerajaan yang saya layak mohon sebagai pemilik perniagaan kecil?',
+    queryEn: 'What grants am I eligible for as a small business owner?',
+    queryZh: '作为小型企业主，我可以申请哪些政府资助？',
+  },
+  {
+    labelMs: 'Gabung geran',
+    labelEn: 'Combine grants',
+    labelZh: '资助叠加',
+    queryMs: 'Bolehkah saya memohon dua geran kerajaan yang berbeza pada masa yang sama?',
+    queryEn: 'Can I apply for two different government grants at the same time?',
+    queryZh: '我可以同时申请两项不同的政府资助吗？',
+  },
+  {
+    labelMs: 'Tarikh tutup geran',
+    labelEn: 'Grant deadline alerts',
+    labelZh: '资助截止提醒',
+    queryMs: 'Bila tarikh tutup permohonan geran ini dan bagaimana saya boleh dapat peringatan?',
+    queryEn: "When does this grant's application window close, and how do I get a reminder?",
+    queryZh: '这项资助的申请截止日期是什么时候？我该如何收到提醒？',
+  },
+  {
+    labelMs: 'Wakil parlimen',
+    labelEn: 'My MP',
+    labelZh: '我的议员',
+    queryMs: 'Siapakah ahli parlimen bagi kawasan saya dan bagaimana saya boleh hubungi mereka?',
+    queryEn: 'Who is the Member of Parliament for my constituency and how do I contact them?',
+    queryZh: '我的选区议员是谁？我该如何联系他们？',
+  },
 ];
 
 interface PromptChipsProps {

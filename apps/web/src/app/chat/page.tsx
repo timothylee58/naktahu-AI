@@ -25,6 +25,44 @@ function makeId() {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
+// Representative queries for the empty-state domain pills, one per language.
+// Mirrors the Chip { queryMs/queryEn/queryZh } shape used by PromptChips —
+// kept inline (rather than importing PromptChips' CHIPS) since these pills
+// are the small icon-less variant and map 1:1 to domain keys, not free-form
+// example questions.
+const DOMAIN_PILL_QUERIES: Record<'tax' | 'epf' | 'business' | 'education' | 'health' | 'immigration', Record<'ms' | 'en' | 'zh', string>> = {
+  tax: {
+    ms: 'Bagaimana cara untuk membayar cukai pendapatan di Malaysia?',
+    en: 'How do I pay income tax in Malaysia?',
+    zh: '在马来西亚如何缴纳所得税？',
+  },
+  epf: {
+    ms: 'Bagaimana cara mengeluarkan wang KWSP untuk pembelian rumah pertama?',
+    en: 'How do I withdraw EPF for first home purchase?',
+    zh: '如何提取公积金用于购买首套房屋？',
+  },
+  business: {
+    ms: 'Apakah langkah-langkah untuk mendaftarkan syarikat di SSM Malaysia?',
+    en: 'What are the steps to register a company with SSM Malaysia?',
+    zh: '在马来西亚SSM注册公司的步骤是什么？',
+  },
+  education: {
+    ms: 'Apakah bantuan kewangan yang tersedia untuk pelajar universiti di Malaysia?',
+    en: 'What financial aid is available for university students in Malaysia?',
+    zh: '马来西亚大学生有哪些经济援助可以申请？',
+  },
+  health: {
+    ms: 'Apakah faedah yang dilindungi di bawah skim kesihatan kerajaan?',
+    en: 'What benefits are covered under the government healthcare scheme?',
+    zh: '政府医疗保健计划涵盖哪些福利？',
+  },
+  immigration: {
+    ms: 'Bagaimana cara memohon permit kerja atau pas pekerjaan di Malaysia?',
+    en: 'How do I apply for a work permit in Malaysia?',
+    zh: '如何在马来西亚申请工作准证？',
+  },
+};
+
 function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
@@ -322,13 +360,15 @@ function ChatPageInner() {
               <p className={`text-sm max-w-[260px] leading-relaxed ${emptyDesc}`}>{t('chat.empty')}</p>
             </div>
             <div className="flex flex-wrap justify-center gap-2 max-w-xs">
-              {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span
+              {(['tax', 'epf', 'business', 'education', 'health', 'immigration'] as const).map((d) => (
+                <button
                   key={d}
-                  className={`text-[11px] font-medium border rounded-full px-2.5 py-1 transition-colors hover:shadow-sm ${domainPill}`}
+                  type="button"
+                  onClick={() => handleChipSelect(DOMAIN_PILL_QUERIES[d][locale])}
+                  className={`text-[11px] font-medium border rounded-full px-2.5 py-1 transition-colors hover:shadow-sm cursor-pointer ${domainPill}`}
                 >
                   {t(`domain.${d}`)}
-                </span>
+                </button>
               ))}
             </div>
           </motion.div>
