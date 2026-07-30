@@ -5,13 +5,23 @@ before RAG retrieval is attempted. Returns a refusal message written via
 get_stream_writer() so the SSE endpoint receives it like any other token stream.
 
 Two layers of defense:
-1. A harmful-intent keyword list (hard, fast, free).
+1. A harmful-intent keyword list (hard, fast, free). Always active.
 2. A best-effort LLM intent classifier (ILMU chat model) for queries that pass
    the keyword check, to catch novel jailbreak/harmful-intent phrasings that
    don't contain any of the listed keywords. This second pass is soft: any
    failure (timeout, API error, malformed JSON) fails OPEN — the query
    proceeds to rag_node rather than being blocked, so an ILMU outage never
    becomes an availability incident or a source of false positives.
+
+   DISABLED BY DEFAULT (settings.guard_llm_check_enabled) as of the
+   incident where it wrongly flagged three unrelated benign civic queries
+   as harmful — lost ID document, contacting an MP, registering a company
+   — despite two rounds of system-prompt tuning (_GUARD_LLM_SYSTEM_PROMPT
+   below still documents that tuning for whenever this is re-enabled).
+   Prompt-only mitigation did not hold across topics, so layer 2 is opt-in
+   via GUARD_LLM_CHECK_ENABLED=true until its real-world false-positive
+   rate is understood. Layer 1 is unaffected and still blocks every
+   listed keyword regardless of this setting.
 
 The query's ``domain`` label is deliberately NOT used as a block reason. The
 router forces every real classification into a valid domain, so a

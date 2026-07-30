@@ -37,6 +37,17 @@ export function ChatInput({
   const isDark = variant === 'dark';
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Guards against a double-submit: isStreaming is a prop driven by async
+  // state in the parent's SSE hook, so there is a real window — between a
+  // submit event firing and React re-rendering with disabled=true — where
+  // a second event (e.g. a duplicate/repeated Enter keydown) could still
+  // see the stale isStreaming=false closure and fire onSend a second time.
+  // A ref is synchronous and immune to that render-timing gap.
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    if (!isStreaming) submittingRef.current = false;
+  }, [isStreaming]);
 
   const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
   const { isListening, transcript, error: voiceError, startListening, stopListening, available } =
@@ -67,7 +78,8 @@ export function ChatInput({
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming) return;
+    if (!trimmed || isStreaming || submittingRef.current) return;
+    submittingRef.current = true;
     onSend(trimmed);
     setValue('');
     if (textareaRef.current) {

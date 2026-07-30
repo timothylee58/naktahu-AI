@@ -25,6 +25,19 @@ def _patch_stream_writer():
         yield mock_writer
 
 
+@pytest.fixture(autouse=True)
+def _enable_llm_guard_check():
+    """The soft LLM classifier defaults OFF in production (see guard_node.py's
+    module docstring — it wrongly flagged benign civic queries as harmful
+    across three separate incidents). This test file exists specifically to
+    exercise the two-layer keyword+LLM interaction, so every test here
+    enables it explicitly — otherwise most of these tests would pass
+    trivially (the LLM mock never gets called) without actually testing the
+    behavior their docstrings claim to cover."""
+    with patch("app.agents.guard_node.settings.guard_llm_check_enabled", True):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_guard_node_keyword_blocked_never_reaches_llm() -> None:
     """A keyword-blocked query short-circuits before the LLM check ever runs."""
@@ -47,7 +60,9 @@ async def test_guard_node_keyword_blocked_never_reaches_llm() -> None:
 @pytest.mark.asyncio
 async def test_guard_node_llm_flags_harmful_query_blocked() -> None:
     """A query that passes keyword/domain checks but is flagged by the LLM
-    second pass is blocked."""
+    second pass is blocked. (The LLM check defaults OFF in production —
+    see guard_node.py's module docstring — but this test file's autouse
+    fixture enables it, since exercising this layer is the point here.)"""
     completion = _mock_completion('{"harmful": true, "reason": "jailbreak attempt"}')
 
     with patch("app.services.llm_client.ilmu_client") as mock_client:

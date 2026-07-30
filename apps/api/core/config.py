@@ -85,8 +85,17 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
     )
+    # Defaults OFF: production observed the ILMU-backed soft classifier
+    # wrongly flag three unrelated, thoroughly benign civic queries as
+    # harmful (lost ID document, contacting an MP, registering a company)
+    # despite two rounds of system-prompt tuning (see guard_node.py's
+    # _GUARD_LLM_SYSTEM_PROMPT history). The hard keyword layer
+    # (_is_blocked_intent) stays fully active regardless of this setting —
+    # only the flaky second-pass LLM check is gated by it. Re-enable via
+    # GUARD_LLM_CHECK_ENABLED=true once the classifier's real-world
+    # false-positive rate has been investigated and brought down.
     guard_llm_check_enabled: bool = Field(
-        default=True,
+        default=False,
         validation_alias=AliasChoices("GUARD_LLM_CHECK_ENABLED", "guard_llm_check_enabled"),
     )
 

@@ -75,3 +75,22 @@ def test_jwt_secret_production_with_explicit_secret_does_not_raise(monkeypatch):
     finally:
         monkeypatch.undo()
         importlib.reload(config_module)
+
+
+def test_guard_llm_check_disabled_by_default(monkeypatch):
+    """Regression: production observed the ILMU-backed soft classifier in
+    guard_node wrongly flag three unrelated benign civic queries (lost ID
+    document, contacting an MP, registering a company) as harmful despite
+    two rounds of system-prompt tuning. Defaults OFF until the classifier's
+    real-world false-positive rate is investigated — the hard keyword
+    layer (_is_blocked_intent) is unaffected by this setting and stays
+    fully active either way."""
+    monkeypatch.delenv("GUARD_LLM_CHECK_ENABLED", raising=False)
+    s = Settings()
+    assert s.guard_llm_check_enabled is False
+
+
+def test_guard_llm_check_still_respects_explicit_env_var(monkeypatch):
+    monkeypatch.setenv("GUARD_LLM_CHECK_ENABLED", "true")
+    s = Settings()
+    assert s.guard_llm_check_enabled is True
