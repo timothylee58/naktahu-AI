@@ -164,14 +164,15 @@ def test_no_auth_required_for_mp_lookup(client):
     assert res.status_code == 200, res.text
 
 
-def test_hansard_domain_now_in_canonical_domain_list():
-    """Migration 026 resolves the Trap #6 deferral recorded in
-    025_parliament_watch.sql: now that scripts/ingest_parliament/ actually
-    writes document_chunks rows with domain='hansard', 'hansard' is a
-    canonical domain everywhere router_node/guard_node classify against.
-    This is the inverse of the old
-    test_hansard_domain_not_in_canonical_domain_list (removed here) — see
-    026_hansard_ingestion.sql for the corresponding CHECK-constraint widen
-    and scripts/ingest_feed.py for its copy of the same list.
+def test_parliament_domain_in_canonical_domain_list():
+    """Migration 026 resolved the Trap #6 deferral recorded in
+    025_parliament_watch.sql by widening the canonical domain list; migration
+    027 then renamed that domain slug from 'hansard' to 'parliament' so it
+    matches every other artefact in this vertical (parliament_bills,
+    parliament_sessions, routers/parliament.py, scripts/ingest_parliament/) —
+    'hansard' was the one leftover mismatched name. See
+    027_rename_hansard_domain_to_parliament.sql for the CHECK-constraint
+    rename and scripts/ingest_feed.py for its copy of the same list.
     """
-    assert "hansard" in _VALID_DOMAINS
+    assert "parliament" in _VALID_DOMAINS
+    assert "hansard" not in _VALID_DOMAINS

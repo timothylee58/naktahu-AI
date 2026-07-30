@@ -4,7 +4,7 @@ Structured reference data (MP profiles, voting records, constituencies)
 backed by 025_parliament_watch.sql. No RAG/LLM synthesis here — every
 answer is a direct structured query or a call to one of the two SQL
 functions the migration defines. Hansard content ingestion (which would
-populate document_chunks with domain='hansard') is a follow-up PR; the
+populate document_chunks with domain='parliament') is a follow-up PR; the
 lookups below never depend on it.
 """
 

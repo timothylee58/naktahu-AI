@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.agents import synthesiser_node as synthesiser_module
-from app.agents.synthesiser_node import stream_synthesis, synthesiser_node
+from app.agents.router_node import _VALID_DOMAINS
+from app.agents.synthesiser_node import _generate_suggestions, stream_synthesis, synthesiser_node
 
 _FALLBACK_EN = "I'm sorry, I'm unable to answer right now. Please try again later."
 
@@ -214,3 +215,48 @@ async def test_synthesiser_flags_output_via_log_warning() -> None:
     args, kwargs = mock_warning.call_args
     assert args[0] == "synthesiser_output_flagged"
     assert kwargs["session_id"] == "sess-3"
+
+
+@pytest.mark.asyncio
+async def test_fallback_suggestions_present_for_all_domains_and_languages() -> None:
+    """Force the LLM path to fail for every valid domain/language and assert a
+    non-empty, non-government-only suggestion set is returned."""
+    fake_client = MagicMock()
+
+    async def raise_error(*args, **kwargs):
+        raise RuntimeError("ilmu unavailable")
+
+    fake_client.chat.completions.create = raise_error
+
+    with patch.object(synthesiser_module, "ilmu_client", fake_client):
+        for domain in _VALID_DOMAINS:
+            for lang in ("bm", "en", "zh"):
+                suggestions = await _generate_suggestions("test query", domain, lang)
+                assert isinstance(suggestions, list)
+                assert len(suggestions) == 3
+                assert all(isinstance(s, str) and s for s in suggestions)
+
+
+@pytest.mark.asyncio
+async def test_fallback_suggestions_are_domain_relevant_not_government_default() -> None:
+    """The exact bug being fixed: a non-government/education domain (tax) must
+    get tax-relevant fallback suggestions, not government's canned ones, when
+    the LLM call fails."""
+    fake_client = MagicMock()
+
+    async def raise_error(*args, **kwargs):
+        raise RuntimeError("ilmu unavailable")
+
+    fake_client.chat.completions.create = raise_error
+
+    government_en = [
+        "How do I apply for this?",
+        "How long does processing take?",
+        "What documents are needed?",
+    ]
+
+    with patch.object(synthesiser_module, "ilmu_client", fake_client):
+        tax_suggestions = await _generate_suggestions("EPF withdrawal question", "tax", "en")
+
+    assert tax_suggestions != government_en
+    assert any("tax" in s.lower() or "refund" in s.lower() or "file" in s.lower() for s in tax_suggestions)
