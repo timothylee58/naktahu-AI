@@ -47,7 +47,12 @@ _BLOCKED_INTENT_KEYWORDS = [
 # Victim/reporting-context phrasing that shares vocabulary with the blocked
 # keywords above but describes someone seeking help after being targeted,
 # not someone requesting how-to instructions. If present alongside a keyword
-# hit, the query is treated as legitimate rather than blocked.
+# hit, the query is treated as legitimate rather than blocked. Also applied
+# as a safety net over the LLM classifier's verdict (see guard_node()) — a
+# civic-service query like "lost my MyKad" shares vocabulary (identity
+# document, replacement, loss) with fraud/identity-theft phrasing and has
+# been observed to trip the LLM classifier as a false positive with no
+# code-level check to catch it, unlike the keyword layer below.
 _BENIGN_CONTEXT_RE = re.compile(
     r"(victim of|hacked my|was hacked|got hacked|"
     r"report(?:ing)? (?:a |an )?(?:scam|hack|hacking|ransomware|phishing|fraud)|"
@@ -55,6 +60,12 @@ _BENIGN_CONTEXT_RE = re.compile(
     r"complain(?:t)? (?:process|to)|steps? (?:to take|should i take)|"
     r"file a (?:police )?report|"
     r"report (?:it )?to (?:the )?(?:police|pdrm|bank negara|nacsa|cybersecurity malaysia)|"
+    r"lo(?:st|se|sing).{0,25}(?:mykad|ic|identity card|id card|passport)|"
+    r"(?:mykad|kad pengenalan|kad|pasport).{0,15}hilang|"
+    r"hilang.{0,15}(?:mykad|kad pengenalan|kad|pasport)|"
+    r"kehilangan.{0,25}(?:mykad|kad pengenalan|pasport)|"
+    r"replace.{0,25}(?:mykad|identity card|id card|passport)|"
+    r"ganti(?:kan)?.{0,25}(?:mykad|kad pengenalan|pasport)|"
     r"licen[cs]e to (?:legally )?(?:own|possess|carry)|"
     r"apply for a (?:firearm|gun|weapon) licen[cs]e|"
     r"legal(?:ly)? (?:own|possess) a weapon|"
@@ -151,6 +162,14 @@ async def guard_node(state: AgentState) -> dict:
     # the query — the hard keyword pass always short-circuits.
     if not blocked and query:
         blocked = await _is_harmful_by_llm(query)
+        # The LLM classifier gets the same benign-context safety net as the
+        # keyword layer above — it is a soft, best-effort pass and has been
+        # observed to false-positive on ordinary civic-service queries (e.g.
+        # "lost my MyKad") that share vocabulary with fraud/identity-theft
+        # phrasing. Without this override there was no way to recover from a
+        # bad LLM verdict, unlike the keyword path.
+        if blocked and _BENIGN_CONTEXT_RE.search(f"{intent.lower()} {query.lower()}"):
+            blocked = False
 
     if blocked:
         log.warning("guard_node_blocked", domain=domain, intent=intent)
