@@ -5,6 +5,7 @@ Anthropic claude-sonnet-4-20250514 is the fallback for the synthesiser only.
 """
 from __future__ import annotations
 
+import json
 import os
 
 import anthropic
@@ -29,3 +30,26 @@ ILMU_CHAT_MODEL: str = os.environ.get("ILMU_CHAT_MODEL", "ilmu-chat")
 ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "ilmu-embedding")
 OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 FALLBACK_MODEL: str = "claude-sonnet-4-20250514"
+
+
+def extract_json_object(raw: str) -> dict:
+    """Extract the first well-formed JSON object from a raw LLM completion.
+
+    Robust to markdown code fences and trailing commentary after the JSON
+    (e.g. '{...} Let me know if you need anything else!') — a naive greedy
+    regex like r'\\{.*\\}' matches from the first '{' to the LAST '}' in the
+    whole completion, so it corrupts parsing the moment the model appends
+    any text containing a brace, silently discarding an otherwise-correct
+    classification. Uses JSONDecoder.raw_decode to parse only the first
+    balanced object starting at the first '{', ignoring everything after it
+    — no dependence on where (or whether) a matching closing brace appears
+    later in unrelated trailing text.
+    """
+    start = raw.find("{")
+    if start == -1:
+        return {}
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(raw[start:])
+    except (ValueError, json.JSONDecodeError):
+        return {}
+    return obj if isinstance(obj, dict) else {}
