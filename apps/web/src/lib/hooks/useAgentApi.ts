@@ -3,13 +3,14 @@
 import { useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchWithAuth } from '@/lib/auth-headers';
+import { API_BASE } from '@/lib/api-base';
 
 export function useAgentApi() {
   const supabase = createClient();
 
   const post = useCallback(
     async (path: string, body: Record<string, unknown>) => {
-      const res = await fetchWithAuth(supabase, path, {
+      const res = await fetchWithAuth(supabase, `${API_BASE}${path}`, {
         method: 'POST',
         body: JSON.stringify(body),
       });

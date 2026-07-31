@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { Citation, SSEMetadata } from '@/lib/types';
+import { API_BASE } from '@/lib/api-base';
 
 export interface UseSSEStreamParams {
   sessionId?: string;
@@ -53,11 +54,6 @@ async function* readSSELines(
     reader.releaseLock();
   }
 }
-
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
 
 export function useSSEStream({
   sessionId,

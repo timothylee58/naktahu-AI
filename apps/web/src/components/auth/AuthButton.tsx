@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchUserCredits } from '@/lib/credits';
 import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
+import { API_BASE } from '@/lib/api-base';
 
 type Tab = 'options' | 'email';
 
@@ -76,8 +77,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         const anonId = localStorage.getItem(ANON_SESSION_KEY);
         if (anonId) {
           try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
-            await fetch(`${apiBase}/api/v1/session/migrate`, {
+            await fetch(`${API_BASE}/api/v1/session/migrate`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
