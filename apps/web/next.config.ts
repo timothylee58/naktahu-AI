@@ -20,8 +20,20 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Proxy /api/v1/* to the FastAPI backend in development.
-  // In production, Vercel rewrites (vercel.json) handle this instead.
+  // Proxy /api/v1/* to the FastAPI backend — mainly a local-dev convenience
+  // (so a bare relative fetch('/api/v1/...') still reaches the backend
+  // without NEXT_PUBLIC_API_URL set) and defense-in-depth if Netlify's
+  // Next.js runtime honours it in production too. Production code must
+  // NEVER rely on this alone, though: every fetch to the backend should
+  // build an absolute URL via the shared API_BASE constant
+  // (apps/web/src/lib/api-base.ts) instead of a bare relative path. This
+  // comment previously (incorrectly) said "In production, Vercel rewrites
+  // (vercel.json) handle this instead" — that was stale from before the
+  // Vercel→Netlify migration; no vercel.json exists in this repo, and
+  // relying on this rewrite alone in production is exactly what caused
+  // /api/v1/history, /api/v1/transcribe, the deadline-monitor widget, and
+  // every vertical-agent start/continue call to silently 404 in
+  // production (fixed by giving them all an absolute URL instead).
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     return [

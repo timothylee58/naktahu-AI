@@ -19,11 +19,7 @@ import { AuthButton } from '@/components/auth/AuthButton';
 import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
-
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
+import { API_BASE } from '@/lib/api-base';
 
 type ApiPlan = 'starter' | 'growth' | 'enterprise' | 'widget' | 'white_label';
 

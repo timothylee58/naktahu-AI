@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchWithAuth } from '@/lib/auth-headers';
+import { API_BASE } from '@/lib/api-base';
 
 export interface HistoryEntry {
   query: string;
@@ -35,7 +36,7 @@ async function parseHistoryResponse(res: Response): Promise<HistoryEntry[]> {
 
 /** @deprecated Prefer fetchHistoryAuthed — avoids stale JWT in SWR keys. */
 export async function fetchHistory(accessToken: string): Promise<HistoryEntry[]> {
-  const res = await fetch('/api/v1/history', {
+  const res = await fetch(`${API_BASE}/api/v1/history`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return parseHistoryResponse(res);
@@ -43,7 +44,7 @@ export async function fetchHistory(accessToken: string): Promise<HistoryEntry[]>
 
 /** Fetch history with live session token + 401 refresh retry. */
 export async function fetchHistoryAuthed(supabase: SupabaseClient): Promise<HistoryEntry[]> {
-  const res = await fetchWithAuth(supabase, '/api/v1/history');
+  const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/history`);
   return parseHistoryResponse(res);
 }
 

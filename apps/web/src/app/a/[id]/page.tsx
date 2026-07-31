@@ -9,11 +9,7 @@ import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { CitationChip } from '@/components/chat/CitationChip';
 import type { Citation } from '@/lib/types';
-
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
+import { API_BASE } from '@/lib/api-base';
 
 interface SharedAnswer {
   id: string;

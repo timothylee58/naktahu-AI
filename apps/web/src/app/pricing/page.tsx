@@ -7,11 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { LangToggle } from '@/components/LangToggle';
-
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
+import { API_BASE } from '@/lib/api-base';
 
 type CheckoutItem =
   | 'pro_individu'

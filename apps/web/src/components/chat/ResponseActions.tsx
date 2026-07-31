@@ -5,11 +5,7 @@ import { motion } from 'framer-motion';
 import type { Citation } from '@/lib/types';
 import { getAnonSessionId } from '@/lib/anon-session';
 import { useI18n } from '@/lib/i18n';
-
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
+import { API_BASE } from '@/lib/api-base';
 
 interface ResponseActionsProps {
   content: string;
