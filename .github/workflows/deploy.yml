@@ -58,36 +58,20 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Debug — list Railway services (temporary)
-        run: railway status --json || railway status
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        continue-on-error: true
-        # TEMPORARY diagnostic step — remove once the correct --service
-        # value below is confirmed working. `railway up --service <name>`
-        # has failed with "Service not found" for both "naktahu-ai" and
-        # "naktahu-AI" despite the Railway dashboard confirming the service
-        # exists and the token is a valid Project Token scoped to this
-        # project. This prints the project's actual service list/IDs from
-        # the same token so the next fix is read from ground truth instead
-        # of guessed from the dashboard UI's display casing.
-
       - name: Deploy to Railway
         working-directory: apps/api
-        run: railway up --service naktahu-AI --detach
+        run: railway up --service f98c0049-c3f4-4ee9-bf29-42aa220cdc16 --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         # RAILWAY_TOKEN — a Project Token (Railway dashboard → project →
         # Settings → Tokens), already scoped to one project+environment.
         # --service is required (the project also has a Redis service, so
         # `railway up` without --service fails with "Multiple services
-        # found"). Railway auto-named this service after the GitHub repo
-        # it's linked to, "naktahu-AI" (capital AI, matching the repo name
-        # timothylee58/naktahu-AI) — lowercase "naktahu-ai" previously
-        # failed with "Service not found" because CLI matching is
-        # case-sensitive.
-        # Service name must match the Railway service exactly (case-sensitive):
-        # the backend service in the naktahu-ai project is named "naktahu-ai".
+        # found"). Using the service ID rather than name: `railway status
+        # --json` (run once as a diagnostic step, since removed) showed the
+        # API service's actual name is literally "@naktahu-ai" (with an "@"
+        # prefix) — neither "naktahu-ai" nor "naktahu-AI" ever matched it.
+        # The ID is stable and immune to any further name/casing surprises.
 
   # ── Deadline Monitor cron (02:00 MYT daily) ───────────────────────────────
   deploy-deadline-cron:
