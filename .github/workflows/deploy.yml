@@ -60,10 +60,16 @@ jobs:
 
       - name: Deploy to Railway
         working-directory: apps/api
-        run: railway up --service naktahu-ai --detach
+        run: railway up --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # RAILWAY_TOKEN — from Railway dashboard → Account Settings → Tokens
+        # RAILWAY_TOKEN — a Project Token (Railway dashboard → project →
+        # Settings → Tokens), already scoped to one project+environment.
+        # No --service flag: with a Project Token the CLI's --service
+        # name-matching against "naktahu-ai" returned "Service not found"
+        # even with the confirmed-correct service name, so we rely on the
+        # token's own project/environment scope + this being the only
+        # non-Redis service to resolve the deploy target.
         # Service name must match the Railway service exactly (case-sensitive):
         # the backend service in the naktahu-ai project is named "naktahu-ai".
 
