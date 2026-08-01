@@ -60,10 +60,12 @@ jobs:
 
       - name: Deploy to Railway
         working-directory: apps/api
-        run: railway up --service naktahu-api --detach
+        run: railway up --service naktahu-ai --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         # RAILWAY_TOKEN — from Railway dashboard → Account Settings → Tokens
+        # Service name must match the Railway service exactly (case-sensitive):
+        # the backend service in the naktahu-ai project is named "naktahu-ai".
 
   # ── Deadline Monitor cron (02:00 MYT daily) ───────────────────────────────
   deploy-deadline-cron:
