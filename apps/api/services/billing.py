@@ -42,6 +42,11 @@ _PLAN_ITEMS: dict[str, tuple[str, str]] = {
     "pro_individu": ("stripe_price_pro_individu", "pro"),
     "pro_perniagaan": ("stripe_price_pro_perniagaan", "business"),
     "student": ("stripe_price_student", "student"),
+    # Annual variants — same resulting plan claim as monthly, different
+    # Stripe Price (see core/config.py for the discount rationale).
+    "pro_individu_annual": ("stripe_price_pro_individu_annual", "pro"),
+    "pro_perniagaan_annual": ("stripe_price_pro_perniagaan_annual", "business"),
+    "student_annual": ("stripe_price_student_annual", "student"),
 }
 
 # item -> (Stripe price env attr, credit count)
