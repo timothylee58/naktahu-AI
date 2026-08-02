@@ -37,6 +37,10 @@ function ChatPageInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
+  // A message sent while the current answer is still streaming — held here
+  // and auto-fired once isStreaming flips false, instead of blocking input
+  // entirely until the in-flight answer completes.
+  const [queuedQuery, setQueuedQuery] = useState<string | null>(null);
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -185,6 +189,8 @@ function ChatPageInner() {
                   content: t('error.stream'),
                   tokens: [],
                   isStreaming: false,
+                  isError: true,
+                  query: lastUserQuery.current,
                 }
               : m,
           ),
@@ -200,6 +206,7 @@ function ChatPageInner() {
     setMessages([]);
     setThinkingId(null);
     setInjectedQuery('');
+    setQueuedQuery(null);
     lastUserQuery.current = '';
     streamingAssistantId.current = null;
     bubbleCreated.current = false;
@@ -209,6 +216,13 @@ function ChatPageInner() {
 
   const handleSend = useCallback(
     (query: string) => {
+      if (isStreaming) {
+        // Don't reset()/abort the in-flight answer — hold this one until
+        // it finishes, then fire it automatically (see the dequeue effect).
+        setQueuedQuery(query);
+        return;
+      }
+
       lastUserQuery.current = query;
       reset();
       streamingAssistantId.current = null;
@@ -240,8 +254,17 @@ function ChatPageInner() {
       setMessages((prev) => [...prev, userMsg, thinkMsg]);
       startStream(query, locale);
     },
-    [reset, startStream, locale],
+    [isStreaming, reset, startStream, locale],
   );
+
+  // Fire a queued message once the current stream actually finishes.
+  useEffect(() => {
+    if (!isStreaming && queuedQuery) {
+      const q = queuedQuery;
+      setQueuedQuery(null);
+      handleSend(q);
+    }
+  }, [isStreaming, queuedQuery, handleSend]);
 
   const handleRegenerate = useCallback(() => {
     if (!lastUserQuery.current) return;
@@ -402,6 +425,7 @@ function ChatPageInner() {
               suggestions={msg.suggestions ?? []}
               onSuggestionSelect={handleChipSelect}
               agencyContact={msg.agencyContact}
+              isError={msg.isError}
             />
           ),
         )}
@@ -432,6 +456,26 @@ function ChatPageInner() {
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
         {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
+        )}
+        {queuedQuery && (
+          <div
+            className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${
+              isDark ? 'bg-white/5 text-zinc-300' : 'bg-zinc-100 text-zinc-600'
+            }`}
+          >
+            <span className="font-semibold flex-shrink-0 locale-nowrap">{t('chat.queued')}:</span>
+            <span className="truncate flex-1">{queuedQuery}</span>
+            <button
+              type="button"
+              onClick={() => setQueuedQuery(null)}
+              aria-label={t('auth.error.dismiss')}
+              className={`flex-shrink-0 p-0.5 rounded transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-200'}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          </div>
         )}
         <ChatInput
           onSend={handleSend}

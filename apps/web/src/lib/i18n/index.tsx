@@ -15,6 +15,8 @@ type Translations = Record<string, string>;
 const MS: Translations = {
   /* ── chat ── */
   'chat.placeholder': 'Taip soalan anda di sini…',
+  'chat.placeholder_queue': 'Jawapan sedang dijana… taip untuk beratur',
+  'chat.queued': 'Beratur',
   'chat.send': 'Hantar',
   'chat.stop': 'Hentikan janaan',
   'chat.mic': 'Input suara',
@@ -342,6 +344,8 @@ const MS: Translations = {
 const EN: Translations = {
   /* ── chat ── */
   'chat.placeholder': 'Type your question here…',
+  'chat.placeholder_queue': 'Answer is streaming… type to queue next',
+  'chat.queued': 'Queued',
   'chat.send': 'Send',
   'chat.stop': 'Stop generating',
   'chat.mic': 'Voice input',
@@ -668,6 +672,8 @@ const EN: Translations = {
 const ZH: Translations = {
   /* ── chat ── */
   'chat.placeholder': '在此输入您的问题…',
+  'chat.placeholder_queue': '正在生成回答…输入以排队下一条',
+  'chat.queued': '已排队',
   'chat.send': '发送',
   'chat.stop': '停止生成',
   'chat.mic': '语音输入',

@@ -40,17 +40,11 @@ export function ChatInput({
   const isDark = variant === 'dark';
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // Guards against a double-submit: isStreaming is a prop driven by async
-  // state in the parent's SSE hook, so there is a real window — between a
-  // submit event firing and React re-rendering with disabled=true — where
-  // a second event (e.g. a duplicate/repeated Enter keydown) could still
-  // see the stale isStreaming=false closure and fire onSend a second time.
-  // A ref is synchronous and immune to that render-timing gap.
+  // Guards against a same-tick double-submit (e.g. a duplicate/repeated
+  // Enter keydown before `value` state has cleared) — released on the next
+  // microtask rather than tied to isStreaming, since sending while a
+  // previous answer is still streaming is now a valid queue action.
   const submittingRef = useRef(false);
-
-  useEffect(() => {
-    if (!isStreaming) submittingRef.current = false;
-  }, [isStreaming]);
 
   const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
   const { isListening, transcript, error: voiceError, startListening, stopListening, available } =
@@ -81,14 +75,17 @@ export function ChatInput({
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming || submittingRef.current) return;
+    if (!trimmed || submittingRef.current) return;
     submittingRef.current = true;
     onSend(trimmed);
     setValue('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, isStreaming, onSend]);
+    queueMicrotask(() => {
+      submittingRef.current = false;
+    });
+  }, [value, onSend]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -152,10 +149,9 @@ export function ChatInput({
           autoResize();
         }}
         onKeyDown={handleKeyDown}
-        placeholder={t('chat.placeholder')}
+        placeholder={isStreaming ? t('chat.placeholder_queue') : t('chat.placeholder')}
         rows={1}
-        disabled={isStreaming}
-        className={`flex-1 resize-none bg-transparent text-sm focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto disabled:opacity-50 ${inputClass}`}
+        className={`flex-1 resize-none bg-transparent text-sm focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto ${inputClass}`}
         aria-label={t('chat.placeholder')}
       />
 
