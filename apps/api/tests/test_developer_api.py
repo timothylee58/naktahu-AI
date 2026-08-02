@@ -22,12 +22,11 @@ from core.config import settings
 from services.api_key_service import API_KEY_RAW_PREFIX, MAX_KEYS_PER_USER
 
 
-def _auth_header(sub: str = "dev-user-1") -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": sub, "aud": settings.supabase_jwt_aud, "exp": int(time.time()) + 3600},
-        settings.jwt_secret,
-        algorithm="HS256",
-    )
+def _auth_header(sub: str = "dev-user-1", plan: str | None = None) -> dict[str, str]:
+    payload: dict = {"sub": sub, "aud": settings.supabase_jwt_aud, "exp": int(time.time()) + 3600}
+    if plan is not None:
+        payload["app_metadata"] = {"plan": plan}
+    token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -131,7 +130,7 @@ def test_create_key_returns_raw_key_once(client) -> None:
     sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
     sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(data=[_key_row()])
 
-    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header())
+    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header(plan="pro"))
 
     assert res.status_code == 201
     data = res.json()
@@ -146,17 +145,29 @@ def test_create_key_invalid_plan_rejected(client) -> None:
     assert res.status_code == 422
 
 
-def test_create_key_default_plan_is_starter(client) -> None:
+def test_create_key_default_plan_is_free(client) -> None:
+    """Freemium: the default plan is the free tier, open to any signed-in
+    user regardless of app subscription — no Pro requirement to try it."""
     c, sb = client
     sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
     sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(
-        data=[_key_row(plan="starter")]
+        data=[_key_row(plan="free", calls_limit=500, rate_limit_per_min=5)]
     )
 
     res = c.post("/api/v1/developer/keys", json={}, headers=_auth_header())
 
     assert res.status_code == 201
-    assert res.json()["key"]["plan"] == "starter"
+    assert res.json()["key"]["plan"] == "free"
+
+
+def test_create_paid_plan_rejected_for_free_tier_app_user(client) -> None:
+    """Freemium gate: paid Developer API plans (starter/growth/etc.) require
+    at least a Pro app subscription — a free-tier app user can still use the
+    Developer API, just not the paid plans, and must upgrade via /pricing."""
+    c, _ = client
+    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header())
+    assert res.status_code == 403
+    assert "Pro subscription" in res.json()["detail"]
 
 
 def test_create_key_quota_enforced_flat_across_plans(client) -> None:
@@ -166,7 +177,7 @@ def test_create_key_quota_enforced_flat_across_plans(client) -> None:
         count=MAX_KEYS_PER_USER
     )
 
-    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header())
+    res = c.post("/api/v1/developer/keys", json={"plan": "starter"}, headers=_auth_header(plan="pro"))
 
     assert res.status_code == 400
     assert "Maximum" in res.json()["detail"]
@@ -182,7 +193,7 @@ def test_create_widget_key_accepts_domain_whitelist(client) -> None:
     res = c.post(
         "/api/v1/developer/keys",
         json={"plan": "widget", "domain_whitelist": ["example.com"]},
-        headers=_auth_header(),
+        headers=_auth_header(plan="pro"),
     )
 
     assert res.status_code == 201

@@ -8,6 +8,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from middleware.plan_gate import _PLAN_RANK
 from services.api_key_service import (
     VALID_API_PLANS,
     create_api_key_record,
@@ -21,9 +22,18 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/developer", tags=["developer"])
 
+# Freemium model: the "free" API plan (modest quota, no SSE/multi/widget) is
+# open to any signed-in app user regardless of subscription tier. The paid
+# API plans (starter/growth/enterprise/widget/white_label — separate from,
+# and priced on top of, the app's own free/student/pro/business ladder)
+# require at least a Pro app subscription — same bar as history and other
+# Pro-gated features (middleware/plan_gate._PLAN_RANK).
+PAID_API_PLANS = frozenset(VALID_API_PLANS - {"free"})
+MIN_APP_PLAN_FOR_PAID_API_PLANS = "pro"
+
 
 class CreateKeyRequest(BaseModel):
-    plan: Literal["starter", "growth", "enterprise", "widget", "white_label"] = "starter"
+    plan: Literal["free", "starter", "growth", "enterprise", "widget", "white_label"] = "free"
     domain_whitelist: list[str] = Field(default_factory=list, max_length=10)
 
 
@@ -64,6 +74,15 @@ async def create_key(
 ) -> CreateKeyResponse:
     if body.plan not in VALID_API_PLANS:
         raise HTTPException(status_code=422, detail=f"Invalid plan: {body.plan}")
+
+    if (
+        body.plan in PAID_API_PLANS
+        and _PLAN_RANK.get(user.plan, 0) < _PLAN_RANK.get(MIN_APP_PLAN_FOR_PAID_API_PLANS, 0)
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Paid Developer API plans require a Pro subscription or higher.",
+        )
 
     supabase = getattr(request.app.state, "supabase", None)
     if supabase is None:
