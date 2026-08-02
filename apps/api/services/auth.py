@@ -4,11 +4,23 @@ from typing import Optional
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from jwt import PyJWKClient
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError, PyJWKClientError
 
 from core.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/ignored", auto_error=False)
+
+# Supabase projects created after their JWT-signing-keys migration issue
+# asymmetric tokens (ES256) verified via this JWKS endpoint, rather than a
+# shared HS256 secret. `jwt.decode` needs to know up front which key/algorithm
+# to use, so we peek at the token's own unverified header (`alg`) and only
+# then decode+verify with the matching key material. PyJWKClient caches
+# fetched keys internally (cache_keys=True), so this doesn't re-fetch the
+# JWKS on every request.
+_jwks_client = PyJWKClient(
+    f"{settings.supabase_url}/auth/v1/.well-known/jwks.json", cache_keys=True
+)
 
 # Supabase Auth includes app_metadata in the JWT automatically once set via
 # the admin API (services/billing.py, on checkout.session.completed). No
@@ -49,15 +61,32 @@ def is_admin_role(role: Optional[str]) -> bool:
 
 def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
     try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret,
-            algorithms=["HS256"],
-            audience=settings.supabase_jwt_aud,
-        )
+        alg = jwt.get_unverified_header(token).get("alg")
+    except InvalidTokenError:
+        return None
+
+    try:
+        if alg == "HS256":
+            # Legacy Supabase projects (shared secret, pre-JWT-signing-keys).
+            payload = jwt.decode(
+                token,
+                settings.jwt_secret,
+                algorithms=["HS256"],
+                audience=settings.supabase_jwt_aud,
+            )
+        else:
+            # Current Supabase projects sign with an asymmetric key (ES256)
+            # published at the project's JWKS endpoint, keyed by `kid`.
+            signing_key = _jwks_client.get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["ES256", "RS256"],
+                audience=settings.supabase_jwt_aud,
+            )
     except ExpiredSignatureError:
         return None
-    except InvalidTokenError:
+    except (InvalidTokenError, PyJWKClientError):
         return None
     sub = payload.get("sub")
     if not sub or not isinstance(sub, str):
