@@ -84,8 +84,70 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Resolve Deadline Monitor Railway service
+        id: deadline-cron-service
+        run: |
+          STATUS_JSON="$(railway status --json)"
+          SERVICE_ID="$(STATUS_JSON="$STATUS_JSON" python - <<'PY'
+          import json
+          import os
+          import sys
+
+          data = json.loads(os.environ["STATUS_JSON"])
+          services = []
+
+          def visit(node):
+              if isinstance(node, dict):
+                  name = node.get("name")
+                  service_id = node.get("id")
+                  if isinstance(name, str) and isinstance(service_id, str):
+                      services.append((name, service_id))
+                  for value in node.values():
+                      visit(value)
+              elif isinstance(node, list):
+                  for item in node:
+                      visit(item)
+
+          visit(data)
+
+          deduped = []
+          seen = set()
+          for name, service_id in services:
+              if service_id in seen:
+                  continue
+              seen.add(service_id)
+              deduped.append((name, service_id))
+
+          preferred_names = {"naktahu-deadline-cron", "@naktahu-deadline-cron"}
+          matches = [item for item in deduped if item[0] in preferred_names]
+
+          if not matches:
+              matches = [
+                  item for item in deduped
+                  if "deadline" in item[0].lower() and "cron" in item[0].lower()
+              ]
+
+          if not matches:
+              matches = [item for item in deduped if "deadline" in item[0].lower()]
+
+          if len(matches) == 1:
+              print(matches[0][1])
+              sys.exit(0)
+
+          if not matches:
+              raise SystemExit("Could not find a Railway service matching deadline cron.")
+
+          names = ", ".join(name for name, _ in matches)
+          raise SystemExit(f"Found multiple candidate Railway services: {names}")
+          PY
+          )"
+
+          echo "service_id=$SERVICE_ID" >> "$GITHUB_OUTPUT"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Deploy Deadline Monitor cron
         working-directory: apps/cron-deadline-monitor
-        run: railway up --service naktahu-deadline-cron --detach
+        run: railway up --service ${{ steps.deadline-cron-service.outputs.service_id }} --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
