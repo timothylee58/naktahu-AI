@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -10,6 +11,7 @@ import {
   GraduationCap,
   HeartPulse,
   Landmark,
+  Lock,
   Plane,
   Sparkles,
   type LucideIcon,
@@ -18,6 +20,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useI18n } from '@/lib/i18n';
+import { createClient } from '@/lib/supabase/client';
+import { fetchWithAuth } from '@/lib/auth-headers';
+import { API_BASE } from '@/lib/api-base';
 import {
   WIRED_AGENTS,
   agentDescKey,
@@ -25,6 +30,11 @@ import {
   agentTitleKey,
   type AgentPlanKey,
 } from '@/lib/agents';
+
+interface BackendAgentInfo {
+  plan_required: string;
+  accessible: boolean;
+}
 
 /** Per-agent icon + accent tile. Slugs match lib/agents.ts / the API registry. */
 const AGENT_VISUALS: Record<string, { icon: LucideIcon; tile: string }> = {
@@ -56,7 +66,7 @@ const AGENT_VISUALS: Record<string, { icon: LucideIcon; tile: string }> = {
 
 const PLAN_BADGE_VARIANT: Record<AgentPlanKey, 'secondary' | 'default' | 'success'> = {
   free: 'success',
-  free_plus: 'secondary',
+  pro: 'secondary',
   student: 'default',
   business: 'default',
 };
@@ -73,6 +83,32 @@ const item = {
 
 export function AgentsHub() {
   const { t } = useI18n();
+  const supabase = useMemo(() => createClient(), []);
+  // Keyed by the agent's real backend name (see WiredAgent.backendName) —
+  // GET /api/v1/agents computes `accessible` server-side from the actual
+  // signed-in user's plan via plan_satisfies(), not a frontend guess.
+  const [backendAgents, setBackendAgents] = useState<Record<string, BackendAgentInfo> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchWithAuth(supabase, `${API_BASE}/api/v1/agents`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: Array<{ name: string; plan_required: string; accessible: boolean }> | null) => {
+        if (!active || !data) return;
+        const map: Record<string, BackendAgentInfo> = {};
+        for (const a of data) {
+          map[a.name] = { plan_required: a.plan_required, accessible: a.accessible };
+        }
+        setBackendAgents(map);
+      })
+      .catch(() => {
+        /* Fall back to the frontend's static planKey/badge below — this
+         * endpoint failing shouldn't block browsing the hub. */
+      });
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
@@ -120,39 +156,63 @@ export function AgentsHub() {
               tile: 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300',
             };
             const Icon = visual.icon;
+            const backendInfo = backendAgents?.[agent.backendName ?? agent.slug];
+            // Until the fetch resolves, fall back to the static planKey so
+            // the grid doesn't flash empty/wrong badges — but never assume
+            // accessible=true before the real check comes back.
+            const planLabel = backendInfo
+              ? t(agentPlanKey((backendInfo.plan_required as AgentPlanKey) || agent.planKey))
+              : t(agentPlanKey(agent.planKey));
+            const locked = backendInfo ? !backendInfo.accessible : false;
+
+            const cardInner = (
+              <Card
+                className={`h-full border-zinc-200 transition-shadow dark:border-white/10 dark:bg-white/5 dark:text-white ${
+                  locked
+                    ? 'opacity-70 hover:opacity-100'
+                    : 'hover:shadow-md dark:hover:border-white/20'
+                }`}
+              >
+                <CardHeader className="h-full gap-3 space-y-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${visual.tile}`}
+                    >
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {agent.badgeKey ? (
+                        <Badge>{t(`agents.badge.${agent.badgeKey}`)}</Badge>
+                      ) : null}
+                      <Badge variant={PLAN_BADGE_VARIANT[agent.planKey]}>{planLabel}</Badge>
+                      {locked && <Lock className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" aria-hidden />}
+                    </div>
+                  </div>
+                  <CardTitle className="text-base">{t(agentTitleKey(agent.slug))}</CardTitle>
+                  <CardDescription className="leading-relaxed dark:text-zinc-400">
+                    {t(agentDescKey(agent.slug))}
+                  </CardDescription>
+                  {locked ? (
+                    <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400 locale-nowrap">
+                      {t('agents.hub.upgrade_cta')}
+                    </span>
+                  ) : (
+                    <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400 locale-nowrap">
+                      {t('agents.hub.open')}
+                      <ArrowRight
+                        className="h-4 w-4 transition-transform group-hover:translate-x-1"
+                        aria-hidden
+                      />
+                    </span>
+                  )}
+                </CardHeader>
+              </Card>
+            );
+
             return (
               <motion.div key={agent.slug} variants={item} whileHover={{ y: -4 }}>
-                <Link href={agent.href} className="group block h-full">
-                  <Card className="h-full border-zinc-200 transition-shadow hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20">
-                    <CardHeader className="h-full gap-3 space-y-0">
-                      <div className="flex items-start justify-between gap-3">
-                        <div
-                          className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${visual.tile}`}
-                        >
-                          <Icon className="h-5 w-5" aria-hidden />
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {agent.badgeKey ? (
-                            <Badge>{t(`agents.badge.${agent.badgeKey}`)}</Badge>
-                          ) : null}
-                          <Badge variant={PLAN_BADGE_VARIANT[agent.planKey]}>
-                            {t(agentPlanKey(agent.planKey))}
-                          </Badge>
-                        </div>
-                      </div>
-                      <CardTitle className="text-base">{t(agentTitleKey(agent.slug))}</CardTitle>
-                      <CardDescription className="leading-relaxed dark:text-zinc-400">
-                        {t(agentDescKey(agent.slug))}
-                      </CardDescription>
-                      <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400 locale-nowrap">
-                        {t('agents.hub.open')}
-                        <ArrowRight
-                          className="h-4 w-4 transition-transform group-hover:translate-x-1"
-                          aria-hidden
-                        />
-                      </span>
-                    </CardHeader>
-                  </Card>
+                <Link href={locked ? '/pricing' : agent.href} className="group block h-full">
+                  {cardInner}
                 </Link>
               </motion.div>
             );

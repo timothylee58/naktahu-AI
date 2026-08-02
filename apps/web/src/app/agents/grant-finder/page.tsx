@@ -1,60 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
-import { useI18n } from '@/lib/i18n';
 
+// Sectors matching grant_database.eligible_sectors seed values (migration
+// 020) — NOT arbitrary labels. A mismatch here silently zeroes out every
+// grant match, since eligibility_agent/analyst_node.py does an exact string
+// membership check against each grant's eligible_sectors array.
 const SECTOR_OPTIONS: ChipOption[] = [
-  { id: 'technology', label: 'Teknologi', icon: '🖥' },
-  { id: 'fnb', label: 'F&B', icon: '🍜' },
-  { id: 'manufacturing', label: 'Pembuatan', icon: '🏭' },
-  { id: 'retail', label: 'Runcit', icon: '🛒' },
-  { id: 'agriculture', label: 'Pertanian', icon: '🌾' },
-  { id: 'creative', label: 'Kreatif', icon: '📐' },
-  { id: 'healthcare', label: 'Kesihatan', icon: '⚕️' },
-  { id: 'education', label: 'Pendidikan', icon: '📚' },
+  { id: 'technology', label: 'Technology', icon: '🖥' },
+  { id: 'ai', label: 'AI', icon: '🤖' },
+  { id: 'fintech', label: 'Fintech', icon: '💳' },
+  { id: 'edtech', label: 'EdTech', icon: '📚' },
+  { id: 'healthtech', label: 'HealthTech', icon: '⚕️' },
+  { id: 'digital', label: 'Digital', icon: '📱' },
+  { id: 'deeptech', label: 'DeepTech', icon: '🔬' },
+  { id: 'biotech', label: 'BioTech', icon: '🧬' },
+  { id: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
+  { id: 'agriculture', label: 'Agriculture', icon: '🌾' },
+  { id: 'services', label: 'Services', icon: '🛎' },
 ];
 
-const STAGE_OPTIONS: ChipOption[] = [
-  { id: 'idea', label: 'Idea', icon: '💡' },
-  { id: 'early', label: 'Permulaan', icon: '🌱' },
-  { id: 'growth', label: 'Pertumbuhan', icon: '📈' },
-  { id: 'established', label: 'Stabil', icon: '🏢' },
+// eligibility_agent/state.py: business_type: sole_prop|sdn_bhd|startup|llp|cooperative
+const BUSINESS_TYPE_OPTIONS: ChipOption[] = [
+  { id: 'sole_prop', label: 'Sole Proprietor', icon: '🏪' },
+  { id: 'sdn_bhd', label: 'Sdn Bhd', icon: '🏢' },
+  { id: 'startup', label: 'Startup', icon: '🚀' },
+  { id: 'llp', label: 'LLP', icon: '🤝' },
+  { id: 'cooperative', label: 'Cooperative', icon: '👥' },
 ];
 
-const FUNDING_OPTIONS: ChipOption[] = [
-  { id: 'under_10k', label: '< RM10k' },
-  { id: '10k_50k', label: 'RM10k–50k' },
-  { id: '50k_200k', label: 'RM50k–200k' },
-  { id: 'above_200k', label: '> RM200k' },
-];
-
-type Grant = {
-  name: string;
-  eligibility: string;
-  amount_hint: string;
-  deadline_hint: string;
-  url: string | null;
-  match_score?: number;
-};
+interface Grant {
+  programme_name: string;
+  agency: string | null;
+  grant_type: string | null;
+  amount_min_myr: number | null;
+  amount_max_myr: number | null;
+  application_deadline: string | null;
+  deadline_is_rolling: boolean;
+  application_url: string | null;
+  eligibility_score: number;
+  eligibility_reasons: string[];
+  ineligibility_reasons: string[];
+}
 
 function parseGrant(raw: unknown): Grant | null {
   if (!raw || typeof raw !== 'object') return null;
-  const row = raw as Record<string, unknown>;
-  const name = typeof row.name === 'string' ? row.name : '';
-  if (!name) return null;
+  const r = raw as Record<string, unknown>;
+  const programme_name = typeof r.programme_name === 'string' ? r.programme_name : '';
+  if (!programme_name) return null;
   return {
-    name,
-    eligibility: typeof row.eligibility === 'string' ? row.eligibility : '',
-    amount_hint: typeof row.amount_hint === 'string' ? row.amount_hint : '',
-    deadline_hint: typeof row.deadline_hint === 'string' ? row.deadline_hint : '',
-    url: typeof row.url === 'string' && row.url.length > 0 ? row.url : null,
-    match_score: typeof row.match_score === 'number' ? row.match_score : undefined,
+    programme_name,
+    agency: typeof r.agency === 'string' ? r.agency : null,
+    grant_type: typeof r.grant_type === 'string' ? r.grant_type : null,
+    amount_min_myr: typeof r.amount_min_myr === 'number' ? r.amount_min_myr : null,
+    amount_max_myr: typeof r.amount_max_myr === 'number' ? r.amount_max_myr : null,
+    application_deadline: typeof r.application_deadline === 'string' ? r.application_deadline : null,
+    deadline_is_rolling: Boolean(r.deadline_is_rolling),
+    application_url: typeof r.application_url === 'string' && r.application_url ? r.application_url : null,
+    eligibility_score: typeof r.eligibility_score === 'number' ? r.eligibility_score : 0,
+    eligibility_reasons: Array.isArray(r.eligibility_reasons) ? (r.eligibility_reasons as string[]) : [],
+    ineligibility_reasons: Array.isArray(r.ineligibility_reasons) ? (r.ineligibility_reasons as string[]) : [],
   };
 }
 
@@ -63,37 +74,134 @@ function parseGrants(raw: unknown): Grant[] {
   return raw.map(parseGrant).filter((g): g is Grant => g !== null);
 }
 
+function formatAmount(g: Grant): string {
+  if (g.amount_min_myr == null && g.amount_max_myr == null) return '';
+  if (g.amount_min_myr != null && g.amount_max_myr != null) {
+    return `RM ${g.amount_min_myr.toLocaleString()} – RM ${g.amount_max_myr.toLocaleString()}`;
+  }
+  const amt = g.amount_max_myr ?? g.amount_min_myr;
+  return amt != null ? `Up to RM ${amt.toLocaleString()}` : '';
+}
+
+function formatDeadline(g: Grant): string {
+  if (g.deadline_is_rolling) return 'Rolling applications';
+  if (!g.application_deadline) return '';
+  return `Closes ${g.application_deadline}`;
+}
+
+function GrantCard({ grant, dimmed }: { grant: Grant; dimmed?: boolean }) {
+  return (
+    <motion.li
+      whileHover={{ y: -2 }}
+      className={`rounded-2xl p-4 text-sm shadow-sm transition-shadow hover:shadow-md border ${
+        dimmed
+          ? 'bg-zinc-50 border-zinc-200 dark:bg-white/[0.02] dark:border-white/5'
+          : 'bg-white border-zinc-200 dark:bg-white/5 dark:border-white/10'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-semibold text-zinc-900 dark:text-white">{grant.programme_name}</p>
+        <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+          {Math.round(grant.eligibility_score * 100)}% match
+        </span>
+      </div>
+      {grant.agency && <p className="text-zinc-500 text-xs mt-0.5 dark:text-zinc-500">{grant.agency}</p>}
+      <p className="text-xs text-zinc-500 mt-1 dark:text-zinc-500">
+        {formatAmount(grant)}
+        {formatAmount(grant) && formatDeadline(grant) ? ' · ' : ''}
+        {formatDeadline(grant)}
+      </p>
+      {dimmed && grant.ineligibility_reasons.length > 0 && (
+        <p className="text-xs text-amber-700 mt-2 dark:text-amber-400">{grant.ineligibility_reasons[0]}</p>
+      )}
+      {grant.application_url && (
+        <a
+          href={grant.application_url}
+          className="text-blue-600 text-xs mt-2 inline-block dark:text-blue-400"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Apply now →
+        </a>
+      )}
+    </motion.li>
+  );
+}
+
 export default function GrantFinderPage() {
-  const { t } = useI18n();
-  const { start } = useAgentApi();
+  const { start, continue: cont } = useAgentApi();
   const [sector, setSector] = useState<string[]>([]);
-  const [stage, setStage] = useState<string[]>([]);
-  const [funding, setFunding] = useState<string[]>([]);
-  const [grants, setGrants] = useState<Grant[]>([]);
+  const [businessType, setBusinessType] = useState<string[]>([]);
+  const [registeredMonths, setRegisteredMonths] = useState('');
+  const [annualRevenue, setAnnualRevenue] = useState('');
+  const [isBumiputera, setIsBumiputera] = useState<boolean | null>(null);
+
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<'intake' | 'chat' | 'results'>('intake');
+  const [nextQuestion, setNextQuestion] = useState<string | null>(null);
+  const [chatReply, setChatReply] = useState('');
+  const [matchedGrants, setMatchedGrants] = useState<Grant[]>([]);
+  const [nearMissGrants, setNearMissGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const search = async () => {
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [phase, nextQuestion]);
+
+  const canStart = sector.length > 0 && businessType.length > 0 && registeredMonths.trim() !== '' && isBumiputera !== null;
+
+  const applyResult = (res: Record<string, unknown>) => {
+    if (!sessionId && res.session_id) setSessionId(String(res.session_id));
+    const out = (res.output as Record<string, unknown>) ?? {};
+    const completed = res.status === 'completed' && !res.awaiting_hitl;
+    if (completed) {
+      setMatchedGrants(parseGrants(out.matched_grants));
+      setNearMissGrants(parseGrants(out.near_miss_grants));
+      setPhase('results');
+      setNextQuestion(null);
+    } else {
+      setNextQuestion((out.next_question as string) ?? 'Could you tell me a bit more about your business?');
+      setPhase('chat');
+    }
+  };
+
+  const submitIntake = async () => {
     setLoading(true);
     setError(null);
     try {
-      const fundingLabel = FUNDING_OPTIONS.find((o) => o.id === funding[0])?.label ?? '';
-      const res = await start('grant-finder', {
-        sector: sector[0] ?? 'technology',
-        business_stage: stage[0] ?? 'early',
-        funding_need: fundingLabel || 'RM 50,000 working capital',
+      const res = await start('eligibility-agent', {
+        sector: sector[0],
+        business_type: businessType[0],
+        registered_months: Number(registeredMonths) || 0,
+        annual_revenue_myr: Number(annualRevenue) || 0,
+        is_bumiputera: isBumiputera,
         language: 'bm',
       });
-      const out = (res.output as Record<string, unknown>) ?? res;
-      setGrants(parseGrants(out.grants ?? out.recommendations));
+      applyResult(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal mendapatkan hasil');
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const canSearch = sector.length > 0;
+  const sendChatReply = async () => {
+    const msg = chatReply.trim();
+    if (!msg || !sessionId) return;
+    setChatReply('');
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await cont('eligibility-agent', { session_id: sessionId, message: msg });
+      applyResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
@@ -114,44 +222,141 @@ export default function GrantFinderPage() {
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="max-w-2xl mx-auto p-4 flex flex-col gap-4"
       >
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Match your profile to Malaysian government grants — MDEC, TEKUN, MARA, Cradle, and more.</p>
-        <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-          <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} />
-          <ChipSelector options={STAGE_OPTIONS} selected={stage} onToggle={(id) => setStage([id])} multiple={false} size="sm" />
-          <ChipSelector options={FUNDING_OPTIONS} selected={funding} onToggle={(id) => setFunding([id])} multiple={false} size="sm" />
-          <button type="button" disabled={loading || !canSearch} onClick={() => void search()} className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50">
-            {loading ? 'Searching…' : 'Find grants'}
-          </button>
-          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
-        </section>
-        {grants.length > 0 && (
-          <ul className="flex flex-col gap-3">
-            {grants.map((g) => (
-              <motion.li
-                key={g.name}
-                whileHover={{ y: -2 }}
-                className="bg-white border border-zinc-200 rounded-2xl p-4 text-sm shadow-sm transition-shadow hover:shadow-md dark:bg-white/5 dark:border-white/10"
-              >
-                <p className="font-semibold">{g.name}</p>
-                <p className="text-zinc-600 mt-1 dark:text-zinc-400">{g.eligibility}</p>
-                <p className="text-xs text-zinc-500 mt-1 dark:text-zinc-500">
-                  {g.amount_hint}
-                  {g.amount_hint && g.deadline_hint ? ' · ' : ''}
-                  {g.deadline_hint}
-                </p>
-                {g.url && (
-                  <a
-                    href={g.url}
-                    className="text-blue-600 text-xs mt-2 inline-block dark:text-blue-400"
-                    target="_blank"
-                    rel="noreferrer"
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Match your business profile to Malaysian government grants — Cradle, MDEC, SME Corp, MTDC, and more — with scoring, near-miss detection, and a recommended application sequence.
+        </p>
+
+        {phase === 'intake' && (
+          <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">Sector</p>
+              <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">Business type</p>
+              <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Months registered</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={registeredMonths}
+                  onChange={(e) => setRegisteredMonths(e.target.value)}
+                  placeholder="e.g. 18"
+                  className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Annual revenue (RM)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={annualRevenue}
+                  onChange={(e) => setAnnualRevenue(e.target.value)}
+                  placeholder="e.g. 250000"
+                  className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+                />
+              </label>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">Bumiputera-owned?</p>
+              <div className="flex gap-2">
+                {[{ id: true, label: 'Yes' }, { id: false, label: 'No' }].map((opt) => (
+                  <button
+                    key={String(opt.id)}
+                    type="button"
+                    onClick={() => setIsBumiputera(opt.id)}
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      isBumiputera === opt.id
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/15 dark:text-blue-300'
+                        : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300'
+                    }`}
                   >
-                    Mohon sekarang →
-                  </a>
-                )}
-              </motion.li>
-            ))}
-          </ul>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={loading || !canStart}
+              onClick={() => void submitIntake()}
+              className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+            >
+              {loading ? 'Matching…' : 'Find grants'}
+            </button>
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+          </section>
+        )}
+
+        {phase === 'chat' && (
+          <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
+            {nextQuestion && <p className="text-sm text-blue-700 dark:text-blue-400">{nextQuestion}</p>}
+            <textarea
+              className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+              rows={2}
+              value={chatReply}
+              onChange={(e) => setChatReply(e.target.value)}
+              placeholder="Type your answer…"
+            />
+            <button
+              type="button"
+              disabled={loading || !chatReply.trim()}
+              onClick={() => void sendChatReply()}
+              className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+            >
+              {loading ? '…' : 'Continue'}
+            </button>
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+            <div ref={bottomRef} />
+          </section>
+        )}
+
+        {loading && phase !== 'results' && <AgentLoadingSkeleton />}
+
+        {phase === 'results' && (
+          <>
+            {matchedGrants.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">
+                  {matchedGrants.length} matching grant{matchedGrants.length === 1 ? '' : 's'}
+                </p>
+                <ul className="flex flex-col gap-3">
+                  {matchedGrants.map((g) => (
+                    <GrantCard key={g.programme_name} grant={g} />
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">No fully-matching grants found for this profile.</p>
+            )}
+            {nearMissGrants.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-zinc-500 mb-2 mt-2 dark:text-zinc-400">
+                  Near-miss — close, but doesn&apos;t fully qualify yet
+                </p>
+                <ul className="flex flex-col gap-3">
+                  {nearMissGrants.map((g) => (
+                    <GrantCard key={g.programme_name} grant={g} dimmed />
+                  ))}
+                </ul>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setPhase('intake');
+                setSessionId(null);
+                setMatchedGrants([]);
+                setNearMissGrants([]);
+              }}
+              className="self-start text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400"
+            >
+              Start a new search
+            </button>
+          </>
         )}
       </motion.div>
     </main>
