@@ -17,6 +17,8 @@ import {
 interface ChatInputProps {
   onSend: (query: string) => void;
   isStreaming: boolean;
+  /** Aborts the in-flight answer. Omit to fall back to a disabled send button. */
+  onStop?: () => void;
   detectedLanguage?: string;
   /** Externally injected query (e.g. from history sidebar or prompt chips). */
   inject?: string;
@@ -28,6 +30,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   isStreaming,
+  onStop,
   detectedLanguage,
   inject,
   conversationChars = 0,
@@ -37,17 +40,11 @@ export function ChatInput({
   const isDark = variant === 'dark';
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // Guards against a double-submit: isStreaming is a prop driven by async
-  // state in the parent's SSE hook, so there is a real window — between a
-  // submit event firing and React re-rendering with disabled=true — where
-  // a second event (e.g. a duplicate/repeated Enter keydown) could still
-  // see the stale isStreaming=false closure and fire onSend a second time.
-  // A ref is synchronous and immune to that render-timing gap.
+  // Guards against a same-tick double-submit (e.g. a duplicate/repeated
+  // Enter keydown before `value` state has cleared) — released on the next
+  // microtask rather than tied to isStreaming, since sending while a
+  // previous answer is still streaming is now a valid queue action.
   const submittingRef = useRef(false);
-
-  useEffect(() => {
-    if (!isStreaming) submittingRef.current = false;
-  }, [isStreaming]);
 
   const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
   const { isListening, transcript, error: voiceError, startListening, stopListening, available } =
@@ -78,14 +75,17 @@ export function ChatInput({
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed || isStreaming || submittingRef.current) return;
+    if (!trimmed || submittingRef.current) return;
     submittingRef.current = true;
     onSend(trimmed);
     setValue('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, isStreaming, onSend]);
+    queueMicrotask(() => {
+      submittingRef.current = false;
+    });
+  }, [value, onSend]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -149,10 +149,9 @@ export function ChatInput({
           autoResize();
         }}
         onKeyDown={handleKeyDown}
-        placeholder={t('chat.placeholder')}
+        placeholder={isStreaming ? t('chat.placeholder_queue') : t('chat.placeholder')}
         rows={1}
-        disabled={isStreaming}
-        className={`flex-1 resize-none bg-transparent text-sm focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto disabled:opacity-50 ${inputClass}`}
+        className={`flex-1 resize-none bg-transparent text-sm focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto ${inputClass}`}
         aria-label={t('chat.placeholder')}
       />
 
@@ -190,24 +189,43 @@ export function ChatInput({
         </div>
       )}
 
-      {/* send button */}
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={!value.trim() || isStreaming}
-        aria-label={t('chat.send')}
-        className="flex-shrink-0 p-2 rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="w-5 h-5"
-          aria-hidden
+      {/* send / stop button */}
+      {isStreaming && onStop ? (
+        <button
+          type="button"
+          onClick={onStop}
+          aria-label={t('chat.stop')}
+          className="flex-shrink-0 p-2 rounded-full bg-zinc-800 text-white transition-colors hover:bg-zinc-700 mb-0.5"
         >
-          <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.115A28.897 28.897 0 0 0 3.105 2.288Z" />
-        </svg>
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="w-5 h-5"
+            aria-hidden
+          >
+            <rect x="5" y="5" width="10" height="10" rx="1.5" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!value.trim() || isStreaming}
+          aria-label={t('chat.send')}
+          className="flex-shrink-0 p-2 rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="w-5 h-5"
+            aria-hidden
+          >
+            <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.115A28.897 28.897 0 0 0 3.105 2.288Z" />
+          </svg>
+        </button>
+      )}
     </div>
 
     <div className="flex items-center gap-2 px-1">

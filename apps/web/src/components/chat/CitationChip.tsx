@@ -5,13 +5,18 @@ import type { Citation } from '@/lib/types';
 
 interface CitationChipProps {
   citation: Citation;
+  /** 1-based position in the answer's citation list. Shown as a small
+   * numbered badge so a citation can be referenced unambiguously ("source
+   * 2") even though the answer text itself has no inline [1][2] markers —
+   * those would need the synthesiser to emit them, a backend change. */
+  index?: number;
 }
 
 function truncate(s: string, max: number) {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
 }
 
-export function CitationChip({ citation }: CitationChipProps) {
+export function CitationChip({ citation, index }: CitationChipProps) {
   const url = citation.url ?? citation.source_url;
   const title = citation.title ?? citation.source_title ?? '';
   const hasUrl = Boolean(url);
@@ -25,6 +30,14 @@ export function CitationChip({ citation }: CitationChipProps) {
       className={`inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline transition-colors dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300 ${hasUrl ? 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20' : 'cursor-default'}`}
       title={title}
     >
+      {typeof index === 'number' && (
+        <span
+          aria-hidden="true"
+          className="flex-shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold dark:bg-blue-500"
+        >
+          {index}
+        </span>
+      )}
       <span className="font-semibold truncate max-w-[6rem]">
         {citation.ministry}
       </span>

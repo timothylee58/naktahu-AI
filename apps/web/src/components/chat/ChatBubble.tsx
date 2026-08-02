@@ -33,6 +33,7 @@ interface AssistantBubbleProps {
   suggestions?: string[];
   onSuggestionSelect?: (query: string) => void;
   agencyContact?: AgencyContact;
+  isError?: boolean;
 }
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
@@ -59,7 +60,7 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact } = props;
+  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact, isError = false } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
 
   return (
@@ -74,9 +75,20 @@ export function ChatBubble(props: ChatBubbleProps) {
           initial={{ opacity: 0, y: 8, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={spring}
-          className="bg-white border border-zinc-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-zinc-800 shadow-sm ring-1 ring-zinc-900/5 dark:bg-white/5 dark:border-white/10 dark:text-zinc-100 dark:ring-white/5"
+          className={
+            isError
+              ? 'flex items-start gap-2 bg-red-50 border border-red-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300'
+              : 'bg-white border border-zinc-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-zinc-800 shadow-sm ring-1 ring-zinc-900/5 dark:bg-white/5 dark:border-white/10 dark:text-zinc-100 dark:ring-white/5'
+          }
         >
-          {isThinking ? (
+          {isError ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 flex-shrink-0 mt-0.5">
+                <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+              </svg>
+              <span>{content}</span>
+            </>
+          ) : isThinking ? (
             <ThinkingIndicator />
           ) : isStreaming || (tokens?.length ?? 0) > 0 ? (
             <StreamingText tokens={tokens ?? []} isStreaming={isStreaming} />
@@ -87,12 +99,25 @@ export function ChatBubble(props: ChatBubbleProps) {
           )}
         </motion.div>
 
-        {!isStreaming && !isThinking && agencyContact && (
+        {isError && onRegenerate && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="self-start flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+              <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clipRule="evenodd" />
+            </svg>
+            {t('error.retry')}
+          </button>
+        )}
+
+        {!isStreaming && !isThinking && !isError && agencyContact && (
           <AgencyContactCard contact={agencyContact} />
         )}
 
         {/* Action buttons — only after streaming completes */}
-        {!isStreaming && !isThinking && content && (
+        {!isStreaming && !isThinking && !isError && content && (
           <ResponseActions
             content={content}
             onRegenerate={onRegenerate}
@@ -106,7 +131,7 @@ export function ChatBubble(props: ChatBubbleProps) {
           />
         )}
 
-        {hasLowConfidence && (
+        {!isError && hasLowConfidence && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -136,7 +161,7 @@ export function ChatBubble(props: ChatBubbleProps) {
                 variants={{ hidden: { opacity: 0, y: 6 }, visible: { opacity: 1, y: 0 } }}
                 transition={{ duration: 0.2 }}
               >
-                <CitationChip citation={c} />
+                <CitationChip citation={c} index={i + 1} />
               </motion.div>
             ))}
           </motion.div>

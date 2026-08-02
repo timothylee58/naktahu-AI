@@ -19,6 +19,10 @@ export interface UseSSEStreamReturn {
   error: string | null;
   startStream: (query: string, language?: string) => void;
   reset: () => void;
+  /** Aborts the in-flight stream. Tokens received so far are kept as the
+   * final message (unlike reset(), which also clears state) — the caller's
+   * "done" handling (isStreaming flips false) finalises the partial answer. */
+  stop: () => void;
 }
 
 async function* readSSELines(
@@ -77,6 +81,10 @@ export function useSSEStream({
     setSuggestions([]);
     setIsStreaming(false);
     setError(null);
+  }, []);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
   }, []);
 
   const startStream = useCallback(
@@ -182,5 +190,5 @@ export function useSSEStream({
     [defaultLanguage, sessionId, accessToken],
   );
 
-  return { tokens, citations, metadata, suggestions, isStreaming, error, startStream, reset };
+  return { tokens, citations, metadata, suggestions, isStreaming, error, startStream, reset, stop };
 }
