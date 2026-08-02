@@ -17,9 +17,6 @@ import { Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchWithAuth } from '@/lib/auth-headers';
 import { useI18n } from '@/lib/i18n';
-import { AuthButton } from '@/components/auth/AuthButton';
-import { LangToggle } from '@/components/LangToggle';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
 import { API_BASE } from '@/lib/api-base';
 import { Button } from '@/components/ui/button';
@@ -27,6 +24,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { canAccessPaidDeveloperPlans } from '@/lib/auth-plan';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 type ApiPlan = 'free' | 'starter' | 'growth' | 'enterprise' | 'widget' | 'white_label';
 
@@ -143,6 +141,9 @@ export default function DeveloperPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const canUsePaidPlans = canAccessPaidDeveloperPlans(user);
 
@@ -170,6 +171,7 @@ export default function DeveloperPage() {
     supabase.auth.getSession().then(({ data }) => {
       setSignedIn(Boolean(data.session));
       setUser(data.session?.user ?? null);
+      setAccessToken(data.session?.access_token ?? null);
       if (data.session) void load();
       else setLoading(false);
     });
@@ -223,28 +225,58 @@ export default function DeveloperPage() {
   }, [usage]);
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="border-b border-zinc-100 bg-white/80 backdrop-blur-md sticky top-0 z-10 supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[#0A0F1E]/80">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <Link href="/" className="font-bold text-sm tracking-tight">
-            NakTahu
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle variant={isDark ? 'dark' : 'light'} />
-            <LangToggle variant={isDark ? 'dark' : 'light'} />
-            <AuthButton variant={isDark ? 'dark' : 'light'} />
-          </div>
-        </div>
+    <div className={`flex h-full ${isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50'}`}>
+      <AppSidebar
+        variant={isDark ? 'dark' : 'light'}
+        isMobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        user={user}
+        accessToken={accessToken}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+      />
+
+      <div className="flex flex-col flex-1 min-w-0 h-full overflow-y-auto text-zinc-900 dark:text-white">
+      <header className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${
+        isDark ? 'border-white/10 bg-[#0A0F1E]/90' : 'border-zinc-100 bg-white/90'
+      }`}>
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label={t('header.menu')}
+          className={`p-1.5 rounded-lg transition-colors lg:hidden ${
+            isDark ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+            <path
+              fillRule="evenodd"
+              d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+        <Link href="/" className="font-bold text-sm tracking-tight">
+          NakTahu
+        </Link>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-10 flex flex-col gap-8">
+      <main className="max-w-5xl mx-auto px-4 py-10 flex flex-col gap-8 w-full">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }}>
           <h1 className="text-2xl font-bold tracking-tight">{t('developer.title')}</h1>
           <p className="mt-2 text-sm text-zinc-600 max-w-2xl leading-relaxed dark:text-zinc-400">{t('developer.subtitle')}</p>
         </motion.div>
 
         {!signedIn ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('developer.sign_in')}</p>
+          <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('developer.title')}</h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-sm">{t('developer.sign_in')}</p>
+            <Link
+              href="/chat"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold"
+            >
+              {t('header.sign_in')}
+            </Link>
+          </div>
         ) : loading ? (
           <div className="flex flex-col gap-4">
             <div className="h-40 rounded-2xl bg-zinc-100 animate-pulse dark:bg-white/5" />
@@ -418,6 +450,7 @@ export default function DeveloperPage() {
           </motion.div>
         )}
       </main>
+      </div>
     </div>
   );
 }
