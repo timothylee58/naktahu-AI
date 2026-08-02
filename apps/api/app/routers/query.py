@@ -182,6 +182,9 @@ async def _sse_generator(
                     domain=str(final_state.get("domain") or "general"),
                     response_text=full_text,
                     citations=list(final_state.get("citations") or []),
+                    confidence=final_state.get("confidence_score"),
+                    suggestions=list(final_state.get("suggestions") or []),
+                    agency_contact=final_state.get("agency_contact"),
                 )
             except Exception as exc:
                 log.warning("history_persist_failed", error=str(exc), user_id=user_ctx.user_id)

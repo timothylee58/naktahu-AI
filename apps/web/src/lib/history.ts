@@ -7,6 +7,17 @@ export interface HistoryEntry {
   language: string;
   domain: string;
   response_summary: string;
+  /** Full stored answer text (migration 028). Absent on rows written before
+   * that migration — those fall back to re-prompting on click. */
+  response_text?: string | null;
+  confidence?: number | null;
+  suggestions?: string[];
+  agency_contact?: {
+    agency: string;
+    domain: string;
+    hotline: string;
+    portal: string;
+  } | null;
   citations: unknown[];
   ts?: number;
 }
@@ -47,6 +58,11 @@ export async function fetchHistoryAuthed(supabase: SupabaseClient): Promise<Hist
   const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/history`);
   return parseHistoryResponse(res);
 }
+
+/** sessionStorage key used to hand a clicked HistoryEntry off to /chat for
+ * reconstruction as real chat bubbles (see history/page.tsx + chat/page.tsx).
+ * sessionStorage (not a URL param) since a full response_text can be long. */
+export const HISTORY_RESTORE_STORAGE_KEY = 'naktahu:restore_history_entry';
 
 export function sidebarHistoryKey(userId: string): readonly ['sidebar-history', string] {
   return ['sidebar-history', userId];

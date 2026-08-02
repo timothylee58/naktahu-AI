@@ -43,7 +43,10 @@ async def _fetch_history_from_supabase(
     try:
         res = await asyncio.to_thread(
             lambda: supabase_client.table("user_sessions")
-            .select("query,language,domain,response_summary,citations,created_at")
+            .select(
+                "query,language,domain,response_summary,response_text,"
+                "confidence,suggestions,agency_contact,citations,created_at"
+            )
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(MAX_HISTORY)
@@ -68,6 +71,12 @@ async def _fetch_history_from_supabase(
                 "language": row.get("language"),
                 "domain": row.get("domain"),
                 "response_summary": row.get("response_summary"),
+                # Falls back to None on rows written before migration 028 —
+                # the frontend re-prompts for those instead of reconstructing.
+                "response_text": row.get("response_text"),
+                "confidence": row.get("confidence"),
+                "suggestions": row.get("suggestions") or [],
+                "agency_contact": row.get("agency_contact"),
                 "citations": row.get("citations") or [],
                 "ts": ts,
             }
@@ -130,13 +139,21 @@ async def persist_session_entry(
     domain: str,
     response_text: str,
     citations: list[Any],
+    confidence: float | None = None,
+    suggestions: list[str] | None = None,
+    agency_contact: dict[str, Any] | None = None,
 ) -> None:
     response_summary = response_text[:150]
+    suggestions = suggestions or []
     entry = {
         "query": query,
         "language": language,
         "domain": domain,
         "response_summary": response_summary,
+        "response_text": response_text,
+        "confidence": confidence,
+        "suggestions": suggestions,
+        "agency_contact": agency_contact,
         "citations": citations,
         "ts": int(time.time()),
     }
@@ -154,6 +171,10 @@ async def persist_session_entry(
         "language": language,
         "domain": domain,
         "response_summary": response_summary,
+        "response_text": response_text,
+        "confidence": confidence,
+        "suggestions": suggestions,
+        "agency_contact": agency_contact,
         "citations": citations,
     }
 
@@ -163,5 +184,12 @@ async def persist_session_entry(
         supabase_client.table("user_sessions").insert(row).execute()
 
     if supabase_client is not None:
-        await asyncio.to_thread(_insert)
+        try:
+            await asyncio.to_thread(_insert)
+        except Exception as exc:
+            # Degrade gracefully if migration 028 hasn't been applied yet
+            # (missing response_text/confidence/suggestions/agency_contact
+            # columns) rather than crashing the request — Redis already has
+            # the entry, so history isn't fully lost, just not durable yet.
+            logger.warning("history_supabase_insert_failed", error=str(exc), user_id=user_id)
     logger.info("history_persisted", user_id=user_id, domain=domain)

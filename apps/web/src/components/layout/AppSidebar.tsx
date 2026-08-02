@@ -31,7 +31,7 @@ export interface AppSidebarProps {
   showHistory?: boolean;
   user?: User | null;
   accessToken?: string | null;
-  onSelectQuery?: (query: string) => void;
+  onSelectQuery?: (entry: HistoryEntry) => void;
   /** Desktop-only: whether the persistent panel is collapsed (hidden). */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -189,7 +189,7 @@ function HistoryGroup({
 }: {
   label: string;
   entries: HistoryEntry[];
-  onSelect: (q: string) => void;
+  onSelect: (entry: HistoryEntry) => void;
   isDark: boolean;
 }) {
   if (entries.length === 0) return null;
@@ -199,7 +199,7 @@ function HistoryGroup({
         {label}
       </span>
       {entries.map((e, i) => (
-        <HistoryRow key={i} entry={e} onClick={() => onSelect(e.query)} isDark={isDark} />
+        <HistoryRow key={i} entry={e} onClick={() => onSelect(e)} isDark={isDark} />
       ))}
     </div>
   );
@@ -218,7 +218,7 @@ function SidebarPanel({
   showHistory: boolean;
   user: User | null;
   accessToken: string | null;
-  onSelectQuery?: (query: string) => void;
+  onSelectQuery?: (entry: HistoryEntry) => void;
   onClose?: () => void;
   onCollapse?: () => void;
 }) {
