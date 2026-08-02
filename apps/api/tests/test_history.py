@@ -566,3 +566,94 @@ async def test_fetch_history_entries_large_supabase_result_is_capped():
     result = await fetch_history_entries(redis_client, sb, "large-user")
     assert len(result) == 100  # documents current behaviour: no client-side cap
     table_mock.select.return_value.eq.return_value.order.return_value.limit.assert_called_with(20)
+
+
+def _configure_delete(sb, returned_rows):
+    sb.table.return_value.delete.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=returned_rows
+    )
+
+
+def _configure_update(sb, returned_rows):
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=returned_rows
+    )
+
+
+def test_delete_history_entry_401_without_auth(client):
+    c, *_ = client
+    res = c.delete("/api/v1/history/some-id")
+    assert res.status_code == 401
+
+
+def test_delete_history_entry_403_on_free_plan(client):
+    c, *_ = client
+    res = c.delete("/api/v1/history/some-id", headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 403
+
+
+def test_delete_history_entry_204_on_success(client):
+    c, redis_client, sb, _ = client
+    _configure_delete(sb, [{"id": "abc-123"}])
+    res = c.delete("/api/v1/history/abc-123", headers=_auth_header())
+    assert res.status_code == 204
+    redis_client.delete.assert_awaited()
+
+
+def test_delete_history_entry_404_when_not_found_or_not_owned(client):
+    c, _, sb, _ = client
+    _configure_delete(sb, [])
+    res = c.delete("/api/v1/history/does-not-exist", headers=_auth_header())
+    assert res.status_code == 404
+
+
+def test_delete_history_entry_503_when_supabase_degraded(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.delete("/api/v1/history/abc-123", headers=_auth_header())
+    assert res.status_code == 503
+
+
+def test_rename_history_entry_401_without_auth(client):
+    c, *_ = client
+    res = c.patch("/api/v1/history/some-id", json={"title": "New title"})
+    assert res.status_code == 401
+
+
+def test_rename_history_entry_403_on_free_plan(client):
+    c, *_ = client
+    res = c.patch(
+        "/api/v1/history/some-id",
+        json={"title": "New title"},
+        headers=_auth_header(sub="free-user", plan="free"),
+    )
+    assert res.status_code == 403
+
+
+def test_rename_history_entry_422_on_empty_title(client):
+    c, *_ = client
+    res = c.patch("/api/v1/history/abc-123", json={"title": ""}, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_rename_history_entry_200_on_success(client):
+    c, redis_client, sb, _ = client
+    _configure_update(sb, [{"id": "abc-123", "title": "New title"}])
+    res = c.patch("/api/v1/history/abc-123", json={"title": "New title"}, headers=_auth_header())
+    assert res.status_code == 200
+    assert res.json() == {"status": "renamed"}
+    redis_client.delete.assert_awaited()
+
+
+def test_rename_history_entry_404_when_not_found_or_not_owned(client):
+    c, _, sb, _ = client
+    _configure_update(sb, [])
+    res = c.patch("/api/v1/history/does-not-exist", json={"title": "New title"}, headers=_auth_header())
+    assert res.status_code == 404
+
+
+def test_rename_history_entry_503_when_supabase_degraded(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.patch("/api/v1/history/abc-123", json={"title": "New title"}, headers=_auth_header())
+    assert res.status_code == 503
