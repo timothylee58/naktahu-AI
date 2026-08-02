@@ -31,7 +31,11 @@ export function ThemeToggle({ variant = 'dark', layout = 'inline' }: ThemeToggle
       aria-label={theme === 'dark' ? t('theme.switch_light') : t('theme.switch_dark')}
       className={`flex items-center gap-2 border text-xs font-semibold transition-colors locale-nowrap ${buttonClass}`}
     >
-      {theme === 'dark' ? (
+      {isSidebar ? (
+        <span aria-hidden="true" className="flex-shrink-0 text-sm leading-none">
+          {theme === 'dark' ? '🌙' : '☀️'}
+        </span>
+      ) : theme === 'dark' ? (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 flex-shrink-0">
           <path d="M10 2a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 2ZM5.05 4.05a.75.75 0 0 1 1.06 0l1.062 1.06a.75.75 0 1 1-1.061 1.062L5.05 5.111a.75.75 0 0 1 0-1.06Zm9.9 0a.75.75 0 0 1 0 1.061l-1.06 1.061a.75.75 0 0 1-1.062-1.06l1.061-1.062a.75.75 0 0 1 1.061 0ZM3 8a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 3 8Zm11 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 14 8Zm-6.828 2.828a3 3 0 1 0 5.656 0 3 3 0 0 0-5.656 0ZM14 16a.75.75 0 0 1-.75.75h-6.5a.75.75 0 0 1 0-1.5h6.5A.75.75 0 0 1 14 16Zm-2.5-3.5a.75.75 0 0 0-3 0V14a.75.75 0 0 0 3 0v-1.5Z" />
         </svg>

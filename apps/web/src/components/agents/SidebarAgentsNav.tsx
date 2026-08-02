@@ -37,7 +37,7 @@ export function SidebarAgentsNav({
         onClick={onClose}
         className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors locale-nowrap ${navLinkClass}`}
       >
-        {t('agents.hub.link')}
+        <span aria-hidden="true">🤖 </span>{t('agents.hub.link')}
       </Link>
     </>
   );

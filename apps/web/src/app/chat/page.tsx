@@ -15,7 +15,6 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
 import { canAccessHistory } from '@/lib/auth-plan';
 import { sidebarHistoryKey } from '@/lib/history';
@@ -74,6 +73,7 @@ function ChatPageInner() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
 
   const q = searchParams.get('q');
@@ -302,6 +302,8 @@ function ChatPageInner() {
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
 
       <div className="flex flex-col flex-1 min-w-0 h-full">
@@ -333,7 +335,6 @@ function ChatPageInner() {
             <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
           </Link>
         </div>
-        <ThemeToggle variant={isDark ? 'dark' : 'light'} />
       </header>
 
       {/* message list */}

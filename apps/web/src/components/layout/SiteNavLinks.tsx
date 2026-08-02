@@ -15,11 +15,11 @@ interface SiteNavLinksProps {
 }
 
 const LINKS = [
-  { href: '/about', key: 'nav.about' },
-  { href: '/faq', key: 'nav.faq' },
-  { href: '/pricing', key: 'nav.pricing' },
-  { href: '/developer', key: 'nav.developer' },
-  { href: '/agents', key: 'nav.agents' },
+  { href: '/about', key: 'nav.about', emoji: 'ℹ️' },
+  { href: '/faq', key: 'nav.faq', emoji: '❓' },
+  { href: '/pricing', key: 'nav.pricing', emoji: '💳' },
+  { href: '/developer', key: 'nav.developer', emoji: '🔌' },
+  { href: '/agents', key: 'nav.agents', emoji: '🤖' },
 ] as const;
 
 export function SiteNavLinks({
@@ -35,6 +35,10 @@ export function SiteNavLinks({
   const isDark = variant === 'dark';
   const excluded = new Set(excludeHrefs);
   const visibleLinks = LINKS.filter((link) => !excluded.has(link.href));
+  // Emoji prefixes are a sidebar-only affordance — the horizontal landing
+  // header (LandingHeader) uses this same component and keeps its plain
+  // text-only look.
+  const showEmoji = layout === 'vertical';
 
   const linkClass = (href: string, emphasized = false) => {
     const active = pathname === href || (href !== '/' && pathname.startsWith(href));
@@ -80,6 +84,7 @@ export function SiteNavLinks({
           onClick={onNavigate}
           className={`${itemClass} ${linkClass('/')}`}
         >
+          {showEmoji && <span aria-hidden="true">🏠 </span>}
           {t('nav.home')}
         </Link>
       )}
@@ -90,6 +95,7 @@ export function SiteNavLinks({
           onClick={onNavigate}
           className={`${itemClass} ${linkClass(link.href)}`}
         >
+          {showEmoji && <span aria-hidden="true">{link.emoji} </span>}
           {t(link.key)}
         </Link>
       ))}
