@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
@@ -13,6 +14,7 @@ import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
+import { useTheme } from '@/lib/theme';
 import {
   fetchHistoryAuthed,
   HistoryFetchError,
@@ -388,6 +390,94 @@ function SidebarPanel({
   );
 }
 
+const RAIL_LINKS = [
+  { href: '/', emoji: '🏠', titleKey: 'nav.home' },
+  { href: '/about', emoji: 'ℹ️', titleKey: 'nav.about' },
+  { href: '/faq', emoji: '❓', titleKey: 'nav.faq' },
+  { href: '/pricing', emoji: '💳', titleKey: 'nav.pricing' },
+  { href: '/developer', emoji: '🔌', titleKey: 'nav.developer' },
+  { href: '/agents', emoji: '🤖', titleKey: 'nav.agents' },
+] as const;
+
+/** Icon-only collapsed rail — desktop only. Secondary controls (language,
+ * account) need more room than a rail affords, so their buttons expand the
+ * full panel back out rather than trying to cram a dropdown into 3.5rem. */
+function SidebarRail({
+  variant,
+  onExpand,
+}: {
+  variant: 'light' | 'dark';
+  onExpand: () => void;
+}) {
+  const { t } = useI18n();
+  const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = variant === 'dark';
+
+  const itemBase = isDark
+    ? 'text-zinc-400 hover:text-white hover:bg-white/10'
+    : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100';
+  const activeItem = isDark ? 'bg-white/10 text-white' : 'bg-zinc-100 text-zinc-900';
+  const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-lg text-base transition-colors flex-shrink-0';
+
+  return (
+    <div className="flex flex-col items-center h-full py-3 gap-1">
+      <button
+        onClick={onExpand}
+        aria-label={t('sidebar.expand')}
+        title={t('sidebar.expand')}
+        className={`${iconBtn} mb-2 ${itemBase}`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+          <path fillRule="evenodd" d="M7.72 12.53a.75.75 0 0 1 0-1.06l2.47-2.47-2.47-2.47a.75.75 0 0 1 1.06-1.06l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 0 1-1.06 0Z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      <nav className="flex flex-col items-center gap-1 flex-1 min-h-0">
+        {RAIL_LINKS.map((link) => {
+          const active = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-label={t(link.titleKey)}
+              title={t(link.titleKey)}
+              className={`${iconBtn} ${active ? activeItem : itemBase}`}
+            >
+              <span aria-hidden="true">{link.emoji}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <button
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? t('theme.switch_light') : t('theme.switch_dark')}
+        title={theme === 'dark' ? t('theme.switch_light') : t('theme.switch_dark')}
+        className={`${iconBtn} ${itemBase}`}
+      >
+        <span aria-hidden="true">{theme === 'dark' ? '🌙' : '☀️'}</span>
+      </button>
+      <button
+        onClick={onExpand}
+        aria-label={t('lang.label')}
+        title={t('lang.label')}
+        className={`${iconBtn} ${itemBase}`}
+      >
+        <span aria-hidden="true">🌐</span>
+      </button>
+      <button
+        onClick={onExpand}
+        aria-label={t('sidebar.account')}
+        title={t('sidebar.account')}
+        className={`${iconBtn} ${itemBase}`}
+      >
+        <span aria-hidden="true">👤</span>
+      </button>
+    </div>
+  );
+}
+
 export function AppSidebar({
   variant = 'light',
   isMobileOpen,
@@ -414,11 +504,16 @@ export function AppSidebar({
 
   return (
     <>
-      {/* Persistent panel — desktop (hidden when collapsed) */}
+      {/* Persistent panel — desktop. Collapses to an icon-only rail rather
+          than hiding entirely, so primary nav stays reachable. */}
       <aside
-        className={`${collapsed ? 'hidden' : 'hidden lg:flex'} w-72 flex-shrink-0 flex-col border-r h-full ${shellClass}`}
+        className={`hidden lg:flex flex-shrink-0 flex-col border-r h-full transition-[width] duration-150 ${collapsed ? 'w-14' : 'w-72'} ${shellClass}`}
       >
-        <SidebarPanel {...panelProps} onCollapse={onToggleCollapse} />
+        {collapsed ? (
+          <SidebarRail variant={variant} onExpand={() => onToggleCollapse?.()} />
+        ) : (
+          <SidebarPanel {...panelProps} onCollapse={onToggleCollapse} />
+        )}
       </aside>
 
       {/* Full-page overlay — mobile only */}

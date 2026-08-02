@@ -16,7 +16,6 @@ import {
 import { canAccessHistory } from '@/lib/auth-plan';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
 
 const DAY_MS = 86_400_000;
@@ -102,6 +101,7 @@ export default function HistoryPage() {
   const isDark = theme === 'dark';
   const { supabase, user, userId, accessToken, ready } = useSupabaseSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const historyEnabled = Boolean(userId && user && canAccessHistory(user));
 
@@ -122,6 +122,8 @@ export default function HistoryPage() {
         showHistory
         user={user}
         accessToken={accessToken}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
 
       <div className="flex flex-col flex-1 min-w-0 min-h-screen">
@@ -152,7 +154,6 @@ export default function HistoryPage() {
         </Link>
         <h1 className="font-semibold truncate locale-nowrap">{t('history.title')}</h1>
         </div>
-        <ThemeToggle variant={isDark ? 'dark' : 'light'} />
       </header>
 
       {/* Content */}

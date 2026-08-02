@@ -63,6 +63,7 @@ const MS: Translations = {
   'nav.agents': 'Ejen',
   'sidebar.collapse': 'Lipat panel',
   'sidebar.expand': 'Buka panel',
+  'sidebar.account': 'Akaun',
 
   'theme.dark': 'Mod gelap',
   'theme.light': 'Mod cerah',
@@ -384,6 +385,7 @@ const EN: Translations = {
   'nav.agents': 'Agents',
   'sidebar.collapse': 'Collapse sidebar',
   'sidebar.expand': 'Expand sidebar',
+  'sidebar.account': 'Account',
 
   'theme.dark': 'Dark mode',
   'theme.light': 'Light mode',
@@ -704,6 +706,7 @@ const ZH: Translations = {
   'nav.agents': '智能代理',
   'sidebar.collapse': '收起侧栏',
   'sidebar.expand': '展开侧栏',
+  'sidebar.account': '账户',
 
   'theme.dark': '深色模式',
   'theme.light': '浅色模式',
