@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import type { User } from '@supabase/supabase-js';
 import {
   CartesianGrid,
   Line,
@@ -12,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchWithAuth } from '@/lib/auth-headers';
 import { useI18n } from '@/lib/i18n';
@@ -20,8 +22,13 @@ import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/theme';
 import { API_BASE } from '@/lib/api-base';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { canAccessPaidDeveloperPlans } from '@/lib/auth-plan';
 
-type ApiPlan = 'starter' | 'growth' | 'enterprise' | 'widget' | 'white_label';
+type ApiPlan = 'free' | 'starter' | 'growth' | 'enterprise' | 'widget' | 'white_label';
 
 interface ApiKeyRow {
   id: string;
@@ -43,12 +50,13 @@ interface UsageStats {
   total_events: number;
 }
 
-const PLANS: { id: ApiPlan; price: string; desc: string }[] = [
-  { id: 'starter', price: 'RM 49/mo', desc: '5,500 calls · 10 req/min · JSON + citations' },
-  { id: 'growth', price: 'RM 149/mo', desc: '50,000 calls · SSE + multi-domain · 60 req/min' },
-  { id: 'widget', price: 'RM 99/mo', desc: 'Embeddable widget · domain-locked key' },
-  { id: 'white_label', price: 'RM 299/mo', desc: 'Widget without NakTahu branding' },
-  { id: 'enterprise', price: 'Custom', desc: 'Unlimited · on-prem · custom corpus' },
+const PLANS: { id: ApiPlan; price: string; desc: string; paid: boolean }[] = [
+  { id: 'free', price: 'RM 0/mo', desc: '500 calls · 5 req/min · JSON + citations', paid: false },
+  { id: 'starter', price: 'RM 49/mo', desc: '5,500 calls · 10 req/min · JSON + citations', paid: true },
+  { id: 'growth', price: 'RM 149/mo', desc: '50,000 calls · SSE + multi-domain · 60 req/min', paid: true },
+  { id: 'widget', price: 'RM 99/mo', desc: 'Embeddable widget · domain-locked key', paid: true },
+  { id: 'white_label', price: 'RM 299/mo', desc: 'Widget without NakTahu branding', paid: true },
+  { id: 'enterprise', price: 'Custom', desc: 'Unlimited · on-prem · custom corpus', paid: true },
 ];
 
 type CodeTab = 'curl' | 'python' | 'typescript';
@@ -88,21 +96,19 @@ console.log(data.answer);`,
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_4px_24px_rgba(15,23,42,0.08)] dark:bg-white/5 dark:border-white/10">
+    <Card className="p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_4px_24px_rgba(15,23,42,0.08)]">
       <div className="flex gap-2 mb-4">
         {(['curl', 'python', 'typescript'] as const).map((tabId) => (
-          <button
+          <Button
             key={tabId}
             type="button"
+            size="sm"
+            variant={tab === tabId ? 'default' : 'secondary'}
             onClick={() => setTab(tabId)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase transition-colors ${
-              tab === tabId
-                ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/20'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20'
-            }`}
+            className="uppercase"
           >
             {tabId}
-          </button>
+          </Button>
         ))}
       </div>
       <pre className="text-xs bg-zinc-950 text-zinc-100 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap ring-1 ring-white/5">
@@ -118,7 +124,7 @@ console.log(data.answer);`,
           OpenAPI docs ↗
         </a>
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -128,14 +134,17 @@ export default function DeveloperPage() {
   const isDark = theme === 'dark';
   const supabase = useMemo(() => createClient(), []);
   const [signedIn, setSignedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [usage, setUsage] = useState<UsageStats | null>(null);
-  const [plan, setPlan] = useState<ApiPlan>('starter');
+  const [plan, setPlan] = useState<ApiPlan>('free');
   const [domains, setDomains] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
+
+  const canUsePaidPlans = canAccessPaidDeveloperPlans(user);
 
   const load = useCallback(async () => {
     setError(null);
@@ -160,6 +169,7 @@ export default function DeveloperPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSignedIn(Boolean(data.session));
+      setUser(data.session?.user ?? null);
       if (data.session) void load();
       else setLoading(false);
     });
@@ -269,46 +279,72 @@ export default function DeveloperPage() {
               </div>
             )}
 
-            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)] flex flex-col gap-4 dark:bg-white/5 dark:border-white/10">
-              <h2 className="text-sm font-semibold">{t('developer.create_key')}</h2>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {PLANS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setPlan(p.id)}
-                    className={`text-left rounded-xl border p-3 transition-all duration-200 ${
-                      plan === p.id
+            <Card className="p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4">
+                <h2 className="text-sm font-semibold">{t('developer.create_key')}</h2>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {PLANS.map((p) => {
+                    const locked = p.paid && !canUsePaidPlans;
+                    const cardClass = `relative text-left rounded-xl border p-3 transition-all duration-200 block ${
+                      plan === p.id && !locked
                         ? 'border-blue-500 ring-1 ring-blue-500/30 bg-blue-50/60 shadow-sm dark:bg-blue-500/10 dark:ring-blue-500/30'
-                        : 'border-zinc-200 hover:border-zinc-300 hover:shadow-sm dark:border-white/10 dark:hover:border-white/20'
-                    }`}
-                  >
-                    <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{p.id}</p>
-                    <p className="text-sm font-semibold">{p.price}</p>
-                    <p className="text-xs text-zinc-500 mt-1 leading-relaxed dark:text-zinc-400">{p.desc}</p>
-                  </button>
-                ))}
+                        : locked
+                          ? 'border-zinc-200 opacity-70 hover:opacity-100 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/20'
+                          : 'border-zinc-200 hover:border-zinc-300 hover:shadow-sm dark:border-white/10 dark:hover:border-white/20'
+                    }`;
+                    const cardContent = (
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                            {p.id.replace('_', ' ')}
+                          </p>
+                          {!p.paid && (
+                            <Badge variant="success">{t('developer.plan.free_badge')}</Badge>
+                          )}
+                          {locked && (
+                            <Lock className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" aria-hidden />
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold">{p.price}</p>
+                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed dark:text-zinc-400">{p.desc}</p>
+                        {locked && (
+                          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-2 locale-nowrap">
+                            {t('developer.plan.locked')} · {t('nav.pricing')} ↗
+                          </p>
+                        )}
+                      </>
+                    );
+                    return locked ? (
+                      <Link key={p.id} href="/pricing" className={cardClass}>
+                        {cardContent}
+                      </Link>
+                    ) : (
+                      <button key={p.id} type="button" onClick={() => setPlan(p.id)} className={cardClass}>
+                        {cardContent}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(plan === 'widget' || plan === 'white_label') && (
+                  <Input
+                    type="text"
+                    value={domains}
+                    onChange={(e) => setDomains(e.target.value)}
+                    placeholder={t('developer.domains_placeholder')}
+                  />
+                )}
+                <Button
+                  type="button"
+                  onClick={() => void createKey()}
+                  disabled={creating || keys.filter((k) => k.active).length >= 3}
+                  className="self-start hover:-translate-y-0.5 active:translate-y-0 shadow-blue-900/20"
+                >
+                  {creating ? '…' : t('developer.generate')}
+                </Button>
               </div>
-              {(plan === 'widget' || plan === 'white_label') && (
-                <input
-                  type="text"
-                  value={domains}
-                  onChange={(e) => setDomains(e.target.value)}
-                  placeholder={t('developer.domains_placeholder')}
-                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm bg-transparent transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
-                />
-              )}
-              <button
-                type="button"
-                onClick={() => void createKey()}
-                disabled={creating || keys.filter((k) => k.active).length >= 3}
-                className="self-start rounded-xl bg-blue-600 hover:bg-blue-500 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white text-sm font-semibold px-4 py-2.5 shadow-sm shadow-blue-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                {creating ? '…' : t('developer.generate')}
-              </button>
-            </section>
+            </Card>
 
-            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
+            <Card className="p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)]">
               <h2 className="text-sm font-semibold mb-4">{t('developer.keys')}</h2>
               {keys.length === 0 ? (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('developer.no_keys')}</p>
@@ -329,22 +365,24 @@ export default function DeveloperPage() {
                         </p>
                       </div>
                       {k.active && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => void revokeKey(k.id)}
-                          className="text-xs font-semibold text-red-600 hover:underline dark:text-red-400"
+                          className="text-red-600 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
                         >
                           {t('developer.revoke')}
-                        </button>
+                        </Button>
                       )}
                     </li>
                   ))}
                 </ul>
               )}
-            </section>
+            </Card>
 
             {chartData.length > 0 && (
-              <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
+              <Card className="p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)]">
                 <h2 className="text-sm font-semibold mb-4">{t('developer.usage')}</h2>
                 <div className="h-56 w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -363,12 +401,12 @@ export default function DeveloperPage() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-              </section>
+              </Card>
             )}
 
             <CodeExamples apiBase={API_BASE} apiKeyPlaceholder="nkt_live_YOUR_KEY" />
 
-            <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
+            <Card className="p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)]">
               <h2 className="text-sm font-semibold mb-2">{t('developer.widget')}</h2>
               <pre className="text-xs bg-zinc-950 text-zinc-100 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap ring-1 ring-white/5">{`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://naktahu.netlify.app'}/widget.js"
   data-api-key="nkt_live_YOUR_KEY"
@@ -376,7 +414,7 @@ export default function DeveloperPage() {
   data-lang="bm"
   data-theme="light"
   data-white-label="false"></script>`}</pre>
-            </section>
+            </Card>
           </motion.div>
         )}
       </main>

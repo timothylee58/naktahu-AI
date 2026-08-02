@@ -134,6 +134,8 @@ const MS: Translations = {
   'developer.error.load': 'Gagal memuatkan data pembangun.',
   'developer.error.create': 'Gagal menjana kunci.',
   'developer.error.revoke': 'Gagal membatalkan kunci.',
+  'developer.plan.free_badge': 'Percuma',
+  'developer.plan.locked': 'Memerlukan pelan Pro atau lebih tinggi',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -456,6 +458,8 @@ const EN: Translations = {
   'developer.error.load': 'Failed to load developer data.',
   'developer.error.create': 'Failed to generate key.',
   'developer.error.revoke': 'Failed to revoke key.',
+  'developer.plan.free_badge': 'Free',
+  'developer.plan.locked': 'Requires Pro plan or higher',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',
@@ -777,6 +781,8 @@ const ZH: Translations = {
   'developer.error.load': '加载开发者数据失败。',
   'developer.error.create': '生成密钥失败。',
   'developer.error.revoke': '撤销密钥失败。',
+  'developer.plan.free_badge': '免费',
+  'developer.plan.locked': '需要 Pro 或更高级别的方案',
 
   /* ── language picker ── */
   'lang.ms': 'Bahasa Malaysia',

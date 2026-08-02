@@ -18,6 +18,14 @@ logger = structlog.get_logger()
 API_KEY_RAW_PREFIX = "nkt_live_"
 
 API_PLAN_DEFAULTS: dict[str, dict[str, Any]] = {
+    "free": {
+        "calls_limit": 500,
+        "rate_limit_per_min": 5,
+        "sse": False,
+        "multi": False,
+        "widget": False,
+        "white_label": False,
+    },
     "starter": {
         "calls_limit": 5500,
         "rate_limit_per_min": 10,
