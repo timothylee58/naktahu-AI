@@ -132,6 +132,23 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("STRIPE_PRICE_STUDENT", "stripe_price_student"),
     )
+    # Annual variants — same plan claim as their monthly counterpart, just a
+    # different Stripe Price (10x monthly for pro/business ~= 2 months free;
+    # student is a steeper 75%-off annual price). Separate Stripe Price IDs,
+    # not a discount applied at checkout time, since Stripe subscriptions are
+    # priced per-Price.
+    stripe_price_pro_individu_annual: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_PRO_INDIVIDU_ANNUAL", "stripe_price_pro_individu_annual"),
+    )
+    stripe_price_pro_perniagaan_annual: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_PRO_PERNIAGAAN_ANNUAL", "stripe_price_pro_perniagaan_annual"),
+    )
+    stripe_price_student_annual: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_STUDENT_ANNUAL", "stripe_price_student_annual"),
+    )
     stripe_price_credits_5: str = Field(
         default="",
         validation_alias=AliasChoices("STRIPE_PRICE_CREDITS_5", "stripe_price_credits_5"),
