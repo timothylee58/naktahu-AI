@@ -16,6 +16,7 @@ const MS: Translations = {
   /* ── chat ── */
   'chat.placeholder': 'Taip soalan anda di sini…',
   'chat.send': 'Hantar',
+  'chat.stop': 'Hentikan janaan',
   'chat.mic': 'Input suara',
   'chat.mic_denied': 'Akses mikrofon dinafikan',
   'chat.thinking': 'Sedang berfikir…',
@@ -26,6 +27,7 @@ const MS: Translations = {
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
   'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
   'chat.new_chat': 'Soalan baharu',
+  'chat.jump_to_latest': 'Ke bawah',
   'chat.context_usage': '{used} digunakan',
   'chat.context_window': 'tetingkap konteks',
   'chat.actions.copy': 'Salin',
@@ -341,6 +343,7 @@ const EN: Translations = {
   /* ── chat ── */
   'chat.placeholder': 'Type your question here…',
   'chat.send': 'Send',
+  'chat.stop': 'Stop generating',
   'chat.mic': 'Voice input',
   'chat.mic_denied': 'Microphone access denied',
   'chat.thinking': 'Thinking…',
@@ -350,6 +353,7 @@ const EN: Translations = {
   'chat.empty': 'Ask me anything about Malaysian government services.',
   'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
   'chat.new_chat': 'New chat',
+  'chat.jump_to_latest': 'Jump to latest',
   'chat.context_usage': '{used} used',
   'chat.context_window': 'context window',
   'chat.actions.copy': 'Copy',
@@ -665,6 +669,7 @@ const ZH: Translations = {
   /* ── chat ── */
   'chat.placeholder': '在此输入您的问题…',
   'chat.send': '发送',
+  'chat.stop': '停止生成',
   'chat.mic': '语音输入',
   'chat.mic_denied': '麦克风访问被拒绝',
   'chat.thinking': '思考中…',
@@ -673,6 +678,7 @@ const ZH: Translations = {
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
   'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
   'chat.new_chat': '新对话',
+  'chat.jump_to_latest': '跳到最新',
   'chat.context_usage': '已使用 {used}',
   'chat.context_window': '上下文窗口',
   'chat.actions.copy': '复制',

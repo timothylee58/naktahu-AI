@@ -24,44 +24,6 @@ function makeId() {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
-// Representative queries for the empty-state domain pills, one per language.
-// Mirrors the Chip { queryMs/queryEn/queryZh } shape used by PromptChips —
-// kept inline (rather than importing PromptChips' CHIPS) since these pills
-// are the small icon-less variant and map 1:1 to domain keys, not free-form
-// example questions.
-const DOMAIN_PILL_QUERIES: Record<'tax' | 'epf' | 'business' | 'education' | 'health' | 'immigration', Record<'ms' | 'en' | 'zh', string>> = {
-  tax: {
-    ms: 'Bagaimana cara untuk membayar cukai pendapatan di Malaysia?',
-    en: 'How do I pay income tax in Malaysia?',
-    zh: '在马来西亚如何缴纳所得税？',
-  },
-  epf: {
-    ms: 'Bagaimana cara mengeluarkan wang KWSP untuk pembelian rumah pertama?',
-    en: 'How do I withdraw EPF for first home purchase?',
-    zh: '如何提取公积金用于购买首套房屋？',
-  },
-  business: {
-    ms: 'Apakah langkah-langkah untuk mendaftarkan syarikat di SSM Malaysia?',
-    en: 'What are the steps to register a company with SSM Malaysia?',
-    zh: '在马来西亚SSM注册公司的步骤是什么？',
-  },
-  education: {
-    ms: 'Apakah bantuan kewangan yang tersedia untuk pelajar universiti di Malaysia?',
-    en: 'What financial aid is available for university students in Malaysia?',
-    zh: '马来西亚大学生有哪些经济援助可以申请？',
-  },
-  health: {
-    ms: 'Apakah faedah yang dilindungi di bawah skim kesihatan kerajaan?',
-    en: 'What benefits are covered under the government healthcare scheme?',
-    zh: '政府医疗保健计划涵盖哪些福利？',
-  },
-  immigration: {
-    ms: 'Bagaimana cara memohon permit kerja atau pas pekerjaan di Malaysia?',
-    en: 'How do I apply for a work permit in Malaysia?',
-    zh: '如何在马来西亚申请工作准证？',
-  },
-};
-
 function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
@@ -86,6 +48,11 @@ function ChatPageInner() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Tracked as a ref (not state) so the auto-scroll effect can read it
+  // synchronously without re-running on every scroll pixel — only the
+  // "jump to latest" button's visibility needs to trigger a re-render.
+  const isAtBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   const conversationChars = useMemo(
     () => messages.reduce((sum, msg) => sum + msg.content.length, 0),
@@ -101,6 +68,7 @@ function ChatPageInner() {
     error,
     startStream,
     reset,
+    stop,
   } = useSSEStream({ language: locale, accessToken: accessToken ?? undefined });
 
   const streamingAssistantId = useRef<string | null>(null);
@@ -108,10 +76,24 @@ function ChatPageInner() {
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    isAtBottomRef.current = true;
+    setShowJumpToLatest(false);
   }, []);
 
+  const handleScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 120;
+    isAtBottomRef.current = atBottom;
+    setShowJumpToLatest(!atBottom);
+  }, []);
+
+  // Auto-scroll only while the user is already at (or near) the bottom —
+  // if they've scrolled up to re-read something mid-answer, new tokens
+  // must not yank them back down.
   useEffect(() => {
-    scrollToBottom();
+    if (isAtBottomRef.current) scrollToBottom();
   }, [messages, tokens, scrollToBottom]);
 
   // When first token arrives, remove ThinkingIndicator and show streaming bubble
@@ -213,12 +195,25 @@ function ChatPageInner() {
     }
   }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleNewChat = useCallback(() => {
+    reset();
+    setMessages([]);
+    setThinkingId(null);
+    setInjectedQuery('');
+    lastUserQuery.current = '';
+    streamingAssistantId.current = null;
+    bubbleCreated.current = false;
+    isAtBottomRef.current = true;
+    setShowJumpToLatest(false);
+  }, [reset]);
+
   const handleSend = useCallback(
     (query: string) => {
       lastUserQuery.current = query;
       reset();
       streamingAssistantId.current = null;
       bubbleCreated.current = false;
+      isAtBottomRef.current = true;
 
       const userMsg: Message = {
         id: makeId(),
@@ -260,6 +255,18 @@ function ChatPageInner() {
     handleSend(lastUserQuery.current);
   }, [handleSend]);
 
+  const handleStop = useCallback(() => {
+    stop();
+    // If the abort lands before any token arrived, the finalise-on-
+    // isStreaming-false effect never fires (streamingAssistantId is still
+    // null — no bubble was ever created to finalise) — the "thinking"
+    // placeholder would otherwise sit there forever. Clear it directly.
+    if (!bubbleCreated.current && thinkingId) {
+      setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
+      setThinkingId(null);
+    }
+  }, [stop, thinkingId]);
+
   const handleSelectHistoryQuery = useCallback((query: string) => {
     setInjectedQuery(query);
     setSidebarOpen(false);
@@ -284,9 +291,6 @@ function ChatPageInner() {
     : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800';
   const emptyTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
   const emptyDesc = isDark ? 'text-zinc-500' : 'text-zinc-400';
-  const domainPill = isDark
-    ? 'text-blue-300 bg-blue-500/10 border-blue-500/30'
-    : 'text-blue-600 bg-blue-50 border-blue-100';
   const inputBarClass = isDark
     ? 'border-white/10 bg-[#0A0F1E]/90'
     : 'border-zinc-100 bg-white/90';
@@ -335,19 +339,34 @@ function ChatPageInner() {
             <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
           </Link>
         </div>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className={`flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 transition-colors ${menuBtn}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            <span className="hidden sm:inline">{t('chat.new_chat')}</span>
+          </button>
+        )}
       </header>
 
       {/* message list */}
+      <div className="relative flex-1 min-h-0">
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
+        <div className="max-w-3xl mx-auto w-full space-y-5">
         {messages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6"
+            className="flex flex-col items-center justify-center text-center gap-5 select-none px-6 py-16"
           >
             {/* Logo mark */}
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/30 ring-1 ring-white/10">
@@ -359,18 +378,6 @@ function ChatPageInner() {
             <div className="flex flex-col gap-1">
               <p className={`text-lg font-bold ${emptyTitle}`}>NakTahu AI</p>
               <p className={`text-sm max-w-[260px] leading-relaxed ${emptyDesc}`}>{t('chat.empty')}</p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
-              {(['tax', 'epf', 'business', 'education', 'health', 'immigration'] as const).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => handleChipSelect(DOMAIN_PILL_QUERIES[d][locale])}
-                  className={`text-[11px] font-medium border rounded-full px-2.5 py-1 transition-colors hover:shadow-sm cursor-pointer ${domainPill}`}
-                >
-                  {t(`domain.${d}`)}
-                </button>
-              ))}
             </div>
           </motion.div>
         )}
@@ -399,15 +406,37 @@ function ChatPageInner() {
           ),
         )}
         <div ref={bottomRef} />
+        </div>
       </div>
 
-      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label={t('chat.jump_to_latest')}
+          className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 shadow-md transition-colors ${
+            isDark
+              ? 'bg-[#141929] text-zinc-200 border border-white/10 hover:bg-white/10'
+              : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+            <path fillRule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v10.638l3.96-4.158a.75.75 0 1 1 1.08 1.04l-5.25 5.5a.75.75 0 0 1-1.08 0l-5.25-5.5a.75.75 0 1 1 1.08-1.04l3.96 4.158V3.75A.75.75 0 0 1 10 3Z" clipRule="evenodd" />
+          </svg>
+          {t('chat.jump_to_latest')}
+        </button>
+      )}
+      </div>
+
+      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
         {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
         )}
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
+          onStop={handleStop}
           detectedLanguage={detectedLang}
           inject={injectedQuery}
           conversationChars={conversationChars}
@@ -416,6 +445,7 @@ function ChatPageInner() {
         <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
           {t('chat.keyboard_hint')}
         </p>
+        </div>
       </div>
       </div>
     </div>
