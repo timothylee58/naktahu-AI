@@ -186,11 +186,11 @@ export default function FAQPage() {
   const content = locale === 'zh' ? faqs.zh : locale === 'en' ? faqs.en : faqs.ms;
 
   return (
-    <div className={`flex flex-col min-h-screen font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
       <LandingHeader />
 
-      <div className="flex flex-col flex-1 min-w-0">
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-10 sm:py-12 max-w-3xl mx-auto w-full">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-10 sm:py-12 max-w-3xl mx-auto w-full">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -199,7 +199,7 @@ export default function FAQPage() {
           >
             <header className="text-center space-y-3">
               <h1 className="text-4xl font-bold tracking-tight">{content.title}</h1>
-              <p className="text-lg text-zinc-400">{content.subtitle}</p>
+              <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{content.subtitle}</p>
             </header>
 
             <div className="space-y-3">
@@ -209,17 +209,21 @@ export default function FAQPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05, duration: 0.3 }}
-                  className="bg-white/5 border border-white/10 rounded-xl overflow-hidden"
+                  className={`rounded-xl overflow-hidden border ${
+                    isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
+                  }`}
                 >
                   <button
                     onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                    className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-white/5 transition-colors"
+                    className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
+                      isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'
+                    }`}
                   >
-                    <span className="font-semibold text-white pr-4">{faq.question}</span>
+                    <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
                     <motion.svg
                       animate={{ rotate: openIndex === index ? 180 : 0 }}
                       transition={{ duration: 0.2 }}
-                      className="w-5 h-5 text-zinc-400 flex-shrink-0"
+                      className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -237,7 +241,7 @@ export default function FAQPage() {
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-6 pb-4 text-zinc-300 leading-relaxed">
+                        <div className={`px-6 pb-4 leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
                           {faq.answer}
                         </div>
                       </motion.div>
@@ -248,7 +252,7 @@ export default function FAQPage() {
             </div>
 
             <div className="flex flex-col items-center gap-4 pt-8 text-center">
-              <p className="text-zinc-400">{locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?'}</p>
+              <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>{locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?'}</p>
               <Link
                 href="/chat"
                 className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
@@ -262,12 +266,14 @@ export default function FAQPage() {
           </motion.div>
         </main>
 
-        <footer className="border-t border-white/10 px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
+        <footer className={`border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm ${
+          isDark ? 'border-white/10 text-zinc-500' : 'border-zinc-200 text-zinc-500'
+        }`}>
           <span className="locale-nowrap">&copy; 2026 NakTahu AI</span>
           <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-white transition-colors">{t('nav.home')}</Link>
-            <Link href="/about" className="hover:text-white transition-colors">{t('nav.about')}</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">{t('footer.privacy')}</Link>
+            <Link href="/" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('nav.home')}</Link>
+            <Link href="/about" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('nav.about')}</Link>
+            <Link href="/privacy" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('footer.privacy')}</Link>
           </div>
         </footer>
       </div>
