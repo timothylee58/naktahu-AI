@@ -148,45 +148,52 @@ export default function AboutPage() {
   const c = locale === 'zh' ? content.zh : locale === 'en' ? content.en : content.ms;
 
   return (
-    <div className={`flex flex-col min-h-screen font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
       <LandingHeader />
 
-      <div className="flex flex-col flex-1 min-w-0 max-w-4xl mx-auto w-full px-4 sm:px-6">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 max-w-4xl mx-auto w-full px-4 sm:px-6">
 
-        <main className="flex-1 overflow-y-auto px-6 py-12 max-w-4xl mx-auto w-full">
+        <main className="flex-1 min-h-0 overflow-y-auto px-6 py-12 max-w-4xl mx-auto w-full">
           <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-12">
             <header className="text-center space-y-3">
               <h1 className="text-4xl font-bold tracking-tight">{c.title}</h1>
-              <p className="text-lg text-zinc-400">{c.subtitle}</p>
+              <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{c.subtitle}</p>
             </header>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-blue-400">{c.mission.title}</h2>
-              <p className="text-zinc-300 leading-relaxed">{c.mission.desc}</p>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.mission.title}</h2>
+              <p className={`leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>{c.mission.desc}</p>
             </section>
 
             <section className="space-y-6">
-              <h2 className="text-2xl font-bold text-blue-400">{c.how.title}</h2>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.how.title}</h2>
               <div className="grid md:grid-cols-3 gap-6">
                 {c.how.steps.map((step, i) => (
-                  <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-2">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg">
+                  <div
+                    key={i}
+                    className={`rounded-xl p-6 space-y-2 border ${
+                      isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                      isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+                    }`}>
                       {i + 1}
                     </div>
-                    <h3 className="font-semibold text-white">{step.title}</h3>
-                    <p className="text-sm text-zinc-400">{step.desc}</p>
+                    <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{step.title}</h3>
+                    <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{step.desc}</p>
                   </div>
                 ))}
               </div>
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-blue-400">{c.sources.title}</h2>
-              <p className="text-zinc-300">{c.sources.desc}</p>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.sources.title}</h2>
+              <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.sources.desc}</p>
               <ul className="grid md:grid-cols-2 gap-3">
                 {c.sources.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-zinc-300">
-                    <svg className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <li key={i} className={`flex items-start gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                     {item}
@@ -196,12 +203,12 @@ export default function AboutPage() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-blue-400">{c.tech.title}</h2>
-              <p className="text-zinc-300">{c.tech.desc}</p>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.tech.title}</h2>
+              <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.tech.desc}</p>
               <ul className="space-y-2">
                 {c.tech.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-zinc-300">
-                    <svg className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <li key={i} className={`flex items-start gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                     {item}
@@ -210,14 +217,16 @@ export default function AboutPage() {
               </ul>
             </section>
 
-            <section className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 space-y-3">
+            <section className={`rounded-xl p-6 space-y-3 border ${
+              isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'
+            }`}>
               <div className="flex items-center gap-2">
-                <svg className="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                <svg className={`w-6 h-6 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                 </svg>
-                <h2 className="text-xl font-bold text-amber-300">{c.disclaimer.title}</h2>
+                <h2 className={`text-xl font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{c.disclaimer.title}</h2>
               </div>
-              <p className="text-zinc-300 leading-relaxed">{c.disclaimer.desc}</p>
+              <p className={`leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>{c.disclaimer.desc}</p>
             </section>
 
             <div className="flex justify-center pt-6">
@@ -234,11 +243,13 @@ export default function AboutPage() {
           </motion.div>
         </main>
 
-        <footer className="border-t border-white/10 px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
+        <footer className={`border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm ${
+          isDark ? 'border-white/10 text-zinc-500' : 'border-zinc-200 text-zinc-500'
+        }`}>
           <span className="locale-nowrap">&copy; 2026 NakTahu AI</span>
           <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-white transition-colors">{t('nav.home')}</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">{t('footer.privacy')}</Link>
+            <Link href="/" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('nav.home')}</Link>
+            <Link href="/privacy" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('footer.privacy')}</Link>
           </div>
         </footer>
       </div>
