@@ -31,27 +31,31 @@ Without `DATABASE_URL`, agents fall back to in-memory checkpoints (lost on resta
 
 Without `RESEND_API_KEY`, Compliance Drafter still generates PDFs but skips email delivery.
 
-## 3. Railway cron — `naktahu-deadline-cron`
+## 3. Deadline Monitor cron — GitHub Actions
 
-Create a **new Railway service** in the same project:
+Runs on a GitHub-hosted runner via `.github/workflows/deadline-monitor.yml`,
+**not** as a Railway service.
 
-1. **Root directory:** `apps/cron-deadline-monitor`
-2. **Service name:** `naktahu-deadline-cron`
-3. Config is in `apps/cron-deadline-monitor/railway.toml`:
-   - Schedule: `0 18 * * *` (02:00 Malaysia Time)
-   - Command: `python scripts/agents/deadline_monitor.py`
-   - `restartPolicyType = NEVER` (cron jobs must not restart)
+- Schedule: `0 18 * * *` (02:00 Malaysia Time), plus `workflow_dispatch` for
+  manual/missed runs.
+- Command: `python scripts/agents/deadline_monitor.py` from `apps/api`.
 
-**Env vars** (subset of API — no `DATABASE_URL` or Resend needed):
+**Required GitHub repository secrets** (Settings → Secrets and variables →
+Actions):
 
-| Variable | Required |
-|----------|----------|
-| `SUPABASE_URL` | Yes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes |
+| Secret | Required | Notes |
+|--------|----------|-------|
+| `SUPABASE_URL` | Yes | Shared with other workflows |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-side only — never exposed to the frontend |
+| `RESEND_API_KEY` | Yes | Email is the only alert delivery channel |
+| `RESEND_FROM_EMAIL` | Yes | Verified sender in Resend |
 
-Optional: `SENTRY_DSN` for error tracking.
-
-GitHub Actions deploys this service on merge to `main` (see `.github/workflows/deploy.yml`).
+Previously this was a Railway cron service (`apps/cron-deadline-monitor`).
+That approach was abandoned after repeated failures: the service was never
+reliably visible to `RAILWAY_TOKEN`, every service-name/ID resolution attempt
+missed, and dashboard edits meant for it landed on the live API service's
+Root Directory instead. Running it in Actions removes that whole class of
+problem and keeps cron changes structurally unable to touch the API service.
 
 ## 4. Verify after deploy
 
