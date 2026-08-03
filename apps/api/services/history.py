@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -43,7 +44,10 @@ async def _fetch_history_from_supabase(
     try:
         res = await asyncio.to_thread(
             lambda: supabase_client.table("user_sessions")
-            .select("query,language,domain,response_summary,citations,created_at")
+            .select(
+                "id,title,query,language,domain,response_summary,response_text,"
+                "confidence,suggestions,agency_contact,citations,created_at"
+            )
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(MAX_HISTORY)
@@ -64,10 +68,20 @@ async def _fetch_history_from_supabase(
                 ts = None
         out.append(
             {
+                # Falls back to None on rows written before migration 029 —
+                # the frontend hides rename/delete for entries with no id.
+                "id": row.get("id"),
+                "title": row.get("title"),
                 "query": row.get("query"),
                 "language": row.get("language"),
                 "domain": row.get("domain"),
                 "response_summary": row.get("response_summary"),
+                # Falls back to None on rows written before migration 028 —
+                # the frontend re-prompts for those instead of reconstructing.
+                "response_text": row.get("response_text"),
+                "confidence": row.get("confidence"),
+                "suggestions": row.get("suggestions") or [],
+                "agency_contact": row.get("agency_contact"),
                 "citations": row.get("citations") or [],
                 "ts": ts,
             }
@@ -130,13 +144,24 @@ async def persist_session_entry(
     domain: str,
     response_text: str,
     citations: list[Any],
+    confidence: float | None = None,
+    suggestions: list[str] | None = None,
+    agency_contact: dict[str, Any] | None = None,
 ) -> None:
     response_summary = response_text[:150]
+    suggestions = suggestions or []
+    entry_id = str(uuid.uuid4())
     entry = {
+        "id": entry_id,
+        "title": None,
         "query": query,
         "language": language,
         "domain": domain,
         "response_summary": response_summary,
+        "response_text": response_text,
+        "confidence": confidence,
+        "suggestions": suggestions,
+        "agency_contact": agency_contact,
         "citations": citations,
         "ts": int(time.time()),
     }
@@ -149,11 +174,16 @@ async def persist_session_entry(
         await pipe.execute()
 
     row = {
+        "id": entry_id,
         "user_id": user_id,
         "query": query,
         "language": language,
         "domain": domain,
         "response_summary": response_summary,
+        "response_text": response_text,
+        "confidence": confidence,
+        "suggestions": suggestions,
+        "agency_contact": agency_contact,
         "citations": citations,
     }
 
@@ -163,5 +193,91 @@ async def persist_session_entry(
         supabase_client.table("user_sessions").insert(row).execute()
 
     if supabase_client is not None:
-        await asyncio.to_thread(_insert)
+        try:
+            await asyncio.to_thread(_insert)
+        except Exception as exc:
+            # Degrade gracefully if migration 028 hasn't been applied yet
+            # (missing response_text/confidence/suggestions/agency_contact
+            # columns) rather than crashing the request — Redis already has
+            # the entry, so history isn't fully lost, just not durable yet.
+            logger.warning("history_supabase_insert_failed", error=str(exc), user_id=user_id)
     logger.info("history_persisted", user_id=user_id, domain=domain)
+
+
+async def _invalidate_redis_cache(redis_client: Redis | None, user_id: str) -> None:
+    """Drop the Redis list after a mutation instead of surgically patching it.
+
+    Entries are plain JSON strings with no indexed lookup by id, so patching
+    the list in place means fetch-all/filter/rewrite anyway. Simplest correct
+    option: delete the key — fetch_history_entries already treats Supabase as
+    authoritative and rewarms the cache on the next read.
+    """
+    if redis_client is None:
+        return
+    try:
+        await redis_client.delete(history_key(user_id))
+    except Exception as exc:
+        logger.warning("history_redis_invalidate_failed", error=str(exc), user_id=user_id)
+
+
+async def delete_session_entry(
+    *,
+    redis_client: Redis | None,
+    supabase_client: Client | None,
+    user_id: str,
+    entry_id: str,
+) -> bool:
+    """Delete one history entry. Returns False if it didn't exist / wasn't owned by user_id."""
+    if supabase_client is None:
+        return False
+
+    def _delete() -> list[dict[str, Any]]:
+        res = (
+            supabase_client.table("user_sessions")
+            .delete()
+            .eq("id", entry_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return res.data or []
+
+    try:
+        deleted = await asyncio.to_thread(_delete)
+    except Exception as exc:
+        logger.warning("history_delete_failed", error=str(exc), user_id=user_id, entry_id=entry_id)
+        return False
+    if deleted:
+        await _invalidate_redis_cache(redis_client, user_id)
+    return bool(deleted)
+
+
+async def rename_session_entry(
+    *,
+    redis_client: Redis | None,
+    supabase_client: Client | None,
+    user_id: str,
+    entry_id: str,
+    title: str,
+) -> bool:
+    """Set a custom display title for one history entry. Returns False if it didn't exist / wasn't owned by user_id."""
+    if supabase_client is None:
+        return False
+
+    def _update() -> list[dict[str, Any]]:
+        res = (
+            supabase_client.table("user_sessions")
+            .update({"title": title})
+            .eq("id", entry_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return res.data or []
+
+    try:
+        updated = await asyncio.to_thread(_update)
+    except Exception as exc:
+        logger.warning("history_rename_failed", error=str(exc), user_id=user_id, entry_id=entry_id)
+        return False
+    if updated:
+        await _invalidate_redis_cache(redis_client, user_id)
+    return bool(updated)

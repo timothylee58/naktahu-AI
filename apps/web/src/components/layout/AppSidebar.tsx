@@ -17,6 +17,8 @@ import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import {
   fetchHistoryAuthed,
+  deleteHistoryEntry,
+  renameHistoryEntry,
   HistoryFetchError,
   HISTORY_SWR_OPTIONS,
   sidebarHistoryKey,
@@ -31,7 +33,7 @@ export interface AppSidebarProps {
   showHistory?: boolean;
   user?: User | null;
   accessToken?: string | null;
-  onSelectQuery?: (query: string) => void;
+  onSelectQuery?: (entry: HistoryEntry) => void;
   /** Desktop-only: whether the persistent panel is collapsed (hidden). */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -82,15 +84,23 @@ const DOMAIN_COLORS_DARK: Record<string, string> = {
 function HistoryRow({
   entry,
   onClick,
+  onDelete,
+  onRename,
   isDark,
 }: {
   entry: HistoryEntry;
   onClick: () => void;
+  /** Absent when entry.id is missing (pre-migration-029 row) — menu hides the actions instead of failing silently on click. */
+  onDelete?: (entryId: string) => Promise<void>;
+  onRename?: (entryId: string, title: string) => Promise<void>;
   isDark: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [starred, setStarred] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [busy, setBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const colors = isDark ? DOMAIN_COLORS_DARK : DOMAIN_COLORS_LIGHT;
   const domainClass = colors[entry.domain] ?? colors['general'];
   const hoverClass = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
@@ -99,9 +109,12 @@ function HistoryRow({
   const menuBg = isDark ? 'bg-[#1a1f2e] border-white/15' : 'bg-white border-zinc-200';
   const menuItemHover = isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-100';
   const menuText = isDark ? 'text-zinc-200' : 'text-zinc-700';
+  const inputClass = isDark
+    ? 'bg-white/10 border-white/20 text-zinc-100 placeholder:text-zinc-500'
+    : 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400';
 
   const summary = entry.response_summary?.trim();
-  const headline = summary || entry.query;
+  const headline = entry.title?.trim() || summary || entry.query;
 
   // Close menu on click outside
   useEffect(() => {
@@ -115,15 +128,72 @@ function HistoryRow({
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (renaming) renameInputRef.current?.focus();
+  }, [renaming]);
+
+  const startRename = () => {
+    setRenameValue(entry.title?.trim() || headline);
+    setRenaming(true);
+    setMenuOpen(false);
+  };
+
+  const commitRename = async () => {
+    const title = renameValue.trim();
+    if (!title || !entry.id || !onRename) {
+      setRenaming(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onRename(entry.id, title);
+    } finally {
+      setBusy(false);
+      setRenaming(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setMenuOpen(false);
+    if (!entry.id || !onDelete) return;
+    if (!window.confirm('Delete this history entry?')) return;
+    setBusy(true);
+    try {
+      await onDelete(entry.id);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (renaming) {
+    return (
+      <div className="px-3 py-1.5">
+        <input
+          ref={renameInputRef}
+          value={renameValue}
+          disabled={busy}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void commitRename();
+            if (e.key === 'Escape') setRenaming(false);
+          }}
+          onBlur={() => void commitRename()}
+          className={`w-full text-sm rounded-md border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 ${inputClass}`}
+          maxLength={150}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="relative group">
       <button
         onClick={onClick}
-        className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 ${hoverClass}`}
+        disabled={busy}
+        className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 disabled:opacity-50 ${hoverClass}`}
       >
         <div className="flex items-start justify-between gap-1">
           <span className={`text-sm leading-snug line-clamp-2 ${textClass}`}>
-            {starred && <span className="text-amber-400 mr-1">★</span>}
             {truncate(headline, 68)}
           </span>
         </div>
@@ -137,16 +207,18 @@ function HistoryRow({
         </span>
       </button>
 
-      {/* Context menu trigger */}
-      <button
-        onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-        className={`absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/15 text-zinc-400' : 'hover:bg-zinc-200 text-zinc-400'}`}
-        aria-label="Options"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-          <path d="M8 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 6.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM9.5 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
-        </svg>
-      </button>
+      {/* Context menu trigger — hidden when there's no id to act on (row predates migration 029) */}
+      {entry.id && (onDelete || onRename) && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+          className={`absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/15 text-zinc-400' : 'hover:bg-zinc-200 text-zinc-400'}`}
+          aria-label="Options"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+            <path d="M8 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 6.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM9.5 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+          </svg>
+        </button>
+      )}
 
       {/* Context menu dropdown */}
       {menuOpen && (
@@ -154,27 +226,24 @@ function HistoryRow({
           ref={menuRef}
           className={`absolute top-8 right-2 z-50 w-40 rounded-lg border shadow-lg py-1 ${menuBg}`}
         >
-          <button
-            onClick={(e) => { e.stopPropagation(); setStarred(!starred); setMenuOpen(false); }}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
-          >
-            <span>{starred ? '★' : '☆'}</span>
-            <span>{starred ? 'Unstar' : 'Star'}</span>
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
-          >
-            <span>✏️</span>
-            <span>Rename</span>
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 ${menuItemHover} transition-colors`}
-          >
-            <span>🗑</span>
-            <span>Delete</span>
-          </button>
+          {onRename && (
+            <button
+              onClick={(e) => { e.stopPropagation(); startRename(); }}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
+            >
+              <span>✏️</span>
+              <span>Rename</span>
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); void handleDelete(); }}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 ${menuItemHover} transition-colors`}
+            >
+              <span>🗑</span>
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -185,11 +254,15 @@ function HistoryGroup({
   label,
   entries,
   onSelect,
+  onDelete,
+  onRename,
   isDark,
 }: {
   label: string;
   entries: HistoryEntry[];
-  onSelect: (q: string) => void;
+  onSelect: (entry: HistoryEntry) => void;
+  onDelete?: (entryId: string) => Promise<void>;
+  onRename?: (entryId: string, title: string) => Promise<void>;
   isDark: boolean;
 }) {
   if (entries.length === 0) return null;
@@ -199,7 +272,14 @@ function HistoryGroup({
         {label}
       </span>
       {entries.map((e, i) => (
-        <HistoryRow key={i} entry={e} onClick={() => onSelect(e.query)} isDark={isDark} />
+        <HistoryRow
+          key={e.id ?? i}
+          entry={e}
+          onClick={() => onSelect(e)}
+          onDelete={onDelete}
+          onRename={onRename}
+          isDark={isDark}
+        />
       ))}
     </div>
   );
@@ -218,7 +298,7 @@ function SidebarPanel({
   showHistory: boolean;
   user: User | null;
   accessToken: string | null;
-  onSelectQuery?: (query: string) => void;
+  onSelectQuery?: (entry: HistoryEntry) => void;
   onClose?: () => void;
   onCollapse?: () => void;
 }) {
@@ -235,6 +315,19 @@ function SidebarPanel({
   );
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
+
+  const handleDeleteEntry = async (entryId: string) => {
+    await deleteHistoryEntry(supabase, entryId);
+    await mutate((current) => (current ?? []).filter((e) => e.id !== entryId), { revalidate: false });
+  };
+
+  const handleRenameEntry = async (entryId: string, title: string) => {
+    await renameHistoryEntry(supabase, entryId, title);
+    await mutate(
+      (current) => (current ?? []).map((e) => (e.id === entryId ? { ...e, title } : e)),
+      { revalidate: false },
+    );
+  };
 
   const headerBorder = isDark ? 'border-white/10' : 'border-zinc-100';
   const footerBorder = isDark ? 'border-white/10 bg-[#0A0F1E]/80' : 'border-zinc-100 bg-zinc-50/80';
@@ -358,18 +451,24 @@ function SidebarPanel({
                 label={t('history.group.today')}
                 entries={groups.today}
                 onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                onDelete={handleDeleteEntry}
+                onRename={handleRenameEntry}
                 isDark={isDark}
               />
               <HistoryGroup
                 label={t('history.group.yesterday')}
                 entries={groups.yesterday}
                 onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                onDelete={handleDeleteEntry}
+                onRename={handleRenameEntry}
                 isDark={isDark}
               />
               <HistoryGroup
                 label={t('history.group.earlier')}
                 entries={groups.earlier}
                 onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                onDelete={handleDeleteEntry}
+                onRename={handleRenameEntry}
                 isDark={isDark}
               />
             </>

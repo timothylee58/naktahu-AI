@@ -17,7 +17,7 @@ import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { useTheme } from '@/lib/theme';
 import { canAccessHistory } from '@/lib/auth-plan';
-import { sidebarHistoryKey } from '@/lib/history';
+import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } from '@/lib/history';
 
 let msgCounter = 0;
 function makeId() {
@@ -290,9 +290,56 @@ function ChatPageInner() {
     }
   }, [stop, thinkingId]);
 
-  const handleSelectHistoryQuery = useCallback((query: string) => {
-    setInjectedQuery(query);
+  const handleSelectHistoryQuery = useCallback((entry: HistoryEntry) => {
     setSidebarOpen(false);
+    // Rows written before migration 028 have no stored response_text — fall
+    // back to the old re-prompt behavior since there's nothing to show back.
+    const responseText = entry.response_text;
+    if (!responseText) {
+      setInjectedQuery(entry.query);
+      return;
+    }
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: makeId(),
+        role: 'user',
+        content: entry.query,
+        tokens: [],
+        citations: [],
+        confidence: null,
+        isStreaming: false,
+      },
+      {
+        id: makeId(),
+        role: 'assistant',
+        content: responseText,
+        tokens: [],
+        citations: (entry.citations as Message['citations']) ?? [],
+        confidence: entry.confidence ?? null,
+        isStreaming: false,
+        query: entry.query,
+        domain: entry.domain,
+        language: entry.language,
+        suggestions: entry.suggestions ?? [],
+        agencyContact: entry.agency_contact ?? undefined,
+      },
+    ]);
+  }, []);
+
+  // Pick up a history entry handed off from /history's "click to view"
+  // (see HISTORY_RESTORE_STORAGE_KEY) — sessionStorage instead of a URL
+  // param since response_text can be long.
+  useEffect(() => {
+    const raw = sessionStorage.getItem(HISTORY_RESTORE_STORAGE_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(HISTORY_RESTORE_STORAGE_KEY);
+    try {
+      handleSelectHistoryQuery(JSON.parse(raw) as HistoryEntry);
+    } catch {
+      // Malformed/stale payload — ignore rather than crash the page.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChipSelect = useCallback((query: string) => {

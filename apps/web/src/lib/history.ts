@@ -3,10 +3,26 @@ import { fetchWithAuth } from '@/lib/auth-headers';
 import { API_BASE } from '@/lib/api-base';
 
 export interface HistoryEntry {
+  /** Row id (migration 029). Absent on rows written before that migration —
+   * the frontend hides rename/delete for entries with no id. */
+  id?: string | null;
+  /** Custom label set via rename (migration 029); overrides response_summary/query in list headlines when present. */
+  title?: string | null;
   query: string;
   language: string;
   domain: string;
   response_summary: string;
+  /** Full stored answer text (migration 028). Absent on rows written before
+   * that migration — those fall back to re-prompting on click. */
+  response_text?: string | null;
+  confidence?: number | null;
+  suggestions?: string[];
+  agency_contact?: {
+    agency: string;
+    domain: string;
+    hotline: string;
+    portal: string;
+  } | null;
   citations: unknown[];
   ts?: number;
 }
@@ -47,6 +63,38 @@ export async function fetchHistoryAuthed(supabase: SupabaseClient): Promise<Hist
   const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/history`);
   return parseHistoryResponse(res);
 }
+
+/** Delete one history entry. Throws on failure (network/404/503) — callers
+ * should catch and surface an error rather than optimistically assume success. */
+export async function deleteHistoryEntry(supabase: SupabaseClient, entryId: string): Promise<void> {
+  const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/history/${encodeURIComponent(entryId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete history entry (${res.status})`);
+  }
+}
+
+/** Rename one history entry (sets a custom display title). Throws on failure. */
+export async function renameHistoryEntry(
+  supabase: SupabaseClient,
+  entryId: string,
+  title: string,
+): Promise<void> {
+  const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/history/${encodeURIComponent(entryId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to rename history entry (${res.status})`);
+  }
+}
+
+/** sessionStorage key used to hand a clicked HistoryEntry off to /chat for
+ * reconstruction as real chat bubbles (see history/page.tsx + chat/page.tsx).
+ * sessionStorage (not a URL param) since a full response_text can be long. */
+export const HISTORY_RESTORE_STORAGE_KEY = 'naktahu:restore_history_entry';
 
 export function sidebarHistoryKey(userId: string): readonly ['sidebar-history', string] {
   return ['sidebar-history', userId];
