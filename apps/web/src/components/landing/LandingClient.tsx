@@ -47,8 +47,8 @@ export function LandingClient() {
   const isDark = theme === 'dark';
 
   const pageClass = isDark
-    ? 'min-h-screen bg-[#0A0F1E] text-white'
-    : 'min-h-screen bg-zinc-50 text-zinc-900';
+    ? 'flex-1 min-h-0 overflow-y-auto bg-[#0A0F1E] text-white'
+    : 'flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900';
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';

@@ -164,7 +164,7 @@ export default function ComplianceDrafterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
+    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
