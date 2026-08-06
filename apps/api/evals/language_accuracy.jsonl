@@ -58,3 +58,7 @@
 {"query": "地方议会门牌税（cukai pintu）的上诉程序是怎样的？", "expected_language": "zh"}
 {"query": "为未成年学生开设银行户口需要什么条件？", "expected_language": "zh"}
 {"query": "如何透过SME Corp申请中小企业补助金？我也想知道 macam mana proses dia。", "expected_language": "zh"}
+{"query": "Bagaimana cara semak status permohonan hakmilik tanah saya?", "expected_language": "bm"}
+{"query": "Apakah hak saya jika majikan menamatkan perkhidmatan saya tanpa notis?", "expected_language": "bm"}
+{"query": "Bagaimana cara memohon faedah pengangguran EIS selepas diberhentikan kerja?", "expected_language": "bm"}
+{"query": "Apakah tanggungjawab yuran penyelenggaraan bagi pemilik hartanah strata?", "expected_language": "bm"}

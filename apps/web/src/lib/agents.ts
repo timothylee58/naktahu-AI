@@ -53,6 +53,12 @@ export const WIRED_AGENTS: WiredAgent[] = [
     href: '/agents/research-synthesiser',
     planKey: 'business',
   },
+  {
+    slug: 'retrenchment-navigator',
+    href: '/agents/retrenchment-navigator',
+    planKey: 'free',
+    badgeKey: 'new',
+  },
 ];
 
 export function agentTitleKey(slug: string): string {

@@ -18,3 +18,8 @@
 {"query": "What is the minimum wage policy currently in effect in Malaysia?", "expected_topic": "finance", "min_confidence": 0.6}
 {"query": "What government assistance programs exist for persons with disabilities (OKU) in Malaysia?", "expected_topic": "government", "min_confidence": 0.6}
 {"query": "What are the requirements for UPSR/PT3 replacement assessments in the Malaysian school system?", "expected_topic": "education", "min_confidence": 0.6}
+{"query": "How do I check the status of a land title search (semakan hakmilik) in Malaysia?", "expected_topic": "property", "min_confidence": 0.6}
+{"query": "What are the maintenance and sinking fund obligations for strata property owners under the Strata Management Act 2013?", "expected_topic": "property", "min_confidence": 0.6}
+{"query": "What are my rights if my employer terminates me without proper notice in Malaysia?", "expected_topic": "legal", "min_confidence": 0.6}
+{"query": "How do I claim EIS unemployment benefits after being retrenched?", "expected_topic": "legal", "min_confidence": 0.6}
+{"query": "What are the requirements to renew my SSM business registration?", "expected_topic": "business", "min_confidence": 0.6}

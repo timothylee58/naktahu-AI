@@ -260,6 +260,11 @@ const MS: Translations = {
   'domain.health': 'Kesihatan',
   'domain.immigration': 'Imigresen',
   'domain.parliament': 'Parlimen',
+  'domain.property': 'Hartanah',
+  'domain.government': 'Kerajaan',
+  'domain.legal': 'Undang-undang',
+  'domain.finance': 'Kewangan',
+  'domain.culture': 'Kebudayaan',
 
   /* ── career wizard ── */
   'career.badge': 'Perancang Kerjaya',
@@ -347,6 +352,25 @@ const MS: Translations = {
   'agents.research-synthesiser.title': 'Penyelidik Sintesis',
   'agents.research-synthesiser.desc':
     'Carian RAG selari merentas 3 domain dengan petikan tidak berulang. Peringkat Perniagaan.',
+  'agents.retrenchment-navigator.title': 'Navigator Pemberhentian Kerja',
+  'agents.retrenchment-navigator.desc':
+    'Kelayakan tuntutan EIS, faedah penamatan statutori, dan senarai semak langkah seterusnya. Percuma.',
+  'agents.retrenchment-navigator.welcome':
+    'Selamat datang. Saya boleh bantu anda memahami hak dan langkah selepas diberhentikan kerja. Berapa lama anda telah bekerja dengan majikan ini?',
+  'agents.retrenchment-navigator.placeholder': 'Saya bekerja 3 tahun, gaji RM4,500, diberi notis 14 hari…',
+  'agents.retrenchment-navigator.button.start': 'Mula',
+  'agents.retrenchment-navigator.button.continue': 'Teruskan',
+  'agents.retrenchment-navigator.result_ready': 'Berikut adalah anggaran hak dan langkah seterusnya anda.',
+  'agents.retrenchment-navigator.error': 'Maaf, ralat berlaku. Sila cuba lagi.',
+  'agents.retrenchment-navigator.section.benefits': 'Anggaran Faedah Penamatan Statutori',
+  'agents.retrenchment-navigator.section.eis': 'Kelayakan Tuntutan EIS',
+  'agents.retrenchment-navigator.section.notice': 'Status Tempoh Notis',
+  'agents.retrenchment-navigator.section.checklist': 'Senarai Semak',
+  'agents.retrenchment-navigator.eis.likely': 'Berkemungkinan layak — sahkan melalui portal PERKESO.',
+  'agents.retrenchment-navigator.eis.unlikely': 'Berkemungkinan tidak layak berdasarkan maklumat diberikan.',
+  'agents.retrenchment-navigator.eis.unknown': 'Sila sahkan kelayakan melalui portal EIS PERKESO.',
+  'agents.retrenchment-navigator.notice.sufficient': 'Notis yang diberikan mencukupi keperluan minimum statutori.',
+  'agents.retrenchment-navigator.notice.owed': 'Majikan mungkin terhutang bayaran ganti notis.',
 
   /* ── agent UI strings ── */
   'agents.health.disclaimer': 'Bukan diagnosis perubatan. Untuk kecemasan, hubungi 999 segera. Alat sivik percuma ini hanya memberi panduan am.',
@@ -629,6 +653,11 @@ const EN: Translations = {
   'domain.health': 'Healthcare',
   'domain.immigration': 'Immigration',
   'domain.parliament': 'Parliament',
+  'domain.property': 'Property',
+  'domain.government': 'Government',
+  'domain.legal': 'Legal',
+  'domain.finance': 'Finance',
+  'domain.culture': 'Culture',
 
   /* ── career wizard ── */
   'career.badge': 'Career Planner',
@@ -716,6 +745,25 @@ const EN: Translations = {
   'agents.research-synthesiser.title': 'Research Synthesiser',
   'agents.research-synthesiser.desc':
     'Parallel fan-out across 3 RAG domains with deduplicated citations. Business tier.',
+  'agents.retrenchment-navigator.title': 'Retrenchment Navigator',
+  'agents.retrenchment-navigator.desc':
+    'EIS claim eligibility, statutory termination benefits, and a next-steps checklist. Free.',
+  'agents.retrenchment-navigator.welcome':
+    "Welcome. I can help you understand your rights and next steps after retrenchment. How long have you worked for this employer?",
+  'agents.retrenchment-navigator.placeholder': 'I worked 3 years, salary RM4,500, given 14 days notice…',
+  'agents.retrenchment-navigator.button.start': 'Start',
+  'agents.retrenchment-navigator.button.continue': 'Continue',
+  'agents.retrenchment-navigator.result_ready': "Here's an estimate of your rights and next steps.",
+  'agents.retrenchment-navigator.error': 'Sorry, an error occurred. Please try again.',
+  'agents.retrenchment-navigator.section.benefits': 'Estimated Statutory Termination Benefit',
+  'agents.retrenchment-navigator.section.eis': 'EIS Claim Eligibility',
+  'agents.retrenchment-navigator.section.notice': 'Notice Period Status',
+  'agents.retrenchment-navigator.section.checklist': 'Checklist',
+  'agents.retrenchment-navigator.eis.likely': 'Likely eligible — confirm via the PERKESO portal.',
+  'agents.retrenchment-navigator.eis.unlikely': 'Likely not eligible based on the information given.',
+  'agents.retrenchment-navigator.eis.unknown': 'Please confirm eligibility via the PERKESO EIS portal.',
+  'agents.retrenchment-navigator.notice.sufficient': 'The notice given meets the statutory minimum requirement.',
+  'agents.retrenchment-navigator.notice.owed': 'Your employer may owe payment in lieu of notice.',
 
   /* ── agent UI strings ── */
   'agents.health.disclaimer': 'Not a medical diagnosis. For emergencies, call 999 immediately. This free civic tool provides general guidance only.',
@@ -992,6 +1040,11 @@ const ZH: Translations = {
   'domain.health': '医疗卫生',
   'domain.immigration': '移民事务',
   'domain.parliament': '国会',
+  'domain.property': '房地产',
+  'domain.government': '政府',
+  'domain.legal': '法律',
+  'domain.finance': '金融',
+  'domain.culture': '文化',
 
   /* ── career wizard ── */
   'career.badge': '职业规划',
@@ -1071,6 +1124,23 @@ const ZH: Translations = {
   'agents.grant-finder.desc': '匹配您的资料与政府资助（MDEC、TEKUN、MARA 等）。',
   'agents.research-synthesiser.title': '研究综合代理',
   'agents.research-synthesiser.desc': '跨 3 个领域并行 RAG，去重引用。商业版。',
+  'agents.retrenchment-navigator.title': '裁员导航代理',
+  'agents.retrenchment-navigator.desc': 'EIS 索赔资格、法定终止福利，以及后续步骤清单。免费。',
+  'agents.retrenchment-navigator.welcome': '欢迎。我可以帮助您了解被裁员后的权益和后续步骤。您在这位雇主工作了多久？',
+  'agents.retrenchment-navigator.placeholder': '我工作了3年，薪水RM4,500，获得14天通知期……',
+  'agents.retrenchment-navigator.button.start': '开始',
+  'agents.retrenchment-navigator.button.continue': '继续',
+  'agents.retrenchment-navigator.result_ready': '以下是您的权益和后续步骤的估算。',
+  'agents.retrenchment-navigator.error': '抱歉，发生错误。请重试。',
+  'agents.retrenchment-navigator.section.benefits': '法定终止福利估算',
+  'agents.retrenchment-navigator.section.eis': 'EIS 索赔资格',
+  'agents.retrenchment-navigator.section.notice': '通知期状态',
+  'agents.retrenchment-navigator.section.checklist': '清单',
+  'agents.retrenchment-navigator.eis.likely': '可能符合资格 — 请通过 PERKESO 门户网站确认。',
+  'agents.retrenchment-navigator.eis.unlikely': '根据所提供的信息，可能不符合资格。',
+  'agents.retrenchment-navigator.eis.unknown': '请通过 PERKESO EIS 门户网站确认资格。',
+  'agents.retrenchment-navigator.notice.sufficient': '所给予的通知期符合法定最低要求。',
+  'agents.retrenchment-navigator.notice.owed': '雇主可能欠您代通知金。',
 
   /* ── agent UI strings ── */
   'agents.health.disclaimer': '非医学诊断。紧急情况请立即拨打 999。这是免费的公民工具，仅提供一般指导。',

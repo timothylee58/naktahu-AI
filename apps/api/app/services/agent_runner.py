@@ -17,6 +17,7 @@ from app.agents.grant_draft_generator.state import GrantDraftState
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
+from app.agents.retrenchment_navigator.graph import get_retrenchment_navigator_graph
 from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
 from app.agents.study_agent.graph import get_study_agent_graph
 
@@ -380,6 +381,52 @@ async def get_immigration_status(session_id: str, checkpointer: Any) -> dict[str
     return {"session_id": session_id, "status": values.get("status", "completed"), "output": _public_output(values)}
 
 
+async def start_retrenchment_navigator(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "message": payload.get("message", ""),
+        "language": payload.get("language", "bm"),
+        "turns_count": 0,
+        "tool_calls": [],
+    }
+    values, _ = await _run_graph(graph, session_id, inputs)
+    status = values.get("status", "completed")
+    _log_run(supabase_client, user_id, "retrenchment-navigator", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def continue_retrenchment_navigator(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
+    await graph.aupdate_state(_thread_config(session_id), {"message": payload.get("message", "")})
+    t0 = time.monotonic()
+    await graph.ainvoke(None, config=_thread_config(session_id))
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    values = dict(snapshot.values) if snapshot else {}
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    status = values.get("status", "completed")
+    user_id = values.get("user_id") or ""
+    _log_run(supabase_client, user_id, "retrenchment-navigator", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def get_retrenchment_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
+    graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        return {"session_id": session_id, "status": "not_found"}
+    values = dict(snapshot.values)
+    return {"session_id": session_id, "status": values.get("status", "completed"), "output": _public_output(values)}
+
+
 # ── Health Triage ─────────────────────────────────────────────────────────────
 
 
@@ -532,6 +579,7 @@ AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "eligibility-agent": start_eligibility_agent,
     "research-synthesiser": start_research_synthesiser,
     "grant-draft-generator": start_grant_draft_generator,
+    "retrenchment-navigator": start_retrenchment_navigator,
 }
 
 AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -539,6 +587,7 @@ AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
     "study-agent": continue_study_agent,
     "immigration-navigator": continue_immigration_navigator,
     "eligibility-agent": continue_eligibility_agent,
+    "retrenchment-navigator": continue_retrenchment_navigator,
 }
 
 AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -547,6 +596,7 @@ AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
     "immigration-navigator": get_immigration_status,
     "health-triage": get_health_status,
     "grant-draft-generator": get_grant_draft_status,
+    "retrenchment-navigator": get_retrenchment_status,
 }
 
 # agent_name -> confirm handler. Every entry here is dispatched generically

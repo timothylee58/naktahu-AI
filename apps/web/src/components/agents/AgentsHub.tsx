@@ -11,6 +11,7 @@ import {
   GraduationCap,
   HeartPulse,
   Landmark,
+  LifeBuoy,
   Lock,
   Plane,
   Sparkles,
@@ -61,6 +62,10 @@ const AGENT_VISUALS: Record<string, { icon: LucideIcon; tile: string }> = {
   'research-synthesiser': {
     icon: FlaskConical,
     tile: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+  },
+  'retrenchment-navigator': {
+    icon: LifeBuoy,
+    tile: 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300',
   },
 };
 

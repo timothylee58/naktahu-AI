@@ -238,6 +238,23 @@ def _fallback_registry() -> dict[str, EnhancedAgentDefinition]:
             supports_streaming=True,
             max_timeout_seconds=30.0,
         ),
+        "retrenchment-navigator": EnhancedAgentDefinition(
+            name="retrenchment-navigator",
+            version="1.0.0",
+            description="Guided retrenchment options: EIS claim eligibility, statutory termination benefits, and next-steps checklist.",
+            capabilities=[
+                AgentCapability.legal_knowledge,
+                AgentCapability.epf_knowledge,
+                AgentCapability.conversational_intake,
+                AgentCapability.multi_turn,
+            ],
+            supported_domains=["legal", "epf"],
+            plan_required="free",
+            credit_cost=0,
+            supports_multi_turn=True,
+            supports_streaming=False,
+            max_timeout_seconds=30.0,
+        ),
     }
 
 

@@ -66,7 +66,7 @@ log = structlog.get_logger(__name__)
 
 _VALID_DOMAINS = {
     "government", "education", "legal", "finance", "healthcare",
-    "epf", "tax", "business", "immigration", "culture", "parliament",
+    "epf", "tax", "business", "immigration", "culture", "parliament", "property",
 }
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")

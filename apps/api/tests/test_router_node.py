@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agents.router_node import _SYSTEM_PROMPT, _VALID_DOMAINS, router_node
+from app.agents.router_node import _DOMAIN_ALIASES, _SYSTEM_PROMPT, _VALID_DOMAINS, router_node
 
 
 def _mock_completion(content: str) -> MagicMock:
@@ -167,3 +167,39 @@ def test_system_prompt_lists_every_valid_domain() -> None:
     appear in the prompt text, not just in the Python set."""
     for domain in _VALID_DOMAINS:
         assert domain in _SYSTEM_PROMPT, f"{domain!r} missing from router_node._SYSTEM_PROMPT"
+
+
+@pytest.mark.asyncio
+async def test_router_node_property_domain_classified() -> None:
+    """'property' was added to _VALID_DOMAINS/prompt/DB constraint in
+    migration 030 — same reachability regression class as the parliament
+    test above."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "property", "intent": "check land title status"}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "How do I check my land title status?"})
+
+    assert result["domain"] == "property"
+
+
+@pytest.mark.parametrize(
+    "alias,expected",
+    [
+        ("eis", "epf"),
+        ("socso", "epf"),
+        ("perkeso", "epf"),
+        ("tanah", "property"),
+        ("hartanah", "property"),
+        ("e-tanah", "property"),
+        ("strata", "property"),
+        ("sewa", "property"),
+    ],
+)
+def test_domain_aliases_map_to_canonical_domain(alias: str, expected: str) -> None:
+    """EIS/SOCSO/Perkeso terms fold to 'epf' (registration/contribution
+    facts); property-related BM/EN terms fold to 'property' — per the
+    domain split decided when migration 030 added the property domain."""
+    assert _DOMAIN_ALIASES[alias] == expected

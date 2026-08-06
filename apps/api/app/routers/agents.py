@@ -163,9 +163,9 @@ async def agent_continue(
         "payload": body.model_dump(exclude_none=True),
         "checkpointer": cp,
     }
-    if agent_name in ("compliance-drafter", "immigration-navigator"):
+    if agent_name in ("compliance-drafter", "immigration-navigator", "retrenchment-navigator"):
         kwargs["user_id"] = user.user_id
-    if agent_name == "immigration-navigator":
+    if agent_name in ("immigration-navigator", "retrenchment-navigator"):
         kwargs["supabase_client"] = sb
 
     result = await handler(**kwargs)
