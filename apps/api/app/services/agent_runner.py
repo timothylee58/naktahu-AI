@@ -13,6 +13,7 @@ from app.agents.compliance_drafter.graph import get_compliance_drafter_graph
 from app.agents.compliance_drafter.state import ComplianceDrafterState
 from app.agents.eligibility_agent.graph import get_eligibility_agent_graph
 from app.agents.grant_draft_generator.graph import get_grant_draft_generator_graph
+from app.agents.grant_draft_generator.nodes import compile_node as _grant_draft_compile_node
 from app.agents.grant_draft_generator.state import GrantDraftState
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
@@ -157,6 +158,7 @@ async def confirm_compliance_drafter(
     user_email: Optional[str],
     supabase_client: Any,
     checkpointer: Any,
+    edits: Optional[dict[str, Any]] = None,  # unused — compliance-drafter has no editable-draft UI
 ) -> dict[str, Any]:
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
     await graph.aupdate_state(_thread_config(session_id), {"_supabase": supabase_client, "_user_email": user_email})
@@ -238,6 +240,9 @@ async def start_grant_draft_generator(
     return resp
 
 
+_EDITABLE_GRANT_DRAFT_FIELDS = {"executive_summary", "use_of_funds_narrative"}
+
+
 async def confirm_grant_draft_generator(
     *,
     session_id: str,
@@ -245,9 +250,25 @@ async def confirm_grant_draft_generator(
     user_email: Optional[str],
     supabase_client: Any,
     checkpointer: Any,
+    edits: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"_supabase": supabase_client, "_user_email": user_email})
+    state_update: dict[str, Any] = {"_supabase": supabase_client, "_user_email": user_email}
+    if edits:
+        # compile_node already ran before the interrupt and baked the
+        # ORIGINAL executive_summary/use_of_funds_narrative into report_html
+        # — just overwriting those two fields wouldn't change the generated
+        # PDF/DOCX. Re-run compile_node against the edited state so
+        # report_html/report_json reflect the user's edits before resuming.
+        clean_edits = {k: v for k, v in edits.items() if k in _EDITABLE_GRANT_DRAFT_FIELDS and isinstance(v, str)}
+        if clean_edits:
+            snapshot = await graph.aget_state(_thread_config(session_id))
+            current = dict(snapshot.values) if snapshot and snapshot.values else {}
+            current.update(clean_edits)
+            recompiled = await _grant_draft_compile_node(current)
+            state_update.update(clean_edits)
+            state_update.update(recompiled)
+    await graph.aupdate_state(_thread_config(session_id), state_update)
     values, _ = await _run_graph(graph, session_id, {}, resume=True)
     status = "error" if values.get("error") else "completed"
     _log_run(supabase_client, user_id, "grant-draft-generator", session_id, {"confirm": True}, values, values.get("latency_ms", 0), status)

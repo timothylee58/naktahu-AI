@@ -3,7 +3,6 @@
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
@@ -89,7 +88,25 @@ function formatDeadline(g: Grant): string {
   return `Closes ${g.application_deadline}`;
 }
 
-function GrantCard({ grant, dimmed }: { grant: Grant; dimmed?: boolean }) {
+interface ProfileForDraftLink {
+  businessType: string;
+  sector: string;
+  registeredMonths: string;
+  annualRevenue: string;
+  isBumiputera: boolean | null;
+}
+
+function draftLinkHref(programmeName: string, profile: ProfileForDraftLink): string {
+  const params = new URLSearchParams({ programme: programmeName });
+  if (profile.businessType) params.set('business_type', profile.businessType);
+  if (profile.sector) params.set('sector', profile.sector);
+  if (profile.registeredMonths) params.set('registered_months', profile.registeredMonths);
+  if (profile.annualRevenue) params.set('annual_revenue_myr', profile.annualRevenue);
+  if (profile.isBumiputera !== null) params.set('is_bumiputera', String(profile.isBumiputera));
+  return `/agents/grant-draft-generator?${params.toString()}`;
+}
+
+function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean; profile: ProfileForDraftLink }) {
   return (
     <motion.li
       whileHover={{ y: -2 }}
@@ -114,16 +131,26 @@ function GrantCard({ grant, dimmed }: { grant: Grant; dimmed?: boolean }) {
       {dimmed && grant.ineligibility_reasons.length > 0 && (
         <p className="text-xs text-amber-700 mt-2 dark:text-amber-400">{grant.ineligibility_reasons[0]}</p>
       )}
-      {grant.application_url && (
-        <a
-          href={grant.application_url}
-          className="text-blue-600 text-xs mt-2 inline-block dark:text-blue-400"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Apply now →
-        </a>
-      )}
+      <div className="flex items-center gap-3 mt-2">
+        {grant.application_url && (
+          <a
+            href={grant.application_url}
+            className="text-blue-600 text-xs dark:text-blue-400"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Apply now →
+          </a>
+        )}
+        {!dimmed && (
+          <Link
+            href={draftLinkHref(grant.programme_name, profile)}
+            className="text-emerald-600 text-xs font-medium dark:text-emerald-400"
+          >
+            Draft application →
+          </Link>
+        )}
+      </div>
     </motion.li>
   );
 }
@@ -151,6 +178,17 @@ export default function GrantFinderPage() {
   }, [phase, nextQuestion]);
 
   const canStart = sector.length > 0 && businessType.length > 0 && registeredMonths.trim() !== '' && isBumiputera !== null;
+
+  // Threaded onto each GrantCard's "Draft application" link so Grant Draft
+  // Generator opens pre-filled instead of the user re-typing everything —
+  // this is the same profile that just found these grants.
+  const profileForDraft: ProfileForDraftLink = {
+    businessType: businessType[0] ?? '',
+    sector: sector[0] ?? '',
+    registeredMonths,
+    annualRevenue,
+    isBumiputera,
+  };
 
   const applyResult = (res: Record<string, unknown>) => {
     if (!sessionId && res.session_id) setSessionId(String(res.session_id));
@@ -204,18 +242,11 @@ export default function GrantFinderPage() {
   };
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link href="/agents" className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400">
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Agents
-          </Link>
-          <span className="text-zinc-300 dark:text-white/20" aria-hidden>/</span>
-          <h1 className="text-sm font-bold">Grant Finder</h1>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold dark:bg-blue-500/15 dark:text-blue-300">Recommended</span>
-        </div>
-      </header>
+    <>
+      <div className="flex items-center gap-2 px-4 pt-4 sm:px-6">
+        <h1 className="text-lg font-bold tracking-tight">Grant Finder</h1>
+        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold dark:bg-blue-500/15 dark:text-blue-300">Recommended</span>
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -325,7 +356,7 @@ export default function GrantFinderPage() {
                 </p>
                 <ul className="flex flex-col gap-3">
                   {matchedGrants.map((g) => (
-                    <GrantCard key={g.programme_name} grant={g} />
+                    <GrantCard key={g.programme_name} grant={g} profile={profileForDraft} />
                   ))}
                 </ul>
               </div>
@@ -339,7 +370,7 @@ export default function GrantFinderPage() {
                 </p>
                 <ul className="flex flex-col gap-3">
                   {nearMissGrants.map((g) => (
-                    <GrantCard key={g.programme_name} grant={g} dimmed />
+                    <GrantCard key={g.programme_name} grant={g} dimmed profile={profileForDraft} />
                   ))}
                 </ul>
               </div>
@@ -359,6 +390,6 @@ export default function GrantFinderPage() {
           </>
         )}
       </motion.div>
-    </main>
+    </>
   );
 }

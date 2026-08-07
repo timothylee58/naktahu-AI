@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchWithAuth } from '@/lib/auth-headers';
 import { API_BASE } from '@/lib/api-base';
+import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
 
 interface Deadline {
@@ -57,23 +57,14 @@ export default function DeadlineMonitorPage() {
   }, []);
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link href="/agents" className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400 locale-nowrap">
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            {t('agents.hub.title')}
-          </Link>
-          <span className="text-zinc-300 dark:text-white/20" aria-hidden>/</span>
-          <h1 className="text-sm font-bold">{t('agents.deadline-monitor.title')}</h1>
-        </div>
-      </header>
+    <>
+      <AgentPageHeader title={t('agents.deadline-monitor.title')} />
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-4"
+        className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4"
       >
         <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('agents.deadline-monitor.desc')}</p>
 
@@ -137,6 +128,6 @@ export default function DeadlineMonitorPage() {
           </ul>
         )}
       </motion.div>
-    </main>
+    </>
   );
 }

@@ -35,5 +35,17 @@ export function useAgentApi() {
     [post],
   );
 
-  return { start, continue: cont, post };
+  const get = useCallback(
+    async (path: string) => {
+      const res = await fetchWithAuth(supabase, `${API_BASE}${path}`);
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { detail?: string };
+        throw new Error(err.detail ?? 'agent-request-failed');
+      }
+      return res.json();
+    },
+    [supabase],
+  );
+
+  return { start, continue: cont, post, get };
 }
