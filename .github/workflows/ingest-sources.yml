@@ -1,0 +1,93 @@
+name: Ingest Sources
+
+# Runs scripts/ingest_feed.py against every source registered in
+# scripts/sources.py on a schedule, instead of relying on someone to run it
+# by hand. This is where the property/business/epf/legal sources added
+# alongside migration 030 actually get pulled into document_chunks.
+#
+# All sources default to --dry-run: the URLs were found via WebSearch (see
+# sources.py's docstring) and confirmed to be real, indexed, official
+# .gov.my / statutory-body domains — but their actual page content was never
+# fetched and inspected, because this repo's own dev sandbox blocks
+# outbound HTTPS to gov.my domains at the network egress proxy level
+# (EGRESS_BLOCKED, not a site-side 403 — a deliberate restriction of that
+# environment, not something to route around). GitHub Actions runners have
+# normal internet access, so this workflow is also how those URLs get their
+# first real content check. A human should read a --dry-run run's log
+# output once per new source, confirm the parsed content actually matches
+# what the source claims to be (not a login wall, not empty, not the wrong
+# language), and only then flip write_mode to "live" for a real run.
+
+on:
+  schedule:
+    - cron: "0 20 * * 0"  # weekly, Sunday 20:00 UTC (04:00 MYT Monday)
+  workflow_dispatch:
+    inputs:
+      write_mode:
+        description: "dry-run (parse + embed, no Supabase write) or live (actually write)"
+        type: choice
+        options:
+          - dry-run
+          - live
+        default: dry-run
+      source:
+        description: "Single source name to ingest (blank = all registered sources)"
+        type: string
+        required: false
+
+jobs:
+  ingest:
+    name: Ingest registered sources
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Health-check registered sources
+        # Informational, not a hard gate — a dead source here still shows up
+        # as a per-source failure in the ingest step below (which does its
+        # own fetch and reports per-source status), so this step existing
+        # separately is about making rot visible at a glance in CI logs
+        # rather than buried inside the ingest loop's output.
+        continue-on-error: true
+        run: python -m scripts.check_sources
+
+      - name: Ingest each source
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Embedding happens even in --dry-run (ingest_feed.py embeds before
+          # deciding whether to write) — ILMU_API_KEY is required either way.
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+        run: |
+          WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
+          SINGLE_SOURCE="${{ github.event.inputs.source }}"
+          DRY_RUN_FLAG="--dry-run"
+          if [ "$WRITE_MODE" = "live" ]; then
+            DRY_RUN_FLAG=""
+          fi
+
+          if [ -n "$SINGLE_SOURCE" ]; then
+            NAMES="$SINGLE_SOURCE"
+          else
+            NAMES=$(python -c "from scripts.sources import SOURCES; print(' '.join(s.name for s in SOURCES))")
+          fi
+
+          status=0
+          for name in $NAMES; do
+            echo "::group::Ingesting $name ($WRITE_MODE)"
+            python -m scripts.ingest_feed --source "$name" $DRY_RUN_FLAG || status=1
+            echo "::endgroup::"
+          done
+          exit $status

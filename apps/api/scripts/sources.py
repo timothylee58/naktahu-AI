@@ -22,6 +22,16 @@ by migration 027, and further widened by migration 030 (Trap #6:
 government, education, legal, finance, healthcare, epf, tax, business,
 immigration, culture, parliament, property) — never invent a new one here.
 URLs must be real, verified pages; never guess a feed URL.
+
+The property/business/epf/legal entries below were found via WebSearch
+(confirmed as real, indexed, official .gov.my / statutory-body domains —
+not phishing lookalikes) but NOT content-verified via a direct fetch,
+since this repo's sandbox blocks outbound HTTPS to gov.my domains at the
+network egress proxy (not a site issue — a deliberate environment
+restriction, see .github/workflows/ingest-sources.yml's header comment).
+The scheduled ingestion workflow defaults every one of these to
+--dry-run until a human confirms the parsed content looks right and
+flips it to a real run — see that workflow for the exact mechanism.
 """
 from __future__ import annotations
 
@@ -69,6 +79,148 @@ SOURCES: tuple[Source, ...] = (
         notes=(
             "MIDA Electronic Investment Portal (EIP) entry page — ASP.NET WebForms "
             "HTML, no feed available. Ingested via --kind html."
+        ),
+    ),
+
+    # ── property (migration 030) ────────────────────────────────────────────
+    Source(
+        name="jkptg-home",
+        url="https://www.jkptg.gov.my/en/",
+        kind="html",
+        domain="property",
+        ministry="Jabatan Ketua Pengarah Tanah dan Galian (JKPTG)",
+        language="en",
+        notes="Federal land administration department homepage.",
+    ),
+    Source(
+        name="jkptg-e-tanah",
+        url="https://www.jkptg.gov.my/en/penerbitan/e-tanah",
+        kind="html",
+        domain="property",
+        ministry="Jabatan Ketua Pengarah Tanah dan Galian (JKPTG)",
+        language="en",
+        notes="JKPTG's own e-Tanah system explainer page (not the login portal).",
+    ),
+    Source(
+        name="jkptg-strata-faq",
+        url="https://www.jkptg.gov.my/en/soalan-lazim-3/104-faq/hakmilik-strata/pengurusan-skim-strata",
+        kind="html",
+        domain="property",
+        ministry="Jabatan Ketua Pengarah Tanah dan Galian (JKPTG)",
+        language="en",
+        notes="JKPTG FAQ page on strata scheme management.",
+    ),
+    Source(
+        name="dbkl-commissioner-of-buildings",
+        url="https://www.dbkl.gov.my/en/pesuruhjaya-bangunan-cob/",
+        kind="html",
+        domain="property",
+        ministry="Dewan Bandaraya Kuala Lumpur (DBKL)",
+        language="en",
+        notes="DBKL Commissioner of Buildings (COB) division overview — state-level strata enforcement example.",
+    ),
+
+    # ── business (SSM — registration/compliance beyond the MIDA investment pages) ──
+    Source(
+        name="ssm-home",
+        url="https://www.ssm.com.my/",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes="Companies Commission of Malaysia homepage.",
+    ),
+    Source(
+        name="ssm-annual-submission",
+        url="https://www.ssm.com.my/Pages/Register_Business_Company_LLP/Company/Annual-Submission.aspx",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes="Official page on annual return / annual submission requirements for registered companies.",
+    ),
+
+    # ── epf (EIS/SOCSO employer registration + contribution facts — migration 030's domain split) ──
+    Source(
+        name="perkeso-home",
+        url="https://www.perkeso.gov.my/en/",
+        kind="html",
+        domain="epf",
+        ministry="Pertubuhan Keselamatan Sosial (PERKESO/SOCSO)",
+        language="en",
+        notes="PERKESO homepage.",
+    ),
+    Source(
+        name="perkeso-employer-registration",
+        url="https://www.perkeso.gov.my/en/our-services/employer-employee/employer-registration/184-our-services.html",
+        kind="html",
+        domain="epf",
+        ministry="Pertubuhan Keselamatan Sosial (PERKESO/SOCSO)",
+        language="en",
+        notes="Employer registration requirements (30-day rule, Form 1/2, ASSIST Portal).",
+    ),
+    Source(
+        name="perkeso-contribution-rates",
+        url="https://www.perkeso.gov.my/en/rate-of-contribution.html",
+        kind="html",
+        domain="epf",
+        ministry="Pertubuhan Keselamatan Sosial (PERKESO/SOCSO)",
+        language="en",
+        notes="SOCSO + EIS contribution rate schedules.",
+    ),
+    Source(
+        name="perkeso-contributions-overview",
+        url="https://www.perkeso.gov.my/en/our-services/employer-employee/contributions.html",
+        kind="html",
+        domain="epf",
+        ministry="Pertubuhan Keselamatan Sosial (PERKESO/SOCSO)",
+        language="en",
+        notes="Contributions overview — EIS 0.2%/0.2% employer/employee split, wage ceiling.",
+    ),
+
+    # ── legal (termination rights, Employment Act, EIS *claims* — migration 030's domain split) ──
+    Source(
+        name="agc-employment-act-1955",
+        url="https://lom.agc.gov.my/act-detail.php?type=amendment&act=A1651&lang=BI",
+        kind="html",
+        domain="legal",
+        ministry="Attorney General's Chambers (AGC) — Laws of Malaysia",
+        language="en",
+        notes=(
+            "AGC federal legislation portal's Employment Act 1955 detail page — the "
+            "authoritative statute-text source. The full text itself is a linked PDF, "
+            "not scrapeable via --kind html; this page's metadata/amendment history is."
+        ),
+    ),
+    Source(
+        name="jtksm-retrenchment-faq",
+        url="https://jtksm.mohr.gov.my/en/frequently-asked-questions/employees-retrenchment",
+        kind="html",
+        domain="legal",
+        ministry="Jabatan Tenaga Kerja Semenanjung Malaysia (JTKSM) / MOHR",
+        language="en",
+        notes="Official retrenchment FAQ — termination benefit calculation, VSS, notice obligations.",
+    ),
+    Source(
+        name="jtksm-retrenchment-forms",
+        url="https://jtksm.mohr.gov.my/en/services/employees-retrenchment/employees-retrenchment-forms",
+        kind="html",
+        domain="legal",
+        ministry="Jabatan Tenaga Kerja Semenanjung Malaysia (JTKSM) / MOHR",
+        language="en",
+        notes="Retrenchment notification procedure (Borang PK) and requirements.",
+    ),
+    Source(
+        name="perkeso-eis-benefits-application-guide",
+        url="https://www.perkeso.gov.my/en/online/contributor/faedah-sip-new/eis-benefits-application-guide.html",
+        kind="html",
+        domain="legal",
+        ministry="Pertubuhan Keselamatan Sosial (PERKESO/SOCSO) — EIS",
+        language="en",
+        notes=(
+            "PERKESO's EIS benefits CLAIMS/application process page — deliberately "
+            "tagged 'legal' not 'epf' (this is the claims procedure, distinct from "
+            "the employer-registration facts tagged 'epf' above)."
         ),
     ),
 )
