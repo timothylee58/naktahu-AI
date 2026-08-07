@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
 import { useI18n } from '@/lib/i18n';
 
 interface ChecklistItem {
@@ -21,10 +22,42 @@ const DOMAIN_COLORS: Record<string, string> = {
   corporate: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
 };
 
+type Mode = 'guided' | 'freetext';
+
+const BUSINESS_TYPE_OPTIONS: ChipOption[] = [
+  { id: 'sole_prop', label: 'Sole Proprietor', icon: '🏪' },
+  { id: 'sdn_bhd', label: 'Sdn Bhd', icon: '🏢' },
+  { id: 'partnership', label: 'Partnership', icon: '🤝' },
+  { id: 'llp', label: 'LLP', icon: '📋' },
+];
+
+const SECTOR_OPTIONS: ChipOption[] = [
+  { id: 'technology', label: 'Technology', icon: '🖥' },
+  { id: 'retail', label: 'Retail', icon: '🛍' },
+  { id: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
+  { id: 'services', label: 'Services', icon: '🛎' },
+  { id: 'fnb', label: 'F&B', icon: '🍽' },
+  { id: 'construction', label: 'Construction', icon: '🏗' },
+];
+
+const EVENT_OPTIONS: { id: string; labelKey: string }[] = [
+  { id: 'hiring_foreign_workers', labelKey: 'agents.sme-compliance-navigator.event.hiring_foreign_workers' },
+  { id: 'new_registration', labelKey: 'agents.sme-compliance-navigator.event.new_registration' },
+  { id: 'missed_filing', labelKey: 'agents.sme-compliance-navigator.event.missed_filing' },
+  { id: 'crossed_sst_threshold', labelKey: 'agents.sme-compliance-navigator.event.crossed_sst_threshold' },
+  { id: 'first_time_hiring', labelKey: 'agents.sme-compliance-navigator.event.first_time_hiring' },
+];
+
 export default function SmeComplianceNavigatorPage() {
   const { t, locale } = useI18n();
   const { start } = useAgentApi();
+  const [mode, setMode] = useState<Mode>('guided');
   const [businessProfile, setBusinessProfile] = useState('');
+  const [businessType, setBusinessType] = useState<string[]>([]);
+  const [sector, setSector] = useState<string[]>([]);
+  const [headcount, setHeadcount] = useState('');
+  const [annualRevenue, setAnnualRevenue] = useState('');
+  const [events, setEvents] = useState<string[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[] | null>(null);
   const [staleWarnings, setStaleWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,13 +65,39 @@ export default function SmeComplianceNavigatorPage() {
 
   const queryLanguage = locale === 'ms' ? 'bm' : 'en';
 
+  // The backend agent still takes a single free-text business_profile string
+  // (no structured fields in the API) — the guided form composes into that
+  // same string instead of requiring a backend/schema change. Full OCR for
+  // uploaded PDF/DOCX would need new backend document-parsing infrastructure,
+  // which is out of scope here; this form is the no-backend-change middle
+  // ground between "one text box" and "upload a document."
+  const composedProfile = useMemo(() => {
+    if (mode === 'freetext') return businessProfile;
+    const parts: string[] = [];
+    const btLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.id === businessType[0])?.label;
+    const secLabel = SECTOR_OPTIONS.find((o) => o.id === sector[0])?.label;
+    if (btLabel && secLabel) parts.push(`${secLabel} ${btLabel}`);
+    else if (btLabel) parts.push(btLabel);
+    else if (secLabel) parts.push(secLabel);
+    if (headcount) parts.push(`${headcount} employees`);
+    if (annualRevenue) parts.push(`annual revenue RM${annualRevenue}`);
+    const eventLabels = events
+      .map((id) => EVENT_OPTIONS.find((e) => e.id === id))
+      .filter((e): e is { id: string; labelKey: string } => Boolean(e))
+      .map((e) => t(e.labelKey));
+    if (eventLabels.length > 0) parts.push(eventLabels.join(', '));
+    return parts.join(', ');
+  }, [mode, businessProfile, businessType, sector, headcount, annualRevenue, events, t]);
+
+  const canRun = mode === 'freetext' ? businessProfile.trim().length > 0 : composedProfile.trim().length > 0;
+
   const run = async () => {
-    if (!businessProfile.trim()) return;
+    if (!canRun) return;
     setLoading(true);
     setError(null);
     try {
       const data = await start('sme-compliance-navigator', {
-        business_profile: businessProfile,
+        business_profile: composedProfile,
         language: queryLanguage,
       });
       setChecklist((data.checklist as ChecklistItem[]) ?? []);
@@ -77,17 +136,107 @@ export default function SmeComplianceNavigatorPage() {
         )}
 
         <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
-          <h2 className="font-semibold">{t('agents.sme-compliance-navigator.prompt')}</h2>
-          <textarea
-            className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
-            rows={5}
-            value={businessProfile}
-            onChange={(e) => setBusinessProfile(e.target.value)}
-            placeholder={t('agents.sme-compliance-navigator.placeholder')}
-          />
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">{t('agents.sme-compliance-navigator.prompt')}</h2>
+            <div className="flex items-center rounded-full border border-zinc-200 p-0.5 text-xs dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setMode('guided')}
+                className={`px-3 py-1 rounded-full font-medium transition-colors ${mode === 'guided' ? 'bg-blue-600 text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
+              >
+                {t('agents.sme-compliance-navigator.mode_guided')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('freetext')}
+                className={`px-3 py-1 rounded-full font-medium transition-colors ${mode === 'freetext' ? 'bg-blue-600 text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
+              >
+                {t('agents.sme-compliance-navigator.mode_freetext')}
+              </button>
+            </div>
+          </div>
+
+          {mode === 'freetext' ? (
+            <textarea
+              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+              rows={5}
+              value={businessProfile}
+              onChange={(e) => setBusinessProfile(e.target.value)}
+              placeholder={t('agents.sme-compliance-navigator.placeholder')}
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {t('agents.sme-compliance-navigator.business_type')}
+                </span>
+                <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {t('agents.sme-compliance-navigator.sector')}
+                </span>
+                <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    {t('agents.sme-compliance-navigator.headcount')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10"
+                    value={headcount}
+                    onChange={(e) => setHeadcount(e.target.value)}
+                    placeholder="8"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    {t('agents.sme-compliance-navigator.annual_revenue')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10"
+                    value={annualRevenue}
+                    onChange={(e) => setAnnualRevenue(e.target.value)}
+                    placeholder="800000"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {t('agents.sme-compliance-navigator.recent_events')}
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  {EVENT_OPTIONS.map((opt) => (
+                    <label key={opt.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={events.includes(opt.id)}
+                        onChange={() =>
+                          setEvents((prev) => (prev.includes(opt.id) ? prev.filter((e) => e !== opt.id) : [...prev, opt.id]))
+                        }
+                        className="accent-blue-600"
+                      />
+                      {t(opt.labelKey)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {composedProfile && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 border-t border-zinc-100 pt-3 dark:border-white/10">
+                  {t('agents.sme-compliance-navigator.preview')}: {composedProfile}
+                </p>
+              )}
+            </div>
+          )}
+
           <button
             type="button"
-            disabled={loading || !businessProfile.trim()}
+            disabled={loading || !canRun}
             onClick={() => void run()}
             className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
           >
