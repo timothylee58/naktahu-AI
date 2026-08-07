@@ -153,7 +153,7 @@ export function AgentsHub() {
   }, [supabase]);
 
   return (
-    <div className={`flex h-full ${isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50'}`}>
+    <div className={`flex h-full ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50/50 text-zinc-900'}`}>
       <AppSidebar
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
