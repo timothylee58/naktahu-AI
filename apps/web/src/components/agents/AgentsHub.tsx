@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import type { User } from '@supabase/supabase-js';
 import {
-  ArrowLeft,
   ArrowRight,
   CalendarClock,
   ClipboardCheck,
@@ -23,7 +23,9 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 import { useI18n } from '@/lib/i18n';
+import { useTheme } from '@/lib/theme';
 import { createClient } from '@/lib/supabase/client';
 import { fetchWithAuth } from '@/lib/auth-headers';
 import { API_BASE } from '@/lib/api-base';
@@ -103,11 +105,31 @@ const item = {
 
 export function AgentsHub() {
   const { t } = useI18n();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const supabase = useMemo(() => createClient(), []);
+  const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Keyed by the agent's real backend name (see WiredAgent.backendName) —
   // GET /api/v1/agents computes `accessible` server-side from the actual
   // signed-in user's plan via plan_satisfies(), not a frontend guess.
   const [backendAgents, setBackendAgents] = useState<Record<string, BackendAgentInfo> | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAccessToken(data.session?.access_token ?? null);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAccessToken(session?.access_token ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   useEffect(() => {
     let active = true;
@@ -131,24 +153,45 @@ export function AgentsHub() {
   }, [supabase]);
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Link
-            href="/chat"
-            className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400 locale-nowrap"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            {t('nav.home')}
-          </Link>
-          <span className="text-zinc-300 dark:text-white/20" aria-hidden>
-            /
-          </span>
-          <h1 className="text-sm font-bold">{t('agents.hub.title')}</h1>
-        </div>
-      </header>
+    <div className={`flex h-full ${isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50'}`}>
+      <AppSidebar
+        variant={isDark ? 'dark' : 'light'}
+        isMobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        user={user}
+        accessToken={accessToken}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+      />
 
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
+      <div className="flex flex-col flex-1 min-w-0 h-full overflow-y-auto">
+        <header
+          className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${
+            isDark ? 'border-white/10 bg-[#0A0F1E]/90 text-white' : 'border-zinc-100 bg-white/90 text-zinc-900'
+          }`}
+        >
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label={t('header.menu')}
+            className={`p-1.5 rounded-lg transition-colors lg:hidden ${
+              isDark ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200' : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+              <path
+                fillRule="evenodd"
+                d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+          <Link href="/" className="flex flex-col">
+            <span className="text-base font-bold tracking-tight">{t('header.title')}</span>
+            <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('header.subtitle')}</span>
+          </Link>
+        </header>
+
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14 w-full">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -239,6 +282,7 @@ export function AgentsHub() {
           })}
         </motion.div>
       </div>
-    </main>
+      </div>
+    </div>
   );
 }
