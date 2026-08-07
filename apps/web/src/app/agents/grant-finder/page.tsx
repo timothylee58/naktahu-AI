@@ -89,7 +89,25 @@ function formatDeadline(g: Grant): string {
   return `Closes ${g.application_deadline}`;
 }
 
-function GrantCard({ grant, dimmed }: { grant: Grant; dimmed?: boolean }) {
+interface ProfileForDraftLink {
+  businessType: string;
+  sector: string;
+  registeredMonths: string;
+  annualRevenue: string;
+  isBumiputera: boolean | null;
+}
+
+function draftLinkHref(programmeName: string, profile: ProfileForDraftLink): string {
+  const params = new URLSearchParams({ programme: programmeName });
+  if (profile.businessType) params.set('business_type', profile.businessType);
+  if (profile.sector) params.set('sector', profile.sector);
+  if (profile.registeredMonths) params.set('registered_months', profile.registeredMonths);
+  if (profile.annualRevenue) params.set('annual_revenue_myr', profile.annualRevenue);
+  if (profile.isBumiputera !== null) params.set('is_bumiputera', String(profile.isBumiputera));
+  return `/agents/grant-draft-generator?${params.toString()}`;
+}
+
+function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean; profile: ProfileForDraftLink }) {
   return (
     <motion.li
       whileHover={{ y: -2 }}
@@ -114,16 +132,26 @@ function GrantCard({ grant, dimmed }: { grant: Grant; dimmed?: boolean }) {
       {dimmed && grant.ineligibility_reasons.length > 0 && (
         <p className="text-xs text-amber-700 mt-2 dark:text-amber-400">{grant.ineligibility_reasons[0]}</p>
       )}
-      {grant.application_url && (
-        <a
-          href={grant.application_url}
-          className="text-blue-600 text-xs mt-2 inline-block dark:text-blue-400"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Apply now →
-        </a>
-      )}
+      <div className="flex items-center gap-3 mt-2">
+        {grant.application_url && (
+          <a
+            href={grant.application_url}
+            className="text-blue-600 text-xs dark:text-blue-400"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Apply now →
+          </a>
+        )}
+        {!dimmed && (
+          <Link
+            href={draftLinkHref(grant.programme_name, profile)}
+            className="text-emerald-600 text-xs font-medium dark:text-emerald-400"
+          >
+            Draft application →
+          </Link>
+        )}
+      </div>
     </motion.li>
   );
 }
@@ -151,6 +179,17 @@ export default function GrantFinderPage() {
   }, [phase, nextQuestion]);
 
   const canStart = sector.length > 0 && businessType.length > 0 && registeredMonths.trim() !== '' && isBumiputera !== null;
+
+  // Threaded onto each GrantCard's "Draft application" link so Grant Draft
+  // Generator opens pre-filled instead of the user re-typing everything —
+  // this is the same profile that just found these grants.
+  const profileForDraft: ProfileForDraftLink = {
+    businessType: businessType[0] ?? '',
+    sector: sector[0] ?? '',
+    registeredMonths,
+    annualRevenue,
+    isBumiputera,
+  };
 
   const applyResult = (res: Record<string, unknown>) => {
     if (!sessionId && res.session_id) setSessionId(String(res.session_id));
@@ -325,7 +364,7 @@ export default function GrantFinderPage() {
                 </p>
                 <ul className="flex flex-col gap-3">
                   {matchedGrants.map((g) => (
-                    <GrantCard key={g.programme_name} grant={g} />
+                    <GrantCard key={g.programme_name} grant={g} profile={profileForDraft} />
                   ))}
                 </ul>
               </div>
@@ -339,7 +378,7 @@ export default function GrantFinderPage() {
                 </p>
                 <ul className="flex flex-col gap-3">
                   {nearMissGrants.map((g) => (
-                    <GrantCard key={g.programme_name} grant={g} dimmed />
+                    <GrantCard key={g.programme_name} grant={g} dimmed profile={profileForDraft} />
                   ))}
                 </ul>
               </div>

@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
@@ -34,19 +35,38 @@ const BUSINESS_TYPE_OPTIONS: ChipOption[] = [
   { id: 'cooperative', label: 'Cooperative', icon: '👥' },
 ];
 
+interface FinancialProjectionSkeleton {
+  is_template?: boolean;
+  disclaimer?: string;
+  grant_amount_range_myr?: { min?: number | null; max?: number | null };
+  revenue_projection?: { period?: string; projected_revenue_myr?: number | null; notes?: string }[];
+  cost_breakdown?: { category?: string; amount_myr?: number | null }[];
+  funding_allocation?: { use_of_funds?: string; amount_myr?: number | null }[];
+}
+
 interface DraftReport {
   executive_summary?: string;
   use_of_funds_narrative?: string;
   document_checklist?: { item?: string; required?: boolean }[];
+  financial_projection_skeleton?: FinancialProjectionSkeleton;
 }
 
-export default function GrantDraftGeneratorPage() {
+function fmtMyr(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—';
+  return `RM ${amount.toLocaleString()}`;
+}
+
+function GrantDraftGeneratorPageInner() {
   const { t, locale } = useI18n();
   const { start, post } = useAgentApi();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('intake');
   const [programmeName, setProgrammeName] = useState('');
   const [businessType, setBusinessType] = useState<string[]>(['sdn_bhd']);
   const [sector, setSector] = useState<string[]>(['technology']);
+  const [registeredMonths, setRegisteredMonths] = useState('');
+  const [annualRevenue, setAnnualRevenue] = useState('');
+  const [isBumiputera, setIsBumiputera] = useState<boolean | null>(null);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'docx'>('pdf');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [report, setReport] = useState<DraftReport | null>(null);
@@ -56,6 +76,25 @@ export default function GrantDraftGeneratorPage() {
 
   const queryLanguage = useMemo(() => (locale === 'ms' ? 'bm' : 'en'), [locale]);
 
+  // Deep-linked from Grant Finder's results (draftLinkHref()) — prefill the
+  // exact programme_name + business profile so the user doesn't retype
+  // anything, and avoids typo-driven "Grant programme not found" errors
+  // since fetch_grant_node does an exact string match.
+  useEffect(() => {
+    const programme = searchParams.get('programme');
+    if (programme) setProgrammeName(programme);
+    const bt = searchParams.get('business_type');
+    if (bt) setBusinessType([bt]);
+    const sec = searchParams.get('sector');
+    if (sec) setSector([sec]);
+    const months = searchParams.get('registered_months');
+    if (months) setRegisteredMonths(months);
+    const revenue = searchParams.get('annual_revenue_myr');
+    if (revenue) setAnnualRevenue(revenue);
+    const bumi = searchParams.get('is_bumiputera');
+    if (bumi !== null) setIsBumiputera(bumi === 'true');
+  }, [searchParams]);
+
   const startAgent = async () => {
     if (!programmeName.trim()) return;
     setLoading(true);
@@ -63,7 +102,13 @@ export default function GrantDraftGeneratorPage() {
     try {
       const data = await start('grant-draft-generator', {
         programme_name: programmeName,
-        business_profile: { business_type: businessType[0], sector: sector[0] },
+        business_profile: {
+          business_type: businessType[0],
+          sector: sector[0],
+          registered_months: registeredMonths ? Number(registeredMonths) : undefined,
+          annual_revenue_myr: annualRevenue ? Number(annualRevenue) : undefined,
+          is_bumiputera: isBumiputera,
+        },
         export_format: exportFormat,
         language: queryLanguage,
       });
@@ -199,6 +244,52 @@ export default function GrantDraftGeneratorPage() {
                 </ul>
               </div>
             )}
+            {report.financial_projection_skeleton && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">
+                  {t('agents.grant-draft-generator.financial_projection')}
+                </h3>
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-2 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
+                  {report.financial_projection_skeleton.disclaimer || t('agents.grant-draft-generator.financial_disclaimer')}
+                </p>
+                {report.financial_projection_skeleton.grant_amount_range_myr && (
+                  <p className="text-sm mb-2">
+                    <span className="text-zinc-500 dark:text-zinc-400">{t('agents.grant-draft-generator.grant_amount_range')}: </span>
+                    {fmtMyr(report.financial_projection_skeleton.grant_amount_range_myr.min)} – {fmtMyr(report.financial_projection_skeleton.grant_amount_range_myr.max)}
+                  </p>
+                )}
+                {Array.isArray(report.financial_projection_skeleton.revenue_projection) && report.financial_projection_skeleton.revenue_projection.length > 0 && (
+                  <div className="mb-2">
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('agents.grant-draft-generator.revenue_projection')}</span>
+                    <ul className="text-sm list-disc pl-5 space-y-0.5">
+                      {report.financial_projection_skeleton.revenue_projection.map((r, i) => (
+                        <li key={i}>{r.period}: {fmtMyr(r.projected_revenue_myr)}{r.notes ? ` — ${r.notes}` : ''}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {Array.isArray(report.financial_projection_skeleton.cost_breakdown) && report.financial_projection_skeleton.cost_breakdown.length > 0 && (
+                  <div className="mb-2">
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('agents.grant-draft-generator.cost_breakdown')}</span>
+                    <ul className="text-sm list-disc pl-5 space-y-0.5">
+                      {report.financial_projection_skeleton.cost_breakdown.map((c, i) => (
+                        <li key={i}>{c.category}: {fmtMyr(c.amount_myr)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {Array.isArray(report.financial_projection_skeleton.funding_allocation) && report.financial_projection_skeleton.funding_allocation.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('agents.grant-draft-generator.funding_allocation')}</span>
+                    <ul className="text-sm list-disc pl-5 space-y-0.5">
+                      {report.financial_projection_skeleton.funding_allocation.map((f, i) => (
+                        <li key={i}>{f.use_of_funds}: {fmtMyr(f.amount_myr)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('agents.grant-draft-generator.credit_note')}</p>
             <button
               type="button"
@@ -232,5 +323,13 @@ export default function GrantDraftGeneratorPage() {
         )}
       </motion.div>
     </main>
+  );
+}
+
+export default function GrantDraftGeneratorPage() {
+  return (
+    <Suspense>
+      <GrantDraftGeneratorPageInner />
+    </Suspense>
   );
 }
