@@ -58,6 +58,64 @@ const SEVERITY_OPTIONS: (ChipOption & { id: Severity })[] = [
   { id: 'severe', label: 'Teruk', icon: '🔴' },
 ];
 
+// Per-symptom red-flag follow-up, one conditional question each — mirrors
+// CVS Health's "more questions appear based on your responses" pattern
+// (Mobbin: symptom-intake flow) rather than special-casing only chest pain.
+// Each entry maps a symptom id to the i18n key for its follow-up question
+// and the free-text fragments appended to buildMessage() for yes/no.
+const REDFLAG_QUESTIONS: Record<string, { questionKey: string; yesText: string; noText: string }> = {
+  sakit_dada: {
+    questionKey: 'agents.health-triage.redflag_chest',
+    yesText: 'Sakit dada merebak ke lengan/rahang.',
+    noText: 'Sakit dada tidak merebak ke lengan/rahang.',
+  },
+  sesak_nafas: {
+    questionKey: 'agents.health-triage.redflag_breath',
+    yesText: 'Sukar bercakap dalam ayat penuh kerana sesak nafas.',
+    noText: 'Masih boleh bercakap dalam ayat penuh.',
+  },
+  sakit_kepala: {
+    questionKey: 'agents.health-triage.redflag_headache',
+    yesText: 'Ini sakit kepala paling teruk pernah dialami / disertai kekakuan leher.',
+    noText: 'Bukan sakit kepala paling teruk, tiada kekakuan leher.',
+  },
+  pening: {
+    questionKey: 'agents.health-triage.redflag_dizzy',
+    yesText: 'Pernah pengsan atau hilang kesedaran.',
+    noText: 'Tidak pernah pengsan atau hilang kesedaran.',
+  },
+  loya: {
+    questionKey: 'agents.health-triage.redflag_vomit',
+    yesText: 'Terdapat darah dalam muntah.',
+    noText: 'Tiada darah dalam muntah.',
+  },
+  sakit_perut: {
+    questionKey: 'agents.health-triage.redflag_abdomen',
+    yesText: 'Kesakitan sangat teruk dan tiba-tiba, atau disertai muntah darah.',
+    noText: 'Kesakitan tidak teruk secara tiba-tiba, tiada muntah darah.',
+  },
+  cirit_birit: {
+    questionKey: 'agents.health-triage.redflag_diarrhea',
+    yesText: 'Terdapat darah dalam najis atau tanda dehidrasi (mulut kering, pening).',
+    noText: 'Tiada darah dalam najis, tiada tanda dehidrasi.',
+  },
+  ruam: {
+    questionKey: 'agents.health-triage.redflag_rash',
+    yesText: 'Ruam disertai bengkak muka/bibir atau kesukaran bernafas.',
+    noText: 'Ruam tidak disertai bengkak muka/bibir atau kesukaran bernafas.',
+  },
+  demam: {
+    questionKey: 'agents.health-triage.redflag_fever',
+    yesText: 'Suhu melebihi 39.5°C atau berlaku sawan.',
+    noText: 'Suhu tidak melebihi 39.5°C, tiada sawan.',
+  },
+  batuk: {
+    questionKey: 'agents.health-triage.redflag_cough',
+    yesText: 'Terdapat darah dalam kahak.',
+    noText: 'Tiada darah dalam kahak.',
+  },
+};
+
 type Step = 'body' | 'symptoms' | 'duration' | 'severity' | 'details' | 'review';
 const STEP_ORDER: Step[] = ['body', 'symptoms', 'duration', 'severity', 'details', 'review'];
 
@@ -90,7 +148,7 @@ export default function HealthTriagePage() {
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [duration, setDuration] = useState<string[]>([]);
   const [severity, setSeverity] = useState<Severity | null>(null);
-  const [chestRadiating, setChestRadiating] = useState<boolean | null>(null);
+  const [redFlagAnswers, setRedFlagAnswers] = useState<Record<string, boolean | null>>({});
   const [extraDetails, setExtraDetails] = useState('');
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,10 +159,13 @@ export default function HealthTriagePage() {
     () => Object.values(SYMPTOMS_BY_AREA).flat(),
     [],
   );
-  // The red-flag follow-up (chest pain radiating to arm/jaw) only applies
-  // when sakit_dada is among the selected symptoms — a concrete example of
-  // the guided flow surfacing a question the old flat chip list never asked.
-  const hasChestPainFlag = selectedSymptoms.includes('sakit_dada');
+  // Applicable red-flag questions — one per selected symptom that has an
+  // entry in REDFLAG_QUESTIONS, in selection order. A concrete example of
+  // the guided flow surfacing questions the old flat chip list never asked.
+  const applicableRedFlags = useMemo(
+    () => selectedSymptoms.filter((id) => REDFLAG_QUESTIONS[id]),
+    [selectedSymptoms],
+  );
 
   const toggleSymptom = (id: string) => {
     setSelectedSymptoms((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -131,7 +192,7 @@ export default function HealthTriagePage() {
       case 'duration':
         return duration.length > 0;
       case 'severity':
-        return severity !== null && (!hasChestPainFlag || chestRadiating !== null);
+        return severity !== null && applicableRedFlags.every((id) => redFlagAnswers[id] !== null && redFlagAnswers[id] !== undefined);
       case 'details':
         return true;
       default:
@@ -148,10 +209,11 @@ export default function HealthTriagePage() {
     let msg = symptomLabels;
     if (dur) msg += ` sejak ${dur}`;
     if (sevLabel) msg += `, tahap keterukan: ${sevLabel}`;
-    if (hasChestPainFlag && chestRadiating !== null) {
-      msg += chestRadiating
-        ? '. Sakit dada merebak ke lengan/rahang.'
-        : '. Sakit dada tidak merebak ke lengan/rahang.';
+    for (const id of applicableRedFlags) {
+      const answer = redFlagAnswers[id];
+      if (answer === null || answer === undefined) continue;
+      const flag = REDFLAG_QUESTIONS[id];
+      msg += `. ${answer ? flag.yesText : flag.noText}`;
     }
     if (extraDetails.trim()) msg += `. ${extraDetails.trim()}`;
     return msg;
@@ -176,7 +238,7 @@ export default function HealthTriagePage() {
     setSelectedSymptoms([]);
     setDuration([]);
     setSeverity(null);
-    setChestRadiating(null);
+    setRedFlagAnswers({});
     setExtraDetails('');
     setOutput(null);
     setError(null);
@@ -276,27 +338,31 @@ export default function HealthTriagePage() {
                       onToggle={(id) => setSeverity(id as Severity)}
                       multiple={false}
                     />
-                    {hasChestPainFlag && (
-                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-500/10">
-                        <p className="text-sm font-medium text-red-800 dark:text-red-300">{t('agents.health-triage.redflag_chest')}</p>
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setChestRadiating(true)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${chestRadiating === true ? 'bg-red-600 border-red-600 text-white' : 'border-red-300 text-red-700 dark:text-red-300 dark:border-red-500/40'}`}
-                          >
-                            {t('agents.health-triage.yes')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setChestRadiating(false)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${chestRadiating === false ? 'bg-red-600 border-red-600 text-white' : 'border-red-300 text-red-700 dark:text-red-300 dark:border-red-500/40'}`}
-                          >
-                            {t('agents.health-triage.no')}
-                          </button>
+                    {applicableRedFlags.map((id) => {
+                      const flag = REDFLAG_QUESTIONS[id];
+                      const answer = redFlagAnswers[id] ?? null;
+                      return (
+                        <div key={id} className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-500/10">
+                          <p className="text-sm font-medium text-red-800 dark:text-red-300">{t(flag.questionKey)}</p>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setRedFlagAnswers((prev) => ({ ...prev, [id]: true }))}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${answer === true ? 'bg-red-600 border-red-600 text-white' : 'border-red-300 text-red-700 dark:text-red-300 dark:border-red-500/40'}`}
+                            >
+                              {t('agents.health-triage.yes')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRedFlagAnswers((prev) => ({ ...prev, [id]: false }))}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${answer === false ? 'bg-red-600 border-red-600 text-white' : 'border-red-300 text-red-700 dark:text-red-300 dark:border-red-500/40'}`}
+                            >
+                              {t('agents.health-triage.no')}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })}
                   </>
                 )}
 
