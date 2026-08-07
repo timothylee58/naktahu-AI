@@ -1,11 +1,10 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChatBubbles, type ChatMessage } from '@/components/agents/ChatBubbles';
+import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
 
 interface StatutoryBenefits {
@@ -78,14 +77,8 @@ export default function RetrenchmentNavigatorPage() {
   };
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/70 border-b border-zinc-100 px-4 py-3 flex gap-3 items-center sticky top-0 z-10 dark:bg-[#0A0F1E]/80 dark:border-white/10">
-        <Link href="/agents" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors dark:text-blue-400 dark:hover:text-blue-300">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          {t('agents.hub.title')}
-        </Link>
-        <h1 className="font-bold tracking-tight">{t('agents.retrenchment-navigator.title')}</h1>
-      </header>
+    <>
+      <AgentPageHeader title={t('agents.retrenchment-navigator.title')} />
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -162,6 +155,6 @@ export default function RetrenchmentNavigatorPage() {
           </button>
         </section>
       </motion.div>
-    </main>
+    </>
   );
 }

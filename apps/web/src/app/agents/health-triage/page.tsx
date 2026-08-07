@@ -1,12 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Phone } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
 
 type BodyArea = 'general' | 'head' | 'chest' | 'abdomen' | 'skin';
@@ -249,20 +249,15 @@ export default function HealthTriagePage() {
   const urgencyStyle = URGENCY_STYLES[urgency];
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/70 border-b border-zinc-100 px-4 py-3 flex gap-3 items-center sticky top-0 z-20 dark:bg-[#0A0F1E]/80 dark:border-white/10">
-        <Link href="/agents" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors dark:text-blue-400 dark:hover:text-blue-300">
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          {t('agents.hub.title')}
-        </Link>
-        <h1 className="font-bold tracking-tight">{t('agents.health-triage.title')}</h1>
-      </header>
+    <>
+      <AgentPageHeader title={t('agents.health-triage.title')} />
 
       {/* Persistent emergency bar — always visible regardless of flow progress,
-          not just a line of small gray text above the form. */}
+          not just a line of small gray text above the form. Sticks directly
+          under the shared app header (top-16 ≈ that header's rendered height). */}
       <a
         href="tel:999"
-        className="sticky top-[52px] z-20 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 transition-colors px-4 py-2 text-white text-sm font-semibold"
+        className="sticky top-16 z-20 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 transition-colors px-4 py-2 text-white text-sm font-semibold"
       >
         <Phone className="h-4 w-4" aria-hidden />
         {t('agents.health-triage.emergency_bar')}
@@ -482,6 +477,6 @@ export default function HealthTriagePage() {
           </div>
         )}
       </motion.div>
-    </main>
+    </>
   );
 }

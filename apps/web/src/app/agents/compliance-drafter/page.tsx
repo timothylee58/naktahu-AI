@@ -1,12 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
 
 type Step = 'business' | 'domains' | 'preview' | 'done';
@@ -181,26 +180,14 @@ export default function ComplianceDrafterPage() {
   };
 
   return (
-    <main className="flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link
-            href="/chat"
-            className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400 locale-nowrap"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            {t('nav.home')}
-          </Link>
-          <span className="text-zinc-300 dark:text-white/20" aria-hidden>/</span>
-          <h1 className="text-sm font-bold">{t('agents.compliance-drafter.title')}</h1>
-        </div>
-      </header>
+    <>
+      <AgentPageHeader title={t('agents.compliance-drafter.title')} />
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6"
+        className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-6"
       >
         {error && (
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2 dark:text-red-300 dark:bg-red-500/10 dark:border-red-500/30">
@@ -360,6 +347,6 @@ export default function ComplianceDrafterPage() {
           </section>
         )}
       </motion.div>
-    </main>
+    </>
   );
 }

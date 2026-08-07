@@ -60,6 +60,9 @@ class AgentContinueRequest(BaseModel):
 
 class AgentConfirmRequest(BaseModel):
     session_id: str
+    # grant-draft-generator only — user-edited draft text applied before the
+    # PDF/DOCX is generated. Other confirm handlers accept and ignore it.
+    edits: Optional[dict[str, Any]] = None
 
 
 def _require_agent_access(agent_name: str, user: UserContext) -> Any:
@@ -208,6 +211,7 @@ async def agent_confirm(
         user_email=user.email,
         supabase_client=sb,
         checkpointer=_checkpointer(request),
+        edits=body.edits,
     )
     if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
         remaining = await deduct_credits(sb, user.user_id, agent.credit_cost)
@@ -244,6 +248,37 @@ async def compliance_preview(
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"session_id": session_id, "report": status.get("report_json") or status.get("output")}
+
+
+@router.get("/{agent_name}/documents")
+async def list_agent_documents(
+    agent_name: str,
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Recent generated files for this user + agent (grant-draft-generator,
+    compliance-drafter) — backs a draft-history list in the frontend.
+    Reads generated_documents, which _persist_document already writes to;
+    no new table. Signed URLs may have expired by the time this is read,
+    so the frontend must check url_expires_at before offering re-download."""
+    _require_agent_access(agent_name, user)
+    sb = getattr(request.app.state, "supabase", None)
+    if not sb:
+        raise HTTPException(status_code=503, detail="Document history is temporarily unavailable.")
+    try:
+        res = (
+            sb.table("generated_documents")
+            .select("id,storage_path,signed_url,url_expires_at,created_at")
+            .eq("user_id", user.user_id)
+            .eq("agent_type", agent_name)
+            .order("created_at", desc=True)
+            .limit(10)
+            .execute()
+        )
+        return res.data or []
+    except Exception as exc:
+        log.warning("agent_documents_fetch_failed", agent=agent_name, error=str(exc))
+        return []
 
 
 @router.get("/deadline-monitor/deadlines")
