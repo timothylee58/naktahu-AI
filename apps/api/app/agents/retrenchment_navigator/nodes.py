@@ -171,14 +171,21 @@ async def output_node(state: RetrenchmentState) -> dict[str, Any]:
 
     years = state.get("years_of_service") or 0.0
     salary = state.get("monthly_salary_myr") or 0.0
-    notice_given = state.get("notice_given_days") or 0
+    # Deliberately NOT `or 0` — the user may never have answered the notice
+    # question (including after hitting _MAX_TURNS with the field still
+    # unset), and that's a different fact from "employer gave zero days'
+    # notice." Collapsing None into 0 made every unanswered case falsely
+    # report "employer owes payment in lieu of notice" (Cursor Bugbot finding,
+    # verified: intake_node leaves notice_given_days as None, not 0, when
+    # unanswered).
+    notice_given = state.get("notice_given_days")
     is_eis = state.get("is_eis_contributor")
 
     statutory_benefits = calculate_statutory_benefits(years, salary) if years and salary else {}
     minimum_notice_weeks = calculate_notice_period_weeks(years) if years else None
     minimum_notice_days = minimum_notice_weeks * 7 if minimum_notice_weeks else None
     notice_period_status = "unknown"
-    if minimum_notice_days is not None:
+    if minimum_notice_days is not None and notice_given is not None:
         notice_period_status = (
             "sufficient" if notice_given >= minimum_notice_days else "employer owes payment in lieu of notice"
         )

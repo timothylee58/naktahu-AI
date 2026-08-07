@@ -244,6 +244,11 @@ async def _generate_suggestions(query: str, domain: str, language: str) -> list[
             "zh": ["该选区的国会议员是谁？", "这场辩论是何时在国会举行的？", "如何查阅完整的国会议事录？"],
             "en": ["Who is the MP for this constituency?", "When did this debate take place in Parliament?", "How do I access the full Hansard record?"],
         },
+        "property": {
+            "bm": ["Bagaimana cara semak status hakmilik tanah saya?", "Apakah tanggungjawab yuran penyelenggaraan strata?", "Ke mana saya patut hubungi untuk pertikaian hartanah?"],
+            "zh": ["如何查询我的土地所有权状态？", "分层地契维护费的责任是什么？", "房地产纠纷应联系哪个机构？"],
+            "en": ["How do I check my land title status?", "What are the strata maintenance fee obligations?", "Who should I contact for a property dispute?"],
+        },
     }
 
     lang_key = language if language in ["bm", "zh", "en"] else "en"

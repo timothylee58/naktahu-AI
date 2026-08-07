@@ -357,9 +357,19 @@ async def start_immigration_navigator(*, user_id: str, payload: dict[str, Any], 
 
 async def continue_immigration_navigator(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
     graph = get_immigration_navigator_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"message": payload.get("message", "")})
     t0 = time.monotonic()
-    await graph.ainvoke(None, config=_thread_config(session_id))
+    # This graph has no interrupt() call — every turn runs START->...->END, it
+    # never pauses mid-graph. ainvoke(None, config) only resumes a graph that
+    # is paused at an interrupt; called against a graph that already reached
+    # END (which every "needs_input" turn does, since route_after_intake
+    # sends incomplete intake straight to END), it is a no-op — verified
+    # empirically, zero node events fire — so turn 2 onward silently returned
+    # turn 1's stale state forever. Passing the new message as real input
+    # instead makes ainvoke actually restart the graph from START with the
+    # existing checkpointed state as its base (found via a Cursor Bugbot
+    # review of the same pattern in retrenchment_navigator; this function had
+    # the identical bug already, unrelated to that PR).
+    await graph.ainvoke({"message": payload.get("message", "")}, config=_thread_config(session_id))
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
     values["latency_ms"] = round((time.monotonic() - t0) * 1000)
@@ -403,9 +413,12 @@ async def start_retrenchment_navigator(*, user_id: str, payload: dict[str, Any],
 
 async def continue_retrenchment_navigator(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
     graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"message": payload.get("message", "")})
     t0 = time.monotonic()
-    await graph.ainvoke(None, config=_thread_config(session_id))
+    # See continue_immigration_navigator's comment — same graph shape (no
+    # interrupt(), incomplete intake goes straight to END), same fix: pass
+    # the new message as real input so ainvoke actually restarts the graph
+    # from START instead of no-op'ing against an already-terminal thread.
+    await graph.ainvoke({"message": payload.get("message", "")}, config=_thread_config(session_id))
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
     values["latency_ms"] = round((time.monotonic() - t0) * 1000)

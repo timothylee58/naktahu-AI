@@ -302,3 +302,33 @@ async def test_fallback_suggestions_are_domain_relevant_not_government_default()
 
     assert tax_suggestions != government_en
     assert any("tax" in s.lower() or "refund" in s.lower() or "file" in s.lower() for s in tax_suggestions)
+
+
+@pytest.mark.asyncio
+async def test_fallback_suggestions_property_domain_not_government_default() -> None:
+    """Cursor Bugbot finding: migration 030 added 'property' as a canonical
+    domain but fallback_suggestions had no entry for it, so the LLM-failure
+    path silently returned government's generic suggestions instead of
+    property-relevant ones. The generic all-domains test above wouldn't have
+    caught this — it only asserts 3 non-empty strings per domain, and
+    falling through to government's list still satisfies that."""
+    fake_client = MagicMock()
+
+    async def raise_error(*args, **kwargs):
+        raise RuntimeError("ilmu unavailable")
+
+    fake_client.chat.completions.create = raise_error
+
+    government_en = [
+        "How do I apply for this?",
+        "How long does processing take?",
+        "What documents are needed?",
+    ]
+
+    with patch.object(synthesiser_module, "ilmu_client", fake_client):
+        property_suggestions = await _generate_suggestions("land title question", "property", "en")
+
+    assert property_suggestions != government_en
+    assert any(
+        kw in s.lower() for s in property_suggestions for kw in ("land", "title", "strata", "property")
+    )

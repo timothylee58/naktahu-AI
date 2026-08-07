@@ -199,6 +199,26 @@ async def test_output_node_handles_missing_years_or_salary():
     assert result["notice_period_status"] == "unknown"
 
 
+@pytest.mark.asyncio
+async def test_output_node_unanswered_notice_is_unknown_not_owed():
+    """Cursor Bugbot finding: `state.get("notice_given_days") or 0` conflated
+    "never answered" with "employer gave zero days' notice" — years/salary
+    are set (so a real minimum applies) but notice_given_days is genuinely
+    unset, which must report 'unknown', not falsely claim the employer owes
+    payment in lieu of notice."""
+    state = {
+        "years_of_service": 3.0,
+        "monthly_salary_myr": 5200.0,
+        "notice_given_days": None,
+        "is_eis_contributor": None,
+        "language": "en",
+        "_rag_findings": [],
+    }
+    with patch("app.agents.retrenchment_navigator.nodes.llm_complete", AsyncMock(return_value="")):
+        result = await output_node(state)
+    assert result["notice_period_status"] == "unknown"
+
+
 # ── Graph wiring ─────────────────────────────────────────────────────────────
 
 def test_retrenchment_navigator_graph_compiles():
@@ -261,3 +281,27 @@ def test_retrenchment_navigator_start_free_plan_allowed():
 def test_retrenchment_navigator_start_401_without_auth():
     res = _client().post("/api/v1/agents/retrenchment-navigator/start", json={"message": "hi"})
     assert res.status_code == 401
+
+
+def test_retrenchment_navigator_continue_does_not_pass_unexpected_user_id():
+    """Cursor Bugbot finding: the /continue endpoint passed user_id into
+    continue_retrenchment_navigator, whose signature doesn't accept it —
+    every second-and-later turn raised TypeError. Assert the real handler
+    (not a mock standing in for it) accepts exactly what the router sends."""
+    from app.routers import agents as agents_router
+
+    captured_kwargs: dict = {}
+
+    async def fake_continue(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"session_id": "r1", "status": "completed", "output": {}}
+
+    with patch.object(agents_router, "AGENT_CONTINUE_HANDLERS", {"retrenchment-navigator": fake_continue}):
+        res = _client().post(
+            "/api/v1/agents/retrenchment-navigator/continue",
+            json={"session_id": "r1", "message": "continuing"},
+            headers=_auth_header("free"),
+        )
+    assert res.status_code == 200
+    assert "user_id" not in captured_kwargs
+    assert "supabase_client" in captured_kwargs
