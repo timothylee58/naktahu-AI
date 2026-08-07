@@ -324,6 +324,8 @@ const MS: Translations = {
   'agents.compliance-drafter.confirming': 'Menjana PDF…',
   'agents.compliance-drafter.credit_note':
     'Sahkan untuk jana PDF dan hantar emel. 1 kredit ejen (RM 5) kecuali pelan Perniagaan.',
+  'agents.compliance-drafter.deadlines': 'Tarikh Akhir',
+  'agents.compliance-drafter.raw_json': 'Lihat data mentah (JSON)',
   'agents.compliance-drafter.download': 'Muat turun PDF',
   'agents.compliance-drafter.email_hint': 'PDF dijana — semak emel anda jika dikonfigurasi.',
   'agents.compliance-drafter.business.sole': 'Peniaga tunggal / Sole proprietor',
@@ -753,6 +755,8 @@ const EN: Translations = {
   'agents.compliance-drafter.confirming': 'Generating PDF…',
   'agents.compliance-drafter.credit_note':
     'Confirm to generate PDF and email delivery. 1 agent credit (RM 5) unless on Business plan.',
+  'agents.compliance-drafter.deadlines': 'Deadlines',
+  'agents.compliance-drafter.raw_json': 'View raw data (JSON)',
   'agents.compliance-drafter.download': 'Download PDF',
   'agents.compliance-drafter.email_hint': 'PDF generated — check your email if configured.',
   'agents.compliance-drafter.business.sole': 'Sole proprietor / Peniaga tunggal',
@@ -1173,6 +1177,8 @@ const ZH: Translations = {
   'agents.compliance-drafter.confirming': '正在生成 PDF…',
   'agents.compliance-drafter.credit_note':
     '确认后将生成 PDF 并发送邮件。1 代理点数（RM 5），商业版无限。',
+  'agents.compliance-drafter.deadlines': '截止日期',
+  'agents.compliance-drafter.raw_json': '查看原始数据（JSON）',
   'agents.compliance-drafter.download': '下载 PDF',
   'agents.compliance-drafter.email_hint': 'PDF 已生成 — 如已配置请查收邮件。',
   'agents.compliance-drafter.business.sole': '独资企业 / Sole proprietor',

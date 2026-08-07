@@ -24,9 +24,24 @@ const DOMAIN_OPTIONS = [
 ] as const;
 
 const DOMAIN_COLORS: Record<string, { bg: string; border: string; badge: string; text: string }> = {
-  tax: { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', text: 'text-red-800' },
-  business: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', text: 'text-blue-800' },
-  epf: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', text: 'text-amber-800' },
+  tax: {
+    bg: 'bg-red-50 dark:bg-red-500/10',
+    border: 'border-red-200 dark:border-red-500/30',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
+    text: 'text-red-800 dark:text-red-200',
+  },
+  business: {
+    bg: 'bg-blue-50 dark:bg-blue-500/10',
+    border: 'border-blue-200 dark:border-blue-500/30',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+    text: 'text-blue-800 dark:text-blue-200',
+  },
+  epf: {
+    bg: 'bg-amber-50 dark:bg-amber-500/10',
+    border: 'border-amber-200 dark:border-amber-500/30',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+    text: 'text-amber-800 dark:text-amber-200',
+  },
 };
 
 interface DomainSection {
@@ -119,6 +134,8 @@ export default function ComplianceDrafterPage() {
     if (locale === 'zh') return 'en';
     return 'en';
   }, [locale]);
+
+  const reportSections = useMemo(() => (report ? parseReportSections(report) : []), [report]);
 
   const toggleDomain = (id: string) => {
     setDomains((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
@@ -266,9 +283,51 @@ export default function ComplianceDrafterPage() {
         {step === 'preview' && report && (
           <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
             <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
-            <pre className="text-xs bg-zinc-50 border border-zinc-100 rounded-xl p-4 overflow-auto max-h-80 dark:bg-black/30 dark:border-white/10 dark:text-zinc-300">
-              {JSON.stringify(report, null, 2)}
-            </pre>
+
+            <div className="flex flex-col gap-3">
+              {reportSections.map((section, i) => {
+                const colors = DOMAIN_COLORS[section.domain] ?? DOMAIN_COLORS.business;
+                return (
+                  <details
+                    key={`${section.domain}-${i}`}
+                    open
+                    className={`rounded-xl border p-4 ${colors.bg} ${colors.border}`}
+                  >
+                    <summary className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                      <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${colors.badge}`}>
+                        {section.domain}
+                      </span>
+                      <span className={colors.text}>{section.title}</span>
+                    </summary>
+                    {section.items.length > 0 && (
+                      <ul className={`mt-3 text-sm list-disc pl-5 space-y-1 ${colors.text}`}>
+                        {section.items.map((line, j) => <li key={j}>{line}</li>)}
+                      </ul>
+                    )}
+                    {section.deadlines && section.deadlines.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-1">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                          {t('agents.compliance-drafter.deadlines')}
+                        </span>
+                        <ul className="text-sm list-disc pl-5 space-y-1 text-amber-700 dark:text-amber-300">
+                          {section.deadlines.map((line, j) => <li key={j}>{line}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </details>
+                );
+              })}
+            </div>
+
+            <details className="text-xs">
+              <summary className="cursor-pointer text-zinc-500 dark:text-zinc-400">
+                {t('agents.compliance-drafter.raw_json')}
+              </summary>
+              <pre className="mt-2 text-xs bg-zinc-50 border border-zinc-100 rounded-xl p-4 overflow-auto max-h-80 dark:bg-black/30 dark:border-white/10 dark:text-zinc-300">
+                {JSON.stringify(report, null, 2)}
+              </pre>
+            </details>
+
             <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('agents.compliance-drafter.credit_note')}</p>
             <button
               type="button"
