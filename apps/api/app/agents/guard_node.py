@@ -184,17 +184,17 @@ def _refusal_message(lang: str) -> str:
     if lang == "bm":
         return (
             "Maaf, NakTahu AI hanya boleh menjawab soalan berkaitan perkhidmatan awam, "
-            "undang-undang, pendidikan, kewangan, kesihatan, dan hal ehwal rakyat Malaysia. "
+            "undang-undang, pendidikan, kewangan, kesihatan, hal ehwal harta tanah, dan hal ehwal rakyat Malaysia. "
             "Soalan anda berada di luar skop sistem ini."
         )
     if lang == "zh":
         return (
             "抱歉，NakTahu AI 只能回答与马来西亚公共服务、法律、教育、金融、"
-            "医疗保健及公民事务相关的问题。您的问题超出本系统的范围。"
+            "医疗保健、房地产事务及公民事务相关的问题。您的问题超出本系统的范围。"
         )
     return (
         "Sorry, NakTahu AI is designed to answer questions about Malaysian public services, "
-        "law, education, finance, healthcare, and civic affairs. "
+        "law, education, finance, healthcare, property matters, and civic affairs. "
         "Your query is outside the scope of this system."
     )
 

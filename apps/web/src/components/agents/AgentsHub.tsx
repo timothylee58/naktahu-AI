@@ -6,11 +6,15 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarClock,
+  ClipboardCheck,
+  FileSignature,
   FileText,
   FlaskConical,
   GraduationCap,
   HeartPulse,
   Landmark,
+  LifeBuoy,
   Lock,
   Plane,
   Sparkles,
@@ -61,6 +65,22 @@ const AGENT_VISUALS: Record<string, { icon: LucideIcon; tile: string }> = {
   'research-synthesiser': {
     icon: FlaskConical,
     tile: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+  },
+  'retrenchment-navigator': {
+    icon: LifeBuoy,
+    tile: 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300',
+  },
+  'sme-compliance-navigator': {
+    icon: ClipboardCheck,
+    tile: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300',
+  },
+  'grant-draft-generator': {
+    icon: FileSignature,
+    tile: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300',
+  },
+  'deadline-monitor': {
+    icon: CalendarClock,
+    tile: 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
   },
 };
 

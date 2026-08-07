@@ -14,14 +14,30 @@ log = structlog.get_logger(__name__)
 _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
     "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
-    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament), intent (string summary max 10 words). "
+    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property), intent (string summary max 10 words). "
     "Use 'parliament' for questions about Members of Parliament, constituencies, voting records, bills, or Hansard. "
+    "Use 'property' for land titles, strata management, tenancy, or e-Tanah matters. "
     "Detect language from the query text itself, not from any metadata."
 )
 
-_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament"}
+_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property"}
 # Map common LLM outputs to stored domain values
-_DOMAIN_ALIASES = {"health": "healthcare", "epf": "epf", "pension": "epf", "kwsp": "epf", "tax": "tax", "cukai": "tax"}
+_DOMAIN_ALIASES = {
+    "health": "healthcare",
+    "epf": "epf",
+    "pension": "epf",
+    "kwsp": "epf",
+    "eis": "epf",
+    "socso": "epf",
+    "perkeso": "epf",
+    "tax": "tax",
+    "cukai": "tax",
+    "tanah": "property",
+    "hartanah": "property",
+    "e-tanah": "property",
+    "strata": "property",
+    "sewa": "property",
+}
 
 # Unicode ranges that unambiguously identify script
 _CJK_RE = re.compile(r'[一-鿿㐀-䶿豈-﫿]')

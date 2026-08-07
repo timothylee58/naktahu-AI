@@ -16,6 +16,7 @@ from middleware.rate_limit import anonymous_limiter
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
 from routes import query as rag_query  # noqa: F401 — lazy RAG imports inside
+from app.routers.agents import router as agents_router
 from app.routers.eligibility import router as eligibility_router
 from app.routers.investor import router as investor_router
 from routers import billing, feedback, history, parliament, query, share
@@ -92,6 +93,7 @@ app.include_router(feedback.router)
 app.include_router(billing.router)
 app.include_router(share.router)
 app.include_router(parliament.router)
+app.include_router(agents_router)
 app.include_router(eligibility_router)
 app.include_router(investor_router)
 app.include_router(developer_router)

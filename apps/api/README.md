@@ -53,7 +53,7 @@ The pipeline is a LangGraph `StateGraph` with four nodes executed in sequence. S
 
 Classifies the query into:
 - **language:** `bm` (Bahasa Malaysia), `en` (English), or `zh` (Chinese/Mandarin)
-- **domain:** `government`, `education`, `legal`, `finance`, `healthcare`, `epf`, `tax`, `business`, `immigration`, or `culture`
+- **domain:** `government`, `education`, `legal`, `finance`, `healthcare`, `epf`, `tax`, `business`, `immigration`, `culture`, `parliament`, or `property`
 
 Uses the ILMU chat model with structured JSON output. A deterministic CJK Unicode range check runs after the LLM call and overrides the language result when Chinese characters are detected, preventing misclassification of Chinese queries as BM.
 

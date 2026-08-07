@@ -44,6 +44,7 @@ class AgentCapability(str, Enum):
     government_knowledge = "government_knowledge"
     finance_knowledge = "finance_knowledge"
     culture_knowledge = "culture_knowledge"
+    property_knowledge = "property_knowledge"
 
     # Functional capabilities
     pdf_generation = "pdf_generation"

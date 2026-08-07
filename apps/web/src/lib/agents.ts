@@ -53,6 +53,27 @@ export const WIRED_AGENTS: WiredAgent[] = [
     href: '/agents/research-synthesiser',
     planKey: 'business',
   },
+  {
+    slug: 'retrenchment-navigator',
+    href: '/agents/retrenchment-navigator',
+    planKey: 'free',
+    badgeKey: 'new',
+  },
+  {
+    slug: 'sme-compliance-navigator',
+    href: '/agents/sme-compliance-navigator',
+    planKey: 'free',
+  },
+  {
+    slug: 'grant-draft-generator',
+    href: '/agents/grant-draft-generator',
+    planKey: 'free',
+  },
+  {
+    slug: 'deadline-monitor',
+    href: '/agents/deadline-monitor',
+    planKey: 'pro',
+  },
 ];
 
 export function agentTitleKey(slug: string): string {

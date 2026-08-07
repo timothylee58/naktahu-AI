@@ -99,6 +99,13 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=3,
         ),
+        "retrenchment-navigator": AgentDefinition(
+            name="retrenchment-navigator",
+            description="Guided retrenchment options: EIS claim eligibility, statutory termination benefits, and next-steps checklist.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
     }
 
 
