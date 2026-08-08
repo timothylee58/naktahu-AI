@@ -15,6 +15,7 @@ from middleware.rate_limit import apply_query_rate_limit
 from services.auth import UserContext, get_optional_user
 from services.warung_watch import (
     create_checkin,
+    find_best_warung_match,
     get_or_create_warung,
     get_status,
     search_warungs,
@@ -53,10 +54,9 @@ async def warung_status(request: Request, name: str) -> dict[str, Any]:
     if not request.app.state.supabase:
         raise HTTPException(status_code=503, detail="Warung Watch is temporarily unavailable")
     sb = request.app.state.supabase
-    matches = await search_warungs(supabase_client=sb, query=name, limit=1)
-    if not matches:
+    warung = await find_best_warung_match(supabase_client=sb, query=name)
+    if not warung:
         return {"warung": None, "status": None, "is_fresh": False, "report_count": 0, "last_updated": None, "sources": []}
-    warung = matches[0]
     status = await get_status(supabase_client=sb, warung_id=warung["id"])
     return {"warung": warung, **status}
 

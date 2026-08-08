@@ -60,3 +60,44 @@ def aggregate_checkin_status(
         "last_updated": active_rows[0]["created_at"],
         "sources": sorted({r["source"] for r in active_rows}),
     }
+
+
+def normalize_name(name: str) -> str:
+    """Collapse whitespace/case so "Pelita", " pelita", "PELITA " all match
+    the same warung instead of silently creating duplicates."""
+    return " ".join(name.strip().lower().split())
+
+
+def _rank_key(normalized_query: str, candidate: dict[str, Any]) -> tuple[int, int]:
+    """Sort key: exact normalized match first (tier 0), then names starting
+    with the query (tier 1, closest prefix), then everything else (tier 2)
+    — ties within a tier broken by shortest name, as a last-resort
+    closeness heuristic. Lower sorts first."""
+    candidate_normalized = normalize_name(candidate.get("name", ""))
+    if candidate_normalized == normalized_query:
+        tier = 0
+    elif candidate_normalized.startswith(normalized_query):
+        tier = 1
+    else:
+        tier = 2
+    return (tier, len(candidate_normalized))
+
+
+def rank_candidates(query: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort a substring-search result set by closeness to `query` — see
+    _rank_key. A plain `ilike('%query%')` with no ordering returns
+    candidates in arbitrary DB row order, which isn't a meaningful
+    tiebreaker when multiple names overlap (e.g. "pelita" also matches
+    "restoran pelita"). Used by both search_warungs (ranked autocomplete
+    list) and select_best_match (its top-1) so the two never disagree on
+    what "closest" means."""
+    normalized_query = normalize_name(query)
+    return sorted(candidates, key=lambda c: _rank_key(normalized_query, c))
+
+
+def select_best_match(query: str, candidates: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    """Pick the single best warung match from a substring-search result
+    set — the top of rank_candidates(), or None if there are no
+    candidates at all."""
+    ranked = rank_candidates(query, candidates)
+    return ranked[0] if ranked else None

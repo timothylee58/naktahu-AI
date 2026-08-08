@@ -22,24 +22,21 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 import structlog
 from supabase import Client
 
-from core.warung_watch import STALE_WINDOW, aggregate_checkin_status
+from core.warung_watch import STALE_WINDOW, aggregate_checkin_status, normalize_name, rank_candidates, select_best_match
 
 logger = structlog.get_logger()
 
 _STATUS_WEIGHT = {"empty": 0, "moderate": 1, "packed": 2}
-
-
-def normalize_name(name: str) -> str:
-    """Collapse whitespace/case so "Pelita", " pelita", "PELITA " all match
-    the same warung instead of silently creating duplicates."""
-    return re.sub(r"\s+", " ", name.strip().lower())
+# Postgres unique_violation SQLSTATE — raised by warungs_normalized_name_idx
+# (a UNIQUE index, see 032_warung_watch.sql) when two concurrent first
+# check-ins for the same name race get_or_create_warung's find-then-insert.
+_UNIQUE_VIOLATION_CODE = "23505"
 
 
 async def get_or_create_warung(
@@ -82,7 +79,21 @@ async def get_or_create_warung(
         res = supabase_client.table("warungs").insert(row).execute()
         return res.data[0]
 
-    warung = await asyncio.to_thread(_insert)
+    try:
+        warung = await asyncio.to_thread(_insert)
+    except Exception as exc:
+        # Race: another request created this exact normalized_name between
+        # our find and our insert. warungs_normalized_name_idx (UNIQUE, see
+        # 032_warung_watch.sql) rejects the duplicate — re-fetch and return
+        # the winner instead of erroring or leaving two rows to split
+        # future reports across.
+        if getattr(exc, "code", None) == _UNIQUE_VIOLATION_CODE or _UNIQUE_VIOLATION_CODE in str(exc):
+            existing = await asyncio.to_thread(_find)
+            if existing:
+                logger.info("warung_create_race_resolved", name=name)
+                return existing
+        raise
+
     logger.info("warung_created", warung_id=warung["id"], name=name)
     return warung
 
@@ -90,21 +101,40 @@ async def get_or_create_warung(
 async def search_warungs(
     *, supabase_client: Client, query: str, limit: int = 10
 ) -> list[dict[str, Any]]:
+    """Autocomplete-style search — returns up to `limit` candidates, ranked
+    (exact match, then prefix match, then shortest name) rather than in
+    arbitrary DB row order, via core.warung_watch.select_best_match's same
+    ranking logic applied across the whole candidate set."""
     normalized = normalize_name(query)
     if not normalized:
         return []
 
     def _search() -> list[dict[str, Any]]:
+        # Fetch a wider pool than `limit` so ranking has something real to
+        # sort — DB-side `ilike` order is not meaningful on its own.
         res = (
             supabase_client.table("warungs")
             .select("id,name,location,verified")
             .ilike("normalized_name", f"%{normalized}%")
-            .limit(limit)
+            .limit(max(limit * 3, 25))
             .execute()
         )
         return res.data or []
 
-    return await asyncio.to_thread(_search)
+    candidates = await asyncio.to_thread(_search)
+    return rank_candidates(query, candidates)[:limit]
+
+
+async def find_best_warung_match(
+    *, supabase_client: Client, query: str
+) -> Optional[dict[str, Any]]:
+    """Single best match for a status lookup — unlike search_warungs (which
+    returns several ranked candidates for autocomplete), this picks the one
+    warung a status check should resolve to, using the same exact/prefix/
+    shortest ranking so "pelita" doesn't arbitrarily resolve to "restoran
+    pelita" or vice versa."""
+    candidates = await search_warungs(supabase_client=supabase_client, query=query, limit=25)
+    return select_best_match(query, candidates)
 
 
 async def create_checkin(

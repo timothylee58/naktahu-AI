@@ -35,9 +35,14 @@ CREATE TABLE IF NOT EXISTS warungs (
     created_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- Case/whitespace-insensitive lookup so "Pelita", "pelita ", "PELITA" all
--- resolve to the same warung instead of silently creating duplicates.
-CREATE INDEX IF NOT EXISTS warungs_normalized_name_idx
+-- UNIQUE (not just indexed): case/whitespace-insensitive lookup so
+-- "Pelita", "pelita ", "PELITA" all resolve to the same warung. The
+-- uniqueness constraint (not just the index) is what actually prevents
+-- duplicate rows from concurrent first check-ins racing get_or_create_warung's
+-- find-then-insert — the app-layer check alone has a TOCTOU gap; this
+-- constraint is the real backstop, and get_or_create_warung() catches the
+-- resulting 23505 to resolve the race instead of erroring.
+CREATE UNIQUE INDEX IF NOT EXISTS warungs_normalized_name_idx
     ON warungs (normalized_name);
 
 CREATE TABLE IF NOT EXISTS warung_checkins (

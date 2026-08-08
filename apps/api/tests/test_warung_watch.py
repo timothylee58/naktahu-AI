@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 import main as api_main
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
-from services.warung_watch import get_status, normalize_name
+from services.warung_watch import find_best_warung_match, get_or_create_warung, get_status, normalize_name
 
 
 def _auth_header(sub: str = "warung-user") -> dict[str, str]:
@@ -116,6 +116,22 @@ def test_status_no_matching_warung(client):
     res = c.get("/api/v1/warung-watch/status", params={"name": "Nonexistent"})
     assert res.status_code == 200, res.text
     assert res.json()["status"] is None
+
+
+def test_status_prefers_exact_match_over_substring_match(client):
+    """Regression test: searching "Pelita" with both "Pelita" and "Restoran
+    Pelita" among the candidates must resolve to the exact match — a bare
+    substring search with no ranking previously returned an arbitrary row."""
+    c, sb, warungs_table, checkins_table = client
+    warungs_table.select.return_value.ilike.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[
+            {"id": "warung-2", "name": "Restoran Pelita", "location": None, "verified": False},
+            {"id": "warung-1", "name": "Pelita", "location": None, "verified": False},
+        ]
+    )
+    res = c.get("/api/v1/warung-watch/status", params={"name": "Pelita"})
+    assert res.status_code == 200, res.text
+    assert res.json()["warung"]["name"] == "Pelita"
 
 
 # ── validation ───────────────────────────────────────────────────────────
@@ -224,3 +240,81 @@ async def test_get_status_falls_back_to_stale_reports_and_flags_them():
     assert result["status"] == "empty"
     assert result["is_fresh"] is False
     assert result["report_count"] == 2
+
+
+# ── find_best_warung_match ranking ────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_find_best_warung_match_prefers_exact_over_prefix():
+    sb = MagicMock()
+    sb.table.return_value.select.return_value.ilike.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[
+            {"id": "w2", "name": "Restoran Pelita", "location": None, "verified": False},
+            {"id": "w1", "name": "Pelita", "location": None, "verified": False},
+        ]
+    )
+    match = await find_best_warung_match(supabase_client=sb, query="Pelita")
+    assert match is not None
+    assert match["name"] == "Pelita"
+
+
+@pytest.mark.asyncio
+async def test_find_best_warung_match_returns_none_for_no_candidates():
+    sb = MagicMock()
+    sb.table.return_value.select.return_value.ilike.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+    match = await find_best_warung_match(supabase_client=sb, query="Nonexistent")
+    assert match is None
+
+
+# ── get_or_create_warung race handling (the confirmed concurrency finding) ─
+
+@pytest.mark.asyncio
+async def test_get_or_create_warung_resolves_concurrent_creation_race():
+    """Two requests both find no existing row, both attempt to insert — the
+    UNIQUE index on normalized_name (032_warung_watch.sql) rejects the
+    loser with a 23505. That loser must re-fetch and return the winner's
+    row instead of raising or creating a duplicate."""
+    sb = MagicMock()
+    winner_row = {"id": "warung-1", "name": "Pelita", "normalized_name": "pelita"}
+
+    find_call_count = 0
+
+    def _select_side_effect(*args, **kwargs):
+        nonlocal find_call_count
+        find_call_count += 1
+        # First call (pre-insert check): nothing exists yet. Second call
+        # (post-conflict re-fetch): the winner's row is now visible.
+        data = [] if find_call_count == 1 else [winner_row]
+        result = MagicMock()
+        result.eq.return_value.limit.return_value.execute.return_value = MagicMock(data=data)
+        return result
+
+    table_mock = MagicMock()
+    table_mock.select.side_effect = _select_side_effect
+
+    conflict_error = Exception("duplicate key value violates unique constraint")
+    conflict_error.code = "23505"  # type: ignore[attr-defined]
+    table_mock.insert.return_value.execute.side_effect = conflict_error
+
+    sb.table.return_value = table_mock
+
+    result = await get_or_create_warung(
+        supabase_client=sb, name="Pelita", location=None, lat=None, lng=None, created_by=None,
+    )
+
+    assert result == winner_row
+    assert find_call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_warung_reraises_non_conflict_errors():
+    sb = MagicMock()
+    table_mock = MagicMock()
+    table_mock.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+    table_mock.insert.return_value.execute.side_effect = RuntimeError("connection reset")
+    sb.table.return_value = table_mock
+
+    with pytest.raises(RuntimeError):
+        await get_or_create_warung(
+            supabase_client=sb, name="Pelita", location=None, lat=None, lng=None, created_by=None,
+        )

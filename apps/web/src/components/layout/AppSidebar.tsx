@@ -10,7 +10,6 @@ import { createClient } from '@/lib/supabase/client';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
 import { SuggestionTeaser } from '@/components/agents/SuggestionTeaser';
-import { SidebarAgentsNav } from '@/components/agents/SidebarAgentsNav';
 import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
@@ -334,7 +333,6 @@ function SidebarPanel({
   const footerBorder = isDark ? 'border-white/10 bg-[#0A0F1E]/80' : 'border-zinc-100 bg-zinc-50/80';
   const titleClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const closeHover = isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-zinc-200' : 'hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700';
-  const dividerClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-500';
 
   return (
@@ -377,10 +375,6 @@ function SidebarPanel({
           variant={variant}
           layout="vertical"
           onNavigate={onClose}
-          // SidebarAgentsNav below renders its own "All agents" link to the
-          // same route whenever it's visible (showHistory && user) — omit
-          // the duplicate here rather than showing "Agents" twice.
-          excludeHrefs={showHistory && user ? ['/agents'] : []}
         />
       </div>
 
@@ -395,13 +389,6 @@ function SidebarPanel({
       {showHistory && (
         <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-4 min-h-0">
           <DeadlineWidget accessToken={accessToken} variant={variant} />
-          <SidebarAgentsNav
-            user={user}
-            isDark={isDark}
-            navLinkClass={isDark ? 'text-zinc-300 hover:text-white hover:bg-white/10' : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'}
-            dividerClass={dividerClass}
-            onClose={onClose}
-          />
           <p className={`text-xs font-semibold uppercase tracking-wider px-3 locale-nowrap ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
             {t('history.title')}
           </p>

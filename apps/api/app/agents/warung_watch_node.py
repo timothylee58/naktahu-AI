@@ -11,13 +11,15 @@ bilingual answer directly from core.warung_watch's aggregation output.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 
 import structlog
 import weave
+from langgraph.config import get_stream_writer
 from supabase import AsyncClient, acreate_client
 
 from app.models.state import AgentState
-from core.warung_watch import aggregate_checkin_status
+from core.warung_watch import STALE_WINDOW, aggregate_checkin_status, select_best_match
 
 log = structlog.get_logger(__name__)
 
@@ -34,10 +36,6 @@ async def _get_client() -> AsyncClient | None:
     if not url or not key:
         return None
     return await acreate_client(url, key)
-
-
-def _normalize_name(name: str) -> str:
-    return " ".join(name.strip().lower().split())
 
 
 def _no_data_message(place_name: str, language: str) -> str:
@@ -87,46 +85,62 @@ def _format_answer(place_name: str, status_data: dict, language: str) -> str:
 async def warung_watch_node(state: AgentState) -> dict:
     place_name = state.get("place_name")
     language = state.get("language", "en")
+    # Every return path must stream the answer via get_stream_writer(),
+    # matching synthesiser_node/guard_node — the SSE endpoint's `custom`
+    # stream mode is the ONLY thing that reaches the client as `token`
+    # events (query.py only replays streaming_token_buffer for the
+    # needs_clarification path, which this node never sets). Writing the
+    # buffer alone, without also calling write(), silently drops the
+    # answer text: the client gets metadata + done with no visible reply.
+    write = get_stream_writer()
+
+    def _respond(text: str) -> dict:
+        write(text)
+        return {"streaming_token_buffer": text, "citations": []}
 
     if not place_name:
         # Shouldn't happen — router_node already clears is_live_status_query
         # when place_name is missing — but never crash the turn on a
         # malformed state.
-        return {"streaming_token_buffer": _no_data_message("that place", language)}
+        return _respond(_no_data_message("that place", language))
 
     client = await _get_client()
     if client is None:
         log.warning("warung_watch_node_no_supabase_client")
-        return {"streaming_token_buffer": _no_data_message(place_name, language)}
+        return _respond(_no_data_message(place_name, language))
 
     try:
-        normalized = _normalize_name(place_name)
+        # Fetch a candidate pool and rank client-side (select_best_match) —
+        # a bare `ilike(...).limit(1)` with no ordering would resolve
+        # "pelita" to an arbitrary row among "pelita"/"restoran pelita"/etc.
         warung_res = (
             await client.table("warungs")
             .select("id,name")
-            .ilike("normalized_name", f"%{normalized}%")
-            .limit(1)
+            .ilike("normalized_name", f"%{place_name.strip().lower()}%")
+            .limit(25)
             .execute()
         )
-        matches = warung_res.data or []
-        if not matches:
-            return {"streaming_token_buffer": _no_data_message(place_name, language)}
+        warung = select_best_match(place_name, warung_res.data or [])
+        if not warung:
+            return _respond(_no_data_message(place_name, language))
 
-        warung = matches[0]
+        # Same STALE_WINDOW (24h) the REST /warung-watch/status endpoint
+        # applies via get_status() — without this filter, chat could report
+        # crowd status from reports far older than what a direct status
+        # check would even surface.
+        stale_cutoff = (datetime.now(timezone.utc) - STALE_WINDOW).isoformat()
         checkin_res = (
             await client.table("warung_checkins")
             .select("status,source,created_at")
             .eq("warung_id", warung["id"])
+            .gte("created_at", stale_cutoff)
             .order("created_at", desc=True)
             .limit(50)
             .execute()
         )
         status_data = aggregate_checkin_status(checkin_res.data or [])
         answer = _format_answer(warung["name"], status_data, language)
-        return {
-            "streaming_token_buffer": answer,
-            "citations": [],
-        }
+        return _respond(answer)
     except Exception as exc:
         log.warning("warung_watch_node_error", error=str(exc), place_name=place_name)
-        return {"streaming_token_buffer": _no_data_message(place_name, language)}
+        return _respond(_no_data_message(place_name, language))
