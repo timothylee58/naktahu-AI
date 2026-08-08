@@ -1,8 +1,23 @@
 # Railway service configuration — lives in apps/api/ (service root directory)
 # Docs: https://docs.railway.app/reference/config-as-code
+#
+# dockerfilePath is explicit and relative to the BUILD CONTEXT, not the repo
+# root. .github/workflows/deploy.yml runs `railway up` with
+# `working-directory: apps/api`, so the uploaded archive's root is already
+# apps/api's contents — the Dockerfile sits at its top level, hence just
+# "Dockerfile" here, not "apps/api/Dockerfile".
+#
+# This only resolves correctly if the Railway service's dashboard "Root
+# Directory" setting (Settings -> Source) is EMPTY. If it's also set to
+# "apps/api", Railway applies that subdirectory a second time on top of the
+# already-apps/api-scoped archive, and no dockerfilePath value here will
+# find the file (this was the actual cause of the "couldn't locate the
+# dockerfile" build failures, not the path string itself) — this is a
+# manual dashboard step, not something railway.toml can override.
 
 [build]
-  builder = "DOCKERFILE"
+  builder       = "DOCKERFILE"
+  dockerfilePath = "Dockerfile"
 
 [deploy]
   healthcheckPath         = "/health"
