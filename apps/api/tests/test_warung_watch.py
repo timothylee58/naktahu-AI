@@ -15,7 +15,8 @@ from fastapi.testclient import TestClient
 import main as api_main
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
-from services.warung_watch import find_best_warung_match, get_or_create_warung, get_status, normalize_name
+from core.warung_watch import rank_candidates, select_best_match
+from services.warung_watch import find_best_warung_match, get_or_create_warung, get_status, normalize_name, search_warungs
 
 
 def _auth_header(sub: str = "warung-user") -> dict[str, str]:
@@ -108,6 +109,29 @@ def test_search_returns_matches(client):
     res = c.get("/api/v1/warung-watch/search", params={"q": "peli"})
     assert res.status_code == 200, res.text
     assert res.json()[0]["name"] == "Pelita"
+
+
+def test_search_endpoint_ranks_exact_match_first_among_overlapping_names(client):
+    """Regression coverage at the HTTP layer (not just find_best_warung_match):
+    /search must return ranked results too, since the frontend's autocomplete
+    list (warung-watch/page.tsx's suggestion dropdown) shows results[0]
+    first without re-ranking client-side. Ranking tiers: exact match (0) >
+    prefix match (1) > substring-only match (2), ties broken by shortest
+    name — "Restoran Pelita" doesn't start with "pelita" so it's tier 2
+    despite being shorter than "Pelita Corner Cafe" (tier 1, a real
+    prefix)."""
+    c, sb, warungs_table, checkins_table = client
+    warungs_table.select.return_value.ilike.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[
+            {"id": "warung-3", "name": "Restoran Pelita", "location": None, "verified": False},
+            {"id": "warung-2", "name": "Pelita Corner Cafe", "location": None, "verified": False},
+            {"id": "warung-1", "name": "Pelita", "location": None, "verified": False},
+        ]
+    )
+    res = c.get("/api/v1/warung-watch/search", params={"q": "Pelita"})
+    assert res.status_code == 200, res.text
+    names = [r["name"] for r in res.json()]
+    assert names == ["Pelita", "Pelita Corner Cafe", "Restoran Pelita"]
 
 
 def test_status_no_matching_warung(client):
@@ -240,6 +264,67 @@ async def test_get_status_falls_back_to_stale_reports_and_flags_them():
     assert result["status"] == "empty"
     assert result["is_fresh"] is False
     assert result["report_count"] == 2
+
+
+# ── search_warungs ranking (service layer, not just via the HTTP endpoint) ─
+
+@pytest.mark.asyncio
+async def test_search_warungs_ranks_candidates_and_respects_limit():
+    sb = MagicMock()
+    sb.table.return_value.select.return_value.ilike.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[
+            {"id": "w3", "name": "Restoran Pelita", "location": None, "verified": False},
+            {"id": "w2", "name": "Pelita Corner Cafe", "location": None, "verified": False},
+            {"id": "w1", "name": "Pelita", "location": None, "verified": False},
+        ]
+    )
+    results = await search_warungs(supabase_client=sb, query="Pelita", limit=2)
+    assert len(results) == 2
+    assert [r["name"] for r in results] == ["Pelita", "Pelita Corner Cafe"]
+
+
+@pytest.mark.asyncio
+async def test_search_warungs_empty_query_returns_empty_without_db_call():
+    sb = MagicMock()
+    results = await search_warungs(supabase_client=sb, query="   ", limit=10)
+    assert results == []
+    sb.table.assert_not_called()
+
+
+# ── core.warung_watch.rank_candidates / select_best_match (pure functions) ─
+
+def test_rank_candidates_orders_exact_prefix_then_rest():
+    candidates = [
+        {"name": "Kedai Kopi Pelita Baru"},
+        {"name": "Restoran Pelita"},
+        {"name": "Pelita"},
+    ]
+    ranked = rank_candidates("Pelita", candidates)
+    assert [c["name"] for c in ranked] == ["Pelita", "Restoran Pelita", "Kedai Kopi Pelita Baru"]
+
+
+def test_rank_candidates_breaks_prefix_ties_by_shortest_name():
+    candidates = [
+        {"name": "Pelita Corner Cafe And Bakery"},
+        {"name": "Pelita Corner"},
+    ]
+    ranked = rank_candidates("Pelita", candidates)
+    assert ranked[0]["name"] == "Pelita Corner"
+
+
+def test_rank_candidates_case_and_whitespace_insensitive():
+    candidates = [{"name": "  PELITA  "}, {"name": "Restoran Pelita"}]
+    ranked = rank_candidates("pelita", candidates)
+    assert ranked[0]["name"] == "  PELITA  "
+
+
+def test_select_best_match_returns_top_ranked():
+    candidates = [{"name": "Restoran Pelita"}, {"name": "Pelita"}]
+    assert select_best_match("Pelita", candidates)["name"] == "Pelita"
+
+
+def test_select_best_match_empty_candidates_returns_none():
+    assert select_best_match("Pelita", []) is None
 
 
 # ── find_best_warung_match ranking ────────────────────────────────────────
