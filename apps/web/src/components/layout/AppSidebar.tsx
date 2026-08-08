@@ -9,6 +9,7 @@ import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
+import { SuggestionTeaser } from '@/components/agents/SuggestionTeaser';
 import { SidebarAgentsNav } from '@/components/agents/SidebarAgentsNav';
 import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -381,6 +382,14 @@ function SidebarPanel({
           // the duplicate here rather than showing "Agents" twice.
           excludeHrefs={showHistory && user ? ['/agents'] : []}
         />
+      </div>
+
+      {/* Always visible (not gated by showHistory) — the condensed teaser
+          half of the "full page + sidebar teaser" smart-suggestions build,
+          so it appears on every page using this shell, not just the
+          history-enabled ones. */}
+      <div className="flex-shrink-0 pt-3">
+        <SuggestionTeaser variant={variant} />
       </div>
 
       {showHistory && (

@@ -20,6 +20,8 @@ const LINKS = [
   { href: '/pricing', key: 'nav.pricing', emoji: '💳' },
   { href: '/developer', key: 'nav.developer', emoji: '🔌' },
   { href: '/agents', key: 'nav.agents', emoji: '🤖' },
+  { href: '/warung-watch', key: 'nav.warung_watch', emoji: '🍜' },
+  { href: '/profile', key: 'nav.profile', emoji: '👤' },
 ] as const;
 
 export function SiteNavLinks({

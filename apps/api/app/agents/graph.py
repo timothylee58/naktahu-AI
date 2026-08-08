@@ -2,8 +2,15 @@
 
 Execution order:
   START → router → guard → rag → analyst → synthesiser   (normal path)
-                        ↓                → clarification  (needs_clarification=True)
-                       END  (blocked query — refusal already streamed)
+              ↓        ↓                → clarification  (needs_clarification=True)
+       warung_watch   END  (blocked query — refusal already streamed)
+              ↓
+             END  (live "is X packed right now" query — answered directly)
+
+warung_watch is a short-circuit off router, same shape as guard's blocked
+path: it bypasses rag/analyst/synthesiser entirely because it answers from
+live crowdsourced check-in data, not the RAG corpus, and that data has its
+own freshness/report-count framing instead of a confidence-gated citation.
 
 Pass a PostgresSaver (or other checkpointer) to build_graph() for persistent
 multi-turn state. Default export is stateless for the SSE /query endpoint.
@@ -19,6 +26,7 @@ from app.agents.guard_node import guard_node
 from app.agents.rag_node import rag_node
 from app.agents.router_node import router_node
 from app.agents.synthesiser_node import synthesiser_node
+from app.agents.warung_watch_node import warung_watch_node
 from app.models.state import AgentState
 
 
@@ -36,6 +44,14 @@ def _clarification_node(state: AgentState) -> dict:
             "Could you please provide more context or rephrase your question?"
         )
     return {"streaming_token_buffer": msg}
+
+
+def _route_after_router(state: AgentState) -> str:
+    """Short-circuit to warung_watch_node for live business-status queries
+    ("Is Pelita packed right now?") instead of the RAG/guard pipeline."""
+    if state.get("is_live_status_query") and state.get("place_name"):
+        return "warung_watch"
+    return "guard"
 
 
 def _route_after_guard(state: AgentState) -> str:
@@ -60,9 +76,15 @@ def build_graph() -> StateGraph:
     graph.add_node("analyst", analyst_node)
     graph.add_node("synthesiser", synthesiser_node)
     graph.add_node("clarification", _clarification_node)
+    graph.add_node("warung_watch", warung_watch_node)
 
     graph.add_edge(START, "router")
-    graph.add_edge("router", "guard")
+    graph.add_conditional_edges(
+        "router",
+        _route_after_router,
+        {"warung_watch": "warung_watch", "guard": "guard"},
+    )
+    graph.add_edge("warung_watch", END)
     graph.add_conditional_edges(
         "guard",
         _route_after_guard,
