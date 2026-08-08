@@ -1,26 +1,25 @@
 # Railway service configuration — lives in apps/api/ (service root directory)
 # Docs: https://docs.railway.app/reference/config-as-code
 #
-# dockerfilePath is relative to the BUILD CONTEXT Railway actually uses,
-# which is the full repo root, NOT apps/api — confirmed empirically: with
-# the dashboard's "Root Directory" (Settings -> Source) cleared to empty,
-# the build log showed a ~3 MB unpacked archive (the whole monorepo) and
-# still failed to find a plain "Dockerfile", proving Railway's build
-# pipeline reads from the repo root regardless of this service's working
-# directory in .github/workflows/deploy.yml (that workflow's `railway up
-# --detach` triggers the build; it does not itself define the build
-# context the way `docker build <context>` would). So the path here must
-# include the apps/api/ prefix.
+# Root cause of the earlier "couldn't locate the dockerfile" failures,
+# found by screenshotting the actual dashboard: Settings -> Source ->
+# Root Directory was a typo, "/app/api" (missing the "s" in "apps"), not
+# "/apps/api". A nonexistent Root Directory made Railway silently fall
+# back to the full repo root as build context every time, which is why
+# the unpacked-archive size in the build log kept reading ~3 MB (the whole
+# monorepo) no matter what dockerfilePath value was tried here.
 #
-# Do not "fix" this back to "Dockerfile" without first confirming in the
-# Railway dashboard build log whether the unpacked archive size looks like
-# apps/api alone (~1 MB) or the full repo (~3 MB) — that determines which
-# form of this path is correct, and it flipped once already when the
-# dashboard Root Directory setting changed.
+# With Root Directory corrected to /apps/api in the dashboard, this path
+# is relative to THAT root — so it's just "Dockerfile", matching where the
+# file actually sits (apps/api/Dockerfile) one level below Root Directory.
+# If this ever regresses, check the dashboard Root Directory field first
+# before touching this value again — the build-log archive size (~1 MB
+# for apps/api alone vs ~3 MB for the full repo) tells you immediately
+# whether Root Directory is resolving correctly.
 
 [build]
   builder        = "DOCKERFILE"
-  dockerfilePath = "apps/api/Dockerfile"
+  dockerfilePath = "Dockerfile"
 
 [deploy]
   healthcheckPath         = "/health"
