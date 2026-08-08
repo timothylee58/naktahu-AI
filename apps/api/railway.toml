@@ -1,23 +1,26 @@
 # Railway service configuration — lives in apps/api/ (service root directory)
 # Docs: https://docs.railway.app/reference/config-as-code
 #
-# dockerfilePath is explicit and relative to the BUILD CONTEXT, not the repo
-# root. .github/workflows/deploy.yml runs `railway up` with
-# `working-directory: apps/api`, so the uploaded archive's root is already
-# apps/api's contents — the Dockerfile sits at its top level, hence just
-# "Dockerfile" here, not "apps/api/Dockerfile".
+# dockerfilePath is relative to the BUILD CONTEXT Railway actually uses,
+# which is the full repo root, NOT apps/api — confirmed empirically: with
+# the dashboard's "Root Directory" (Settings -> Source) cleared to empty,
+# the build log showed a ~3 MB unpacked archive (the whole monorepo) and
+# still failed to find a plain "Dockerfile", proving Railway's build
+# pipeline reads from the repo root regardless of this service's working
+# directory in .github/workflows/deploy.yml (that workflow's `railway up
+# --detach` triggers the build; it does not itself define the build
+# context the way `docker build <context>` would). So the path here must
+# include the apps/api/ prefix.
 #
-# This only resolves correctly if the Railway service's dashboard "Root
-# Directory" setting (Settings -> Source) is EMPTY. If it's also set to
-# "apps/api", Railway applies that subdirectory a second time on top of the
-# already-apps/api-scoped archive, and no dockerfilePath value here will
-# find the file (this was the actual cause of the "couldn't locate the
-# dockerfile" build failures, not the path string itself) — this is a
-# manual dashboard step, not something railway.toml can override.
+# Do not "fix" this back to "Dockerfile" without first confirming in the
+# Railway dashboard build log whether the unpacked archive size looks like
+# apps/api alone (~1 MB) or the full repo (~3 MB) — that determines which
+# form of this path is correct, and it flipped once already when the
+# dashboard Root Directory setting changed.
 
 [build]
-  builder       = "DOCKERFILE"
-  dockerfilePath = "Dockerfile"
+  builder        = "DOCKERFILE"
+  dockerfilePath = "apps/api/Dockerfile"
 
 [deploy]
   healthcheckPath         = "/health"
