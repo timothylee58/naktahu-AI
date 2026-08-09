@@ -83,8 +83,18 @@ export default function WarungWatchPage() {
         setNearbyMapsUrl(`https://www.google.com/maps/search/warung+kedai+makan/@${latitude},${longitude},16z`);
         setNearbyLoading(false);
       },
-      () => {
-        setNearbyError(t('warung_watch.error.geolocation_denied'));
+      (err) => {
+        // GeolocationPositionError.code: 1 = PERMISSION_DENIED, 2 =
+        // POSITION_UNAVAILABLE, 3 = TIMEOUT — only code 1 is an actual
+        // denial. The other two (including hitting the 10s timeout below)
+        // were previously shown with the same "access denied" copy, which
+        // told a user who simply had a slow GPS fix to go check their
+        // permission settings instead of just retrying.
+        setNearbyError(
+          err.code === GeolocationPositionError.PERMISSION_DENIED
+            ? t('warung_watch.error.geolocation_denied')
+            : t('warung_watch.error.geolocation_unavailable'),
+        );
         setNearbyLoading(false);
       },
       { timeout: 10000 },

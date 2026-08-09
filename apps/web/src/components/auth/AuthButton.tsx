@@ -232,7 +232,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                     {suggestions.length > 0 && (
                       <div className="mt-2 flex flex-col gap-1.5 max-h-48 overflow-y-auto">
                         {suggestions.map((s, i) => (
-                          <SuggestionCard key={i} suggestion={s} />
+                          <SuggestionCard key={i} suggestion={s} onNavigate={() => setProfileOpen(false)} />
                         ))}
                       </div>
                     )}
