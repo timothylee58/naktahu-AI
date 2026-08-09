@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
@@ -9,6 +10,8 @@ import { fetchUserCredits } from '@/lib/credits';
 import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
 import { API_BASE } from '@/lib/api-base';
+import { suggestForQuery } from '@/lib/agent-suggestions';
+import { SuggestionCard } from '@/components/agents/SuggestionCard';
 
 type Tab = 'options' | 'email';
 
@@ -45,6 +48,13 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [credits, setCredits] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Sidebar-layout only: the compact profile card (email/plan/credits) is
+  // now the single entry point into the profile experience — clicking it
+  // opens a popover with Smart Suggestions + a link to the full /profile
+  // page, replacing the separate always-visible "Profile" nav link and
+  // sidebar suggestions teaser that used to sit above/below it.
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [suggestQuery, setSuggestQuery] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -188,9 +198,66 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
           : null;
 
     if (isSidebar) {
+      const isDark = variant === 'dark';
+      const suggestions = suggestQuery.trim() ? suggestForQuery(suggestQuery) : [];
+
       return (
-        <div className="w-full flex flex-col gap-2">
-          <div className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
+        <div className="w-full flex flex-col gap-2 relative">
+          <AnimatePresence>
+            {profileOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className={`absolute bottom-full left-0 right-0 mb-2 rounded-2xl border shadow-xl z-50 overflow-hidden p-3 flex flex-col gap-3 ${
+                    isDark ? 'border-white/10 bg-[#0F1626]' : 'border-zinc-200 bg-white'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
+                      {t('profile.suggestions_title')}
+                    </p>
+                    <input
+                      type="text"
+                      value={suggestQuery}
+                      onChange={(e) => setSuggestQuery(e.target.value)}
+                      placeholder={t('profile.suggestions_placeholder')}
+                      className={`w-full text-xs rounded-lg px-2.5 py-1.5 border bg-transparent focus:outline-none ${
+                        isDark ? 'border-white/10 placeholder:text-zinc-500 text-zinc-200' : 'border-zinc-200 placeholder:text-zinc-400 text-zinc-800'
+                      }`}
+                    />
+                    {suggestions.length > 0 && (
+                      <div className="mt-2 flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                        {suggestions.map((s, i) => (
+                          <SuggestionCard key={i} suggestion={s} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    href="/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className={`text-xs font-semibold text-center rounded-lg px-3 py-2 transition-colors ${
+                      isDark ? 'bg-blue-500/15 text-blue-300 hover:bg-blue-500/25' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                    }`}
+                  >
+                    {t('profile.view_full')}
+                  </Link>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="button"
+            onClick={() => setProfileOpen((o) => !o)}
+            className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 border text-left transition-colors ${
+              isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'
+            }`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               {user.user_metadata?.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -219,7 +286,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 </span>
               )}
             </div>
-          </div>
+          </button>
           <button
             onClick={signOut}
             className={`w-full text-sm font-medium rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${variant === 'dark' ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'}`}

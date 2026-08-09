@@ -58,6 +58,39 @@ export default function WarungWatchPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
+  // "Nearby warungs" via the free browser Geolocation API + a Google Maps
+  // search URL centered on the user's coords — no Google Places API key
+  // needed, so this is fully functional today. Auto-suggesting real nearby
+  // place NAMES into the search box above would need the Places Nearby
+  // Search API (GOOGLE_PLACES_API_KEY, not configured in this deployment —
+  // see services/warung_watch.py's fetch_google_popular_times_baseline()
+  // for the same deferred-integration pattern); this opens Maps instead,
+  // which needs no key and works today.
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyMapsUrl, setNearbyMapsUrl] = useState<string | null>(null);
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  const findNearby = () => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      setNearbyError(t('warung_watch.error.geolocation_unsupported'));
+      return;
+    }
+    setNearbyLoading(true);
+    setNearbyError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setNearbyMapsUrl(`https://www.google.com/maps/search/warung+kedai+makan/@${latitude},${longitude},16z`);
+        setNearbyLoading(false);
+      },
+      () => {
+        setNearbyError(t('warung_watch.error.geolocation_denied'));
+        setNearbyLoading(false);
+      },
+      { timeout: 10000 },
+    );
+  };
+
   useEffect(() => {
     if (!localStorage.getItem(ANON_SESSION_KEY)) {
       localStorage.setItem(ANON_SESSION_KEY, crypto.randomUUID());
@@ -178,6 +211,31 @@ export default function WarungWatchPage() {
               {error}
             </div>
           )}
+
+          <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-2 shadow-sm dark:bg-white/5 dark:border-white/10">
+            <h2 className="text-sm font-semibold">{t('warung_watch.nearby_title')}</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('warung_watch.nearby_desc')}</p>
+            {nearbyError && <p className="text-xs text-red-600 dark:text-red-400">{nearbyError}</p>}
+            {nearbyMapsUrl ? (
+              <a
+                href={nearbyMapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="self-start inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 transition-colors text-white text-sm font-semibold"
+              >
+                🗺️ {t('warung_watch.nearby_open_maps')}
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled={nearbyLoading}
+                onClick={findNearby}
+                className="self-start px-4 py-2 rounded-xl border border-orange-300 text-orange-700 dark:text-orange-300 dark:border-orange-500/40 hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors text-sm font-semibold disabled:opacity-50"
+              >
+                {nearbyLoading ? t('warung_watch.nearby_locating') : t('warung_watch.nearby_button')}
+              </button>
+            )}
+          </section>
 
           <section className="relative bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
             <label className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
