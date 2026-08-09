@@ -14,9 +14,16 @@ log = structlog.get_logger(__name__)
 _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
     "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
-    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property), intent (string summary max 10 words). "
+    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property), intent (string summary max 10 words), "
+    "is_live_status_query (boolean), place_name (string or null). "
     "Use 'parliament' for questions about Members of Parliament, constituencies, voting records, bills, or Hansard. "
     "Use 'property' for land titles, strata management, tenancy, or e-Tanah matters. "
+    "Set is_live_status_query=true ONLY for questions asking whether a specific named "
+    "restaurant/warung/kopitiam/food stall is currently busy, packed, crowded, or has a "
+    "queue right now (e.g. 'Is Pelita packed right now?', 'Ada line tak kat Village Park sekarang?'). "
+    "This is a distinct category from general knowledge questions about government/business/etc — "
+    "it is about live real-time crowd status at one specific named place, not a rule or fact lookup. "
+    "When true, set place_name to the place's name exactly as written in the query (no city/address). "
     "Detect language from the query text itself, not from any metadata."
 )
 
@@ -116,5 +123,27 @@ async def router_node(state: AgentState) -> dict:
     if not isinstance(intent, str):
         intent = ""
 
-    log.info("router_classified", language=language, domain=domain, intent=intent)
-    return {"language": language, "domain": domain, "intent": intent}
+    is_live_status_query = bool(parsed.get("is_live_status_query") is True)
+    place_name = parsed.get("place_name")
+    if not isinstance(place_name, str) or not place_name.strip():
+        place_name = None
+        # A malformed classification (flag true, no usable name) can't be
+        # routed anywhere useful — fall back to the normal RAG path rather
+        # than sending warung_watch_node a query it can't search on.
+        is_live_status_query = False
+
+    log.info(
+        "router_classified",
+        language=language,
+        domain=domain,
+        intent=intent,
+        is_live_status_query=is_live_status_query,
+        place_name=place_name,
+    )
+    return {
+        "language": language,
+        "domain": domain,
+        "intent": intent,
+        "is_live_status_query": is_live_status_query,
+        "place_name": place_name,
+    }

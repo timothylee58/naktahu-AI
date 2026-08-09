@@ -203,3 +203,52 @@ def test_domain_aliases_map_to_canonical_domain(alias: str, expected: str) -> No
     facts); property-related BM/EN terms fold to 'property' — per the
     domain split decided when migration 030 added the property domain."""
     assert _DOMAIN_ALIASES[alias] == expected
+
+
+@pytest.mark.asyncio
+async def test_router_node_detects_live_status_query() -> None:
+    """Warung Watch: router_node's single classification call also flags
+    live "is X packed right now" queries and extracts the place name."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "business", "intent": "check if Pelita is busy", '
+        '"is_live_status_query": true, "place_name": "Pelita"}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "Is Pelita packed right now?"})
+
+    assert result["is_live_status_query"] is True
+    assert result["place_name"] == "Pelita"
+
+
+@pytest.mark.asyncio
+async def test_router_node_normal_query_not_flagged_as_live_status() -> None:
+    completion = _mock_completion(
+        '{"language": "en", "domain": "epf", "intent": "epf withdrawal age"}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "What is the EPF withdrawal age?"})
+
+    assert result["is_live_status_query"] is False
+    assert result["place_name"] is None
+
+
+@pytest.mark.asyncio
+async def test_router_node_ignores_flag_true_without_usable_place_name() -> None:
+    """A malformed classification (flag true, no name / empty name) can't
+    be routed to warung_watch_node — falls back to the normal RAG path
+    rather than crashing on an unusable place_name."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "business", "intent": "vague busy question", '
+        '"is_live_status_query": true, "place_name": "  "}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "is it busy"})
+
+    assert result["is_live_status_query"] is False
+    assert result["place_name"] is None

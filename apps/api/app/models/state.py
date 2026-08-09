@@ -52,3 +52,11 @@ class AgentState(TypedDict, total=False):
     # NakTahu has no access to any user's records, so this carries the real
     # agency contact to show instead of attempting an answer.
     agency_contact: Optional[dict[str, str]]
+    # Warung Watch — set by router_node when the query is asking about a
+    # named place's live crowd status ("Is Pelita packed right now?")
+    # rather than a knowledge-base question. When true, graph.py routes
+    # straight to warung_watch_node instead of rag/analyst/synthesiser —
+    # this is live, ephemeral crowd data, not something the RAG pipeline's
+    # confidence-gated document citations model applies to.
+    is_live_status_query: bool
+    place_name: Optional[str]
