@@ -5,17 +5,28 @@ Source model (see 032_warung_watch.sql): `warung_checkins.source` supports
 three values, but only 'user_report' is actually written today —
 
   - 'user_report'            — LIVE. The crowdsourced check-in flow below.
-  - 'google_popular_times'   — DEFERRED. fetch_google_popular_times_baseline()
-    is a real, documented integration point, but it no-ops unless
-    GOOGLE_PLACES_API_KEY is set — this repo has no such key configured, so
-    it is never claimed as working. Set the env var to turn it on.
+  - 'google_popular_times'   — NOT BUILDABLE. An earlier version of this
+    module claimed this was a real deferred integration point behind
+    GOOGLE_PLACES_API_KEY. That was wrong: Google's official Places API
+    does not expose Popular Times / live-busyness data at all — it's a
+    Maps-UI-only feature. The only ways to get it programmatically are
+    unofficial scrapers that violate Google's Terms of Service, which
+    this repo will not build. The enum value stays (harmless, already
+    applied via migration 032 — see CLAUDE.md Trap #5 on not retroactively
+    editing applied migrations) but nothing writes to it.
   - 'owner_report'           — DEFERRED, not implemented. A WhatsApp-based
     owner toggle (Meta Cloud API / Twilio) is a separate webhook + phone
     verification flow, out of scope for the crowdsourced-first build.
 
-get_status() aggregates whatever sources exist without caring which one
-produced a row, so turning on google_popular_times later needs no schema
-or aggregation-query change — just a real API key and a write path.
+What IS real and implemented: search_nearby_places() below calls the
+official, ToS-compliant Places API (New) Nearby Search endpoint to surface
+real nearby place names for the check-in search box — a legitimate,
+documented Google API, unlike Popular Times. It's a search assist, not a
+check-in source, so it doesn't touch warung_checkins at all.
+
+get_status() aggregates whatever check-in sources exist without caring
+which one produced a row — that part of the original design was sound and
+is unchanged.
 """
 
 from __future__ import annotations
@@ -25,6 +36,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import httpx
 import structlog
 from supabase import Client
 
@@ -33,6 +45,13 @@ from core.warung_watch import STALE_WINDOW, aggregate_checkin_status, normalize_
 logger = structlog.get_logger()
 
 _STATUS_WEIGHT = {"empty": 0, "moderate": 1, "packed": 2}
+_PLACES_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby"
+_PLACES_REQUEST_TIMEOUT = 8.0
+# Types that map reasonably onto "warung" — Google's place-type taxonomy has
+# no dedicated "warung"/"kopitiam" category. Restaurant/cafe/meal_takeaway
+# covers the realistic range without pulling in unrelated results (e.g.
+# "grocery_store", which also appears under the broader "food" type).
+_NEARBY_PLACE_TYPES = ["restaurant", "cafe", "meal_takeaway"]
 # Postgres unique_violation SQLSTATE — raised by warungs_normalized_name_idx
 # (a UNIQUE index, see 032_warung_watch.sql) when two concurrent first
 # check-ins for the same name race get_or_create_warung's find-then-insert.
@@ -191,28 +210,72 @@ async def get_status(
     return aggregate_checkin_status(rows)
 
 
-async def fetch_google_popular_times_baseline(
-    *, place_name: str, lat: Optional[float], lng: Optional[float]
-) -> Optional[dict[str, Any]]:
-    """Deferred integration point for a Google Places "Popular Times"
-    baseline layer, to fall back on when there are no fresh crowdsourced
-    check-ins. Not wired into get_status() yet, and deliberately a no-op
-    unless GOOGLE_PLACES_API_KEY is configured — this repo has no such key
-    today, and this function must never be presented as live without one.
+def places_api_configured() -> bool:
+    return bool(os.environ.get("GOOGLE_PLACES_API_KEY"))
 
-    To enable: set GOOGLE_PLACES_API_KEY, implement the Places API "Place
-    Details" request (fields=business_status,current_opening_hours or the
-    dedicated Popular Times field where available), and write a
-    'google_popular_times' row into warung_checkins on a schedule (this is
-    historical-pattern data, not truly live, so treat it as a periodic
-    background refresh, not a per-request call) — get_status() already
-    aggregates by source-agnostic status weight, so no changes are needed
-    there once this starts writing real rows.
+
+async def search_nearby_places(
+    *, lat: float, lng: float, radius_m: int = 1500, max_results: int = 10
+) -> dict[str, Any]:
+    """Real nearby-place search via the official Places API (New) Nearby
+    Search endpoint — search assist for the check-in box, not a check-in
+    source itself. Returns {"configured": False, "places": []} when
+    GOOGLE_PLACES_API_KEY isn't set (never claims results it can't produce),
+    and degrades the same way — logged, empty list, no exception — on any
+    upstream failure, matching how services/speech.py treats an unconfigured
+    or failing Google Cloud dependency: this is a convenience layer, and a
+    timeout here must not break the rest of the check-in flow.
     """
-    if not os.environ.get("GOOGLE_PLACES_API_KEY"):
-        logger.info("google_popular_times_skipped_no_api_key", place_name=place_name)
-        return None
-    raise NotImplementedError(
-        "GOOGLE_PLACES_API_KEY is set but the Places API call itself is not "
-        "implemented yet — this is a real deferred integration, not a bug."
-    )
+    api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+    if not api_key:
+        return {"configured": False, "places": []}
+
+    body = {
+        "includedTypes": _NEARBY_PLACE_TYPES,
+        "maxResultCount": max(1, min(max_results, 20)),
+        "locationRestriction": {
+            "circle": {
+                "center": {"latitude": lat, "longitude": lng},
+                "radius": float(max(1, min(radius_m, 5000))),
+            }
+        },
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": api_key,
+        # Places API (New) requires an explicit field mask on every request —
+        # unlike the legacy API, nothing is returned by default.
+        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=_PLACES_REQUEST_TIMEOUT) as client:
+            resp = await client.post(_PLACES_NEARBY_SEARCH_URL, json=body, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        places = []
+        # `data.get("places", [])` can legitimately be `None` (the API omits
+        # the key or returns it null when zero places match) rather than an
+        # absent key, and Places API (New) is a documented but external
+        # contract — a malformed/unexpected body (non-dict root, a place
+        # entry that isn't a dict) must degrade the same as a network
+        # failure below, not 500 the whole check-in flow. Kept inside this
+        # try so any of those shapes falls through to the shared handler.
+        for place in data.get("places") or []:
+            display_name = (place.get("displayName") or {}).get("text")
+            if not display_name:
+                continue
+            location = place.get("location") or {}
+            places.append({
+                "place_id": place.get("id"),
+                "name": display_name,
+                "address": place.get("formattedAddress"),
+                "lat": location.get("latitude"),
+                "lng": location.get("longitude"),
+            })
+    except Exception as exc:
+        logger.warning("places_nearby_search_failed", error=str(exc))
+        return {"configured": True, "places": []}
+
+    return {"configured": True, "places": places}

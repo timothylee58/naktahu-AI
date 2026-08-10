@@ -29,6 +29,14 @@ interface WarungStatus {
   sources: string[];
 }
 
+interface NearbyPlace {
+  place_id: string | null;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
 const STATUS_STYLE: Record<Status, { emoji: string; bg: string; text: string }> = {
   empty: { emoji: '🟢', bg: 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30', text: 'text-green-700 dark:text-green-300' },
   moderate: { emoji: '🟡', bg: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30', text: 'text-amber-700 dark:text-amber-300' },
@@ -60,15 +68,18 @@ export default function WarungWatchPage() {
 
   // "Nearby warungs" via the free browser Geolocation API + a Google Maps
   // search URL centered on the user's coords — no Google Places API key
-  // needed, so this is fully functional today. Auto-suggesting real nearby
-  // place NAMES into the search box above would need the Places Nearby
-  // Search API (GOOGLE_PLACES_API_KEY, not configured in this deployment —
-  // see services/warung_watch.py's fetch_google_popular_times_baseline()
-  // for the same deferred-integration pattern); this opens Maps instead,
-  // which needs no key and works today.
+  // needed, so the Maps link is fully functional regardless of backend
+  // config. Alongside it, GET /api/v1/warung-watch/nearby calls the real
+  // Places API (New) Nearby Search endpoint (see services/warung_watch.py)
+  // to surface actual nearby place names as tappable buttons; it always
+  // returns 200 with `configured: false` when GOOGLE_PLACES_API_KEY isn't
+  // set on the backend, so this section degrades to the Maps-link-only
+  // view rather than erroring.
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyMapsUrl, setNearbyMapsUrl] = useState<string | null>(null);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const [nearbyPlacesConfigured, setNearbyPlacesConfigured] = useState(false);
 
   const findNearby = () => {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
@@ -82,6 +93,16 @@ export default function WarungWatchPage() {
         const { latitude, longitude } = pos.coords;
         setNearbyMapsUrl(`https://www.google.com/maps/search/warung+kedai+makan/@${latitude},${longitude},16z`);
         setNearbyLoading(false);
+        apiFetch(`/api/v1/warung-watch/nearby?lat=${latitude}&lng=${longitude}`, accessToken)
+          .then((res) => (res.ok ? res.json() : { configured: false, places: [] }))
+          .then((data: { configured: boolean; places: NearbyPlace[] }) => {
+            setNearbyPlacesConfigured(data.configured);
+            setNearbyPlaces(data.places);
+          })
+          .catch(() => {
+            // Search assist is a convenience on top of the Maps link above —
+            // a failure here shouldn't block the flow that already worked.
+          });
       },
       (err) => {
         // GeolocationPositionError.code: 1 = PERMISSION_DENIED, 2 =
@@ -99,6 +120,11 @@ export default function WarungWatchPage() {
       },
       { timeout: 10000 },
     );
+  };
+
+  const selectNearbyPlace = (name: string) => {
+    setQuery(name);
+    void loadStatus(name);
   };
 
   useEffect(() => {
@@ -244,6 +270,27 @@ export default function WarungWatchPage() {
               >
                 {nearbyLoading ? t('warung_watch.nearby_locating') : t('warung_watch.nearby_button')}
               </button>
+            )}
+            {nearbyMapsUrl && nearbyPlacesConfigured && nearbyPlaces.length > 0 && (
+              <div className="flex flex-col gap-1.5 pt-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {t('warung_watch.nearby_places_title')}
+                </p>
+                <ul className="flex flex-col gap-1.5">
+                  {nearbyPlaces.map((place) => (
+                    <li key={place.place_id ?? place.name}>
+                      <button
+                        type="button"
+                        onClick={() => selectNearbyPlace(place.name)}
+                        className="w-full text-left px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/10 text-sm hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                      >
+                        {place.name}
+                        {place.address && <span className="block text-xs text-zinc-400">{place.address}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </section>
 
