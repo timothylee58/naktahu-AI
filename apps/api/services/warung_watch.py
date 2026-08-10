@@ -253,22 +253,29 @@ async def search_nearby_places(
             resp = await client.post(_PLACES_NEARBY_SEARCH_URL, json=body, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+
+        places = []
+        # `data.get("places", [])` can legitimately be `None` (the API omits
+        # the key or returns it null when zero places match) rather than an
+        # absent key, and Places API (New) is a documented but external
+        # contract — a malformed/unexpected body (non-dict root, a place
+        # entry that isn't a dict) must degrade the same as a network
+        # failure below, not 500 the whole check-in flow. Kept inside this
+        # try so any of those shapes falls through to the shared handler.
+        for place in data.get("places") or []:
+            display_name = (place.get("displayName") or {}).get("text")
+            if not display_name:
+                continue
+            location = place.get("location") or {}
+            places.append({
+                "place_id": place.get("id"),
+                "name": display_name,
+                "address": place.get("formattedAddress"),
+                "lat": location.get("latitude"),
+                "lng": location.get("longitude"),
+            })
     except Exception as exc:
         logger.warning("places_nearby_search_failed", error=str(exc))
         return {"configured": True, "places": []}
-
-    places = []
-    for place in data.get("places", []):
-        display_name = place.get("displayName", {}).get("text")
-        if not display_name:
-            continue
-        location = place.get("location") or {}
-        places.append({
-            "place_id": place.get("id"),
-            "name": display_name,
-            "address": place.get("formattedAddress"),
-            "lat": location.get("latitude"),
-            "lng": location.get("longitude"),
-        })
 
     return {"configured": True, "places": places}

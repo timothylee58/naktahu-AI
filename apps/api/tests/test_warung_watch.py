@@ -488,6 +488,37 @@ async def test_search_nearby_places_degrades_on_http_error_status(monkeypatch):
     assert result == {"configured": True, "places": []}
 
 
+@pytest.mark.asyncio
+async def test_search_nearby_places_degrades_on_malformed_response_body(monkeypatch):
+    """Confirmed Cursor Bugbot finding: a 200 response whose body doesn't
+    match the expected shape (places: null, or a place entry that isn't a
+    dict) must degrade like a network failure, not 500 the whole check-in
+    flow — Places API (New) is an external contract, not something this
+    repo controls the shape of."""
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
+
+    async def fake_post(self, url, json=None, headers=None, **kwargs):
+        return httpx.Response(200, json={"places": None}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    result = await search_nearby_places(lat=3.1390, lng=101.6869)
+    assert result == {"configured": True, "places": []}
+
+
+@pytest.mark.asyncio
+async def test_search_nearby_places_degrades_on_non_dict_place_entry(monkeypatch):
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
+
+    async def fake_post(self, url, json=None, headers=None, **kwargs):
+        return httpx.Response(200, json={"places": ["not-a-dict"]}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    result = await search_nearby_places(lat=3.1390, lng=101.6869)
+    assert result == {"configured": True, "places": []}
+
+
 # ── router: GET /nearby ─────────────────────────────────────────────────
 
 def test_nearby_returns_unconfigured_without_key(client, monkeypatch):
