@@ -8,16 +8,17 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from middleware.rate_limit import apply_query_rate_limit
+from middleware.rate_limit import anonymous_limiter, apply_query_rate_limit
 from services.auth import UserContext, get_optional_user
 from services.warung_watch import (
     create_checkin,
     find_best_warung_match,
     get_or_create_warung,
     get_status,
+    search_nearby_places,
     search_warungs,
 )
 
@@ -59,6 +60,27 @@ async def warung_status(request: Request, name: str) -> dict[str, Any]:
         return {"warung": None, "status": None, "is_fresh": False, "report_count": 0, "last_updated": None, "sources": []}
     status = await get_status(supabase_client=sb, warung_id=warung["id"])
     return {"warung": warung, **status}
+
+
+@router.get("/nearby")
+@anonymous_limiter.limit("20/minute")
+async def warung_nearby(
+    request: Request,
+    response: Response,
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius_m: int = Query(1500, ge=100, le=5000),
+) -> dict[str, Any]:
+    """Real nearby-place search assist via the official Places API (New) —
+    see services/warung_watch.py's module docstring for why this is a
+    legitimate integration and Google "Popular Times" is not. Rate-limited
+    (not the shared apply_query_rate_limit — a tighter, GET-specific limit)
+    since every call costs real Google API quota/billing once
+    GOOGLE_PLACES_API_KEY is configured. Never 503s: returns
+    {"configured": false, "places": []} when the key isn't set, so the
+    frontend can degrade to its Maps-link-only fallback instead of erroring.
+    """
+    return await search_nearby_places(lat=lat, lng=lng, radius_m=radius_m)
 
 
 @router.post("/checkin", status_code=201)

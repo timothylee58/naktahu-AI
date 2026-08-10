@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import jwt
 import pytest
 from fastapi.testclient import TestClient
@@ -16,7 +17,14 @@ import main as api_main
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
 from core.warung_watch import rank_candidates, select_best_match
-from services.warung_watch import find_best_warung_match, get_or_create_warung, get_status, normalize_name, search_warungs
+from services.warung_watch import (
+    find_best_warung_match,
+    get_or_create_warung,
+    get_status,
+    normalize_name,
+    search_nearby_places,
+    search_warungs,
+)
 
 
 def _auth_header(sub: str = "warung-user") -> dict[str, str]:
@@ -403,3 +411,113 @@ async def test_get_or_create_warung_reraises_non_conflict_errors():
         await get_or_create_warung(
             supabase_client=sb, name="Pelita", location=None, lat=None, lng=None, created_by=None,
         )
+
+
+# ── search_nearby_places (Places API (New) Nearby Search) ─────────────────
+
+@pytest.mark.asyncio
+async def test_search_nearby_places_unconfigured_without_key(monkeypatch):
+    monkeypatch.delenv("GOOGLE_PLACES_API_KEY", raising=False)
+    result = await search_nearby_places(lat=3.1390, lng=101.6869)
+    assert result == {"configured": False, "places": []}
+
+
+@pytest.mark.asyncio
+async def test_search_nearby_places_parses_successful_response(monkeypatch):
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
+
+    fake_response_body = {
+        "places": [
+            {
+                "id": "place-1",
+                "displayName": {"text": "Warung Pelita"},
+                "formattedAddress": "Jalan Bukit Bintang, Kuala Lumpur",
+                "location": {"latitude": 3.1401, "longitude": 101.6870},
+            },
+            # Missing displayName — must be skipped, not raise.
+            {"id": "place-2", "formattedAddress": "Somewhere"},
+        ]
+    }
+
+    async def fake_post(self, url, json=None, headers=None, **kwargs):
+        assert url == "https://places.googleapis.com/v1/places:searchNearby"
+        assert headers["X-Goog-Api-Key"] == "test-key"
+        assert "X-Goog-FieldMask" in headers
+        assert json["locationRestriction"]["circle"]["center"] == {"latitude": 3.1390, "longitude": 101.6869}
+        return httpx.Response(200, json=fake_response_body, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    result = await search_nearby_places(lat=3.1390, lng=101.6869)
+    assert result["configured"] is True
+    assert result["places"] == [
+        {
+            "place_id": "place-1",
+            "name": "Warung Pelita",
+            "address": "Jalan Bukit Bintang, Kuala Lumpur",
+            "lat": 3.1401,
+            "lng": 101.6870,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_search_nearby_places_degrades_on_upstream_failure(monkeypatch):
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
+
+    async def fake_post(self, url, json=None, headers=None, **kwargs):
+        raise httpx.ConnectTimeout("timed out", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    result = await search_nearby_places(lat=3.1390, lng=101.6869)
+    assert result == {"configured": True, "places": []}
+
+
+@pytest.mark.asyncio
+async def test_search_nearby_places_degrades_on_http_error_status(monkeypatch):
+    monkeypatch.setenv("GOOGLE_PLACES_API_KEY", "test-key")
+
+    async def fake_post(self, url, json=None, headers=None, **kwargs):
+        request = httpx.Request("POST", url)
+        return httpx.Response(403, json={"error": "PERMISSION_DENIED"}, request=request)
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    result = await search_nearby_places(lat=3.1390, lng=101.6869)
+    assert result == {"configured": True, "places": []}
+
+
+# ── router: GET /nearby ─────────────────────────────────────────────────
+
+def test_nearby_returns_unconfigured_without_key(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.delenv("GOOGLE_PLACES_API_KEY", raising=False)
+    res = c.get("/api/v1/warung-watch/nearby", params={"lat": 3.1390, "lng": 101.6869})
+    assert res.status_code == 200, res.text
+    assert res.json() == {"configured": False, "places": []}
+
+
+def test_nearby_rejects_out_of_range_lat(client):
+    c, *_ = client
+    res = c.get("/api/v1/warung-watch/nearby", params={"lat": 200.0, "lng": 101.6869})
+    assert res.status_code == 422, res.text
+
+
+def test_nearby_rejects_out_of_range_radius(client):
+    c, *_ = client
+    res = c.get("/api/v1/warung-watch/nearby", params={"lat": 3.1390, "lng": 101.6869, "radius_m": 99999})
+    assert res.status_code == 422, res.text
+
+
+def test_nearby_rate_limit_boundary(client, monkeypatch):
+    """20/minute per the router's @anonymous_limiter.limit("20/minute") —
+    the 21st call in one minute from the same client must 429."""
+    c, *_ = client
+    monkeypatch.delenv("GOOGLE_PLACES_API_KEY", raising=False)
+    params = {"lat": 3.1390, "lng": 101.6869}
+    for _ in range(20):
+        res = c.get("/api/v1/warung-watch/nearby", params=params)
+        assert res.status_code == 200, res.text
+    res = c.get("/api/v1/warung-watch/nearby", params=params)
+    assert res.status_code == 429, res.text
