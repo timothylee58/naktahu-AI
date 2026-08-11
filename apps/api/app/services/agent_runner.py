@@ -1,6 +1,7 @@
 """Orchestrate product-agent graph runs, checkpoints, and audit logging."""
 from __future__ import annotations
 
+import html
 import time
 import uuid
 from typing import Any, Callable, Optional
@@ -485,6 +486,79 @@ async def get_health_status(session_id: str, checkpointer: Any) -> dict[str, Any
     if not snapshot or not snapshot.values:
         return {"session_id": session_id, "status": "not_found"}
     return {"session_id": session_id, "status": "completed", "output": _public_output(dict(snapshot.values))}
+
+
+def _render_health_triage_html(values: dict[str, Any]) -> str:
+    """Render a completed Health Triage session's state to a printable HTML
+    summary — same generate_pdf() tool compliance_drafter/grant_draft_generator
+    already use, applied to a session that's already fully answered (this
+    graph has no HITL confirm step, unlike those two), so this doesn't
+    re-run the graph or the LLM, just formats what's already there.
+    User-supplied free text (symptoms, from the intake message) is
+    html.escape()'d before interpolation — a real, if low-severity, gap in
+    the pattern this mirrors (compliance_drafter/grant_draft_generator's
+    own HTML building doesn't escape either), worth not repeating here."""
+    symptoms = ", ".join(html.escape(s) for s in (values.get("symptoms") or []))
+    severity = html.escape(str(values.get("severity") or ""))
+    recommendation = html.escape(str(values.get("facility_recommendation") or ""))
+    disclaimer = html.escape(str(values.get("disclaimer") or ""))
+
+    facility_items = "".join(
+        f"<li><strong>{html.escape(str(f.get('name', '')))}</strong>: {html.escape(str(f.get('action', '')))}</li>"
+        for f in (values.get("facilities") or [])
+    )
+    citation_items = "".join(
+        f"<li>{html.escape(str(c.get('title', '')))} ({html.escape(str(c.get('ministry', '')))})</li>"
+        for c in (values.get("citations") or [])
+        if c.get("title")
+    )
+
+    return (
+        "<html><body>"
+        "<h1>Health Triage Summary</h1>"
+        f"<p><strong>Symptoms reported:</strong> {symptoms or '—'}</p>"
+        f"<p><strong>Severity:</strong> {severity}</p>"
+        f"<h2>Recommendation</h2><p>{recommendation}</p>"
+        f"<h2>Suggested Facilities</h2><ul>{facility_items}</ul>"
+        + (f"<h2>Sources</h2><ul>{citation_items}</ul>" if citation_items else "")
+        + f"<p><em>{disclaimer}</em></p>"
+        "</body></html>"
+    )
+
+
+async def export_health_triage(
+    *, session_id: str, checkpointer: Any, supabase_client: Any, user_id: str
+) -> dict[str, Any]:
+    """On-demand PDF export of a completed Health Triage session — no
+    graph re-run, no new LLM call, just formats already-generated state.
+    Raises ValueError (mapped to 404 by the router) when the session
+    doesn't exist or hasn't finished yet, since there's nothing to export."""
+    graph = get_health_triage_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        raise ValueError("session not found")
+    values = dict(snapshot.values)
+    if not values.get("facility_recommendation"):
+        raise ValueError("session not yet completed")
+
+    from app.agents.tools import generate_pdf as gen_pdf
+
+    html_report = _render_health_triage_html(values)
+    path, url, expires = await gen_pdf(
+        html_report,
+        user_id=user_id,
+        agent_type="health-triage",
+        supabase_client=supabase_client,
+    )
+    result = {"pdf_storage_path": path, "signed_url": url, "url_expires_at": expires or None}
+    if supabase_client and path:
+        # Same generated_documents row shape compliance-drafter/grant-draft-
+        # generator write — the existing GET /agents/{agent_name}/documents
+        # endpoint reads this table generically by agent_type, so health-
+        # triage exports show up in that history list automatically, no
+        # endpoint change needed there.
+        _persist_document(supabase_client, user_id, "health-triage", result)
+    return result
 
 
 # ── Eligibility Agent ────────────────────────────────────────────────────────
