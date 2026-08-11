@@ -114,6 +114,28 @@ function GrantDraftGeneratorPageInner() {
     if (bumi !== null) setIsBumiputera(bumi === 'true');
   }, [searchParams]);
 
+  // Resume from History's "?run=<agent_runs.id>" link — jump straight to
+  // the draft preview instead of the intake flow. Silent fallback to a
+  // fresh intake on any failure (bad/expired link) rather than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        const draft = (run.output as DraftReport) ?? null;
+        setReport(draft);
+        setEditedSummary(draft?.executive_summary ?? '');
+        setEditedFunds(draft?.use_of_funds_narrative ?? '');
+        setStep('preview');
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Draft history — Contractbook-style list of past generated files
   // (Mobbin reference), backed by the new GET .../documents endpoint over
   // the existing generated_documents table (no new table needed).

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 
-export default function ResearchSynthesiserPage() {
-  const { start } = useAgentApi();
+function ResearchSynthesiserPageInner() {
+  const { start, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
   const [citations, setCitations] = useState<Array<Record<string, unknown>>>([]);
   const [domains, setDomains] = useState<string[]>([]);
@@ -26,6 +28,30 @@ export default function ResearchSynthesiserPage() {
       setLoading(false);
     }
   };
+
+  // Resume from History's "?run=<agent_runs.id>" link. This agent
+  // compiles its LangGraph with no checkpointer at all (single-shot,
+  // confirmed in agent_runner.py) — there's no session_id/continue
+  // concept to restore, only the stored output, so this just re-hydrates
+  // citations/domains/query directly from agent_runs.output. Silent
+  // fallback on any failure (bad/expired link) rather than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const stored = await get(`/api/v1/agent-runs/${runId}`);
+        const out = (stored.output as Record<string, unknown>) ?? {};
+        if (typeof out.query === 'string') setQuery(out.query);
+        const restoredCitations = (out.merged_citations ?? out.citations) as Array<Record<string, unknown>> | undefined;
+        setCitations(restoredCitations ?? []);
+        setDomains((out.detected_domains as string[]) ?? []);
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -68,5 +94,13 @@ export default function ResearchSynthesiserPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function ResearchSynthesiserPage() {
+  return (
+    <Suspense>
+      <ResearchSynthesiserPageInner />
+    </Suspense>
   );
 }

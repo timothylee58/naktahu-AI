@@ -323,3 +323,43 @@ async def fetch_agent_run_history(
     except Exception as exc:
         logger.warning("agent_run_history_fetch_failed", error=str(exc), user_id=user_id)
         return []
+
+
+async def fetch_agent_run_by_id(
+    *, supabase_client: Client | None, run_id: str, user_id: str
+) -> dict[str, Any] | None:
+    """Single stored agent_runs row, for the "resume a past session" flow —
+    reused across every agent's page rather than each agent needing its own
+    checkpoint-state re-fetch. Deliberately sources from agent_runs (already
+    written by every start/continue call via _log_run) instead of LangGraph
+    checkpoint state: two agents (research-synthesiser,
+    sme-compliance-navigator) compile their graph with no checkpointer at
+    all — single-shot, nothing to re-fetch from a thread_id — so agent_runs
+    is the only place ANY agent's past output is durably retrievable from,
+    not just a convenience shortcut for those two.
+
+    Ownership-checked by user_id in the same query (not a separate lookup +
+    compare) — returns None for "not found" and "found but not yours"
+    identically, so the 404 the router raises doesn't confirm a run_id is
+    valid for someone else.
+    """
+    if supabase_client is None:
+        logger.warning("agent_run_fetch_supabase_unavailable")
+        return None
+
+    def _fetch() -> dict[str, Any] | None:
+        res = (
+            supabase_client.table("agent_runs")
+            .select("id,agent_name,session_id,output,completion_status,turns_count,created_at")
+            .eq("id", run_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as exc:
+        logger.warning("agent_run_fetch_failed", error=str(exc), run_id=run_id)
+        return None

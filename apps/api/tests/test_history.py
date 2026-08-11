@@ -734,3 +734,46 @@ def test_get_agent_runs_degrades_to_empty_list_on_fetch_error(client):
     res = c.get("/api/v1/agent-runs", headers=_auth_header(sub="free-user", plan="free"))
     assert res.status_code == 200, res.text
     assert res.json() == []
+
+
+# ── GET /api/v1/agent-runs/{run_id} ────────────────────────────────────
+# Backs the "resume a past session" flow every agent page uses — sourced
+# from agent_runs (not per-agent checkpoint state) since two agents
+# (research-synthesiser, sme-compliance-navigator) compile with no
+# checkpointer at all and have nothing else to resume from.
+
+def test_get_agent_run_by_id_401_without_auth(client):
+    c, *_ = client
+    res = c.get("/api/v1/agent-runs/run-1")
+    assert res.status_code == 401
+
+
+def test_get_agent_run_by_id_200_for_owner(client):
+    c, _, sb, _ = client
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[_AGENT_RUN_ROW]
+    )
+    res = c.get("/api/v1/agent-runs/run-1", headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 200, res.text
+    assert res.json() == _AGENT_RUN_ROW
+
+
+def test_get_agent_run_by_id_404_when_not_found_or_not_owned(client):
+    """Confirms the same 404 for a genuinely missing run and one that
+    belongs to someone else — a distinct response would confirm the
+    run_id is valid for another user."""
+    c, _, sb, _ = client
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[]
+    )
+    res = c.get("/api/v1/agent-runs/not-mine", headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 404
+
+
+def test_get_agent_run_by_id_503_when_supabase_degraded(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.get("/api/v1/agent-runs/run-1", headers=_auth_header())
+    assert res.status_code == 503

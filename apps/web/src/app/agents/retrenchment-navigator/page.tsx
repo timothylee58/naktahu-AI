@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChatBubbles, type ChatMessage } from '@/components/agents/ChatBubbles';
@@ -19,9 +20,10 @@ interface EisEligibility {
   note?: string;
 }
 
-export default function RetrenchmentNavigatorPage() {
+function RetrenchmentNavigatorPageInner() {
   const { t } = useI18n();
-  const { start, continue: cont } = useAgentApi();
+  const { start, continue: cont, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [message, setMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -39,6 +41,36 @@ export default function RetrenchmentNavigatorPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Resume from History's "?run=<agent_runs.id>" link. No persisted chat
+  // transcript server-side (only the latest structured output), so this
+  // restores the structured summary panel + session_id (so a follow-up
+  // message continues the real thread) and adds one synthetic bot message
+  // rather than replaying every prior turn. Silent fallback to a fresh
+  // start on any failure (bad/expired link) rather than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        const out = (run.output as Record<string, unknown>) ?? {};
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        if (out.statutory_benefits) setStatutoryBenefits(out.statutory_benefits as StatutoryBenefits);
+        if (out.eis_eligibility) setEisEligibility(out.eis_eligibility as EisEligibility);
+        if (out.notice_period_status) setNoticePeriodStatus(String(out.notice_period_status));
+        if (Array.isArray(out.checklist)) setChecklist(out.checklist as string[]);
+        if (Array.isArray(out.warnings)) setWarnings(out.warnings as string[]);
+        setMessages((prev) => [
+          ...prev,
+          { id: 'resumed', role: 'bot', content: t('agents.retrenchment-navigator.result_ready') },
+        ]);
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const send = async (text?: string) => {
     const msg = text ?? message;
@@ -156,5 +188,13 @@ export default function RetrenchmentNavigatorPage() {
         </section>
       </motion.div>
     </>
+  );
+}
+
+export default function RetrenchmentNavigatorPage() {
+  return (
+    <Suspense>
+      <RetrenchmentNavigatorPageInner />
+    </Suspense>
   );
 }

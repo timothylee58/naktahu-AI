@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
@@ -140,9 +141,10 @@ function directionsUrl(facilityName: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facilityName)}`;
 }
 
-export default function HealthTriagePage() {
+function HealthTriagePageInner() {
   const { t } = useI18n();
-  const { start, post } = useAgentApi();
+  const { start, post, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('body');
   const [bodyArea, setBodyArea] = useState<BodyArea | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -221,6 +223,28 @@ export default function HealthTriagePage() {
     if (extraDetails.trim()) msg += `. ${extraDetails.trim()}`;
     return msg;
   };
+
+  // Resume from History's "?run=<agent_runs.id>" link — fetch the stored
+  // run and jump straight to the results view instead of the intake flow.
+  // Silently falls back to a fresh intake on any failure (bad/expired
+  // link, network error) rather than surfacing an error for what's often
+  // just a stale link — this is a convenience restore, not a page the
+  // user is blocked without.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        setOutput((run.output as Record<string, unknown>) ?? {});
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        setStep('review');
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submit = async () => {
     setLoading(true);
@@ -522,5 +546,13 @@ export default function HealthTriagePage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function HealthTriagePage() {
+  return (
+    <Suspense>
+      <HealthTriagePageInner />
+    </Suspense>
   );
 }

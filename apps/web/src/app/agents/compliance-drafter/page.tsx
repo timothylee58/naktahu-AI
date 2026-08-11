@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
@@ -115,9 +116,10 @@ function resolveAgentError(message: string, t: (key: string) => string): string 
   return mapApiErrorDetail(message, t);
 }
 
-export default function ComplianceDrafterPage() {
+function ComplianceDrafterPageInner() {
   const { t, locale } = useI18n();
-  const { start, post } = useAgentApi();
+  const { start, post, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('business');
   const [businessType, setBusinessType] = useState('sole_proprietor');
   const [domains, setDomains] = useState<string[]>(['tax', 'business', 'epf']);
@@ -139,6 +141,26 @@ export default function ComplianceDrafterPage() {
   const toggleDomain = (id: string) => {
     setDomains((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   };
+
+  // Resume from History's "?run=<agent_runs.id>" link — jump straight to
+  // the report preview instead of the intake flow. Silent fallback to a
+  // fresh intake on any failure (bad/expired link) rather than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        const output = (run.output as Record<string, unknown>) ?? {};
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        setReport((output.report_json as Record<string, unknown>) ?? output);
+        setStep('preview');
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startAgent = async () => {
     setLoading(true);
@@ -348,5 +370,13 @@ export default function ComplianceDrafterPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function ComplianceDrafterPage() {
+  return (
+    <Suspense>
+      <ComplianceDrafterPageInner />
+    </Suspense>
   );
 }

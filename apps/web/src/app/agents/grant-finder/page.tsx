@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
@@ -155,8 +156,9 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
   );
 }
 
-export default function GrantFinderPage() {
-  const { start, continue: cont } = useAgentApi();
+function GrantFinderPageInner() {
+  const { start, continue: cont, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [sector, setSector] = useState<string[]>([]);
   const [businessType, setBusinessType] = useState<string[]>([]);
   const [registeredMonths, setRegisteredMonths] = useState('');
@@ -204,6 +206,34 @@ export default function GrantFinderPage() {
       setPhase('chat');
     }
   };
+
+  // Resume from History's "?run=<agent_runs.id>" link. Note: this page's
+  // backend agent name is 'eligibility-agent' (grant-finder is the
+  // frontend-only slug — see agents.ts's backendName override), but the
+  // agent_runs row is already keyed by 'eligibility-agent' too (that's
+  // what _log_run was called with), so no extra name mapping is needed
+  // here. Reuses applyResult() so resumed sessions go through the exact
+  // same completed-vs-mid-intake branching a live response would. Silent
+  // fallback to a fresh intake on any failure (bad/expired link) rather
+  // than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        applyResult({
+          session_id: run.session_id,
+          status: run.completion_status,
+          awaiting_hitl: run.completion_status !== 'completed',
+          output: run.output,
+        });
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submitIntake = async () => {
     setLoading(true);
@@ -391,5 +421,13 @@ export default function GrantFinderPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function GrantFinderPage() {
+  return (
+    <Suspense>
+      <GrantFinderPageInner />
+    </Suspense>
   );
 }

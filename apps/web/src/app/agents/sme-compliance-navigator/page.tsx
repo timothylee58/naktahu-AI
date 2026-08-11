@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
@@ -48,9 +49,10 @@ const EVENT_OPTIONS: { id: string; labelKey: string }[] = [
   { id: 'first_time_hiring', labelKey: 'agents.sme-compliance-navigator.event.first_time_hiring' },
 ];
 
-export default function SmeComplianceNavigatorPage() {
+function SmeComplianceNavigatorPageInner() {
   const { t, locale } = useI18n();
-  const { start } = useAgentApi();
+  const { start, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [formStep, setFormStep] = useState<FormStep>('form');
   const [mode, setMode] = useState<Mode>('guided');
   const [businessProfile, setBusinessProfile] = useState('');
@@ -97,6 +99,27 @@ export default function SmeComplianceNavigatorPage() {
   }, [mode, businessProfile, businessType, sector, headcount, annualRevenue, events, t]);
 
   const canRun = mode === 'freetext' ? businessProfile.trim().length > 0 : composedProfile.trim().length > 0;
+
+  // Resume from History's "?run=<agent_runs.id>" link. This agent compiles
+  // its LangGraph with no checkpointer at all (single-shot) — no
+  // session_id/continue concept, just the stored checklist/warnings.
+  // Silent fallback to the fresh form on any failure (bad/expired link).
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        const out = (run.output as Record<string, unknown>) ?? {};
+        setChecklist((out.checklist as ChecklistItem[]) ?? []);
+        setDoneItems({});
+        setStaleWarnings((out.stale_warnings as string[]) ?? []);
+      } catch {
+        /* stale/invalid run id — stays on the fresh form */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const run = async () => {
     if (!canRun) return;
@@ -333,5 +356,13 @@ export default function SmeComplianceNavigatorPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function SmeComplianceNavigatorPage() {
+  return (
+    <Suspense>
+      <SmeComplianceNavigatorPageInner />
+    </Suspense>
   );
 }
