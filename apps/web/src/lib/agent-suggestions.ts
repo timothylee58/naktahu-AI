@@ -124,8 +124,13 @@ const DEFAULT_SUGGESTION: Suggestion = {
 
 /** Match free text against the keyword table. Case-insensitive substring
  * match on the raw query — good enough for a rule table this small, and
- * keeps this a pure, dependency-free function (easy to unit test). */
-export function suggestForQuery(query: string): Suggestion[] {
+ * keeps this a pure, dependency-free function (easy to unit test).
+ * Returns [] on no match — the DEFAULT_SUGGESTION fallback lives in
+ * suggestForQuery below, not here, since a live-typing consumer (the chat
+ * input's auto-routing banner) wants silence on a genuine non-match, not
+ * "try the Developer API" surfacing on every keystroke of an ordinary
+ * question. */
+export function matchAgentRules(query: string): Suggestion[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
 
@@ -144,5 +149,15 @@ export function suggestForQuery(query: string): Suggestion[] {
     }
   }
 
-  return matched.length > 0 ? matched.slice(0, 4) : [DEFAULT_SUGGESTION];
+  return matched.slice(0, 4);
+}
+
+/** Same matching, but with the DEFAULT_SUGGESTION fallback applied — used
+ * by the Profile page/popover, where showing *something* for any non-empty
+ * query is the intended UX (a deliberate "ask me anything, here's how" nudge
+ * rather than a live suggestion overlay). */
+export function suggestForQuery(query: string): Suggestion[] {
+  if (!query.trim()) return [];
+  const matched = matchAgentRules(query);
+  return matched.length > 0 ? matched : [DEFAULT_SUGGESTION];
 }

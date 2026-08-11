@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
@@ -8,6 +8,7 @@ import { useTheme } from '@/lib/theme';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { API_BASE } from '@/lib/api-base';
+import { WarungPriceChart, type PriceHistoryPoint } from '@/components/warung-watch/WarungPriceChart';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
@@ -62,6 +63,16 @@ export default function WarungWatchPage() {
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [status, setStatus] = useState<WarungStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
+  // Guards the whole loadStatus() call, not just its price-history
+  // sub-fetch (confirmed Bugbot finding, then a follow-on CodeRabbit
+  // finding that the token was created too late to guard the status
+  // fetch itself) — switching warungs quickly can let an older request's
+  // response resolve *after* a newer one and overwrite the UI with the
+  // wrong venue's status/chart. Each loadStatus() call bumps this and
+  // captures its own token up front; any state setter only applies if
+  // it's still the latest request by the time its response resolves.
+  const loadRequestRef = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -160,19 +171,41 @@ export default function WarungWatchPage() {
   }, [query, accessToken]);
 
   const loadStatus = async (name: string) => {
+    // Confirmed CodeRabbit finding: the token was previously created only
+    // after the status fetch resolved, so it guarded the price-history
+    // sub-fetch but not the status fetch itself — switching warungs
+    // quickly could still let an older loadStatus() call's status
+    // response win the race and overwrite a newer selection. Creating
+    // the token up front and guarding every state setter with it closes
+    // that gap for status/error/loading too, not just price history.
+    const requestToken = ++loadRequestRef.current;
     setStatusLoading(true);
     setError(null);
+    setPriceHistory([]);
     try {
       const res = await apiFetch(`/api/v1/warung-watch/status?name=${encodeURIComponent(name)}`, accessToken);
       if (!res.ok) throw new Error('fetch-failed');
       const data: WarungStatus = await res.json();
+      if (loadRequestRef.current !== requestToken) return;
       setStatus(data);
       setSelectedName(name);
       setSuggestions([]);
+      // Price history is a convenience add-on to the status card — a
+      // failure here shouldn't block the busyness status the user
+      // actually asked for, so it's fetched separately and not awaited
+      // as part of the try/catch above.
+      apiFetch(`/api/v1/warung-watch/price-history?name=${encodeURIComponent(name)}`, accessToken)
+        .then((r) => (r.ok ? r.json() : { history: [] }))
+        .then((d: { history: PriceHistoryPoint[] }) => {
+          if (loadRequestRef.current === requestToken) setPriceHistory(d.history);
+        })
+        .catch(() => {
+          /* chart just stays empty — see WarungPriceChart's empty-state handling */
+        });
     } catch {
-      setError(t('warung_watch.error.fetch'));
+      if (loadRequestRef.current === requestToken) setError(t('warung_watch.error.fetch'));
     } finally {
-      setStatusLoading(false);
+      if (loadRequestRef.current === requestToken) setStatusLoading(false);
     }
   };
 
@@ -372,6 +405,12 @@ export default function WarungWatchPage() {
               ) : (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('warung_watch.no_reports')}</p>
               )}
+            </section>
+          )}
+
+          {priceHistory.length > 0 && (
+            <section className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm dark:bg-white/5 dark:border-white/10">
+              <WarungPriceChart history={priceHistory} isDark={isDark} />
             </section>
           )}
 

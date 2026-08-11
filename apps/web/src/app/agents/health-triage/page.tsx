@@ -142,7 +142,7 @@ function directionsUrl(facilityName: string): string {
 
 export default function HealthTriagePage() {
   const { t } = useI18n();
-  const { start } = useAgentApi();
+  const { start, post } = useAgentApi();
   const [step, setStep] = useState<Step>('body');
   const [bodyArea, setBodyArea] = useState<BodyArea | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -151,8 +151,11 @@ export default function HealthTriagePage() {
   const [redFlagAnswers, setRedFlagAnswers] = useState<Record<string, boolean | null>>({});
   const [extraDetails, setExtraDetails] = useState('');
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportUrl, setExportUrl] = useState<string | null>(null);
 
   const symptomOptions = useMemo(() => (bodyArea ? SYMPTOMS_BY_AREA[bodyArea] : []), [bodyArea]);
   const allSymptomLabels = useMemo(
@@ -225,10 +228,25 @@ export default function HealthTriagePage() {
     try {
       const res = await start('health-triage', { message: buildMessage(), language: 'bm' });
       setOutput((res.output as Record<string, unknown>) ?? res);
+      setSessionId(typeof res.session_id === 'string' ? res.session_id : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ralat berlaku');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    if (!sessionId) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const res = await post(`/api/v1/agents/health-triage/${sessionId}/export`, {});
+      setExportUrl(typeof res.signed_url === 'string' ? res.signed_url : null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ralat berlaku');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -241,6 +259,8 @@ export default function HealthTriagePage() {
     setRedFlagAnswers({});
     setExtraDetails('');
     setOutput(null);
+    setSessionId(null);
+    setExportUrl(null);
     setError(null);
   };
 
@@ -466,6 +486,30 @@ export default function HealthTriagePage() {
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 p-3 rounded-xl dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
               {String(output.disclaimer)}
             </p>
+
+            {sessionId && (
+              <div className="flex items-center gap-3">
+                {exportUrl ? (
+                  <a
+                    href={exportUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {t('agents.health-triage.download')}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void exportPdf()}
+                    disabled={exporting}
+                    className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400 disabled:opacity-40"
+                  >
+                    {exporting ? t('agents.health-triage.exporting') : t('agents.health-triage.export_pdf')}
+                  </button>
+                )}
+              </div>
+            )}
 
             <button
               type="button"

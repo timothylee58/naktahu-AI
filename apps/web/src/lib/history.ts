@@ -91,6 +91,31 @@ export async function renameHistoryEntry(
   }
 }
 
+export interface AgentRunEntry {
+  id: string;
+  agent_name: string;
+  session_id: string | null;
+  output: Record<string, unknown>;
+  completion_status: string;
+  turns_count: number;
+  created_at: string;
+}
+
+/** Fetch past vertical-agent runs (drafts, checklists, eligibility
+ * results) — GET /api/v1/agent-runs, plain-auth (not pro-gated like
+ * /history above), since the underlying agents span every plan tier. */
+export async function fetchAgentRunsAuthed(supabase: SupabaseClient): Promise<AgentRunEntry[]> {
+  const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/agent-runs`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch agent run history (${res.status})`);
+  }
+  return res.json() as Promise<AgentRunEntry[]>;
+}
+
+export function agentRunsPageKey(userId: string): readonly ['agent-runs-page', string] {
+  return ['agent-runs-page', userId];
+}
+
 /** sessionStorage key used to hand a clicked HistoryEntry off to /chat for
  * reconstruction as real chat bubbles (see history/page.tsx + chat/page.tsx).
  * sessionStorage (not a URL param) since a full response_text can be long. */

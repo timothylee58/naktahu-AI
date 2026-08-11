@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import {
   KeyboardEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -13,6 +15,13 @@ import {
   contextUsagePercent,
   formatContextUsage,
 } from '@/lib/context-window';
+import { matchAgentRules, type AgentSuggestion } from '@/lib/agent-suggestions';
+
+// Below this length, a keyword substring match is more likely noise than
+// real intent ("tax" alone shouldn't redirect someone mid-sentence) — the
+// same reasoning as agent-suggestions.ts's own empty-string guard, just
+// applied to a live-typing consumer instead of a submitted query.
+const MIN_CHARS_FOR_LIVE_SUGGESTION = 6;
 
 interface ChatInputProps {
   onSend: (query: string) => void;
@@ -49,6 +58,23 @@ export function ChatInput({
   const voiceLang = locale === 'ms' ? 'ms-MY' : locale === 'zh' ? 'zh-MY' : 'en-MY';
   const { isListening, transcript, error: voiceError, startListening, stopListening, available } =
     useVoiceInput({ language: voiceLang });
+
+  // Smart auto-routing: surface a matching vertical agent while the user is
+  // still typing, rather than only after they submit and get a general-RAG
+  // answer. Only the first agent-kind match is shown (not the API
+  // suggestion agent-suggestions.ts also returns for some rules) — a
+  // multi-card banner above the input would compete with the input itself
+  // for attention. Dismissed by slug, not a plain boolean, so a dismissal
+  // doesn't also suppress a *different* agent match later in the same typed
+  // sentence.
+  const liveSuggestion = useMemo<AgentSuggestion | null>(() => {
+    const trimmed = value.trim();
+    if (trimmed.length < MIN_CHARS_FOR_LIVE_SUGGESTION) return null;
+    const match = matchAgentRules(trimmed).find((s): s is AgentSuggestion => s.kind === 'agent');
+    return match ?? null;
+  }, [value]);
+  const [dismissedSlug, setDismissedSlug] = useState<string | null>(null);
+  const showSuggestionBanner = liveSuggestion !== null && liveSuggestion.slug !== dismissedSlug && !isStreaming;
 
   useEffect(() => {
     if (transcript) setValue(transcript);
@@ -135,6 +161,32 @@ export function ChatInput({
 
   return (
     <div className="flex flex-col gap-1.5 w-full">
+    {showSuggestionBanner && liveSuggestion && (
+      <div
+        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${
+          isDark ? 'border-blue-500/30 bg-blue-500/10 text-blue-200' : 'border-blue-200 bg-blue-50 text-blue-800'
+        }`}
+      >
+        <span aria-hidden>💡</span>
+        <span className="flex-1 locale-text-balance">
+          {t('chat.suggestion.intro').replace('{agent}', t(liveSuggestion.titleKey))}
+        </span>
+        <Link
+          href={liveSuggestion.href}
+          className="flex-shrink-0 font-semibold underline-offset-2 hover:underline locale-nowrap"
+        >
+          {t('chat.suggestion.open')} →
+        </Link>
+        <button
+          type="button"
+          onClick={() => setDismissedSlug(liveSuggestion.slug)}
+          aria-label={t('chat.suggestion.dismiss')}
+          className="flex-shrink-0 opacity-60 hover:opacity-100"
+        >
+          ✕
+        </button>
+      </div>
+    )}
     <div className={`flex items-end gap-2 border rounded-2xl px-3 py-2 ${shellClass}`}>
       <span className={`flex-shrink-0 text-[10px] font-semibold rounded-full px-2 py-0.5 mb-1 select-none ${langBadgeClass}`}>
         {langLabel}

@@ -14,6 +14,7 @@ from app.services.agent_runner import (
     AGENT_START_HANDLERS,
     AGENT_STATUS_HANDLERS,
     CREDIT_ON_COMPLETE_AGENTS,
+    export_health_triage,
     get_compliance_status,
 )
 from middleware.plan_gate import require_plan
@@ -248,6 +249,33 @@ async def compliance_preview(
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"session_id": session_id, "report": status.get("report_json") or status.get("output")}
+
+
+@router.post("/health-triage/{session_id}/export")
+async def export_health_triage_pdf(
+    session_id: str,
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """On-demand PDF export of a completed Health Triage session. Health
+    Triage's graph has no HITL confirm step (unlike compliance-drafter/
+    grant-draft-generator, which generate their PDF as part of the graph
+    flow itself) — export here is a separate call after the fact instead,
+    so this doesn't re-run the graph or the LLM, just formats state that's
+    already there."""
+    _require_agent_access("health-triage", user)
+    sb = getattr(request.app.state, "supabase", None)
+    if not sb:
+        raise HTTPException(status_code=503, detail="Export is temporarily unavailable.")
+    try:
+        return await export_health_triage(
+            session_id=session_id,
+            checkpointer=_checkpointer(request),
+            supabase_client=sb,
+            user_id=user.user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/{agent_name}/documents")
