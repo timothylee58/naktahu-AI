@@ -8,6 +8,7 @@ import { useTheme } from '@/lib/theme';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { API_BASE } from '@/lib/api-base';
+import { WarungPriceChart, type PriceHistoryPoint } from '@/components/warung-watch/WarungPriceChart';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
@@ -62,6 +63,7 @@ export default function WarungWatchPage() {
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [status, setStatus] = useState<WarungStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -169,6 +171,17 @@ export default function WarungWatchPage() {
       setStatus(data);
       setSelectedName(name);
       setSuggestions([]);
+      // Price history is a convenience add-on to the status card — a
+      // failure here shouldn't block the busyness status the user
+      // actually asked for, so it's fetched separately and not awaited
+      // as part of the try/catch above.
+      setPriceHistory([]);
+      apiFetch(`/api/v1/warung-watch/price-history?name=${encodeURIComponent(name)}`, accessToken)
+        .then((r) => (r.ok ? r.json() : { history: [] }))
+        .then((d: { history: PriceHistoryPoint[] }) => setPriceHistory(d.history))
+        .catch(() => {
+          /* chart just stays empty — see WarungPriceChart's empty-state handling */
+        });
     } catch {
       setError(t('warung_watch.error.fetch'));
     } finally {
@@ -372,6 +385,12 @@ export default function WarungWatchPage() {
               ) : (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('warung_watch.no_reports')}</p>
               )}
+            </section>
+          )}
+
+          {priceHistory.length > 0 && (
+            <section className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm dark:bg-white/5 dark:border-white/10">
+              <WarungPriceChart history={priceHistory} isDark={isDark} />
             </section>
           )}
 
