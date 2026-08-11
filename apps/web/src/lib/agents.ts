@@ -87,3 +87,14 @@ export function agentDescKey(slug: string): string {
 export function agentPlanKey(planKey: AgentPlanKey): string {
   return `agents.plan.${planKey}`;
 }
+
+/** Reverse-lookup from a backend agent_runs.agent_name value (e.g.
+ * "eligibility-agent") to the frontend slug/href (e.g. "grant-finder") —
+ * needed by the agent-run history list, which only has the backend name
+ * to work with. Falls back to treating the name as already-a-slug when no
+ * WIRED_AGENTS entry overrides it (true for every agent except
+ * grant-finder today). */
+export function agentSlugFromBackendName(backendName: string): string {
+  const match = WIRED_AGENTS.find((a) => a.backendName === backendName);
+  return match?.slug ?? backendName;
+}

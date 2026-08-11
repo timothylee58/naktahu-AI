@@ -1,14 +1,15 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from middleware.plan_gate import require_plan
 from middleware.rate_limit import apply_query_rate_limit
 from routers._request_fields import Domain, Language, normalise_language
-from services.auth import UserContext
+from services.auth import UserContext, get_current_user
 from services.history import (
     delete_session_entry,
+    fetch_agent_run_history,
     fetch_history_entries,
     persist_session_entry,
     rename_session_entry,
@@ -110,3 +111,33 @@ async def rename_history_entry(
     if not renamed:
         raise HTTPException(404, "History entry not found")
     return {"status": "renamed"}
+
+
+@router.get("/agent-runs")
+@apply_query_rate_limit()
+async def get_agent_run_history(
+    request: Request,
+    response: Response,
+    user: Annotated[UserContext, Depends(get_current_user)],
+    agent_name: Optional[str] = Query(None, max_length=64),
+    limit: int = Query(20, ge=1, le=50),
+):
+    """Past vertical-agent runs (drafts, checklists, eligibility results) —
+    distinct from /history's chat Q&A transcript above. Gated by plain
+    auth (any signed-in user), not require_plan("pro") like /history: the
+    underlying agents span every plan tier (health-triage and
+    retrenchment-navigator are free), so a free-tier user must still be
+    able to see their own past free-agent output. The rows themselves are
+    real, previously-logged runs — agent_runner.py's _log_run() has been
+    writing every start/continue call to `agent_runs` all along; this is
+    the first endpoint that reads it back.
+    """
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Agent run history is temporarily unavailable")
+    return await fetch_agent_run_history(
+        supabase_client=supabase_client,
+        user_id=user.user_id,
+        agent_name=agent_name,
+        limit=limit,
+    )

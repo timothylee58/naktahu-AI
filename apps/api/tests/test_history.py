@@ -657,3 +657,80 @@ def test_rename_history_entry_503_when_supabase_degraded(client, monkeypatch):
     monkeypatch.setattr(api_main.app.state, "supabase", None)
     res = c.patch("/api/v1/history/abc-123", json={"title": "New title"}, headers=_auth_header())
     assert res.status_code == 503
+
+
+# ── GET /api/v1/agent-runs ─────────────────────────────────────────────
+# Plain-auth (not require_plan("pro")) since the underlying agents span
+# every plan tier — a free-tier health-triage/retrenchment-navigator user
+# must still see their own past output.
+
+_AGENT_RUN_ROW = {
+    "id": "run-1",
+    "agent_name": "retrenchment-navigator",
+    "session_id": "sess-1",
+    "output": {"checklist": ["File EIS claim"], "status": "completed"},
+    "completion_status": "completed",
+    "turns_count": 3,
+    "created_at": "2024-01-01T00:00:00Z",
+}
+
+
+def test_get_agent_runs_401_without_auth(client):
+    c, *_ = client
+    res = c.get("/api/v1/agent-runs")
+    assert res.status_code == 401
+
+
+def test_get_agent_runs_200_for_free_plan_user(client):
+    """Confirms this endpoint is NOT plan-gated like /history — a free-tier
+    user must be able to list their own agent runs."""
+    c, redis_client, sb, _ = client
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[_AGENT_RUN_ROW]
+    )
+    res = c.get("/api/v1/agent-runs", headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 200, res.text
+    assert res.json() == [_AGENT_RUN_ROW]
+
+
+def test_get_agent_runs_filters_by_agent_name(client):
+    c, redis_client, sb, _ = client
+    table_mock = sb.table.return_value
+    # Two `.eq()` calls in the chain when agent_name is passed (user_id,
+    # then agent_name) — distinct from the single-.eq() chain the other
+    # /history tests configure.
+    table_mock.select.return_value.eq.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[_AGENT_RUN_ROW]
+    )
+    res = c.get(
+        "/api/v1/agent-runs",
+        params={"agent_name": "retrenchment-navigator"},
+        headers=_auth_header(sub="free-user", plan="free"),
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == [_AGENT_RUN_ROW]
+
+
+def test_get_agent_runs_rejects_out_of_range_limit(client):
+    c, *_ = client
+    res = c.get("/api/v1/agent-runs", params={"limit": 999}, headers=_auth_header())
+    assert res.status_code == 422
+
+
+def test_get_agent_runs_503_when_supabase_degraded(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.get("/api/v1/agent-runs", headers=_auth_header())
+    assert res.status_code == 503
+
+
+def test_get_agent_runs_degrades_to_empty_list_on_fetch_error(client):
+    c, redis_client, sb, _ = client
+    table_mock = sb.table.return_value
+    table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.side_effect = RuntimeError(
+        "connection reset"
+    )
+    res = c.get("/api/v1/agent-runs", headers=_auth_header(sub="free-user", plan="free"))
+    assert res.status_code == 200, res.text
+    assert res.json() == []

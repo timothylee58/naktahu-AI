@@ -19,6 +19,7 @@ import { canAccessHistory } from '@/lib/auth-plan';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { useTheme } from '@/lib/theme';
+import { AgentRunHistorySection } from '@/components/history/AgentRunHistorySection';
 
 const DAY_MS = 86_400_000;
 
@@ -188,6 +189,15 @@ export default function HistoryPage() {
 
         <main className="flex-1 px-4 py-6 max-w-2xl w-full mx-auto flex flex-col gap-6">
           <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{t('history.title')}</h1>
+
+          {/* Agent-run history is intentionally NOT behind canAccessHistory's
+              pro-gate below — it spans every plan tier (health-triage and
+              retrenchment-navigator are free), so a free user must still see
+              their own past agent output even while the chat-history section
+              beneath shows the pro-upsell state. */}
+          {ready && user && userId && (
+            <AgentRunHistorySection supabase={supabase} userId={userId} isDark={isDark} />
+          )}
 
           {!ready ? (
             <div className="flex flex-col gap-3">

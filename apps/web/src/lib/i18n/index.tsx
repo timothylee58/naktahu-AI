@@ -267,6 +267,11 @@ const MS: Translations = {
 
   /* ── history ── */
   'history.title': 'Sejarah Soalan',
+  'history.agent_runs.title': 'Sejarah Ejen AI',
+  'history.agent_runs.turns': '{n} giliran',
+  'history.agent_runs.status.completed': 'Selesai',
+  'history.agent_runs.status.awaiting_hitl': 'Menunggu pengesahan',
+  'history.agent_runs.status.running': 'Sedang berjalan',
   'history.empty': 'Tiada sejarah lagi.',
   'history.sign_in_prompt': 'Daftar masuk untuk simpan sejarah soalan anda.',
   'history.group.today': 'Hari ini',
@@ -896,6 +901,11 @@ const EN: Translations = {
 
   /* ── history ── */
   'history.title': 'Query History',
+  'history.agent_runs.title': 'AI Agent History',
+  'history.agent_runs.turns': '{n} turns',
+  'history.agent_runs.status.completed': 'Completed',
+  'history.agent_runs.status.awaiting_hitl': 'Awaiting confirmation',
+  'history.agent_runs.status.running': 'In progress',
   'history.empty': 'No history yet.',
   'history.sign_in_prompt': 'Sign in to save your query history.',
   'history.group.today': 'Today',
@@ -1524,6 +1534,11 @@ const ZH: Translations = {
 
   /* ── history ── */
   'history.title': '查询历史',
+  'history.agent_runs.title': 'AI 代理历史',
+  'history.agent_runs.turns': '{n} 轮对话',
+  'history.agent_runs.status.completed': '已完成',
+  'history.agent_runs.status.awaiting_hitl': '待确认',
+  'history.agent_runs.status.running': '进行中',
   'history.empty': '暂无历史记录。',
   'history.sign_in_prompt': '登录以保存您的查询历史。',
   'history.group.today': '今天',

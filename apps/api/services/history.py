@@ -281,3 +281,45 @@ async def rename_session_entry(
     if updated:
         await _invalidate_redis_cache(redis_client, user_id)
     return bool(updated)
+
+
+async def fetch_agent_run_history(
+    *,
+    supabase_client: Client | None,
+    user_id: str,
+    agent_name: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Real, previously-logged vertical-agent runs (agent_runner.py's
+    _log_run() already writes every start/continue call to `agent_runs` —
+    this is the first read path for that table). Distinct from the
+    query/chat history above: this is structured agent output (drafts,
+    checklists, eligibility results), not a Q&A transcript, so it's a
+    separate table and a separate fetch rather than folded into
+    fetch_history_entries().
+
+    No Redis cache layer — agent_runs is already the durable source with
+    no separate fast-path cache to keep in sync, and this is a low-volume
+    read (one user's own history page), unlike the chat-history endpoint's
+    higher read/write ratio.
+    """
+    if supabase_client is None:
+        logger.warning("agent_run_history_supabase_unavailable")
+        return []
+
+    def _fetch() -> list[dict[str, Any]]:
+        query = (
+            supabase_client.table("agent_runs")
+            .select("id,agent_name,session_id,output,completion_status,turns_count,created_at")
+            .eq("user_id", user_id)
+        )
+        if agent_name:
+            query = query.eq("agent_name", agent_name)
+        res = query.order("created_at", desc=True).limit(limit).execute()
+        return res.data or []
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as exc:
+        logger.warning("agent_run_history_fetch_failed", error=str(exc), user_id=user_id)
+        return []
