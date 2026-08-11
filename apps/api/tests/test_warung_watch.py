@@ -18,6 +18,7 @@ from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
 from core.warung_watch import rank_candidates, select_best_match
 from services.warung_watch import (
+    create_checkin,
     find_best_warung_match,
     get_or_create_warung,
     get_status,
@@ -552,3 +553,83 @@ def test_nearby_rate_limit_boundary(client, monkeypatch):
         assert res.status_code == 200, res.text
     res = c.get("/api/v1/warung-watch/nearby", params=params)
     assert res.status_code == 429, res.text
+
+
+# ── checkin price field (033_warung_checkin_price.sql) ───────────────────
+
+def test_checkin_with_price_pair_accepted(client):
+    c, sb, warungs_table, checkins_table = client
+    res = c.post(
+        "/api/v1/warung-watch/checkin",
+        json=_checkin_body(price_item="Nasi Lemak", price_myr=5.5),
+    )
+    assert res.status_code == 201, res.text
+    inserted_checkin = checkins_table.insert.call_args[0][0]
+    assert inserted_checkin["price_item"] == "Nasi Lemak"
+    assert inserted_checkin["price_myr"] == 5.5
+
+
+def test_checkin_without_price_omits_pair(client):
+    c, sb, warungs_table, checkins_table = client
+    res = c.post("/api/v1/warung-watch/checkin", json=_checkin_body())
+    assert res.status_code == 201, res.text
+    inserted_checkin = checkins_table.insert.call_args[0][0]
+    assert inserted_checkin["price_item"] is None
+    assert inserted_checkin["price_myr"] is None
+
+
+def test_checkin_rejects_half_filled_price_pair(client):
+    c, *_ = client
+    res = c.post("/api/v1/warung-watch/checkin", json=_checkin_body(price_myr=5.5))
+    assert res.status_code == 422, res.text
+    res = c.post("/api/v1/warung-watch/checkin", json=_checkin_body(price_item="Nasi Lemak"))
+    assert res.status_code == 422, res.text
+
+
+def test_checkin_rejects_negative_price(client):
+    c, *_ = client
+    res = c.post(
+        "/api/v1/warung-watch/checkin",
+        json=_checkin_body(price_item="Nasi Lemak", price_myr=-1),
+    )
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.asyncio
+async def test_create_checkin_service_rejects_half_filled_price_pair():
+    sb = MagicMock()
+    with pytest.raises(ValueError):
+        await create_checkin(
+            supabase_client=sb,
+            warung_id="warung-1",
+            status="packed",
+            reporter_id=None,
+            anon_session_id=None,
+            price_item="Nasi Lemak",
+            price_myr=None,
+        )
+
+
+# ── GET /price-history ────────────────────────────────────────────────────
+
+def test_price_history_returns_empty_for_unmatched_warung(client):
+    c, sb, warungs_table, checkins_table = client
+    warungs_table.select.return_value.ilike.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+    res = c.get("/api/v1/warung-watch/price-history", params={"name": "Nonexistent"})
+    assert res.status_code == 200, res.text
+    assert res.json() == {"warung": None, "history": []}
+
+
+def test_price_history_returns_priced_checkins(client):
+    c, sb, warungs_table, checkins_table = client
+    priced_rows = [
+        {"price_item": "Nasi Lemak", "price_myr": 5.5, "created_at": "2024-01-01T00:00:00Z"},
+    ]
+    checkins_table.select.return_value.eq.return_value.not_.is_.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=priced_rows
+    )
+    res = c.get("/api/v1/warung-watch/price-history", params={"name": "Pelita"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["warung"]["name"] == "Pelita"
+    assert body["history"] == priced_rows

@@ -65,6 +65,10 @@ export default function WarungWatchPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Optional price report attached to a check-in — both must be filled to
+  // submit (033_warung_checkin_price.sql's pair constraint).
+  const [priceItem, setPriceItem] = useState('');
+  const [priceMyr, setPriceMyr] = useState('');
 
   // "Nearby warungs" via the free browser Geolocation API + a Google Maps
   // search URL centered on the user's coords — no Google Places API key
@@ -175,6 +179,14 @@ export default function WarungWatchPage() {
   const submitCheckin = async (checkinStatus: Status) => {
     const name = (selectedName ?? query).trim();
     if (!name) return;
+    // Price report is optional and both fields must be filled together —
+    // mirrors 033_warung_checkin_price.sql's warung_checkins_price_pair_chk
+    // constraint. Silently drop a half-filled pair rather than let the
+    // backend 422 on a field the user never meant to submit.
+    const trimmedPriceItem = priceItem.trim();
+    const parsedPrice = priceMyr.trim() ? Number(priceMyr) : null;
+    const hasCompletePricePair = trimmedPriceItem !== '' && parsedPrice !== null && !Number.isNaN(parsedPrice);
+
     setSubmitting(true);
     setError(null);
     try {
@@ -184,10 +196,13 @@ export default function WarungWatchPage() {
           name,
           status: checkinStatus,
           anon_session_id: localStorage.getItem(ANON_SESSION_KEY),
+          ...(hasCompletePricePair ? { price_item: trimmedPriceItem, price_myr: parsedPrice } : {}),
         }),
       });
       if (!res.ok) throw new Error('submit-failed');
       setSubmitted(true);
+      setPriceItem('');
+      setPriceMyr('');
       await loadStatus(name);
     } catch {
       setError(t('warung_watch.error.submit'));
@@ -377,6 +392,34 @@ export default function WarungWatchPage() {
                 </button>
               ))}
             </div>
+
+            <div className="pt-1 border-t border-zinc-100 dark:border-white/10">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1.5 mt-2">
+                {t('warung_watch.price_label')}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={priceItem}
+                  onChange={(e) => setPriceItem(e.target.value)}
+                  placeholder={t('warung_watch.price_item_placeholder')}
+                  maxLength={80}
+                  className="flex-1 min-w-0 border border-zinc-200 rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:border-orange-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+                />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step={0.1}
+                  value={priceMyr}
+                  onChange={(e) => setPriceMyr(e.target.value)}
+                  placeholder="RM"
+                  className="w-20 border border-zinc-200 rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:border-orange-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+                />
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-1">{t('warung_watch.price_hint')}</p>
+            </div>
+
             {submitted && (
               <p className="text-xs text-green-600 dark:text-green-400">{t('warung_watch.checkin_success')}</p>
             )}
