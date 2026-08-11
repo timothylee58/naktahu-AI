@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
@@ -64,6 +64,13 @@ export default function WarungWatchPage() {
   const [status, setStatus] = useState<WarungStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
+  // Guards against the confirmed Bugbot race: price-history is fetched as
+  // a detached (non-awaited) promise per loadStatus() call, so switching
+  // warungs quickly can let an older request's response resolve *after* a
+  // newer one and overwrite the chart with the wrong venue's points. Each
+  // loadStatus() call bumps this and captures its own token; a resolving
+  // fetch only applies setPriceHistory if it's still the latest request.
+  const priceRequestRef = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -176,9 +183,12 @@ export default function WarungWatchPage() {
       // actually asked for, so it's fetched separately and not awaited
       // as part of the try/catch above.
       setPriceHistory([]);
+      const requestToken = ++priceRequestRef.current;
       apiFetch(`/api/v1/warung-watch/price-history?name=${encodeURIComponent(name)}`, accessToken)
         .then((r) => (r.ok ? r.json() : { history: [] }))
-        .then((d: { history: PriceHistoryPoint[] }) => setPriceHistory(d.history))
+        .then((d: { history: PriceHistoryPoint[] }) => {
+          if (priceRequestRef.current === requestToken) setPriceHistory(d.history);
+        })
         .catch(() => {
           /* chart just stays empty — see WarungPriceChart's empty-state handling */
         });

@@ -20,9 +20,26 @@ interface AgentRunHistorySectionProps {
 
 const STATUS_STYLE: Record<string, string> = {
   completed: 'text-green-600 dark:text-green-400',
+  explained: 'text-green-600 dark:text-green-400',
   awaiting_hitl: 'text-amber-600 dark:text-amber-400',
+  needs_input: 'text-amber-600 dark:text-amber-400',
   running: 'text-zinc-500 dark:text-zinc-400',
+  no_questions: 'text-zinc-500 dark:text-zinc-400',
+  error: 'text-red-600 dark:text-red-400',
 };
+
+// t() falls back to returning the raw key string when a translation is
+// missing (see useI18n's implementation) — with completion_status values
+// coming straight from each agent's own node code (confirmed: completed,
+// explained, needs_input, no_questions, awaiting_hitl, plus whatever an
+// agent might set on error), a status this component doesn't have a
+// specific label for must fall back to a generic "unknown" label instead
+// of rendering "history.agent_runs.status.some_new_value" as visible text.
+function statusLabel(t: (key: string) => string, status: string): string {
+  const key = `history.agent_runs.status.${status}`;
+  const resolved = t(key);
+  return resolved === key ? t('history.agent_runs.status.unknown') : resolved;
+}
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -84,7 +101,7 @@ export function AgentRunHistorySection({ supabase, userId, isDark }: AgentRunHis
                     {t(agentTitleKey(slug))}
                   </span>
                   <span className={`text-[10px] font-semibold uppercase ${statusClass}`}>
-                    {t(`history.agent_runs.status.${run.completion_status}`)}
+                    {statusLabel(t, run.completion_status)}
                   </span>
                 </div>
                 <span className={`text-xs ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
