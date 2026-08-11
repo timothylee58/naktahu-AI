@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
+
 // Next.js's top-level error boundary — the only one that can catch a
 // rendering error thrown by the root layout itself (a regular error.tsx
 // can't, since it renders *inside* the layout). Required reading for
@@ -10,14 +13,22 @@
 // This replaces the root <html>/<body> (the root layout is gone by the
 // time this renders), so it can't reach useI18n/ThemeProvider/etc. — kept
 // deliberately static and dependency-free, in both languages inline
-// rather than through the i18n key table.
-
+// rather than through the i18n key table. Sentry.captureException is safe
+// to call here even without sentry.client.config.ts's DSN guard having
+// run — Sentry.init() no-ops captureException when it was never
+// initialised (no DSN / invalid DSN, see src/lib/sentry-dsn.ts), so this
+// never throws on top of the error it's reporting.
 export default function GlobalError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body

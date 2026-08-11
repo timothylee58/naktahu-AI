@@ -12,10 +12,13 @@ import { useI18n } from '@/lib/i18n';
 // title}) from CitationChip.tsx, but the URLs point at each agency's real
 // public domain (hasil.gov.my, kwsp.gov.my) rather than a synthetic link,
 // since those domains are public, stable facts, not runtime-verified
-// per-document URLs the way live citations are.
+// per-document URLs the way live citations are. Titles are looked up
+// through i18n (titleKey) rather than hardcoded — confirmed Cursor Bugbot
+// finding: they stayed in Malay regardless of landing-page locale while
+// demo_query/demo_answer correctly followed it.
 const DEMO_CITATIONS = [
-  { ministry: 'LHDN', title: 'Jadual Pelepasan Cukai 2024', url: 'https://www.hasil.gov.my' },
-  { ministry: 'KWSP', title: 'Garis Panduan Caruman', url: 'https://www.kwsp.gov.my' },
+  { ministry: 'LHDN', titleKey: 'landing.preview.citation.lhdn', url: 'https://www.hasil.gov.my' },
+  { ministry: 'KWSP', titleKey: 'landing.preview.citation.kwsp', url: 'https://www.kwsp.gov.my' },
 ] as const;
 
 interface InteractiveAnswerPreviewProps {
@@ -99,7 +102,7 @@ export function InteractiveAnswerPreview({ isDark = true }: InteractiveAnswerPre
               >
                 <span className="font-semibold">{c.ministry}</span>
                 <span className="opacity-70">·</span>
-                <span>{c.title}</span>
+                <span>{t(c.titleKey)}</span>
               </a>
             ))}
           </div>

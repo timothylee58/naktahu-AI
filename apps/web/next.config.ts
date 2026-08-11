@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Lets the Next.js dev server accept requests proxied through a preview
+  // iframe on a different origin (e.g. Cloud Run-style *.run.app preview
+  // hosts some sandboxed dev environments route through) without Next's
+  // built-in cross-origin dev-request guard rejecting them. Harmless in
+  // production — this option only affects `next dev`.
+  allowedDevOrigins: ['*.run.app', 'localhost:3000'],
+
   // Security headers applied to every route (augmented by Vercel headers in vercel.json)
   async headers() {
     return [
