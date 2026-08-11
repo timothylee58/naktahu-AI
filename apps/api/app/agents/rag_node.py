@@ -14,11 +14,18 @@ from app.services.llm_client import (
     ilmu_client,
     openai_client,
 )
+from app.services.reranker import rerank_chunks, rerank_enabled
 from app.services.vector_store import ChunkResult, hybrid_search
 
 log = structlog.get_logger(__name__)
 
 _CACHE_TTL = 3600
+_FINAL_CHUNK_COUNT = 5
+# Wider than _FINAL_CHUNK_COUNT only when reranking is on — the reranker
+# needs a real pool to choose from; when it's off, requesting the wider
+# pool from hybrid_search would just waste DB work for chunks nothing
+# reads, so this only takes effect behind the RERANK_ENABLED flag below.
+_RERANK_CANDIDATE_POOL = 12
 
 
 def _cache_key(query: str, language: str, domain: str | None) -> str:
@@ -101,9 +108,11 @@ async def rag_node(state: AgentState) -> dict:
 
     # Cache miss — generate embedding and search
     log.info("rag_cache_miss", key=key[:16])
+    do_rerank = rerank_enabled()
+    search_limit = _RERANK_CANDIDATE_POOL if do_rerank else _FINAL_CHUNK_COUNT
     try:
         embedding = await _embed(query)
-        chunks = await hybrid_search(query, embedding, domain=domain, limit=5)
+        chunks = await hybrid_search(query, embedding, domain=domain, limit=search_limit)
         # Recall fallback: hybrid_search hard-filters on dc.domain = domain_filter,
         # so a single misclassified domain from router_node (e.g. a tax question
         # tagged "government") returns zero chunks — the user then sees a
@@ -112,7 +121,12 @@ async def rag_node(state: AgentState) -> dict:
         # domain can still surface and be ranked by vector similarity.
         if not chunks and domain is not None:
             log.info("rag_domain_fallback", domain=domain)
-            chunks = await hybrid_search(query, embedding, domain=None, limit=5)
+            chunks = await hybrid_search(query, embedding, domain=None, limit=search_limit)
+
+        if do_rerank and chunks:
+            chunks = await rerank_chunks(query=query, chunks=chunks, top_n=_FINAL_CHUNK_COUNT)
+        else:
+            chunks = chunks[:_FINAL_CHUNK_COUNT]
     except Exception as exc:
         log.warning("rag_retrieval_failed", error=str(exc))
         return {"retrieved_chunks": []}
