@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Lets the Next.js dev server accept requests proxied through a preview
+  // iframe on a different origin (e.g. Cloud Run-style *.run.app preview
+  // hosts some sandboxed dev environments route through) without Next's
+  // built-in cross-origin dev-request guard rejecting them. Harmless in
+  // production — this option only affects `next dev`.
+  allowedDevOrigins: ['*.run.app', 'localhost:3000'],
+
   // Security headers applied to every route (augmented by Vercel headers in vercel.json)
   async headers() {
     return [
@@ -47,9 +54,20 @@ const nextConfig: NextConfig = {
 
 // Wrap with Sentry only when NEXT_PUBLIC_SENTRY_DSN is set so local dev
 // without a DSN still works without the @sentry/nextjs package being required
-// at build time.
+// at build time. Validated the same way as sentry.*.config.ts — a
+// truthiness check alone let a placeholder value like "your_sentry_dsn_here"
+// through, and withSentryConfig() would then fail on it at build time
+// instead of degrading gracefully like an unset var does. Inlined rather
+// than importing src/lib/sentry-dsn.ts: next.config.ts runs through Next's
+// own config loader before path aliases are set up, so the "@/*" import
+// isn't reliably resolvable here.
+const SENTRY_DSN_PATTERN = /^https:\/\/[a-f0-9]+@[a-z0-9.-]+\/\d+$/i;
+function isValidSentryDsn(dsn: string | undefined): dsn is string {
+  return !!dsn && SENTRY_DSN_PATTERN.test(dsn.trim());
+}
+
 async function buildConfig(): Promise<NextConfig> {
-  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  if (!isValidSentryDsn(process.env.NEXT_PUBLIC_SENTRY_DSN)) {
     return nextConfig;
   }
   try {

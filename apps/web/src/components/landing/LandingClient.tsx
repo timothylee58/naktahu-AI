@@ -7,6 +7,10 @@ import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatures } from './LandingFeatures';
+import { AgencyTrustGrid } from './AgencyTrustGrid';
+import { AgentSpotlight } from './AgentSpotlight';
+import { ComparisonSection } from './ComparisonSection';
+import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
 import { useI18n } from '@/lib/i18n';
 import {
   LANDING_TAGLINE_KEYS,
@@ -15,7 +19,22 @@ import {
 } from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
 
-const DOMAINS = [
+// Interactive hero chips — each is a real, functioning shortcut: domain
+// chips prefill /chat with a representative query for that domain (see
+// app/chat/page.tsx's ?q= handling), and the Warung Watch chip links
+// straight to its own page rather than into chat, since it isn't a RAG
+// domain.
+const DOMAIN_CHIPS = [
+  { key: 'tax', queryKey: 'landing.chip.tax.query' },
+  { key: 'epf', queryKey: 'landing.chip.epf.query' },
+  { key: 'business', queryKey: 'landing.chip.business.query' },
+  { key: 'health', queryKey: 'landing.chip.health.query' },
+  { key: 'immigration', queryKey: 'landing.chip.immigration.query' },
+] as const;
+
+// Full domain badge list shown further down the page ("Knowledge Domains")
+// — static, not clickable, distinct from the interactive hero chips above.
+const ALL_DOMAINS = [
   { key: 'tax' },
   { key: 'epf' },
   { key: 'business' },
@@ -151,6 +170,30 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
+          className="flex flex-wrap justify-center gap-2 max-w-xl"
+        >
+          {DOMAIN_CHIPS.map((chip) => (
+            <Link
+              key={chip.key}
+              href={`/chat?q=${encodeURIComponent(t(chip.queryKey))}`}
+              className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+            >
+              {t(`domain.${chip.key}`)}
+            </Link>
+          ))}
+          <Link
+            href="/warung-watch"
+            className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+          >
+            {t('nav.warung_watch')}
+          </Link>
+        </motion.div>
+
+        <motion.div
+          custom={5}
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
           className="flex flex-col items-center gap-3"
         >
           <Link
@@ -194,6 +237,67 @@ export function LandingClient() {
       </motion.section>
 
       <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
+          <h2 className={`text-xl sm:text-2xl font-bold mb-2 locale-text-balance ${sectionTitle}`}>
+            {t('landing.preview.title')}
+          </h2>
+          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.preview.desc')}</p>
+        </div>
+        <InteractiveAnswerPreview isDark={isDark} />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
+          <h2 className={`text-xl sm:text-2xl font-bold mb-2 locale-text-balance ${sectionTitle}`}>
+            {t('landing.trust.title')}
+          </h2>
+          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.trust.desc')}</p>
+        </div>
+        <AgencyTrustGrid isDark={isDark} />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
+          <h2 className={`text-xl sm:text-2xl font-bold mb-2 locale-text-balance ${sectionTitle}`}>
+            {t('landing.spotlight.title')}
+          </h2>
+          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.spotlight.desc')}</p>
+        </div>
+        <AgentSpotlight isDark={isDark} />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <h2 className={`text-center text-xl sm:text-2xl font-bold mb-8 sm:mb-10 locale-text-balance ${sectionTitle}`}>
+          {t('landing.compare.title')}
+        </h2>
+        <ComparisonSection isDark={isDark} />
+      </motion.section>
+
+      <motion.section
         initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '-60px' }}
@@ -204,7 +308,7 @@ export function LandingClient() {
           {t('landing.domains.title')}
         </h2>
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-2xl">
-          {DOMAINS.map((d, i) => (
+          {ALL_DOMAINS.map((d, i) => (
             <motion.span
               key={d.key}
               initial={{ opacity: 0, scale: 0.9 }}

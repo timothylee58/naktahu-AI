@@ -260,3 +260,53 @@ async def test_rag_node_no_fallback_when_first_search_hits() -> None:
 
     assert len(result["retrieved_chunks"]) == 1
     assert mock_search.call_count == 1
+
+
+# ── RERANK_ENABLED behaviour ───────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_rag_node_rerank_disabled_by_default_uses_final_limit(monkeypatch) -> None:
+    """RERANK_ENABLED unset: hybrid_search is called with the normal
+    5-chunk limit, and rerank_chunks is never invoked — the feature flag
+    must not change default behaviour."""
+    monkeypatch.delenv("RERANK_ENABLED", raising=False)
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+    mock_search = AsyncMock(return_value=_FAKE_CHUNKS)
+    mock_rerank = AsyncMock()
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", mock_search),
+        patch("app.agents.rag_node.rerank_chunks", mock_rerank),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        result = await rag_node(_STATE)
+
+    assert mock_search.await_args.kwargs.get("limit") == 5
+    mock_rerank.assert_not_called()
+    assert len(result["retrieved_chunks"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_rag_node_rerank_enabled_widens_pool_and_calls_reranker(monkeypatch) -> None:
+    monkeypatch.setenv("RERANK_ENABLED", "true")
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+    wide_chunks = _FAKE_CHUNKS * 3  # simulate a wider candidate pool
+    mock_search = AsyncMock(return_value=wide_chunks)
+    mock_rerank = AsyncMock(return_value=_FAKE_CHUNKS)
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", mock_search),
+        patch("app.agents.rag_node.rerank_chunks", mock_rerank),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        result = await rag_node(_STATE)
+
+    assert mock_search.await_args.kwargs.get("limit") == 12
+    mock_rerank.assert_awaited_once()
+    assert result["retrieved_chunks"] == _FAKE_CHUNKS

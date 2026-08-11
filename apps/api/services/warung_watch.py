@@ -164,9 +164,17 @@ async def create_checkin(
     reporter_id: Optional[str],
     anon_session_id: Optional[str],
     source: str = "user_report",
+    price_item: Optional[str] = None,
+    price_myr: Optional[float] = None,
 ) -> dict[str, Any]:
     if status not in _STATUS_WEIGHT:
         raise ValueError(f"Invalid status: {status}")
+    # Mirrors 033_warung_checkin_price.sql's warung_checkins_price_pair_chk
+    # constraint in the application layer too — fail fast with a clear
+    # ValueError instead of letting a half-filled pair reach the DB and
+    # bounce back as an opaque Postgres constraint-violation error.
+    if (price_item is None) != (price_myr is None):
+        raise ValueError("price_item and price_myr must both be set or both be None")
 
     row = {
         "warung_id": warung_id,
@@ -174,6 +182,8 @@ async def create_checkin(
         "source": source,
         "reporter_id": reporter_id,
         "anon_session_id": anon_session_id,
+        "price_item": price_item,
+        "price_myr": price_myr,
     }
 
     def _insert() -> dict[str, Any]:
@@ -181,8 +191,39 @@ async def create_checkin(
         return res.data[0]
 
     checkin = await asyncio.to_thread(_insert)
-    logger.info("warung_checkin_created", warung_id=warung_id, status=status, source=source)
+    logger.info(
+        "warung_checkin_created",
+        warung_id=warung_id,
+        status=status,
+        source=source,
+        has_price=price_myr is not None,
+    )
     return checkin
+
+
+async def get_price_history(
+    *, supabase_client: Client, warung_id: str, limit: int = 30
+) -> list[dict[str, Any]]:
+    """Recent priced check-ins for this warung, oldest-to-newest, for the
+    price-trend chart — a real, crowdsourced series (however sparse it
+    starts out), never fabricated sample data. Unlike get_status(), this
+    intentionally has no staleness cutoff: a trend chart wants the actual
+    history, not just what's still "fresh" for a live status badge."""
+
+    def _fetch() -> list[dict[str, Any]]:
+        res = (
+            supabase_client.table("warung_checkins")
+            .select("price_item,price_myr,created_at")
+            .eq("warung_id", warung_id)
+            .not_.is_("price_myr", "null")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+
+    rows = await asyncio.to_thread(_fetch)
+    return list(reversed(rows))
 
 
 async def get_status(
