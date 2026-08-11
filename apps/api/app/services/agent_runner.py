@@ -326,7 +326,9 @@ async def start_study_agent(*, user_id: str, payload: dict[str, Any], supabase_c
     return _base_response(session_id, values)
 
 
-async def continue_study_agent(*, session_id: str, payload: dict[str, Any], checkpointer: Any) -> dict[str, Any]:
+async def continue_study_agent(
+    *, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any
+) -> dict[str, Any]:
     from app.agents.study_agent.nodes import explain_node, track_topics_node
 
     graph = get_study_agent_graph(checkpointer=checkpointer)
@@ -343,6 +345,16 @@ async def continue_study_agent(*, session_id: str, payload: dict[str, Any], chec
     state.update(await track_topics_node(state))
     await graph.aupdate_state(_thread_config(session_id), state)
     state["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    # Confirmed Cursor Bugbot finding: this never logged a row on continue
+    # turns at all — only start_study_agent did — so a History link to a
+    # multi-turn study session always resumed to turn-1's stale
+    # explanations, no matter how many follow-up questions were asked
+    # since. Same user_id-from-checkpointed-state pattern
+    # continue_immigration_navigator/continue_retrenchment_navigator
+    # already use, since this handler's signature (like theirs) doesn't
+    # take user_id directly.
+    user_id = state.get("user_id") or ""
+    _log_run(supabase_client, user_id, "study-agent", session_id, payload, state, state.get("latency_ms", 0), "completed")
     return _base_response(session_id, state)
 
 
@@ -622,17 +634,40 @@ async def start_eligibility_agent(*, user_id: str, payload: dict[str, Any], supa
     return resp
 
 
-async def continue_eligibility_agent(*, session_id: str, payload: dict[str, Any], checkpointer: Any) -> dict[str, Any]:
+async def continue_eligibility_agent(
+    *, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any
+) -> dict[str, Any]:
+    # Adjacent pre-existing bug found while fixing the Cursor Bugbot finding
+    # below (not something this change introduced) — flagging per CLAUDE.md
+    # §8 rather than silently patching: this graph's own _route_after_intake
+    # sends incomplete intake straight to END with no interrupt() call, the
+    # exact same shape as the bug already found and fixed in
+    # continue_immigration_navigator/continue_retrenchment_navigator (see
+    # those functions' comments). `ainvoke(None, config)` only resumes a
+    # graph paused at an interrupt; called against an already-terminal
+    # thread (which every "needs more info" turn is, since there's no
+    # interrupt to pause at) it's a no-op — turn 2 onward silently returned
+    # turn 1's stale state forever, not just for the /history resume
+    # feature but for every live multi-turn Grant Finder conversation.
+    # Fixed the same way those two were: pass the new message as real
+    # ainvoke input so the graph actually restarts from START with the
+    # existing checkpointed state as its base.
     graph = get_eligibility_agent_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"latest_user_input": payload.get("message", "")})
     t0 = time.monotonic()
-    await graph.ainvoke(None, config=_thread_config(session_id))
+    await graph.ainvoke({"latest_user_input": payload.get("message", "")}, config=_thread_config(session_id))
     latency_ms = round((time.monotonic() - t0) * 1000)
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
     values["latency_ms"] = latency_ms
     awaiting = snapshot.next if snapshot else ()
     status = "completed" if values.get("intake_complete") else "awaiting_hitl"
+    # Confirmed Cursor Bugbot finding: this never logged a row on continue
+    # turns at all — only start_eligibility_agent did — so a History link
+    # to a multi-turn Grant Finder session always resumed to turn-1's
+    # awaiting_hitl status and first-turn output, no matter how far the
+    # conversation actually progressed.
+    user_id = values.get("user_id") or ""
+    _log_run(supabase_client, user_id, "eligibility-agent", session_id, payload, values, values.get("latency_ms", 0), status)
     resp = _base_response(session_id, values, awaiting=awaiting)
     resp["status"] = status
     resp["awaiting_hitl"] = not values.get("intake_complete", False)

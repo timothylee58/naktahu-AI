@@ -53,9 +53,11 @@ function formatDate(iso: string): string {
 // the first place that reads it back for a user to revisit past drafts
 // and checklists. Each entry links to its agent page with ?run=<id> —
 // every agent page reads that param on mount, fetches the stored run via
-// fetchAgentRunByIdAuthed(), and renders straight into its results view
-// instead of starting the intake fresh (real resume, not just a fresh
-// agent link). Agents that support further conversation (compliance-
+// useAgentApi().get(`/api/v1/agent-runs/${runId}`) (same authed-fetch
+// pattern every one of those pages already uses for everything else), and
+// renders straight into its results view instead of starting the intake
+// fresh (real resume, not just a fresh agent link). Agents that support
+// further conversation (compliance-
 // drafter, study-agent, immigration-navigator, grant-finder,
 // retrenchment-navigator) also restore session_id so a follow-up message
 // continues the real LangGraph thread rather than starting a new one.

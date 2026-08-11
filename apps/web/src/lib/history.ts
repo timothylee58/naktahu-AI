@@ -112,29 +112,6 @@ export async function fetchAgentRunsAuthed(supabase: SupabaseClient): Promise<Ag
   return res.json() as Promise<AgentRunEntry[]>;
 }
 
-/** Fetch one stored agent run by id — backs every agent page's "resume
- * from ?run=<id>" flow (see AgentRunHistorySection.tsx, which links here).
- * Sourced from agent_runs rather than a per-agent status endpoint: two
- * agents (research-synthesiser, sme-compliance-navigator) compile their
- * LangGraph with no checkpointer at all, so agent_runs.output is the only
- * place their past results are durably retrievable from — using it
- * uniformly for all agents avoids needing a different resume mechanism
- * per agent. Returns null on 404 (not found / not owned) rather than
- * throwing, so callers can silently fall back to a fresh intake instead
- * of surfacing an error for what's often just a stale/bad link.
- */
-export async function fetchAgentRunByIdAuthed(
-  supabase: SupabaseClient,
-  runId: string,
-): Promise<AgentRunEntry | null> {
-  const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/agent-runs/${encodeURIComponent(runId)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Failed to fetch agent run (${res.status})`);
-  }
-  return res.json() as Promise<AgentRunEntry>;
-}
-
 export function agentRunsPageKey(userId: string): readonly ['agent-runs-page', string] {
   return ['agent-runs-page', userId];
 }

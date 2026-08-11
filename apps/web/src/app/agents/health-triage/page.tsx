@@ -154,6 +154,15 @@ function HealthTriagePageInner() {
   const [extraDetails, setExtraDetails] = useState('');
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Only set on resume — the "Your symptoms" panel normally derives its
+  // text from the local wizard state (bodyArea/selectedSymptoms/etc. via
+  // buildMessage()), but a resumed session has none of that local state
+  // populated, only the stored `output`. Confirmed Cursor Bugbot finding:
+  // without this, resumed sessions showed a blank/misleading symptoms
+  // line despite the real composed message being right there in
+  // output.message (HealthTriageState's own `message` field, preserved
+  // by _public_output).
+  const [resumedMessage, setResumedMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -236,8 +245,10 @@ function HealthTriagePageInner() {
     (async () => {
       try {
         const run = await get(`/api/v1/agent-runs/${runId}`);
-        setOutput((run.output as Record<string, unknown>) ?? {});
+        const out = (run.output as Record<string, unknown>) ?? {};
+        setOutput(out);
         setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        setResumedMessage(typeof out.message === 'string' ? out.message : null);
         setStep('review');
       } catch {
         /* stale/invalid run id — stays on the fresh intake flow */
@@ -284,6 +295,7 @@ function HealthTriagePageInner() {
     setExtraDetails('');
     setOutput(null);
     setSessionId(null);
+    setResumedMessage(null);
     setExportUrl(null);
     setError(null);
   };
@@ -478,7 +490,7 @@ function HealthTriagePageInner() {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">
                 {t('agents.health-triage.your_symptoms')}
               </h3>
-              <p className="text-sm text-zinc-700 dark:text-zinc-300">{buildMessage()}</p>
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">{resumedMessage ?? buildMessage()}</p>
             </section>
 
             {facilities.length > 0 && (

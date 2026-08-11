@@ -167,14 +167,14 @@ async def agent_continue(
         "payload": body.model_dump(exclude_none=True),
         "checkpointer": cp,
     }
-    # Only compliance-drafter's continue handler accepts user_id — immigration-
-    # navigator's and retrenchment-navigator's derive it from checkpointed
-    # state instead (see agent_runner.py). Passing it here raised TypeError on
-    # every second-and-later turn (Cursor Bugbot finding, verified by reading
-    # both handler signatures directly).
+    # Only compliance-drafter's continue handler accepts user_id — the rest
+    # derive it from checkpointed state instead (see agent_runner.py).
+    # Passing it here raised TypeError on every second-and-later turn
+    # (Cursor Bugbot finding, verified by reading the handler signatures
+    # directly).
     if agent_name == "compliance-drafter":
         kwargs["user_id"] = user.user_id
-    if agent_name in ("immigration-navigator", "retrenchment-navigator"):
+    if agent_name in ("immigration-navigator", "retrenchment-navigator", "study-agent", "eligibility-agent"):
         kwargs["supabase_client"] = sb
 
     result = await handler(**kwargs)
