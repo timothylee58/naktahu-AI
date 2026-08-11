@@ -25,6 +25,10 @@ const MS: Translations = {
   'chat.warning.low_confidence':
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
   'chat.language_indicator': 'BM',
+  'citation.confidence': 'Keyakinan',
+  'citation.stale': 'Sumber mungkin sudah lapuk',
+  'citation.view_source': 'Lihat sumber rasmi',
+  'citation.no_link': 'Tiada pautan langsung tersedia untuk sumber ini.',
   'chat.empty':
     'Tanya saya soalan berkaitan perkhidmatan kerajaan Malaysia.',
   'chat.keyboard_hint': 'Enter untuk hantar · Ctrl+Enter · Esc untuk padam',
@@ -624,6 +628,10 @@ const EN: Translations = {
   'chat.warning.low_confidence':
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
   'chat.language_indicator': 'EN',
+  'citation.confidence': 'Confidence',
+  'citation.stale': 'This source may be outdated',
+  'citation.view_source': 'View official source',
+  'citation.no_link': 'No direct link is available for this source.',
   'chat.empty': 'Ask me anything about Malaysian government services.',
   'chat.keyboard_hint': 'Enter to send · Ctrl+Enter · Esc to clear',
   'chat.new_chat': 'New chat',
@@ -1221,6 +1229,10 @@ const ZH: Translations = {
   'chat.thinking': '思考中…',
   'chat.warning.low_confidence': '答案可能不准确 / Answer may be inaccurate',
   'chat.language_indicator': '中文',
+  'citation.confidence': '置信度',
+  'citation.stale': '此来源可能已过时',
+  'citation.view_source': '查看官方来源',
+  'citation.no_link': '此来源暂无直接链接。',
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
   'chat.keyboard_hint': '按 Enter 发送 · Ctrl+Enter · Esc 清空',
   'chat.new_chat': '新对话',

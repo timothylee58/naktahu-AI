@@ -1,6 +1,8 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { useEffect, useId, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useI18n } from '@/lib/i18n';
 import type { Citation } from '@/lib/types';
 
 interface CitationChipProps {
@@ -17,49 +19,120 @@ function truncate(s: string, max: number) {
 }
 
 export function CitationChip({ citation, index }: CitationChipProps) {
+  const { t } = useI18n();
   const url = citation.url ?? citation.source_url;
   const title = citation.title ?? citation.source_title ?? '';
   const hasUrl = Boolean(url);
+  const popoverId = useId();
+  // Pinned = opened by click/tap (stays open until an explicit close or an
+  // outside click); hover alone shows the popover on desktop without
+  // pinning it, so a stray mouse-over on a chip mid-scroll doesn't leave a
+  // popover stuck open.
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const open = pinned || hovered;
+
+  useEffect(() => {
+    if (!pinned) return;
+    function onOutsideClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setPinned(false);
+      }
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPinned(false);
+    }
+    document.addEventListener('mousedown', onOutsideClick);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onOutsideClick);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [pinned]);
+
+  const confidencePct = typeof citation.confidence === 'number' ? Math.round(citation.confidence * 100) : null;
+  const confidenceColor =
+    confidencePct === null
+      ? ''
+      : confidencePct >= 80
+        ? 'text-green-600 dark:text-green-400'
+        : confidencePct >= 60
+          ? 'text-amber-600 dark:text-amber-400'
+          : 'text-red-600 dark:text-red-400';
+
   return (
-    <motion.a
-      href={url}
-      target={hasUrl ? '_blank' : undefined}
-      rel={hasUrl ? 'noopener noreferrer' : undefined}
-      whileHover={hasUrl ? { scale: 1.03 } : undefined}
-      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-      className={`inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline transition-colors dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300 ${hasUrl ? 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20' : 'cursor-default'}`}
-      title={title}
+    <div
+      ref={rootRef}
+      className="relative inline-block"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {typeof index === 'number' && (
-        <span
-          aria-hidden="true"
-          className="flex-shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold dark:bg-blue-500"
-        >
-          {index}
-        </span>
-      )}
-      <span className="font-semibold truncate max-w-[6rem]">
-        {citation.ministry}
-      </span>
-      <span className="opacity-70">·</span>
-      <span className="truncate max-w-[12rem]">
-        {truncate(title, 32)}
-      </span>
-      {hasUrl && (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 16 16"
-          fill="currentColor"
-          className="w-3 h-3 flex-shrink-0 opacity-60"
-          aria-hidden
-        >
-          <path
-            fillRule="evenodd"
-            d="M4.5 11.5a.75.75 0 0 0 1.06 0l5-5v2.69a.75.75 0 0 0 1.5 0V5a.75.75 0 0 0-.75-.75H7.06a.75.75 0 0 0 0 1.5H9.75l-5 5a.75.75 0 0 0 0 1.06Z"
-            clipRule="evenodd"
-          />
-        </svg>
-      )}
-    </motion.a>
+      <motion.button
+        type="button"
+        whileHover={{ scale: 1.03 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+        aria-expanded={open}
+        aria-describedby={open ? popoverId : undefined}
+        onClick={() => setPinned((p) => !p)}
+        className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium transition-colors dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20"
+      >
+        {typeof index === 'number' && (
+          <span
+            aria-hidden="true"
+            className="flex-shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold dark:bg-blue-500"
+          >
+            {index}
+          </span>
+        )}
+        <span className="font-semibold truncate max-w-[6rem]">{citation.ministry}</span>
+        <span className="opacity-70">·</span>
+        <span className="truncate max-w-[12rem]">{truncate(title, 32)}</span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            id={popoverId}
+            role="tooltip"
+            initial={{ opacity: 0, y: 4, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-30 left-0 top-full mt-1.5 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-lg dark:border-white/10 dark:bg-[#111827]"
+          >
+            <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{citation.ministry}</p>
+            <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 locale-text-balance">{title}</p>
+            {confidencePct !== null && (
+              <p className={`mt-1.5 text-[11px] font-medium ${confidenceColor}`}>
+                {t('citation.confidence')}: {confidencePct}%
+              </p>
+            )}
+            {citation.stale_disclaimer && (
+              <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">{t('citation.stale')}</p>
+            )}
+            {hasUrl ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                {t('citation.view_source')}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3" aria-hidden>
+                  <path
+                    fillRule="evenodd"
+                    d="M4.5 11.5a.75.75 0 0 0 1.06 0l5-5v2.69a.75.75 0 0 0 1.5 0V5a.75.75 0 0 0-.75-.75H7.06a.75.75 0 0 0 0 1.5H9.75l-5 5a.75.75 0 0 0 0 1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </a>
+            ) : (
+              <p className="mt-2 text-[11px] text-zinc-400">{t('citation.no_link')}</p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
