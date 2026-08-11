@@ -64,13 +64,15 @@ export default function WarungWatchPage() {
   const [status, setStatus] = useState<WarungStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryPoint[]>([]);
-  // Guards against the confirmed Bugbot race: price-history is fetched as
-  // a detached (non-awaited) promise per loadStatus() call, so switching
-  // warungs quickly can let an older request's response resolve *after* a
-  // newer one and overwrite the chart with the wrong venue's points. Each
-  // loadStatus() call bumps this and captures its own token; a resolving
-  // fetch only applies setPriceHistory if it's still the latest request.
-  const priceRequestRef = useRef(0);
+  // Guards the whole loadStatus() call, not just its price-history
+  // sub-fetch (confirmed Bugbot finding, then a follow-on CodeRabbit
+  // finding that the token was created too late to guard the status
+  // fetch itself) — switching warungs quickly can let an older request's
+  // response resolve *after* a newer one and overwrite the UI with the
+  // wrong venue's status/chart. Each loadStatus() call bumps this and
+  // captures its own token up front; any state setter only applies if
+  // it's still the latest request by the time its response resolves.
+  const loadRequestRef = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -169,12 +171,22 @@ export default function WarungWatchPage() {
   }, [query, accessToken]);
 
   const loadStatus = async (name: string) => {
+    // Confirmed CodeRabbit finding: the token was previously created only
+    // after the status fetch resolved, so it guarded the price-history
+    // sub-fetch but not the status fetch itself — switching warungs
+    // quickly could still let an older loadStatus() call's status
+    // response win the race and overwrite a newer selection. Creating
+    // the token up front and guarding every state setter with it closes
+    // that gap for status/error/loading too, not just price history.
+    const requestToken = ++loadRequestRef.current;
     setStatusLoading(true);
     setError(null);
+    setPriceHistory([]);
     try {
       const res = await apiFetch(`/api/v1/warung-watch/status?name=${encodeURIComponent(name)}`, accessToken);
       if (!res.ok) throw new Error('fetch-failed');
       const data: WarungStatus = await res.json();
+      if (loadRequestRef.current !== requestToken) return;
       setStatus(data);
       setSelectedName(name);
       setSuggestions([]);
@@ -182,20 +194,18 @@ export default function WarungWatchPage() {
       // failure here shouldn't block the busyness status the user
       // actually asked for, so it's fetched separately and not awaited
       // as part of the try/catch above.
-      setPriceHistory([]);
-      const requestToken = ++priceRequestRef.current;
       apiFetch(`/api/v1/warung-watch/price-history?name=${encodeURIComponent(name)}`, accessToken)
         .then((r) => (r.ok ? r.json() : { history: [] }))
         .then((d: { history: PriceHistoryPoint[] }) => {
-          if (priceRequestRef.current === requestToken) setPriceHistory(d.history);
+          if (loadRequestRef.current === requestToken) setPriceHistory(d.history);
         })
         .catch(() => {
           /* chart just stays empty — see WarungPriceChart's empty-state handling */
         });
     } catch {
-      setError(t('warung_watch.error.fetch'));
+      if (loadRequestRef.current === requestToken) setError(t('warung_watch.error.fetch'));
     } finally {
-      setStatusLoading(false);
+      if (loadRequestRef.current === requestToken) setStatusLoading(false);
     }
   };
 

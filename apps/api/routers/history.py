@@ -22,6 +22,16 @@ class HistoryRenamePayload(BaseModel):
     title: str = Field(..., min_length=1, max_length=150)
 
 
+class AgentRunEntryResponse(BaseModel):
+    id: str
+    agent_name: str
+    session_id: Optional[str] = None
+    output: dict[str, Any] = Field(default_factory=dict)
+    completion_status: str
+    turns_count: int = 0
+    created_at: str
+
+
 class HistoryEntryPayload(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     language: Language = "en"
@@ -113,7 +123,7 @@ async def rename_history_entry(
     return {"status": "renamed"}
 
 
-@router.get("/agent-runs")
+@router.get("/agent-runs", response_model=list[AgentRunEntryResponse])
 @apply_query_rate_limit()
 async def get_agent_run_history(
     request: Request,

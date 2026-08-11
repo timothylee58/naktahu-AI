@@ -507,10 +507,17 @@ def _render_health_triage_html(values: dict[str, Any]) -> str:
         f"<li><strong>{html.escape(str(f.get('name', '')))}</strong>: {html.escape(str(f.get('action', '')))}</li>"
         for f in (values.get("facilities") or [])
     )
+    # Requires both title AND a real source url before rendering — matching
+    # CLAUDE.md's citation rule (only real gov.my-family URLs, never a
+    # citation-shaped entry with no verified source behind it). facility_node
+    # already filters citations to those with source_url before they reach
+    # state, but this is defense-in-depth against any future caller of this
+    # renderer that doesn't pre-filter — confirmed CodeRabbit finding.
     citation_items = "".join(
-        f"<li>{html.escape(str(c.get('title', '')))} ({html.escape(str(c.get('ministry', '')))})</li>"
+        f'<li><a href="{html.escape(str(c["url"]), quote=True)}">{html.escape(str(c.get("title", "")))}</a>'
+        f' ({html.escape(str(c.get("ministry", "")))})</li>'
         for c in (values.get("citations") or [])
-        if c.get("title")
+        if c.get("title") and c.get("url")
     )
 
     return (
@@ -532,12 +539,25 @@ async def export_health_triage(
     """On-demand PDF export of a completed Health Triage session — no
     graph re-run, no new LLM call, just formats already-generated state.
     Raises ValueError (mapped to 404 by the router) when the session
-    doesn't exist or hasn't finished yet, since there's nothing to export."""
+    doesn't exist, hasn't finished yet, or doesn't belong to the
+    requesting user — confirmed Cursor/CodeRabbit finding: session_id is
+    a checkpointer thread_id with no ownership check of its own, so any
+    authenticated user who obtained (or guessed) another user's session_id
+    could otherwise export that user's symptoms/facility recommendation.
+    Checked against the state's own user_id (set by start_health_triage's
+    inputs, not user-suppliable on this export call) rather than a
+    separate DB lookup — cheaper, and doesn't depend on agent_runs having
+    a row for this session."""
     graph = get_health_triage_graph(checkpointer=checkpointer)
     snapshot = await graph.aget_state(_thread_config(session_id))
     if not snapshot or not snapshot.values:
         raise ValueError("session not found")
     values = dict(snapshot.values)
+    if values.get("user_id") != user_id:
+        # Same 404 as "doesn't exist" — an export attempt against someone
+        # else's session must not reveal (via a distinct 403) that the
+        # session_id is valid at all.
+        raise ValueError("session not found")
     if not values.get("facility_recommendation"):
         raise ValueError("session not yet completed")
 

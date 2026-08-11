@@ -226,7 +226,7 @@ Migrations under `infra/supabase/migrations/` are versioned SQL, applied manuall
 | `GOOGLE_SPEECH_CREDENTIALS_JSON` / `GOOGLE_SPEECH_PROJECT_ID` / `GOOGLE_SPEECH_LOCATION` | Google Speech-to-Text V2, cross-browser voice-input fallback. Optional — the frontend falls back to the browser's own Web Speech API when unset. |
 | `RERANK_ENABLED` | Turns on the optional cross-encoder-style re-ranking pass over hybrid-search results (default `false`) |
 
-See `apps/api/core/config.py` for the complete, authoritative list.
+Most are validated via `apps/api/core/config.py`'s `Settings` object — but not all: `GOOGLE_PLACES_API_KEY`, the `GOOGLE_SPEECH_*` vars, `RERANK_ENABLED`, `SENTRY_DSN`, and `LANGSMITH_API_KEY`/`LANGSMITH_PROJECT` are read directly via `os.environ.get(...)` in their own modules (`services/warung_watch.py`, `app/services/speech.py`, `app/services/reranker.py`) rather than through `Settings`, so `core/config.py` alone won't show the full picture — this table plus a repo-wide `grep -rn "os.environ.get" apps/api` is the accurate way to find every one.
 
 ---
 

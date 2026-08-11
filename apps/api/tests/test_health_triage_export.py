@@ -22,6 +22,7 @@ from services.agent_registry import load_agent_registry
 
 _COMPLETED_VALUES = {
     "session_id": "h1",
+    "user_id": "u1",
     "symptoms": ["demam", "batuk"],
     "severity": "routine",
     "facility_recommendation": "Klinik Kesihatan (KK) untuk rawatan primer.",
@@ -61,6 +62,22 @@ def test_render_health_triage_html_escapes_user_supplied_symptoms():
     assert "&lt;script&gt;" in rendered
 
 
+def test_render_health_triage_html_omits_citation_without_url():
+    """Confirmed CodeRabbit finding: a citation-shaped entry with a title
+    but no source url must not be rendered as if it were a real,
+    verified source (CLAUDE.md's citation rule)."""
+    values = {
+        **_COMPLETED_VALUES,
+        "citations": [
+            {"title": "Has URL", "ministry": "KKM", "url": "https://www.moh.gov.my"},
+            {"title": "No URL", "ministry": "KKM"},
+        ],
+    }
+    rendered = _render_health_triage_html(values)
+    assert "Has URL" in rendered
+    assert "No URL" not in rendered
+
+
 @pytest.mark.asyncio
 async def test_export_health_triage_raises_on_missing_session():
     with patch("app.services.agent_runner.get_health_triage_graph", return_value=_fake_graph(None)):
@@ -77,6 +94,20 @@ async def test_export_health_triage_raises_when_not_yet_completed():
         with pytest.raises(ValueError):
             await export_health_triage(
                 session_id="h1", checkpointer=None, supabase_client=MagicMock(), user_id="u1"
+            )
+
+
+@pytest.mark.asyncio
+async def test_export_health_triage_raises_for_non_owner():
+    """Confirmed Cursor Bugbot/security finding: session_id alone is not
+    ownership proof — a different authenticated user requesting export
+    of u1's session must be rejected, and with the same ValueError as a
+    genuinely missing session (not a distinct error) so the response
+    doesn't confirm the session_id is valid for someone else."""
+    with patch("app.services.agent_runner.get_health_triage_graph", return_value=_fake_graph(_COMPLETED_VALUES)):
+        with pytest.raises(ValueError):
+            await export_health_triage(
+                session_id="h1", checkpointer=None, supabase_client=MagicMock(), user_id="someone-else"
             )
 
 
@@ -122,6 +153,11 @@ def _client(supabase: object | None) -> TestClient:
     app.state.supabase = supabase
     load_agent_registry(None)
     return TestClient(app)
+
+
+def test_export_endpoint_401_without_auth():
+    res = _client(MagicMock()).post("/api/v1/agents/health-triage/h1/export")
+    assert res.status_code == 401
 
 
 def test_export_endpoint_503_when_supabase_degraded():

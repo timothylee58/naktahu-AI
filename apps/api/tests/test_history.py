@@ -684,7 +684,7 @@ def test_get_agent_runs_401_without_auth(client):
 def test_get_agent_runs_200_for_free_plan_user(client):
     """Confirms this endpoint is NOT plan-gated like /history — a free-tier
     user must be able to list their own agent runs."""
-    c, redis_client, sb, _ = client
+    c, _, sb, _ = client
     table_mock = sb.table.return_value
     table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
         data=[_AGENT_RUN_ROW]
@@ -695,7 +695,7 @@ def test_get_agent_runs_200_for_free_plan_user(client):
 
 
 def test_get_agent_runs_filters_by_agent_name(client):
-    c, redis_client, sb, _ = client
+    c, _, sb, _ = client
     table_mock = sb.table.return_value
     # Two `.eq()` calls in the chain when agent_name is passed (user_id,
     # then agent_name) — distinct from the single-.eq() chain the other
@@ -726,7 +726,7 @@ def test_get_agent_runs_503_when_supabase_degraded(client, monkeypatch):
 
 
 def test_get_agent_runs_degrades_to_empty_list_on_fetch_error(client):
-    c, redis_client, sb, _ = client
+    c, _, sb, _ = client
     table_mock = sb.table.return_value
     table_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.side_effect = RuntimeError(
         "connection reset"
