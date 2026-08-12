@@ -66,16 +66,16 @@ export function LandingClient() {
   const isDark = theme === 'dark';
 
   const pageClass = isDark
-    ? 'flex-1 min-h-0 overflow-y-auto bg-[#0A0F1E] text-white'
+    ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
     : 'flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900';
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-[#2563EB]/50'
-    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-[#2563EB]/40';
+    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-[#3B6FE0]/50'
+    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-[#3B6FE0]/40';
   const domainPillClass = isDark
-    ? 'border-[#2563EB]/40 text-[#2563EB] bg-[#2563EB]/10'
+    ? 'border-[#3B6FE0]/40 text-[#3B6FE0] bg-[#3B6FE0]/10'
     : 'border-blue-200 text-blue-700 bg-blue-50';
   const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
@@ -106,10 +106,18 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#2563EB] uppercase border border-[#2563EB]/30 rounded-full px-4 py-1.5 locale-nowrap"
+          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#3B6FE0] uppercase border border-[#3B6FE0]/30 rounded-full px-4 py-1.5 locale-nowrap"
         >
           🇲🇾 {t('landing.badge')}
         </motion.div>
+
+        {/* Trust disclaimer surfaced right under the badge, not buried in
+            the footer — for tax/immigration-adjacent answers, "this isn't
+            official government advice" is reassurance a first-time visitor
+            needs before they start typing, not after they scroll away. */}
+        <p className={`text-xs max-w-md locale-text-balance ${mutedText}`}>
+          ℹ️ {t('landing.hero.disclaimer_note')}
+        </p>
 
         <motion.h1
           custom={1}
@@ -126,7 +134,7 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-[#2563EB]">{highlight}</span>
+                <span className="text-[#3B6FE0]">{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
@@ -198,7 +206,7 @@ export function LandingClient() {
         >
           <Link
             href="/chat"
-            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+            className="inline-flex items-center gap-2 bg-[#3B6FE0] hover:bg-blue-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
           >
             {t('landing.hero.cta')}
             <svg
@@ -216,9 +224,18 @@ export function LandingClient() {
           </Link>
           <Link
             href="/agents"
-            className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
+            className="text-sm hover:text-[#3B6FE0] transition-colors locale-nowrap"
           >
             {t('landing.hero.secondary_cta')}
+          </Link>
+          {/* Real numbers pulled from the actual pricing page (pricing.free.feature.1,
+              pricing.pro.price, pricing.credits.subtitle) — not a separate marketing
+              claim that could drift from what /pricing actually charges. */}
+          <Link
+            href="/pricing"
+            className={`text-xs hover:text-[#3B6FE0] transition-colors locale-nowrap ${mutedText}`}
+          >
+            {t('landing.hero.pricing_note')}
           </Link>
         </motion.div>
       </section>
@@ -332,7 +349,7 @@ export function LandingClient() {
         <div className="flex flex-col items-center sm:items-end gap-1 text-center sm:text-right">
           <div className="flex items-center gap-3">
             <a
-              href="https://github.com"
+              href="https://github.com/timothylee58/naktahu-AI"
               target="_blank"
               rel="noopener noreferrer"
               className={`transition-colors locale-nowrap ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}

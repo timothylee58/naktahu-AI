@@ -7,12 +7,39 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ── NakTahu design tokens ──────────────────────────────────────────
+     Two-accent system doubles as functional wayfinding, not decoration:
+     "official" (blue) marks anything sourced from a government document
+     — citations, agency badges, primary CTAs. "community" (gold) marks
+     anything crowd-sourced — Warung Watch and user-contributed data. A
+     user learns the distinction once and it holds everywhere. */
+  --nk-bg: #12151c;         /* base dark background — warm charcoal, not flat near-black */
+  --nk-surface: #1b2028;    /* card/surface, one step up from base */
+  --nk-official: #3b6fe0;   /* primary accent — official/verified content */
+  --nk-official-dim: #2f57b3;
+  --nk-community: #e0a83b;  /* secondary accent — crowd-sourced content */
+  --nk-community-dim: #b3852c;
+  --nk-text: #edeae3;       /* off-white, warm not clinical */
+  --nk-text-muted: #8a8f98;
+  --font-display: var(--font-sans);
+  --font-mono-citation: var(--font-mono), 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-sans: var(--font-inter), 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+  --font-display: var(--font-display-sans), var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-mono-plex), ui-monospace, monospace;
+  --color-nk-bg: var(--nk-bg);
+  --color-nk-surface: var(--nk-surface);
+  --color-nk-official: var(--nk-official);
+  --color-nk-official-dim: var(--nk-official-dim);
+  --color-nk-community: var(--nk-community);
+  --color-nk-community-dim: var(--nk-community-dim);
+  --color-nk-text: var(--nk-text);
+  --color-nk-text-muted: var(--nk-text-muted);
 }
 
 body {

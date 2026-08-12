@@ -62,3 +62,5 @@
 {"query": "Apakah hak saya jika majikan menamatkan perkhidmatan saya tanpa notis?", "expected_language": "bm"}
 {"query": "Bagaimana cara memohon faedah pengangguran EIS selepas diberhentikan kerja?", "expected_language": "bm"}
 {"query": "Apakah tanggungjawab yuran penyelenggaraan bagi pemilik hartanah strata?", "expected_language": "bm"}
+{"query": "Berapa lama tempoh pengecualian cukai Taraf Perintis?", "expected_language": "bm"}
+{"query": "Apakah perbelanjaan modal layak di bawah Elaun Cukai Pelaburan (ITA)?", "expected_language": "bm"}

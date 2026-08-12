@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
@@ -155,8 +156,9 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
   );
 }
 
-export default function GrantFinderPage() {
-  const { start, continue: cont } = useAgentApi();
+function GrantFinderPageInner() {
+  const { start, continue: cont, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [sector, setSector] = useState<string[]>([]);
   const [businessType, setBusinessType] = useState<string[]>([]);
   const [registeredMonths, setRegisteredMonths] = useState('');
@@ -171,13 +173,22 @@ export default function GrantFinderPage() {
   const [nearMissGrants, setNearMissGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set only once the user actually tries to submit with missing/invalid
+  // fields — inline errors shouldn't appear before someone's had a chance
+  // to fill the form in. Replaces the old silently-disabled submit button
+  // (a real UX complaint: nothing told the user *why* the button wouldn't
+  // respond) with a button that's always clickable and explains itself.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [phase, nextQuestion]);
 
-  const canStart = sector.length > 0 && businessType.length > 0 && registeredMonths.trim() !== '' && isBumiputera !== null;
+  const revenueValue = annualRevenue.trim() === '' ? null : Number(annualRevenue);
+  const revenueInvalid = revenueValue !== null && (Number.isNaN(revenueValue) || revenueValue < 0);
+  const canStart =
+    sector.length > 0 && businessType.length > 0 && registeredMonths.trim() !== '' && isBumiputera !== null && !revenueInvalid;
 
   // Threaded onto each GrantCard's "Draft application" link so Grant Draft
   // Generator opens pre-filled instead of the user re-typing everything —
@@ -205,7 +216,39 @@ export default function GrantFinderPage() {
     }
   };
 
+  // Resume from History's "?run=<agent_runs.id>" link. Note: this page's
+  // backend agent name is 'eligibility-agent' (grant-finder is the
+  // frontend-only slug — see agents.ts's backendName override), but the
+  // agent_runs row is already keyed by 'eligibility-agent' too (that's
+  // what _log_run was called with), so no extra name mapping is needed
+  // here. Reuses applyResult() so resumed sessions go through the exact
+  // same completed-vs-mid-intake branching a live response would. Silent
+  // fallback to a fresh intake on any failure (bad/expired link) rather
+  // than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        applyResult({
+          session_id: run.session_id,
+          status: run.completion_status,
+          awaiting_hitl: run.completion_status !== 'completed',
+          output: run.output,
+        });
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const submitIntake = async () => {
+    if (!canStart) {
+      setAttemptedSubmit(true);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -260,16 +303,33 @@ export default function GrantFinderPage() {
         {phase === 'intake' && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
             <div>
-              <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">Sector</p>
+              <p className="text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400">
+                Sector <span className="text-red-500">*</span>
+                <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">(choose one)</span>
+              </p>
               <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
+              {attemptedSubmit && sector.length === 0 && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Pick a sector to continue.</p>
+              )}
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">Business type</p>
+              <p className="text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400">
+                Business type <span className="text-red-500">*</span>
+                <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">(choose one)</span>
+              </p>
               <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
+              <p className="text-xs text-zinc-400 mt-1 dark:text-zinc-500">
+                &quot;Startup&quot; means an early-stage company, not a legal structure — pick it if you haven&apos;t formally registered a company type yet.
+              </p>
+              {attemptedSubmit && businessType.length === 0 && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Pick a business type to continue.</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Months registered</span>
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                  Months registered <span className="text-red-500">*</span>
+                </span>
                 <input
                   type="number"
                   min={0}
@@ -278,21 +338,37 @@ export default function GrantFinderPage() {
                   placeholder="e.g. 18"
                   className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
                 />
+                {attemptedSubmit && registeredMonths.trim() === '' && (
+                  <span className="text-xs text-red-600 dark:text-red-400">Required.</span>
+                )}
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Annual revenue (RM)</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={annualRevenue}
-                  onChange={(e) => setAnnualRevenue(e.target.value)}
-                  placeholder="e.g. 250000"
-                  className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
-                />
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Annual revenue (yearly, RM)</span>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400 dark:text-zinc-500">
+                    RM
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={annualRevenue}
+                    onChange={(e) => setAnnualRevenue(e.target.value)}
+                    placeholder="e.g. 250000"
+                    className="w-full border border-zinc-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+                  />
+                </div>
+                {revenueInvalid && (
+                  <span className="text-xs text-red-600 dark:text-red-400">Enter a revenue of 0 or more.</span>
+                )}
               </label>
             </div>
             <div>
-              <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">Bumiputera-owned?</p>
+              <p className="text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400">
+                Bumiputera-owned? <span className="text-red-500">*</span>
+              </p>
+              <p className="text-xs text-zinc-400 mb-2 dark:text-zinc-500">
+                Some grants (e.g. TERAJU, MARA-linked funds) are reserved for or prioritise Bumiputera-owned businesses — this helps us match you to the right ones.
+              </p>
               <div className="flex gap-2">
                 {[{ id: true, label: 'Yes' }, { id: false, label: 'No' }].map((opt) => (
                   <button
@@ -309,10 +385,13 @@ export default function GrantFinderPage() {
                   </button>
                 ))}
               </div>
+              {attemptedSubmit && isBumiputera === null && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Please select yes or no.</p>
+              )}
             </div>
             <button
               type="button"
-              disabled={loading || !canStart}
+              disabled={loading}
               onClick={() => void submitIntake()}
               className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
@@ -391,5 +470,13 @@ export default function GrantFinderPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function GrantFinderPage() {
+  return (
+    <Suspense>
+      <GrantFinderPageInner />
+    </Suspense>
   );
 }

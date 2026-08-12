@@ -9,6 +9,7 @@ from routers._request_fields import Domain, Language, normalise_language
 from services.auth import UserContext, get_current_user
 from services.history import (
     delete_session_entry,
+    fetch_agent_run_by_id,
     fetch_agent_run_history,
     fetch_history_entries,
     persist_session_entry,
@@ -151,3 +152,25 @@ async def get_agent_run_history(
         agent_name=agent_name,
         limit=limit,
     )
+
+
+@router.get("/agent-runs/{run_id}", response_model=AgentRunEntryResponse)
+@apply_query_rate_limit()
+async def get_agent_run_by_id(
+    request: Request,
+    response: Response,
+    run_id: str,
+    user: Annotated[UserContext, Depends(get_current_user)],
+):
+    """One stored agent run, for the "resume a past session" flow each
+    agent page uses (fetch this on ?run=<id>, render the stored output
+    directly instead of starting the intake fresh). Same plain-auth gate
+    as the list endpoint above, same 404-for-both-missing-and-not-yours
+    behaviour as fetch_agent_run_by_id documents."""
+    supabase_client = getattr(request.app.state, "supabase", None)
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Agent run history is temporarily unavailable")
+    run = await fetch_agent_run_by_id(supabase_client=supabase_client, run_id=run_id, user_id=user.user_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    return run

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Phone } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
@@ -140,9 +141,10 @@ function directionsUrl(facilityName: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facilityName)}`;
 }
 
-export default function HealthTriagePage() {
+function HealthTriagePageInner() {
   const { t } = useI18n();
-  const { start, post } = useAgentApi();
+  const { start, post, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('body');
   const [bodyArea, setBodyArea] = useState<BodyArea | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -152,6 +154,15 @@ export default function HealthTriagePage() {
   const [extraDetails, setExtraDetails] = useState('');
   const [output, setOutput] = useState<Record<string, unknown> | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Only set on resume — the "Your symptoms" panel normally derives its
+  // text from the local wizard state (bodyArea/selectedSymptoms/etc. via
+  // buildMessage()), but a resumed session has none of that local state
+  // populated, only the stored `output`. Confirmed Cursor Bugbot finding:
+  // without this, resumed sessions showed a blank/misleading symptoms
+  // line despite the real composed message being right there in
+  // output.message (HealthTriageState's own `message` field, preserved
+  // by _public_output).
+  const [resumedMessage, setResumedMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -222,6 +233,30 @@ export default function HealthTriagePage() {
     return msg;
   };
 
+  // Resume from History's "?run=<agent_runs.id>" link — fetch the stored
+  // run and jump straight to the results view instead of the intake flow.
+  // Silently falls back to a fresh intake on any failure (bad/expired
+  // link, network error) rather than surfacing an error for what's often
+  // just a stale link — this is a convenience restore, not a page the
+  // user is blocked without.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        const out = (run.output as Record<string, unknown>) ?? {};
+        setOutput(out);
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        setResumedMessage(typeof out.message === 'string' ? out.message : null);
+        setStep('review');
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const submit = async () => {
     setLoading(true);
     setError(null);
@@ -260,6 +295,7 @@ export default function HealthTriagePage() {
     setExtraDetails('');
     setOutput(null);
     setSessionId(null);
+    setResumedMessage(null);
     setExportUrl(null);
     setError(null);
   };
@@ -454,7 +490,7 @@ export default function HealthTriagePage() {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">
                 {t('agents.health-triage.your_symptoms')}
               </h3>
-              <p className="text-sm text-zinc-700 dark:text-zinc-300">{buildMessage()}</p>
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">{resumedMessage ?? buildMessage()}</p>
             </section>
 
             {facilities.length > 0 && (
@@ -522,5 +558,13 @@ export default function HealthTriagePage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function HealthTriagePage() {
+  return (
+    <Suspense>
+      <HealthTriagePageInner />
+    </Suspense>
   );
 }

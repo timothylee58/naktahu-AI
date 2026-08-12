@@ -51,12 +51,16 @@ function formatDate(iso: string): string {
 // previously-logged runs — agent_runner.py's _log_run() has been writing
 // every start/continue call to `agent_runs` all along; this section is
 // the first place that reads it back for a user to revisit past drafts
-// and checklists. Deliberately NOT full mid-conversation resume (opening
-// an entry links to the agent's own page fresh, not back into that exact
-// LangGraph thread) — that would need every one of the 9 agent pages to
-// accept a ?session= param and call their own get_status endpoint on
-// mount, a larger follow-up if wanted. This shows the real stored output
-// inline instead, which is honest about what's actually being offered.
+// and checklists. Each entry links to its agent page with ?run=<id> —
+// every agent page reads that param on mount, fetches the stored run via
+// useAgentApi().get(`/api/v1/agent-runs/${runId}`) (same authed-fetch
+// pattern every one of those pages already uses for everything else), and
+// renders straight into its results view instead of starting the intake
+// fresh (real resume, not just a fresh agent link). Agents that support
+// further conversation (compliance-
+// drafter, study-agent, immigration-navigator, grant-finder,
+// retrenchment-navigator) also restore session_id so a follow-up message
+// continues the real LangGraph thread rather than starting a new one.
 export function AgentRunHistorySection({ supabase, userId, isDark }: AgentRunHistorySectionProps) {
   const { t } = useI18n();
   const { data: runs = [], isLoading, error } = useSWR<AgentRunEntry[]>(
@@ -91,7 +95,7 @@ export function AgentRunHistorySection({ supabase, userId, isDark }: AgentRunHis
           return (
             <li key={run.id}>
               <Link
-                href={`/agents/${slug}`}
+                href={`/agents/${slug}?run=${encodeURIComponent(run.id)}`}
                 className={`block rounded-xl px-4 py-3 flex flex-col gap-1 shadow-sm border transition-colors ${
                   isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-zinc-100 hover:bg-zinc-50'
                 }`}

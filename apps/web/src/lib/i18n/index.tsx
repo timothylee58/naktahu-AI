@@ -73,6 +73,8 @@ const MS: Translations = {
   'nav.pricing': 'Harga',
   'nav.agents': 'Ejen',
   'nav.warung_watch': 'Warung Watch',
+  'nav.group.ai': 'Tanya AI',
+  'nav.group.community': 'Komuniti',
   'nav.profile': 'Profil',
   'not_found.title': 'Halaman Tidak Dijumpai',
   'not_found.desc': 'Halaman yang anda cari tidak wujud atau telah dialihkan.',
@@ -285,8 +287,10 @@ const MS: Translations = {
 
   /* ── landing ── */
   'landing.badge': 'Dibuat untuk Malaysia',
-  'landing.hero.headline': 'Tanya apa sahaja tentang Malaysia.',
+  'landing.hero.headline': 'Tanya apa sahaja tentang kerajaan Malaysia.',
   'landing.hero.headline.highlight': 'Malaysia',
+  'landing.hero.disclaimer_note': 'NakTahu AI bukan nasihat rasmi kerajaan — sentiasa sahkan maklumat penting dengan agensi berkaitan.',
+  'landing.hero.pricing_note': 'Percuma — 25 soalan sehari. Pro dari RM19/bulan · kredit ejen dari RM5 →',
   'landing.hero.subtext':
     'NakTahu AI memberi jawapan berdasarkan sumber rasmi kerajaan.',
   'landing.tagline.01': 'Tanya je. Jawapan terus.',
@@ -432,10 +436,12 @@ const MS: Translations = {
   /* ── agents ── */
   'agents.hub.title': 'Ejen NakTahu',
   'agents.hub.subtitle':
-    'Ejen LangGraph dengan RAG sumber rasmi, penapisan pelan, dan meter kredit.',
+    'Pembantu langkah demi langkah untuk tugas kerajaan biasa — jawapan berdasarkan sumber rasmi, bukan agakan.',
   'agents.hub.link': 'Semua ejen',
   'agents.hub.open': 'Buka ejen',
   'agents.hub.sign_in': 'Daftar masuk untuk mengakses ejen produk.',
+  'agents.hub.credits_explainer':
+    'Sesetengah ejen guna "kredit" — setiap kredit = RM 5 dan setara satu penggunaan penuh ejen tersebut. Akaun percuma dapat beberapa kredit setiap bulan; pelan Perniagaan tiada had.',
   'agents.badge.new': 'Baharu',
   'agents.plan.free': 'Percuma',
   'agents.plan.pro': 'Pro',
@@ -445,7 +451,11 @@ const MS: Translations = {
   'agents.hub.upgrade_cta': 'Naik taraf · Harga ↗',
   'agents.compliance-drafter.title': 'Pengarang Pematuhan',
   'agents.compliance-drafter.desc':
-    'Laporan PDF pelbagai domain dengan semakan manusia. 1 kredit (Perniagaan tanpa had).',
+    'Jawab beberapa soalan tentang perniagaan anda dan dapatkan laporan pematuhan siap pakai — semak dahulu sebelum muat turun. 1 kredit (Perniagaan tanpa had).',
+  'agents.compliance-drafter.step_of': 'Langkah {current} daripada {total}',
+  'agents.compliance-drafter.intro':
+    '3 langkah ringkas (± 2 minit). Pada akhirnya, anda akan dapat pratonton laporan untuk disemak sebelum muat turun PDF.',
+  'agents.compliance-drafter.business_required': 'Sila pilih satu jenis perniagaan untuk teruskan.',
   'agents.compliance-drafter.step1': '1. Jenis perniagaan',
   'agents.compliance-drafter.step2': '2. Domain pematuhan',
   'agents.compliance-drafter.step3': '3. Semak laporan (HITL)',
@@ -476,10 +486,10 @@ const MS: Translations = {
   'agents.error.confirm_failed': 'Gagal menjana PDF. Sila cuba lagi.',
   'agents.study-agent.title': 'Ejen Pelajaran',
   'agents.study-agent.desc':
-    'Muat naik kertas SPM — ekstrak soalan, penjelasan RAG, penjejakan topik.',
+    'Muat naik kertas SPM anda — dapatkan penjelasan setiap soalan dan topik mana perlu diberi tumpuan.',
   'agents.immigration-navigator.title': 'Navigator Imigresen',
   'agents.immigration-navigator.desc':
-    'Intake visa 3–5 giliran → senarai semak, amaran, petikan dengan tarikh luput. 1 kredit.',
+    'Jawab beberapa soalan ringkas tentang tujuan lawatan anda → dapatkan senarai semak dokumen, amaran, dan rujukan rasmi. 1 kredit.',
   'agents.immigration-navigator.intent_step': 'Langkah 1',
   'agents.immigration-navigator.intent_prompt': 'Apa yang anda ingin lakukan?',
   'agents.immigration-navigator.intent_skip': 'Tulis sendiri sebaliknya →',
@@ -715,6 +725,8 @@ const EN: Translations = {
   'nav.pricing': 'Pricing',
   'nav.agents': 'Agents',
   'nav.warung_watch': 'Warung Watch',
+  'nav.group.ai': 'Ask AI',
+  'nav.group.community': 'Community',
   'nav.profile': 'Profile',
   'not_found.title': 'Page Not Found',
   'not_found.desc': "The page you're looking for doesn't exist or has been moved.",
@@ -927,8 +939,10 @@ const EN: Translations = {
 
   /* ── landing ── */
   'landing.badge': 'Built for Malaysia',
-  'landing.hero.headline': 'Ask anything about Malaysia.',
-  'landing.hero.headline.highlight': 'Malaysia',
+  'landing.hero.headline': 'Ask anything about the Malaysian government.',
+  'landing.hero.headline.highlight': 'Malaysian government',
+  'landing.hero.disclaimer_note': "NakTahu AI isn't official government advice — always verify anything important with the relevant agency.",
+  'landing.hero.pricing_note': 'Free — 25 questions/day. Pro from RM19/month · agent credits from RM5 →',
   'landing.hero.subtext':
     'NakTahu AI provides answers grounded in official government sources.',
   'landing.tagline.01': 'Ask once. Know now.',
@@ -1074,10 +1088,12 @@ const EN: Translations = {
   /* ── agents ── */
   'agents.hub.title': 'NakTahu Agents',
   'agents.hub.subtitle':
-    'LangGraph-powered agents with official-source RAG, plan gating, and credit metering.',
+    'Step-by-step helpers for everyday government tasks — answers grounded in official sources, not guesses.',
   'agents.hub.link': 'All agents',
   'agents.hub.open': 'Open agent',
   'agents.hub.sign_in': 'Sign in to access product agents.',
+  'agents.hub.credits_explainer':
+    "Some agents use \"credits\" — each credit is RM5 and covers one full use of that agent. Free accounts get a few credits every month; Business plans have no limit.",
   'agents.badge.new': 'New',
   'agents.plan.free': 'Free',
   'agents.plan.pro': 'Pro',
@@ -1087,7 +1103,11 @@ const EN: Translations = {
   'agents.hub.upgrade_cta': 'Upgrade · Pricing ↗',
   'agents.compliance-drafter.title': 'Compliance Drafter',
   'agents.compliance-drafter.desc':
-    'Multi-domain PDF report with human review. 1 credit (Business unlimited).',
+    "Answer a few questions about your business and get a ready-to-use compliance report — review it before you download. 1 credit (Business unlimited).",
+  'agents.compliance-drafter.step_of': 'Step {current} of {total}',
+  'agents.compliance-drafter.intro':
+    "3 quick steps (~2 min). At the end, you'll get a preview to review before downloading the PDF.",
+  'agents.compliance-drafter.business_required': 'Please pick a business type to continue.',
   'agents.compliance-drafter.step1': '1. Business type',
   'agents.compliance-drafter.step2': '2. Compliance domains',
   'agents.compliance-drafter.step3': '3. Review report (HITL)',
@@ -1118,10 +1138,10 @@ const EN: Translations = {
   'agents.error.confirm_failed': 'Failed to generate PDF. Please try again.',
   'agents.study-agent.title': 'Study Agent',
   'agents.study-agent.desc':
-    'Upload SPM past papers — extract questions, RAG explanations, topic tracking.',
+    'Upload your SPM past paper — get an explanation for every question and see which topics to focus on.',
   'agents.immigration-navigator.title': 'Immigration Navigator',
   'agents.immigration-navigator.desc':
-    '3–5 turn visa intake → checklist, warnings, expiry-aware citations. 1 credit.',
+    "Answer a few quick questions about your visit → get a document checklist, warnings, and official references. 1 credit.",
   'agents.immigration-navigator.intent_step': 'Step 1',
   'agents.immigration-navigator.intent_prompt': 'What are you trying to do?',
   'agents.immigration-navigator.intent_skip': 'Write it myself instead →',
@@ -1356,6 +1376,8 @@ const ZH: Translations = {
   'nav.pricing': '价格',
   'nav.agents': '智能代理',
   'nav.warung_watch': 'Warung Watch 排队观察',
+  'nav.group.ai': '问 AI',
+  'nav.group.community': '社区',
   'nav.profile': '个人资料',
   'not_found.title': '找不到页面',
   'not_found.desc': '您查找的页面不存在或已被移动。',
@@ -1570,6 +1592,8 @@ const ZH: Translations = {
   'landing.badge': '专为马来西亚打造',
   'landing.hero.headline': '为您解答关于马来西亚政策问题',
   'landing.hero.headline.highlight': '马来西亚',
+  'landing.hero.disclaimer_note': 'NakTahu AI 并非官方政府建议——重要事项请务必向相关机构核实。',
+  'landing.hero.pricing_note': '免费——每日25个问题。Pro 每月RM19起 · 代理点数RM5起 →',
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.tagline.01': '问一次，马上知道。',
   'landing.tagline.02': '马来西亚知识，触手可及。',
@@ -1699,9 +1723,10 @@ const ZH: Translations = {
 
   /* ── agents ── */
   'agents.hub.title': 'NakTahu 智能代理',
-  'agents.hub.subtitle': '基于 LangGraph 的智能代理agent，官方来源 RAG、套餐门控与点数计量。',
+  'agents.hub.subtitle': '为日常政府事务提供逐步指引 — 答案均以官方来源为依据，而非猜测。',
   'agents.hub.link': '全部代理',
   'agents.hub.open': '打开代理',
+  'agents.hub.credits_explainer': '部分代理需使用"点数" — 每点数为 RM5，可完整使用该代理一次。免费账户每月可获数点数；商业版无使用上限。',
   'agents.hub.sign_in': '请登录以使用产品代理。',
   'agents.badge.new': '新',
   'agents.plan.free': '免费',
@@ -1711,7 +1736,10 @@ const ZH: Translations = {
   'agents.plan.business': '商业',
   'agents.hub.upgrade_cta': '升级 · 价格 ↗',
   'agents.compliance-drafter.title': '合规起草代理',
-  'agents.compliance-drafter.desc': '多领域 PDF 报告，人工审核。1 点数（商业版无限）。',
+  'agents.compliance-drafter.desc': '回答几个关于您企业的问题，即可获得可直接使用的合规报告 — 下载前可先预览审阅。1 点数（商业版无限）。',
+  'agents.compliance-drafter.step_of': '第 {current} 步，共 {total} 步',
+  'agents.compliance-drafter.intro': '3 个简单步骤（约 2 分钟）。完成后可先预览报告，再下载 PDF。',
+  'agents.compliance-drafter.business_required': '请选择一种企业类型以继续。',
   'agents.compliance-drafter.step1': '1. 企业类型',
   'agents.compliance-drafter.step2': '2. 合规领域',
   'agents.compliance-drafter.step3': '3. 审核报告（人工确认）',
@@ -1741,9 +1769,9 @@ const ZH: Translations = {
   'agents.error.start_failed': '生成预览失败，请重试。',
   'agents.error.confirm_failed': '生成 PDF 失败，请重试。',
   'agents.study-agent.title': '学习 Agent',
-  'agents.study-agent.desc': '上传 SPM 试卷 — 提取题目、RAG 讲解、主题追踪。',
+  'agents.study-agent.desc': '上传您的 SPM 试卷 — 获取每道题目的讲解，并了解应重点复习的主题。',
   'agents.immigration-navigator.title': '移民导航代理',
-  'agents.immigration-navigator.desc': '3–5 轮签证信息采集 → 清单、警告、含有效期的引用。1 点数。',
+  'agents.immigration-navigator.desc': '回答几个关于您此行目的的简单问题 → 获取文件清单、注意事项与官方参考资料。1 点数。',
   'agents.immigration-navigator.intent_step': '第 1 步',
   'agents.immigration-navigator.intent_prompt': '您想要做什么？',
   'agents.immigration-navigator.intent_skip': '改为自行输入 →',

@@ -14,13 +14,19 @@ interface SiteNavLinksProps {
   hideHome?: boolean;
 }
 
+// "group" separates two different interaction models that shouldn't read as
+// one flat feature list: 'ai' items are turn-based AI consultations (ask a
+// question, get a structured/cited answer); 'community' is Warung Watch —
+// crowd-sourced, real-time, browse-and-glance, no RAG/citations/credits.
+// Mixing them undifferentiated sets the wrong expectation for what tapping
+// Warung Watch actually does.
 const LINKS = [
-  { href: '/about', key: 'nav.about', emoji: 'ℹ️' },
-  { href: '/faq', key: 'nav.faq', emoji: '❓' },
-  { href: '/pricing', key: 'nav.pricing', emoji: '💳' },
-  { href: '/developer', key: 'nav.developer', emoji: '🔌' },
-  { href: '/agents', key: 'nav.agents', emoji: '🤖' },
-  { href: '/warung-watch', key: 'nav.warung_watch', emoji: '🍜' },
+  { href: '/about', key: 'nav.about', emoji: 'ℹ️', group: 'ai' },
+  { href: '/faq', key: 'nav.faq', emoji: '❓', group: 'ai' },
+  { href: '/pricing', key: 'nav.pricing', emoji: '💳', group: 'ai' },
+  { href: '/developer', key: 'nav.developer', emoji: '🔌', group: 'ai' },
+  { href: '/agents', key: 'nav.agents', emoji: '🤖', group: 'ai' },
+  { href: '/warung-watch', key: 'nav.warung_watch', emoji: '🍜', group: 'community' },
 ] as const;
 
 export function SiteNavLinks({
@@ -40,13 +46,19 @@ export function SiteNavLinks({
   // header (LandingHeader) uses this same component and keeps its plain
   // text-only look.
   const showEmoji = layout === 'vertical';
+  // Group divider is a vertical-sidebar-only affordance too — the horizontal
+  // landing header's flat pill row has no room for a section label and
+  // isn't the primary app nav this distinction matters most for.
+  const showGroups = layout === 'vertical';
+  const aiLinks = visibleLinks.filter((link) => link.group === 'ai');
+  const communityLinks = visibleLinks.filter((link) => link.group === 'community');
 
   const linkClass = (href: string, emphasized = false) => {
     const active = pathname === href || (href !== '/' && pathname.startsWith(href));
     if (emphasized) {
       return isDark
-        ? 'border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
-        : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100';
+        ? 'border-nk-official/40 bg-nk-official/10 text-nk-official hover:bg-nk-official/20'
+        : 'border-nk-official/30 bg-nk-official/5 text-nk-official-dim hover:bg-nk-official/10';
     }
     if (active) {
       return isDark
@@ -89,17 +101,70 @@ export function SiteNavLinks({
           {t('nav.home')}
         </Link>
       )}
-      {visibleLinks.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          onClick={onNavigate}
-          className={`${itemClass} ${linkClass(link.href)}`}
-        >
-          {showEmoji && <span aria-hidden="true">{link.emoji} </span>}
-          {t(link.key)}
-        </Link>
-      ))}
+      {showGroups ? (
+        <>
+          {!hideHome && (
+            <span
+              className={`px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider ${
+                isDark ? 'text-zinc-500' : 'text-zinc-400'
+              }`}
+            >
+              {t('nav.group.ai')}
+            </span>
+          )}
+          {aiLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={onNavigate}
+              className={`${itemClass} ${linkClass(link.href)}`}
+            >
+              {showEmoji && <span aria-hidden="true">{link.emoji} </span>}
+              {t(link.key)}
+            </Link>
+          ))}
+          {communityLinks.length > 0 && (
+            <>
+              <span
+                className={`px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider ${
+                  isDark ? 'text-zinc-500' : 'text-zinc-400'
+                }`}
+              >
+                {t('nav.group.community')}
+              </span>
+              {communityLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={onNavigate}
+                  className={`${itemClass} ${linkClass(link.href)} flex items-center gap-1.5`}
+                >
+                  {showEmoji && <span aria-hidden="true">{link.emoji} </span>}
+                  {t(link.key)}
+                  {/* Live-pulse dot — signals "real-time crowd data", distinct
+                      from the static-document AI agents above. */}
+                  <span className="relative flex h-1.5 w-1.5 flex-shrink-0" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-nk-community opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-nk-community" />
+                  </span>
+                </Link>
+              ))}
+            </>
+          )}
+        </>
+      ) : (
+        visibleLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={onNavigate}
+            className={`${itemClass} ${linkClass(link.href)}`}
+          >
+            {showEmoji && <span aria-hidden="true">{link.emoji} </span>}
+            {t(link.key)}
+          </Link>
+        ))
+      )}
     </nav>
   );
 }

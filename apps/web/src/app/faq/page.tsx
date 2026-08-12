@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
@@ -10,12 +10,39 @@ import { useTheme } from '@/lib/theme';
 interface FAQItem {
   question: string;
   answer: string;
+  sourceUrl?: string;
 }
+
+const SOURCE_LABEL: Record<string, string> = {
+  ms: '↗ Lihat sumber rasmi',
+  en: '↗ View official source',
+  zh: '↗ 查看官方来源',
+};
+
+// Groups the 12 flat FAQ items into 3 scannable clusters so a reader
+// looking for "is this trustworthy" vs "how do I use it" vs "my account"
+// doesn't have to read a single undifferentiated list top to bottom.
+// Indices are identical across all three languages (same item order),
+// so one index map covers every locale.
+const GROUP_INDEXES: number[][] = [
+  [0, 1, 2, 6], // Asas / Basics — what it is, cost, languages, voice input
+  [3, 4, 5, 9, 10, 11], // Ketepatan & Kepercayaan / Accuracy & Trust
+  [7, 8], // Akaun & Privasi / Account & Privacy
+];
+
+const GROUP_LABELS: Record<string, string[]> = {
+  ms: ['Asas', 'Ketepatan & Kepercayaan', 'Akaun & Privasi'],
+  en: ['Basics', 'Accuracy & Trust', 'Account & Privacy'],
+  zh: ['基础', '准确性与信任', '账户与隐私'],
+};
 
 export default function FAQPage() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const reduceMotion = useReducedMotion();
+  // Only one item open at a time — keeps the long question list scannable
+  // instead of letting every answer stack up on the page at once.
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const faqs: Record<string, { title: string; subtitle: string; items: FAQItem[] }> = {
@@ -38,6 +65,7 @@ export default function FAQPage() {
         {
           question: 'Dari mana data jawapan diperolehi?',
           answer: 'Semua jawapan berdasarkan dokumen rasmi dari portal kerajaan Malaysia (gov.my), LHDN, KWSP/EPF, SSM, Kementerian Pendidikan, Jabatan Imigresen, dan agensi kerajaan lain yang sah.',
+          sourceUrl: 'https://www.malaysia.gov.my/',
         },
         {
           question: 'Sejauh mana ketepatan jawapan?',
@@ -92,6 +120,7 @@ export default function FAQPage() {
         {
           question: 'Where does the answer data come from?',
           answer: 'All answers are based on official documents from Malaysian government portals (gov.my), LHDN, EPF/KWSP, SSM, Ministry of Education, Immigration Department, and other verified government agencies.',
+          sourceUrl: 'https://www.malaysia.gov.my/',
         },
         {
           question: 'How accurate are the answers?',
@@ -146,6 +175,7 @@ export default function FAQPage() {
         {
           question: '答案数据来自哪里？',
           answer: '所有答案均基于马来西亚政府门户网站 (gov.my)、国内税收局、雇员公积金、公司委员会、教育部、移民局和其他经过验证的政府机构的官方文件。',
+          sourceUrl: 'https://www.malaysia.gov.my/',
         },
         {
           question: '答案准确度如何？',
@@ -186,7 +216,7 @@ export default function FAQPage() {
   const content = locale === 'zh' ? faqs.zh : locale === 'en' ? faqs.en : faqs.ms;
 
   return (
-    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
       <LandingHeader />
 
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
@@ -202,54 +232,84 @@ export default function FAQPage() {
               <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{content.subtitle}</p>
             </header>
 
-            <div className="space-y-3">
-              {content.items.map((faq, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05, duration: 0.3 }}
-                  className={`rounded-xl overflow-hidden border ${
-                    isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
-                  }`}
-                >
-                  <button
-                    onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                    className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
-                      isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'
-                    }`}
-                  >
-                    <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
-                    <motion.svg
-                      animate={{ rotate: openIndex === index ? 180 : 0 }}
-                      transition={{ duration: 0.2 }}
-                      className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+            {GROUP_INDEXES.map((group, groupIdx) => (
+              <div key={groupIdx} className="space-y-3">
+                <h2 className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                  {(GROUP_LABELS[locale] ?? GROUP_LABELS.en)[groupIdx]}
+                </h2>
+                {group.map((index) => {
+                  const faq = content.items[index];
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: reduceMotion ? 0 : index * 0.04, duration: 0.3, ease: 'easeOut' }}
+                      className={`rounded-xl overflow-hidden border ${
+                        isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
+                      }`}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </motion.svg>
-                  </button>
-
-                  <AnimatePresence>
-                    {openIndex === index && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
+                      <button
+                        onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                        aria-expanded={openIndex === index}
+                        className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
+                          isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'
+                        }`}
                       >
-                        <div className={`px-6 pb-4 leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                          {faq.answer}
+                        <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
+                        <svg
+                          style={{
+                            transform: `rotate(${openIndex === index ? 135 : 0}deg)`,
+                            transition: reduceMotion ? 'none' : 'transform 0.15s ease-out',
+                          }}
+                          className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden
+                        >
+                          {/* A "+" that rotates into an "×" reads as opening/closing a
+                              panel, not just flipping a chevron. */}
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+
+                      {/* grid-template-rows 0fr -> 1fr instead of height:auto / max-height
+                          hacks — the inner content's real height animates smoothly with no
+                          snap or overshoot, and no exit-animation choreography is needed.
+                          Only the interacted panel's rows value changes on any given
+                          click — siblings that are already open/closed don't re-render
+                          their transition, so there's no visual noise from neighbors. */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateRows: openIndex === index ? '1fr' : '0fr',
+                          transition: reduceMotion ? 'none' : 'grid-template-rows 0.2s ease-out',
+                        }}
+                      >
+                        <div className="overflow-hidden">
+                          <div className={`px-6 pb-4 leading-relaxed flex flex-col gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                            <p>{faq.answer}</p>
+                            {faq.sourceUrl && (
+                              <a
+                                href={faq.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`self-start text-sm font-medium transition-colors ${
+                                  isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                                }`}
+                              >
+                                {SOURCE_LABEL[locale] ?? SOURCE_LABEL.en}
+                              </a>
+                            )}
+                          </div>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ))}
 
             <div className="flex flex-col items-center gap-4 pt-8 text-center">
               <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>{locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?'}</p>

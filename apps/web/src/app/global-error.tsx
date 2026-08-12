@@ -39,7 +39,7 @@ export default function GlobalError({
           alignItems: 'center',
           justifyContent: 'center',
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          background: '#0A0F1E',
+          background: '#12151C',
           color: '#fff',
           padding: '1.5rem',
         }}
@@ -60,7 +60,7 @@ export default function GlobalError({
             type="button"
             onClick={reset}
             style={{
-              background: '#2563EB',
+              background: '#3B6FE0',
               color: '#fff',
               border: 'none',
               borderRadius: '9999px',

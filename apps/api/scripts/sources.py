@@ -223,6 +223,48 @@ SOURCES: tuple[Source, ...] = (
             "the employer-registration facts tagged 'epf' above)."
         ),
     ),
+
+    # ── tax incentives (Pioneer Status / ITA / RA — statutory, not grant_database) ──
+    # Confirmed real via WebSearch (returned live content snippets: "Pioneer
+    # Status (PS) provides income tax exemption of 70%-100% of statutory
+    # income for 5 to 10 years"; "Investment Tax Allowance (ITA) offers an
+    # allowance of 60%-100% on qualifying capital expenditure") — but NOT
+    # content-verified via a direct fetch, same sandbox-egress restriction
+    # as the property/business/epf/legal sources above (mida.gov.my is
+    # blocked by this environment's network egress proxy, not a site
+    # issue). Deliberately routed into document_chunks (RAG), not
+    # grant_database: Pioneer Status/ITA/RA are percentage-of-income /
+    # percentage-of-capex statutory tax reliefs, not fixed-MYR-band grants —
+    # grant_database's amount_min_myr/amount_max_myr schema doesn't fit
+    # them, and forcing a numeric "amount" would mean guessing a figure
+    # that isn't actually what the incentive grants. RAG lets chat/agents
+    # answer questions about them with a real citation instead.
+    Source(
+        name="mida-tax-incentives-overview",
+        url="https://www.mida.gov.my/setting-up-content/incentives/",
+        kind="html",
+        domain="tax",
+        ministry="Malaysian Investment Development Authority (MIDA)",
+        language="en",
+        notes=(
+            "Pioneer Status and Investment Tax Allowance (ITA) overview — "
+            "exemption/allowance percentages and duration under the Promotion "
+            "of Investments Act 1986."
+        ),
+    ),
+    Source(
+        name="mida-reinvestment-allowance",
+        url="https://www.mida.gov.my/setting-up-content/expand-and-diversify/",
+        kind="html",
+        domain="tax",
+        ministry="Malaysian Investment Development Authority (MIDA)",
+        language="en",
+        notes=(
+            "Reinvestment Allowance (RA) — incentive for existing companies "
+            "expanding, modernising, or diversifying manufacturing/processing "
+            "activity, under Schedule 7A of the Income Tax Act 1967."
+        ),
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}

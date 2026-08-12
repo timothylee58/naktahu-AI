@@ -189,6 +189,7 @@ function HistoryRow({
       <button
         onClick={onClick}
         disabled={busy}
+        title={summary ? `${headline}\n${entry.query}` : headline}
         className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 disabled:opacity-50 ${hoverClass}`}
       >
         <div className="flex items-start justify-between gap-1">
@@ -329,7 +330,7 @@ function SidebarPanel({
   };
 
   const headerBorder = isDark ? 'border-white/10' : 'border-zinc-100';
-  const footerBorder = isDark ? 'border-white/10 bg-[#0A0F1E]/80' : 'border-zinc-100 bg-zinc-50/80';
+  const footerBorder = isDark ? 'border-white/10 bg-[#12151C]/80' : 'border-zinc-100 bg-zinc-50/80';
   const titleClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const closeHover = isDark ? 'hover:bg-white/10 text-zinc-400 hover:text-zinc-200' : 'hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700';
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-500';
@@ -483,6 +484,7 @@ const RAIL_LINKS = [
   { href: '/pricing', emoji: '💳', titleKey: 'nav.pricing' },
   { href: '/developer', emoji: '🔌', titleKey: 'nav.developer' },
   { href: '/agents', emoji: '🤖', titleKey: 'nav.agents' },
+  { href: '/warung-watch', emoji: '🍜', titleKey: 'nav.warung_watch' },
 ] as const;
 
 /** Icon-only collapsed rail — desktop only. Secondary controls (language,
@@ -577,7 +579,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const isDark = variant === 'dark';
   const shellClass = isDark
-    ? 'bg-[#0A0F1E] border-white/10 text-white'
+    ? 'bg-[#12151C] border-white/10 text-white'
     : 'bg-white border-zinc-200 text-zinc-900';
 
   const panelProps = {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import type { Citation } from '@/lib/types';
 
@@ -18,8 +18,17 @@ function truncate(s: string, max: number) {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
 }
 
+// The "stamp" is this app's one signature, brand-owned visual moment —
+// every other surface (nav, forms, cards) stays quiet and disciplined so
+// this doesn't compete with a second decorative element. A double border
+// echoes an official rubber stamp; the mono face reads as "record/data",
+// distinct from the conversational sans used everywhere else; the slight
+// rotation on hover gives it a tactile, physical-stamp feel. It's earned
+// here specifically because this chip *is* the proof of official sourcing
+// — the product's core differentiator, encoded into the interface itself.
 export function CitationChip({ citation, index }: CitationChipProps) {
   const { t } = useI18n();
+  const reduceMotion = useReducedMotion();
   const url = citation.url ?? citation.source_url;
   const title = citation.title ?? citation.source_title ?? '';
   const hasUrl = Boolean(url);
@@ -70,22 +79,28 @@ export function CitationChip({ citation, index }: CitationChipProps) {
     >
       <motion.button
         type="button"
-        whileHover={{ scale: 1.03 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+        // Stamp-down entrance: a small overshoot-and-settle when a citation
+        // first appears in a streamed answer — this is the one place we
+        // allow a slightly more expressive motion, because it reinforces
+        // meaning ("this claim just got verified/stamped"), not decoration.
+        initial={reduceMotion ? false : { opacity: 0, scale: 1.08, rotate: -2 }}
+        animate={{ opacity: 1, scale: 1, rotate: -1 }}
+        transition={reduceMotion ? { duration: 0.15 } : { duration: 0.25, ease: 'easeOut' }}
+        whileHover={reduceMotion ? undefined : { rotate: 1.5, scale: 1.02 }}
         aria-expanded={open}
         aria-describedby={open ? popoverId : undefined}
         onClick={() => setPinned((p) => !p)}
-        className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium transition-colors dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20"
+        className="inline-flex items-center gap-1.5 rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 text-nk-official-dim px-3 py-1 text-xs font-medium transition-colors dark:bg-nk-official/10 dark:border-nk-official/40 dark:text-nk-official cursor-pointer hover:bg-nk-official/10 dark:hover:bg-nk-official/15"
       >
         {typeof index === 'number' && (
           <span
             aria-hidden="true"
-            className="flex-shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold dark:bg-blue-500"
+            className="flex-shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-nk-official text-white text-[10px] font-bold font-mono"
           >
             {index}
           </span>
         )}
-        <span className="font-semibold truncate max-w-[6rem]">{citation.ministry}</span>
+        <span className="font-mono font-semibold uppercase tracking-tight truncate max-w-[6rem]">{citation.ministry}</span>
         <span className="opacity-70">·</span>
         <span className="truncate max-w-[12rem]">{truncate(title, 32)}</span>
       </motion.button>
@@ -99,9 +114,9 @@ export function CitationChip({ citation, index }: CitationChipProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-30 left-0 top-full mt-1.5 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-lg dark:border-white/10 dark:bg-[#111827]"
+            className="absolute z-30 left-0 top-full mt-1.5 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-lg dark:border-white/10 dark:bg-nk-surface"
           >
-            <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{citation.ministry}</p>
+            <p className="text-xs font-mono font-semibold uppercase tracking-tight text-zinc-900 dark:text-zinc-100">{citation.ministry}</p>
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 locale-text-balance">{title}</p>
             {confidencePct !== null && (
               <p className={`mt-1.5 text-[11px] font-medium ${confidenceColor}`}>
@@ -116,7 +131,7 @@ export function CitationChip({ citation, index }: CitationChipProps) {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-nk-official-dim hover:text-nk-official dark:text-nk-official dark:hover:text-nk-official/80"
               >
                 {t('citation.view_source')}
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3" aria-hidden>

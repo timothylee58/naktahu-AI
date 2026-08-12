@@ -299,9 +299,6 @@ export function ChatInput({
       <span className={`text-[10px] tabular-nums flex-shrink-0 select-none ${contextLabelClass}`}>
         {usageLabel}
       </span>
-      <span className={`text-[10px] flex-shrink-0 select-none hidden sm:inline ${contextLabelClass}`}>
-        {t('chat.context_window')}
-      </span>
     </div>
     </div>
   );

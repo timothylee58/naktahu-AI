@@ -99,9 +99,9 @@ function ScenarioCard({ scenario, isDark, autoStart }: ScenarioCardProps) {
               href={scenario.citation.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-full px-3 py-1 text-xs font-medium no-underline transition-colors hover:bg-blue-100 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-500/20"
+              className="inline-flex items-center gap-1.5 rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 text-nk-official-dim px-3 py-1 text-xs font-medium no-underline transition-colors hover:bg-nk-official/10 dark:bg-nk-official/10 dark:border-nk-official/40 dark:text-nk-official dark:hover:bg-nk-official/15"
             >
-              <span className="font-semibold">{scenario.citation.ministry}</span>
+              <span className="font-mono font-semibold uppercase tracking-tight">{scenario.citation.ministry}</span>
               <span className="opacity-70">·</span>
               <span>{t(scenario.citation.titleKey)}</span>
             </a>
@@ -149,7 +149,7 @@ export function InteractiveAnswerPreview({ isDark = true }: InteractiveAnswerPre
     ? 'bg-white/5 border-white/10'
     : 'bg-white border-zinc-200 shadow-sm';
   const chromeClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const tabActiveClass = 'bg-[#2563EB] text-white';
+  const tabActiveClass = 'bg-[#3B6FE0] text-white';
   const tabInactiveClass = isDark
     ? 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
     : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700';

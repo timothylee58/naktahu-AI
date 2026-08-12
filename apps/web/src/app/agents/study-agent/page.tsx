@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
@@ -9,9 +10,10 @@ import { agentTitleKey } from '@/lib/agents';
 
 const SUBJECTS = ['sejarah', 'matematik', 'sains', 'bm', 'bi'];
 
-export default function StudyAgentPage() {
+function StudyAgentPageInner() {
   const { t } = useI18n();
-  const { start, continue: cont } = useAgentApi();
+  const { start, continue: cont, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [subject, setSubject] = useState('sejarah');
   const [paperText, setPaperText] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -46,6 +48,25 @@ export default function StudyAgentPage() {
       setLoading(false);
     }
   };
+
+  // Resume from History's "?run=<agent_runs.id>" link — populating
+  // `output` non-empty is enough to render the results section below;
+  // there's no separate step/phase gate on this page. Silent fallback to
+  // a fresh intake on any failure (bad/expired link) rather than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        setOutput((run.output as Record<string, unknown>) ?? {});
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const explanations = (output?.explanations as Array<Record<string, unknown>>) ?? [];
   const topics = output?.topic_progress as Record<string, number> | undefined;
@@ -108,5 +129,13 @@ export default function StudyAgentPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function StudyAgentPage() {
+  return (
+    <Suspense>
+      <StudyAgentPageInner />
+    </Suspense>
   );
 }

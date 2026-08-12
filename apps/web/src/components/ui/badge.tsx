@@ -8,10 +8,14 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+        default: 'bg-nk-official/10 text-nk-official-dim dark:bg-nk-official/15 dark:text-nk-official',
         secondary: 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300',
         success: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
         outline: 'border border-zinc-200 text-zinc-600 dark:border-white/15 dark:text-zinc-300',
+        // Crowd-sourced/community content (Warung Watch) — gold, distinct
+        // from "default"'s official-blue so the two-accent categorization
+        // holds wherever Badge is reused.
+        community: 'bg-nk-community/10 text-nk-community-dim dark:bg-nk-community/15 dark:text-nk-community',
       },
     },
     defaultVariants: {

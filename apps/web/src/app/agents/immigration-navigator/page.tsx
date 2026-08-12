@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChatBubbles, QuickReplies, type ChatMessage } from '@/components/agents/ChatBubbles';
@@ -20,9 +21,10 @@ const INTENTS: { id: string; icon: string; titleKey: string; descKey: string; me
   { id: 'extend', icon: '🔄', titleKey: 'agents.immigration-navigator.intent.extend.title', descKey: 'agents.immigration-navigator.intent.extend.desc', message: 'Extend my current visa' },
 ];
 
-export default function ImmigrationNavigatorPage() {
+function ImmigrationNavigatorPageInner() {
   const { t } = useI18n();
-  const { start, continue: cont } = useAgentApi();
+  const { start, continue: cont, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [intentChosen, setIntentChosen] = useState(false);
   const [message, setMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -41,6 +43,42 @@ export default function ImmigrationNavigatorPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Resume from History's "?run=<agent_runs.id>" link. The chat transcript
+  // itself isn't persisted server-side (only the latest structured output
+  // is), so this can't replay every prior message — it restores the
+  // structured state (visa_type/checklist/warnings/session_id so a
+  // follow-up message continues the real LangGraph thread) and adds one
+  // synthetic bot message summarizing where the conversation left off,
+  // which is honest about what's actually being restored. Silent fallback
+  // to a fresh intake on any failure (bad/expired link) rather than an
+  // error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        const out = (run.output as Record<string, unknown>) ?? {};
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        setIntentChosen(true);
+        setTurnsCount(typeof run.turns_count === 'number' ? run.turns_count : 0);
+        if (out.visa_type) setVisaType(String(out.visa_type));
+        if (Array.isArray(out.checklist)) setChecklist(out.checklist as string[]);
+        if (Array.isArray(out.warnings)) setWarnings(out.warnings as string[]);
+        const lastResponse = out.response ?? out.summary ?? out.output;
+        if (lastResponse) {
+          setMessages((prev) => [
+            ...prev,
+            { id: 'resumed', role: 'bot', content: String(lastResponse) },
+          ]);
+        }
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const send = async (text?: string) => {
     const msg = text ?? message;
@@ -173,5 +211,13 @@ export default function ImmigrationNavigatorPage() {
         )}
       </motion.div>
     </>
+  );
+}
+
+export default function ImmigrationNavigatorPage() {
+  return (
+    <Suspense>
+      <ImmigrationNavigatorPageInner />
+    </Suspense>
   );
 }

@@ -225,7 +225,7 @@ export default function DeveloperPage() {
   }, [usage]);
 
   return (
-    <div className={`flex h-full ${isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50'}`}>
+    <div className={`flex h-full ${isDark ? 'bg-[#12151C]' : 'bg-zinc-50/50'}`}>
       <AppSidebar
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
@@ -238,7 +238,7 @@ export default function DeveloperPage() {
 
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-y-auto text-zinc-900 dark:text-white">
       <header className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${
-        isDark ? 'border-white/10 bg-[#0A0F1E]/90' : 'border-zinc-100 bg-white/90'
+        isDark ? 'border-white/10 bg-[#12151C]/90' : 'border-zinc-100 bg-white/90'
       }`}>
         <button
           onClick={() => setSidebarOpen(true)}
@@ -425,11 +425,11 @@ export default function DeveloperPage() {
                       <Tooltip
                         contentStyle={
                           isDark
-                            ? { background: '#0A0F1E', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }
+                            ? { background: '#12151C', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }
                             : undefined
                         }
                       />
-                      <Line type="monotone" dataKey="count" stroke="#2563EB" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="count" stroke="#3B6FE0" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
