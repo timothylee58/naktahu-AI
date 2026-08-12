@@ -11,6 +11,8 @@ import { useI18n } from '@/lib/i18n';
 
 type Step = 'business' | 'domains' | 'preview' | 'done';
 
+const STEP_ORDER: Step[] = ['business', 'domains', 'preview', 'done'];
+
 const BUSINESS_TYPES = [
   { id: 'sole_proprietor', labelKey: 'agents.compliance-drafter.business.sole', icon: '🏪', desc: 'Enterprise Perseorangan' },
   { id: 'sdn_bhd', labelKey: 'agents.compliance-drafter.business.sdn', icon: '🏢', desc: 'Syarikat Sendirian Berhad' },
@@ -121,7 +123,11 @@ function ComplianceDrafterPageInner() {
   const { start, post, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('business');
-  const [businessType, setBusinessType] = useState('sole_proprietor');
+  // No default selected — this report has legal/financial consequences,
+  // so a rushed "click Next without reading" shouldn't silently generate
+  // a report for the wrong business type. Force an active choice instead.
+  const [businessType, setBusinessType] = useState('');
+  const [businessTypeTouched, setBusinessTypeTouched] = useState(false);
   const [domains, setDomains] = useState<string[]>(['tax', 'business', 'epf']);
   const [context, setContext] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -217,9 +223,32 @@ function ComplianceDrafterPageInner() {
           </div>
         )}
 
+        {step !== 'done' && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              <span>
+                {t('agents.compliance-drafter.step_of')
+                  .replace('{current}', String(STEP_ORDER.indexOf(step) + 1))
+                  .replace('{total}', String(STEP_ORDER.length - 1))}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden dark:bg-white/10">
+              <div
+                className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                style={{ width: `${((STEP_ORDER.indexOf(step) + 1) / (STEP_ORDER.length - 1)) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {step === 'business' && (
           <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
-            <h2 className="font-semibold">{t('agents.compliance-drafter.step1')}</h2>
+            <div>
+              <h2 className="font-semibold">{t('agents.compliance-drafter.step1')}</h2>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {t('agents.compliance-drafter.intro')}
+              </p>
+            </div>
             <div className="flex flex-col gap-2">
               {BUSINESS_TYPES.map((b) => (
                 <label key={b.id} className="flex items-center gap-2 text-sm">
@@ -227,12 +256,15 @@ function ComplianceDrafterPageInner() {
                     type="radio"
                     name="business"
                     checked={businessType === b.id}
-                    onChange={() => setBusinessType(b.id)}
+                    onChange={() => { setBusinessType(b.id); setBusinessTypeTouched(true); }}
                     className="accent-blue-600"
                   />
                   {t(b.labelKey)}
                 </label>
               ))}
+              {businessTypeTouched && !businessType && (
+                <p className="text-xs text-red-600 dark:text-red-400">{t('agents.compliance-drafter.business_required')}</p>
+              )}
             </div>
             <textarea
               className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
@@ -243,7 +275,13 @@ function ComplianceDrafterPageInner() {
             />
             <button
               type="button"
-              onClick={() => setStep('domains')}
+              onClick={() => {
+                if (!businessType) {
+                  setBusinessTypeTouched(true);
+                  return;
+                }
+                setStep('domains');
+              }}
               className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold"
             >
               {t('agents.compliance-drafter.next')}
@@ -291,7 +329,16 @@ function ComplianceDrafterPageInner() {
 
         {step === 'preview' && report && (
           <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
-            <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
+              <button
+                type="button"
+                onClick={() => setStep('domains')}
+                className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors dark:text-zinc-400 dark:hover:text-white"
+              >
+                {t('agents.compliance-drafter.back')}
+              </button>
+            </div>
 
             <div className="flex flex-col gap-3">
               {reportSections.map((section, i) => {

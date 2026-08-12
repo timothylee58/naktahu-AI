@@ -450,6 +450,10 @@ const MS: Translations = {
   'agents.compliance-drafter.title': 'Pengarang Pematuhan',
   'agents.compliance-drafter.desc':
     'Jawab beberapa soalan tentang perniagaan anda dan dapatkan laporan pematuhan siap pakai — semak dahulu sebelum muat turun. 1 kredit (Perniagaan tanpa had).',
+  'agents.compliance-drafter.step_of': 'Langkah {current} daripada {total}',
+  'agents.compliance-drafter.intro':
+    '3 langkah ringkas (± 2 minit). Pada akhirnya, anda akan dapat pratonton laporan untuk disemak sebelum muat turun PDF.',
+  'agents.compliance-drafter.business_required': 'Sila pilih satu jenis perniagaan untuk teruskan.',
   'agents.compliance-drafter.step1': '1. Jenis perniagaan',
   'agents.compliance-drafter.step2': '2. Domain pematuhan',
   'agents.compliance-drafter.step3': '3. Semak laporan (HITL)',
@@ -1096,6 +1100,10 @@ const EN: Translations = {
   'agents.compliance-drafter.title': 'Compliance Drafter',
   'agents.compliance-drafter.desc':
     "Answer a few questions about your business and get a ready-to-use compliance report — review it before you download. 1 credit (Business unlimited).",
+  'agents.compliance-drafter.step_of': 'Step {current} of {total}',
+  'agents.compliance-drafter.intro':
+    "3 quick steps (~2 min). At the end, you'll get a preview to review before downloading the PDF.",
+  'agents.compliance-drafter.business_required': 'Please pick a business type to continue.',
   'agents.compliance-drafter.step1': '1. Business type',
   'agents.compliance-drafter.step2': '2. Compliance domains',
   'agents.compliance-drafter.step3': '3. Review report (HITL)',
@@ -1723,6 +1731,9 @@ const ZH: Translations = {
   'agents.hub.upgrade_cta': '升级 · 价格 ↗',
   'agents.compliance-drafter.title': '合规起草代理',
   'agents.compliance-drafter.desc': '回答几个关于您企业的问题，即可获得可直接使用的合规报告 — 下载前可先预览审阅。1 点数（商业版无限）。',
+  'agents.compliance-drafter.step_of': '第 {current} 步，共 {total} 步',
+  'agents.compliance-drafter.intro': '3 个简单步骤（约 2 分钟）。完成后可先预览报告，再下载 PDF。',
+  'agents.compliance-drafter.business_required': '请选择一种企业类型以继续。',
   'agents.compliance-drafter.step1': '1. 企业类型',
   'agents.compliance-drafter.step2': '2. 合规领域',
   'agents.compliance-drafter.step3': '3. 审核报告（人工确认）',
