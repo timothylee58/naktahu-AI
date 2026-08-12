@@ -111,6 +111,14 @@ export function LandingClient() {
           🇲🇾 {t('landing.badge')}
         </motion.div>
 
+        {/* Trust disclaimer surfaced right under the badge, not buried in
+            the footer — for tax/immigration-adjacent answers, "this isn't
+            official government advice" is reassurance a first-time visitor
+            needs before they start typing, not after they scroll away. */}
+        <p className={`text-xs max-w-md locale-text-balance ${mutedText}`}>
+          ℹ️ {t('landing.hero.disclaimer_note')}
+        </p>
+
         <motion.h1
           custom={1}
           variants={fadeUp}
@@ -219,6 +227,15 @@ export function LandingClient() {
             className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
           >
             {t('landing.hero.secondary_cta')}
+          </Link>
+          {/* Real numbers pulled from the actual pricing page (pricing.free.feature.1,
+              pricing.pro.price, pricing.credits.subtitle) — not a separate marketing
+              claim that could drift from what /pricing actually charges. */}
+          <Link
+            href="/pricing"
+            className={`text-xs hover:text-[#2563EB] transition-colors locale-nowrap ${mutedText}`}
+          >
+            {t('landing.hero.pricing_note')}
           </Link>
         </motion.div>
       </section>
@@ -332,7 +349,7 @@ export function LandingClient() {
         <div className="flex flex-col items-center sm:items-end gap-1 text-center sm:text-right">
           <div className="flex items-center gap-3">
             <a
-              href="https://github.com"
+              href="https://github.com/timothylee58/naktahu-AI"
               target="_blank"
               rel="noopener noreferrer"
               className={`transition-colors locale-nowrap ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}

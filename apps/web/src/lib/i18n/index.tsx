@@ -285,8 +285,10 @@ const MS: Translations = {
 
   /* ── landing ── */
   'landing.badge': 'Dibuat untuk Malaysia',
-  'landing.hero.headline': 'Tanya apa sahaja tentang Malaysia.',
+  'landing.hero.headline': 'Tanya apa sahaja tentang kerajaan Malaysia.',
   'landing.hero.headline.highlight': 'Malaysia',
+  'landing.hero.disclaimer_note': 'NakTahu AI bukan nasihat rasmi kerajaan — sentiasa sahkan maklumat penting dengan agensi berkaitan.',
+  'landing.hero.pricing_note': 'Percuma — 25 soalan sehari. Pro dari RM19/bulan · kredit ejen dari RM5 →',
   'landing.hero.subtext':
     'NakTahu AI memberi jawapan berdasarkan sumber rasmi kerajaan.',
   'landing.tagline.01': 'Tanya je. Jawapan terus.',
@@ -927,8 +929,10 @@ const EN: Translations = {
 
   /* ── landing ── */
   'landing.badge': 'Built for Malaysia',
-  'landing.hero.headline': 'Ask anything about Malaysia.',
-  'landing.hero.headline.highlight': 'Malaysia',
+  'landing.hero.headline': 'Ask anything about the Malaysian government.',
+  'landing.hero.headline.highlight': 'Malaysian government',
+  'landing.hero.disclaimer_note': "NakTahu AI isn't official government advice — always verify anything important with the relevant agency.",
+  'landing.hero.pricing_note': 'Free — 25 questions/day. Pro from RM19/month · agent credits from RM5 →',
   'landing.hero.subtext':
     'NakTahu AI provides answers grounded in official government sources.',
   'landing.tagline.01': 'Ask once. Know now.',
@@ -1570,6 +1574,8 @@ const ZH: Translations = {
   'landing.badge': '专为马来西亚打造',
   'landing.hero.headline': '为您解答关于马来西亚政策问题',
   'landing.hero.headline.highlight': '马来西亚',
+  'landing.hero.disclaimer_note': 'NakTahu AI 并非官方政府建议——重要事项请务必向相关机构核实。',
+  'landing.hero.pricing_note': '免费——每日25个问题。Pro 每月RM19起 · 代理点数RM5起 →',
   'landing.hero.subtext': 'NakTahu AI 提供基于官方政府来源的答案。',
   'landing.tagline.01': '问一次，马上知道。',
   'landing.tagline.02': '马来西亚知识，触手可及。',
