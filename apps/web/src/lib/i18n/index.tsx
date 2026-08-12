@@ -434,10 +434,12 @@ const MS: Translations = {
   /* ── agents ── */
   'agents.hub.title': 'Ejen NakTahu',
   'agents.hub.subtitle':
-    'Ejen LangGraph dengan RAG sumber rasmi, penapisan pelan, dan meter kredit.',
+    'Pembantu langkah demi langkah untuk tugas kerajaan biasa — jawapan berdasarkan sumber rasmi, bukan agakan.',
   'agents.hub.link': 'Semua ejen',
   'agents.hub.open': 'Buka ejen',
   'agents.hub.sign_in': 'Daftar masuk untuk mengakses ejen produk.',
+  'agents.hub.credits_explainer':
+    'Sesetengah ejen guna "kredit" — setiap kredit = RM 5 dan setara satu penggunaan penuh ejen tersebut. Akaun percuma dapat beberapa kredit setiap bulan; pelan Perniagaan tiada had.',
   'agents.badge.new': 'Baharu',
   'agents.plan.free': 'Percuma',
   'agents.plan.pro': 'Pro',
@@ -447,7 +449,7 @@ const MS: Translations = {
   'agents.hub.upgrade_cta': 'Naik taraf · Harga ↗',
   'agents.compliance-drafter.title': 'Pengarang Pematuhan',
   'agents.compliance-drafter.desc':
-    'Laporan PDF pelbagai domain dengan semakan manusia. 1 kredit (Perniagaan tanpa had).',
+    'Jawab beberapa soalan tentang perniagaan anda dan dapatkan laporan pematuhan siap pakai — semak dahulu sebelum muat turun. 1 kredit (Perniagaan tanpa had).',
   'agents.compliance-drafter.step1': '1. Jenis perniagaan',
   'agents.compliance-drafter.step2': '2. Domain pematuhan',
   'agents.compliance-drafter.step3': '3. Semak laporan (HITL)',
@@ -478,10 +480,10 @@ const MS: Translations = {
   'agents.error.confirm_failed': 'Gagal menjana PDF. Sila cuba lagi.',
   'agents.study-agent.title': 'Ejen Pelajaran',
   'agents.study-agent.desc':
-    'Muat naik kertas SPM — ekstrak soalan, penjelasan RAG, penjejakan topik.',
+    'Muat naik kertas SPM anda — dapatkan penjelasan setiap soalan dan topik mana perlu diberi tumpuan.',
   'agents.immigration-navigator.title': 'Navigator Imigresen',
   'agents.immigration-navigator.desc':
-    'Intake visa 3–5 giliran → senarai semak, amaran, petikan dengan tarikh luput. 1 kredit.',
+    'Jawab beberapa soalan ringkas tentang tujuan lawatan anda → dapatkan senarai semak dokumen, amaran, dan rujukan rasmi. 1 kredit.',
   'agents.immigration-navigator.intent_step': 'Langkah 1',
   'agents.immigration-navigator.intent_prompt': 'Apa yang anda ingin lakukan?',
   'agents.immigration-navigator.intent_skip': 'Tulis sendiri sebaliknya →',
@@ -1078,10 +1080,12 @@ const EN: Translations = {
   /* ── agents ── */
   'agents.hub.title': 'NakTahu Agents',
   'agents.hub.subtitle':
-    'LangGraph-powered agents with official-source RAG, plan gating, and credit metering.',
+    'Step-by-step helpers for everyday government tasks — answers grounded in official sources, not guesses.',
   'agents.hub.link': 'All agents',
   'agents.hub.open': 'Open agent',
   'agents.hub.sign_in': 'Sign in to access product agents.',
+  'agents.hub.credits_explainer':
+    "Some agents use \"credits\" — each credit is RM5 and covers one full use of that agent. Free accounts get a few credits every month; Business plans have no limit.",
   'agents.badge.new': 'New',
   'agents.plan.free': 'Free',
   'agents.plan.pro': 'Pro',
@@ -1091,7 +1095,7 @@ const EN: Translations = {
   'agents.hub.upgrade_cta': 'Upgrade · Pricing ↗',
   'agents.compliance-drafter.title': 'Compliance Drafter',
   'agents.compliance-drafter.desc':
-    'Multi-domain PDF report with human review. 1 credit (Business unlimited).',
+    "Answer a few questions about your business and get a ready-to-use compliance report — review it before you download. 1 credit (Business unlimited).",
   'agents.compliance-drafter.step1': '1. Business type',
   'agents.compliance-drafter.step2': '2. Compliance domains',
   'agents.compliance-drafter.step3': '3. Review report (HITL)',
@@ -1122,10 +1126,10 @@ const EN: Translations = {
   'agents.error.confirm_failed': 'Failed to generate PDF. Please try again.',
   'agents.study-agent.title': 'Study Agent',
   'agents.study-agent.desc':
-    'Upload SPM past papers — extract questions, RAG explanations, topic tracking.',
+    'Upload your SPM past paper — get an explanation for every question and see which topics to focus on.',
   'agents.immigration-navigator.title': 'Immigration Navigator',
   'agents.immigration-navigator.desc':
-    '3–5 turn visa intake → checklist, warnings, expiry-aware citations. 1 credit.',
+    "Answer a few quick questions about your visit → get a document checklist, warnings, and official references. 1 credit.",
   'agents.immigration-navigator.intent_step': 'Step 1',
   'agents.immigration-navigator.intent_prompt': 'What are you trying to do?',
   'agents.immigration-navigator.intent_skip': 'Write it myself instead →',
@@ -1705,9 +1709,10 @@ const ZH: Translations = {
 
   /* ── agents ── */
   'agents.hub.title': 'NakTahu 智能代理',
-  'agents.hub.subtitle': '基于 LangGraph 的智能代理agent，官方来源 RAG、套餐门控与点数计量。',
+  'agents.hub.subtitle': '为日常政府事务提供逐步指引 — 答案均以官方来源为依据，而非猜测。',
   'agents.hub.link': '全部代理',
   'agents.hub.open': '打开代理',
+  'agents.hub.credits_explainer': '部分代理需使用"点数" — 每点数为 RM5，可完整使用该代理一次。免费账户每月可获数点数；商业版无使用上限。',
   'agents.hub.sign_in': '请登录以使用产品代理。',
   'agents.badge.new': '新',
   'agents.plan.free': '免费',
@@ -1717,7 +1722,7 @@ const ZH: Translations = {
   'agents.plan.business': '商业',
   'agents.hub.upgrade_cta': '升级 · 价格 ↗',
   'agents.compliance-drafter.title': '合规起草代理',
-  'agents.compliance-drafter.desc': '多领域 PDF 报告，人工审核。1 点数（商业版无限）。',
+  'agents.compliance-drafter.desc': '回答几个关于您企业的问题，即可获得可直接使用的合规报告 — 下载前可先预览审阅。1 点数（商业版无限）。',
   'agents.compliance-drafter.step1': '1. 企业类型',
   'agents.compliance-drafter.step2': '2. 合规领域',
   'agents.compliance-drafter.step3': '3. 审核报告（人工确认）',
@@ -1747,9 +1752,9 @@ const ZH: Translations = {
   'agents.error.start_failed': '生成预览失败，请重试。',
   'agents.error.confirm_failed': '生成 PDF 失败，请重试。',
   'agents.study-agent.title': '学习 Agent',
-  'agents.study-agent.desc': '上传 SPM 试卷 — 提取题目、RAG 讲解、主题追踪。',
+  'agents.study-agent.desc': '上传您的 SPM 试卷 — 获取每道题目的讲解，并了解应重点复习的主题。',
   'agents.immigration-navigator.title': '移民导航代理',
-  'agents.immigration-navigator.desc': '3–5 轮签证信息采集 → 清单、警告、含有效期的引用。1 点数。',
+  'agents.immigration-navigator.desc': '回答几个关于您此行目的的简单问题 → 获取文件清单、注意事项与官方参考资料。1 点数。',
   'agents.immigration-navigator.intent_step': '第 1 步',
   'agents.immigration-navigator.intent_prompt': '您想要做什么？',
   'agents.immigration-navigator.intent_skip': '改为自行输入 →',

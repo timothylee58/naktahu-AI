@@ -120,13 +120,13 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
   };
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+    <div className="flex flex-wrap gap-2 pb-1">
       {CHIPS.map((chip) => (
         <button
           key={chip.labelEn}
           onClick={() => onSelect(getQuery(chip))}
           disabled={disabled}
-          className={`flex-shrink-0 px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap ${chipClass}`}
+          className={`px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${chipClass}`}
         >
           {getLabel(chip)}
         </button>

@@ -145,6 +145,9 @@ export function AgentsHub() {
           <h2 className="max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl locale-text-balance">
             {t('agents.hub.subtitle')}
           </h2>
+          <p className="max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">
+            {t('agents.hub.credits_explainer')}
+          </p>
         </motion.div>
 
         <motion.div

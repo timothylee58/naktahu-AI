@@ -189,6 +189,7 @@ function HistoryRow({
       <button
         onClick={onClick}
         disabled={busy}
+        title={summary ? `${headline}\n${entry.query}` : headline}
         className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col gap-0.5 disabled:opacity-50 ${hoverClass}`}
       >
         <div className="flex items-start justify-between gap-1">
@@ -483,6 +484,7 @@ const RAIL_LINKS = [
   { href: '/pricing', emoji: '💳', titleKey: 'nav.pricing' },
   { href: '/developer', emoji: '🔌', titleKey: 'nav.developer' },
   { href: '/agents', emoji: '🤖', titleKey: 'nav.agents' },
+  { href: '/warung-watch', emoji: '🍜', titleKey: 'nav.warung_watch' },
 ] as const;
 
 /** Icon-only collapsed rail — desktop only. Secondary controls (language,
