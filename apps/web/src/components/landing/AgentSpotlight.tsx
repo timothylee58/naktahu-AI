@@ -50,14 +50,31 @@ export function AgentSpotlight({ isDark = true }: AgentSpotlightProps) {
         </motion.div>
       ))}
 
+      {/* Deliberately NOT styled like the three AI-agent cards above — Warung
+          Watch is crowd-sourced/real-time browse-and-glance, not a "give
+          input, get a cited AI answer" consultation, and an identical card
+          in this row would misrepresent what tapping it does. The emerald
+          border + live-pulse badge signal "different interaction model",
+          not "4th agent". */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: SPOTLIGHT_SLUGS.length * 0.06, duration: 0.4 }}
         whileHover={{ y: -4 }}
-        className={`flex flex-col gap-3 border rounded-2xl p-5 transition-all duration-200 ${cardClass}`}
+        className={`flex flex-col gap-3 border-2 border-dashed rounded-2xl p-5 transition-all duration-200 ${
+          isDark ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50' : 'bg-emerald-50/50 border-emerald-300 hover:border-emerald-400'
+        }`}
       >
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2 flex-shrink-0" aria-hidden>
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          </span>
+          <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+            {t('nav.group.community')}
+          </span>
+        </div>
         <h3 className={`font-semibold text-sm locale-nowrap ${titleClass}`}>{t('nav.warung_watch')}</h3>
         <p className={`text-xs leading-relaxed flex-1 locale-text-balance ${descClass}`}>
           {t('landing.spotlight.warung_watch.desc')}
