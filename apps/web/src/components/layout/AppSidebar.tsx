@@ -471,7 +471,7 @@ function SidebarPanel({
       <div className={`flex-shrink-0 border-t px-4 py-3 flex flex-col gap-2 ${footerBorder}`}>
         <div className="flex items-center gap-2">
           <ThemeToggle variant={variant} layout="inline" />
-          <LangToggle variant={variant} layout="inline" />
+          <LangToggle variant={variant} layout="inline" align="left" />
         </div>
         <AuthButton variant={variant} layout="sidebar" />
       </div>
