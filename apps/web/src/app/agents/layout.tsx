@@ -42,7 +42,7 @@ export default function AgentsLayout({ children }: { children: React.ReactNode }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-zinc-50 dark:bg-[#0A0F1E] flex items-center justify-center">
+      <main className="min-h-screen bg-zinc-50 dark:bg-[#12151C] flex items-center justify-center">
         <div className="h-10 w-48 rounded-xl bg-zinc-200 dark:bg-white/10 animate-pulse" />
       </main>
     );
@@ -50,7 +50,7 @@ export default function AgentsLayout({ children }: { children: React.ReactNode }
 
   if (!user) {
     return (
-      <main className="min-h-screen bg-zinc-50 dark:bg-[#0A0F1E] flex flex-col items-center justify-center px-4 gap-4">
+      <main className="min-h-screen bg-zinc-50 dark:bg-[#12151C] flex flex-col items-center justify-center px-4 gap-4">
         <h1 className="text-lg font-bold text-zinc-900 dark:text-white">{t('agents.hub.title')}</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 text-center max-w-sm">{t('agents.hub.sign_in')}</p>
         <Link
@@ -64,7 +64,7 @@ export default function AgentsLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className={`flex h-full ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50/50 text-zinc-900'}`}>
+    <div className={`flex h-full ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50/50 text-zinc-900'}`}>
       <AppSidebar
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
@@ -78,7 +78,7 @@ export default function AgentsLayout({ children }: { children: React.ReactNode }
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-y-auto">
         <header
           className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${
-            isDark ? 'border-white/10 bg-[#0A0F1E]/90 text-white' : 'border-zinc-100 bg-white/90 text-zinc-900'
+            isDark ? 'border-white/10 bg-[#12151C]/90 text-white' : 'border-zinc-100 bg-white/90 text-zinc-900'
           }`}
         >
           <button

@@ -150,7 +150,7 @@ export default function AboutPage() {
   const c = locale === 'zh' ? content.zh : locale === 'en' ? content.en : content.ms;
 
   return (
-    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
       <LandingHeader />
 
       <div className="flex flex-col flex-1 min-w-0 min-h-0 max-w-4xl mx-auto w-full px-4 sm:px-6">

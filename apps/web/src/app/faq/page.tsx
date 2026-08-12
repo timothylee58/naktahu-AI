@@ -216,7 +216,7 @@ export default function FAQPage() {
   const content = locale === 'zh' ? faqs.zh : locale === 'en' ? faqs.en : faqs.ms;
 
   return (
-    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
       <LandingHeader />
 
       <div className="flex flex-col flex-1 min-w-0 min-h-0">

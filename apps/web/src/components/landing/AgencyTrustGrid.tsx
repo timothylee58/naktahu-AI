@@ -29,9 +29,13 @@ export function AgencyTrustGrid({ isDark = true }: AgencyTrustGridProps) {
   const cardClass = isDark
     ? 'bg-white/5 border-white/10 hover:border-white/20'
     : 'bg-white border-zinc-200 shadow-sm hover:shadow-md';
+  // Same stamp motif as CitationChip (double border, mono face) — every
+  // official-source touchpoint should read as one visual language, not a
+  // one-off. Static here (no hover-rotate/entrance spring) since this grid
+  // is a static trust list, not a live streamed answer earning motion.
   const badgeClass = isDark
-    ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-    : 'bg-blue-50 text-blue-700 border-blue-200';
+    ? 'bg-nk-official/10 text-nk-official border-nk-official/40'
+    : 'bg-nk-official/5 text-nk-official-dim border-nk-official/30';
   const nameClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const tagClass = isDark ? 'text-zinc-400' : 'text-zinc-600';
 
@@ -47,7 +51,7 @@ export function AgencyTrustGrid({ isDark = true }: AgencyTrustGridProps) {
           whileHover={{ y: -3 }}
           className={`flex flex-col gap-2 border rounded-xl px-4 py-3.5 transition-all duration-200 ${cardClass}`}
         >
-          <span className={`self-start inline-flex items-center border rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide locale-nowrap ${badgeClass}`}>
+          <span className={`self-start inline-flex items-center border-2 border-double rounded-md px-2 py-0.5 text-[11px] font-mono font-bold uppercase tracking-wide locale-nowrap ${badgeClass}`}>
             {agency.abbr}
           </span>
           <span className={`text-sm font-semibold leading-snug locale-text-balance ${nameClass}`}>

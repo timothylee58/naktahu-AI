@@ -85,9 +85,17 @@ function ResearchSynthesiserPageInner() {
         {citations.length > 0 && (
           <ul className="flex flex-col gap-2">
             {citations.map((c, i) => (
-              <motion.li key={i} whileHover={{ y: -2 }} className="bg-white border border-zinc-200 rounded-xl p-3 text-sm shadow-sm transition-shadow hover:shadow-md dark:bg-white/5 dark:border-white/10">
-                <a href={String(c.url)} className="font-medium text-blue-700 hover:underline dark:text-blue-400" target="_blank" rel="noreferrer">{String(c.title)}</a>
-                <span className="text-xs text-zinc-500 ml-2 dark:text-zinc-500">{String(c.ministry)}</span>
+              <motion.li
+                key={i}
+                whileHover={{ y: -2 }}
+                className="bg-nk-official/5 border-2 border-double border-nk-official/40 rounded-xl p-3 text-sm shadow-sm transition-shadow hover:shadow-md dark:bg-nk-official/10 dark:border-nk-official/30"
+              >
+                <span className="mr-2 text-[10px] font-mono font-bold uppercase tracking-wide text-nk-official-dim dark:text-nk-official">
+                  {String(c.ministry)}
+                </span>
+                <a href={String(c.url)} className="font-medium text-nk-official-dim hover:underline dark:text-nk-official" target="_blank" rel="noreferrer">
+                  {String(c.title)}
+                </a>
               </motion.li>
             ))}
           </ul>

@@ -57,8 +57,8 @@ export function SiteNavLinks({
     const active = pathname === href || (href !== '/' && pathname.startsWith(href));
     if (emphasized) {
       return isDark
-        ? 'border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
-        : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100';
+        ? 'border-nk-official/40 bg-nk-official/10 text-nk-official hover:bg-nk-official/20'
+        : 'border-nk-official/30 bg-nk-official/5 text-nk-official-dim hover:bg-nk-official/10';
     }
     if (active) {
       return isDark
@@ -144,8 +144,8 @@ export function SiteNavLinks({
                   {/* Live-pulse dot — signals "real-time crowd data", distinct
                       from the static-document AI agents above. */}
                   <span className="relative flex h-1.5 w-1.5 flex-shrink-0" aria-hidden>
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-nk-community opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-nk-community" />
                   </span>
                 </Link>
               ))}

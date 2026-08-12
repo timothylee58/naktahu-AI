@@ -351,9 +351,9 @@ function ChatPageInner() {
 
   const showChips = messages.length === 0 && !isStreaming;
 
-  const pageBg = isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50';
+  const pageBg = isDark ? 'bg-[#12151C]' : 'bg-zinc-50/50';
   const headerClass = isDark
-    ? 'border-white/10 bg-[#0A0F1E]/90 text-white'
+    ? 'border-white/10 bg-[#12151C]/90 text-white'
     : 'border-zinc-100 bg-white/90 text-zinc-900';
   const headerSub = isDark ? 'text-zinc-400' : 'text-zinc-500';
   const menuBtn = isDark
@@ -362,7 +362,7 @@ function ChatPageInner() {
   const emptyTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
   const emptyDesc = isDark ? 'text-zinc-500' : 'text-zinc-400';
   const inputBarClass = isDark
-    ? 'border-white/10 bg-[#0A0F1E]/90'
+    ? 'border-white/10 bg-[#12151C]/90'
     : 'border-zinc-100 bg-white/90';
   const hintClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
 

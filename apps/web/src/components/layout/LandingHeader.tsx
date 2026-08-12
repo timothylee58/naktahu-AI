@@ -19,7 +19,7 @@ export function LandingHeader() {
   const isDark = theme === 'dark';
 
   const shellClass = isDark
-    ? 'border-white/10 bg-[#0A0F1E]/90 text-white'
+    ? 'border-white/10 bg-[#12151C]/90 text-white'
     : 'border-zinc-200 bg-white/90 text-zinc-900';
   const menuBtnClass = isDark
     ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
@@ -70,7 +70,7 @@ export function LandingHeader() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className={`md:hidden border-t overflow-hidden ${isDark ? 'border-white/10 bg-[#0A0F1E]' : 'border-zinc-200 bg-white'}`}
+            className={`md:hidden border-t overflow-hidden ${isDark ? 'border-white/10 bg-[#12151C]' : 'border-zinc-200 bg-white'}`}
           >
             <div className="px-4 py-4 flex flex-col gap-4">
               <SiteNavLinks
