@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
@@ -15,6 +15,8 @@ export default function AboutPage() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const reduceMotion = useReducedMotion();
+  const sealLabel = locale === 'zh' ? '已验证 · LHDN.gov.my' : locale === 'en' ? 'Verified · LHDN.gov.my' : 'Disahkan · LHDN.gov.my';
 
   const content = {
     ms: {
@@ -167,23 +169,60 @@ export default function AboutPage() {
 
             <section className="space-y-6">
               <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.how.title}</h2>
-              <div className="grid md:grid-cols-3 gap-6">
-                {c.how.steps.map((step, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-xl p-6 space-y-2 border ${
-                      isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                      isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
-                    }`}>
-                      {i + 1}
-                    </div>
-                    <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{step.title}</h3>
-                    <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{step.desc}</p>
-                  </div>
-                ))}
+              <div className="relative">
+                {/* Connecting line — draws left-to-right as the row scrolls into view.
+                    Desktop only (the grid is single-column below md, where a horizontal
+                    line between stacked cards wouldn't read as a sequence). */}
+                <motion.div
+                  aria-hidden
+                  initial={reduceMotion ? false : { scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  viewport={{ once: true, amount: 0.6 }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  style={{ transformOrigin: 'left' }}
+                  className={`hidden md:block absolute top-5 left-[16.66%] right-[16.66%] h-px ${
+                    isDark ? 'bg-blue-500/30' : 'bg-blue-200'
+                  }`}
+                />
+                <div className="grid md:grid-cols-3 gap-6">
+                  {c.how.steps.map((step, i) => (
+                    <motion.div
+                      key={i}
+                      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.5 }}
+                      transition={{ duration: 0.45, delay: reduceMotion ? 0 : i * 0.15, ease: 'easeOut' }}
+                      className={`relative rounded-xl p-6 space-y-2 border ${
+                        isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
+                      }`}
+                    >
+                      <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                        isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {i + 1}
+                      </div>
+                      <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{step.title}</h3>
+                      <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{step.desc}</p>
+                      {i === c.how.steps.length - 1 && (
+                        // Makes the "we cite official sources" claim visible at the
+                        // exact moment a reader would otherwise just read it as a
+                        // sentence — the one deliberate flourish on this page.
+                        // Decorative only: no meaning conveyed by color alone.
+                        <motion.span
+                          initial={reduceMotion ? false : { opacity: 0, scale: 0.6, rotate: -12 }}
+                          whileInView={{ opacity: 1, scale: 1, rotate: -8 }}
+                          viewport={{ once: true, amount: 0.6 }}
+                          transition={reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 260, damping: 14, delay: 0.5 }}
+                          className={`absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm ${
+                            isDark ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                          }`}
+                        >
+                          {sealLabel}
+                        </motion.span>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </section>
 
