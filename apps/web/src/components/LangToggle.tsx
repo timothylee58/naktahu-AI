@@ -16,9 +16,15 @@ interface LangToggleProps {
   variant?: 'dark' | 'light';
   /** sidebar = full-width trigger in left panel */
   layout?: 'inline' | 'sidebar';
+  /** Inline-layout dropdown anchor. 'right' (default) matches the header
+   * usage, where the button sits at the right edge of its row. Pass
+   * 'left' when the button instead sits near a container's left edge
+   * (e.g. packed into a compact sidebar footer row) — right-anchoring
+   * there pushes the dropdown's left edge off-screen. */
+  align?: 'left' | 'right';
 }
 
-export function LangToggle({ variant = 'dark', layout = 'inline' }: LangToggleProps) {
+export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right' }: LangToggleProps) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -52,7 +58,9 @@ export function LangToggle({ variant = 'dark', layout = 'inline' }: LangTogglePr
 
   const dropdownPosition = isSidebar
     ? 'absolute left-0 right-0 bottom-full mb-2'
-    : 'absolute right-0 mt-2 w-44';
+    : align === 'left'
+      ? 'absolute left-0 mt-2 w-44'
+      : 'absolute right-0 mt-2 w-44';
 
   const optionHover =
     variant === 'light'

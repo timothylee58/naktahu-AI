@@ -370,10 +370,10 @@ function SidebarPanel({
         </div>
       </div>
 
-      <div className={`flex-shrink-0 px-2 py-3 border-b ${headerBorder}`}>
+      <div className={`flex-shrink-0 px-2 py-2 border-b ${headerBorder}`}>
         <SiteNavLinks
           variant={variant}
-          layout="vertical"
+          layout="icons"
           onNavigate={onClose}
         />
       </div>
@@ -468,9 +468,11 @@ function SidebarPanel({
         <div className="flex-1 min-h-0" />
       )}
 
-      <div className={`flex-shrink-0 border-t px-4 py-4 flex flex-col gap-3 ${footerBorder}`}>
-        <ThemeToggle variant={variant} layout="sidebar" />
-        <LangToggle variant={variant} layout="sidebar" />
+      <div className={`flex-shrink-0 border-t px-4 py-3 flex flex-col gap-2 ${footerBorder}`}>
+        <div className="flex items-center gap-2">
+          <ThemeToggle variant={variant} layout="inline" />
+          <LangToggle variant={variant} layout="inline" align="left" />
+        </div>
         <AuthButton variant={variant} layout="sidebar" />
       </div>
     </>
