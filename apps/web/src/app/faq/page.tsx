@@ -19,6 +19,23 @@ const SOURCE_LABEL: Record<string, string> = {
   zh: '↗ 查看官方来源',
 };
 
+// Groups the 12 flat FAQ items into 3 scannable clusters so a reader
+// looking for "is this trustworthy" vs "how do I use it" vs "my account"
+// doesn't have to read a single undifferentiated list top to bottom.
+// Indices are identical across all three languages (same item order),
+// so one index map covers every locale.
+const GROUP_INDEXES: number[][] = [
+  [0, 1, 2, 6], // Asas / Basics — what it is, cost, languages, voice input
+  [3, 4, 5, 9, 10, 11], // Ketepatan & Kepercayaan / Accuracy & Trust
+  [7, 8], // Akaun & Privasi / Account & Privacy
+];
+
+const GROUP_LABELS: Record<string, string[]> = {
+  ms: ['Asas', 'Ketepatan & Kepercayaan', 'Akaun & Privasi'],
+  en: ['Basics', 'Accuracy & Trust', 'Account & Privacy'],
+  zh: ['基础', '准确性与信任', '账户与隐私'],
+};
+
 export default function FAQPage() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
@@ -215,73 +232,84 @@ export default function FAQPage() {
               <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{content.subtitle}</p>
             </header>
 
-            <div className="space-y-3">
-              {content.items.map((faq, index) => (
-                <motion.div
-                  key={index}
-                  initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: reduceMotion ? 0 : index * 0.05, duration: 0.3 }}
-                  className={`rounded-xl overflow-hidden border ${
-                    isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
-                  }`}
-                >
-                  <button
-                    onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                    aria-expanded={openIndex === index}
-                    className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
-                      isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'
-                    }`}
-                  >
-                    <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
-                    <svg
-                      style={{
-                        transform: `rotate(${openIndex === index ? 135 : 0}deg)`,
-                        transition: reduceMotion ? 'none' : 'transform 0.2s ease-out',
-                      }}
-                      className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden
+            {GROUP_INDEXES.map((group, groupIdx) => (
+              <div key={groupIdx} className="space-y-3">
+                <h2 className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                  {(GROUP_LABELS[locale] ?? GROUP_LABELS.en)[groupIdx]}
+                </h2>
+                {group.map((index) => {
+                  const faq = content.items[index];
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: reduceMotion ? 0 : index * 0.04, duration: 0.3, ease: 'easeOut' }}
+                      className={`rounded-xl overflow-hidden border ${
+                        isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
+                      }`}
                     >
-                      {/* A "+" that rotates into an "×" reads as opening/closing a
-                          panel, not just flipping a chevron. */}
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
+                      <button
+                        onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                        aria-expanded={openIndex === index}
+                        className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
+                          isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'
+                        }`}
+                      >
+                        <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
+                        <svg
+                          style={{
+                            transform: `rotate(${openIndex === index ? 135 : 0}deg)`,
+                            transition: reduceMotion ? 'none' : 'transform 0.15s ease-out',
+                          }}
+                          className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          aria-hidden
+                        >
+                          {/* A "+" that rotates into an "×" reads as opening/closing a
+                              panel, not just flipping a chevron. */}
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
 
-                  {/* grid-template-rows 0fr -> 1fr instead of height:auto / max-height
-                      hacks — the inner content's real height animates smoothly with no
-                      snap or overshoot, and no exit-animation choreography is needed. */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateRows: openIndex === index ? '1fr' : '0fr',
-                      transition: reduceMotion ? 'none' : 'grid-template-rows 0.25s ease-out',
-                    }}
-                  >
-                    <div className="overflow-hidden">
-                      <div className={`px-6 pb-4 leading-relaxed flex flex-col gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                        <p>{faq.answer}</p>
-                        {faq.sourceUrl && (
-                          <a
-                            href={faq.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`self-start text-sm font-medium transition-colors ${
-                              isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
-                            }`}
-                          >
-                            {SOURCE_LABEL[locale] ?? SOURCE_LABEL.en}
-                          </a>
-                        )}
+                      {/* grid-template-rows 0fr -> 1fr instead of height:auto / max-height
+                          hacks — the inner content's real height animates smoothly with no
+                          snap or overshoot, and no exit-animation choreography is needed.
+                          Only the interacted panel's rows value changes on any given
+                          click — siblings that are already open/closed don't re-render
+                          their transition, so there's no visual noise from neighbors. */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateRows: openIndex === index ? '1fr' : '0fr',
+                          transition: reduceMotion ? 'none' : 'grid-template-rows 0.2s ease-out',
+                        }}
+                      >
+                        <div className="overflow-hidden">
+                          <div className={`px-6 pb-4 leading-relaxed flex flex-col gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                            <p>{faq.answer}</p>
+                            {faq.sourceUrl && (
+                              <a
+                                href={faq.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`self-start text-sm font-medium transition-colors ${
+                                  isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                                }`}
+                              >
+                                {SOURCE_LABEL[locale] ?? SOURCE_LABEL.en}
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ))}
 
             <div className="flex flex-col items-center gap-4 pt-8 text-center">
               <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>{locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?'}</p>

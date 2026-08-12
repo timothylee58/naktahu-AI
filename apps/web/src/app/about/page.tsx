@@ -162,10 +162,16 @@ export default function AboutPage() {
               <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{c.subtitle}</p>
             </header>
 
-            <section className="space-y-4">
+            <motion.section
+              className="space-y-4"
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
               <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.mission.title}</h2>
               <p className={`leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>{c.mission.desc}</p>
-            </section>
+            </motion.section>
 
             <section className="space-y-6">
               <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.how.title}</h2>
@@ -209,10 +215,13 @@ export default function AboutPage() {
                         // sentence — the one deliberate flourish on this page.
                         // Decorative only: no meaning conveyed by color alone.
                         <motion.span
-                          initial={reduceMotion ? false : { opacity: 0, scale: 0.6, rotate: -12 }}
-                          whileInView={{ opacity: 1, scale: 1, rotate: -8 }}
+                          initial={reduceMotion ? false : { opacity: 0, scale: 0.85 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
                           viewport={{ once: true, amount: 0.6 }}
-                          transition={reduceMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 260, damping: 14, delay: 0.5 }}
+                          // No spring/bounce — this seal backs a trust claim (official
+                          // sourcing), and this product's whole pitch is "calm and
+                          // precise, not playful." Short ease-out only.
+                          transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : 0.35 }}
                           className={`absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm ${
                             isDark ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700'
                           }`}
@@ -226,32 +235,56 @@ export default function AboutPage() {
               </div>
             </section>
 
+            {/* Trust signal — a distinct green-tinted card treatment with checkmarks,
+                so it reads visually as "these are the sources backing every answer"
+                rather than looking like the (differently-styled) engineering list
+                below it. */}
             <section className="space-y-4">
               <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.sources.title}</h2>
               <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.sources.desc}</p>
-              <ul className="grid md:grid-cols-2 gap-3">
+              <ul className={`grid md:grid-cols-2 gap-3 rounded-xl border p-4 ${
+                isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50/60 border-emerald-200'
+              }`}>
                 {c.sources.items.map((item, i) => (
-                  <li key={i} className={`flex items-start gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                  <motion.li
+                    key={i}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : i * 0.04 }}
+                    className={`flex items-start gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}
+                  >
+                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                     {item}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             </section>
 
+            {/* Engineering-credibility list — a distinct slate/monospace treatment
+                so it doesn't visually blend with the trust-signal card above it. */}
             <section className="space-y-4">
               <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.tech.title}</h2>
               <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.tech.desc}</p>
-              <ul className="space-y-2">
+              <ul className={`space-y-2 rounded-xl border p-4 ${
+                isDark ? 'bg-white/[0.03] border-white/10' : 'bg-zinc-50 border-zinc-200'
+              }`}>
                 {c.tech.items.map((item, i) => (
-                  <li key={i} className={`flex items-start gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                  <motion.li
+                    key={i}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : i * 0.04 }}
+                    className={`flex items-start gap-2 font-mono text-sm ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}
+                  >
+                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                      <path fillRule="evenodd" d="M6.28 5.22a.75.75 0 010 1.06L2.56 10l3.72 3.72a.75.75 0 01-1.06 1.06L.97 10.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0zm7.44 0a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 010-1.06z" clipRule="evenodd" />
                     </svg>
                     {item}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             </section>
