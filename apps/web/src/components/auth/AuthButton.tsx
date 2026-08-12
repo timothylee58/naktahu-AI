@@ -246,6 +246,19 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   >
                     {t('profile.view_full')}
                   </Link>
+                  {/* Sign out lives in this popover instead of as a
+                      persistent full-width row below the avatar card — the
+                      footer was eating too much vertical space that query
+                      history needed; this is a rare action, not one that
+                      deserves permanent real estate. */}
+                  <button
+                    onClick={signOut}
+                    className={`text-xs font-medium text-center rounded-lg px-3 py-2 transition-colors ${
+                      isDark ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                  >
+                    {t('header.sign_out')}
+                  </button>
                 </motion.div>
               </>
             )}
@@ -286,12 +299,6 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 </span>
               )}
             </div>
-          </button>
-          <button
-            onClick={signOut}
-            className={`w-full text-sm font-medium rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${variant === 'dark' ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'}`}
-          >
-            {t('header.sign_out')}
           </button>
         </div>
       );

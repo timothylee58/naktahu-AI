@@ -7,7 +7,11 @@ import { useI18n } from '@/lib/i18n';
 interface SiteNavLinksProps {
   variant: 'dark' | 'light';
   onNavigate?: () => void;
-  layout?: 'vertical' | 'horizontal';
+  /** 'icons' = compact wrapping row of icon-only buttons (native title
+   * tooltip for the label) — used by the app sidebar, where these are
+   * one-time-visit utility links that shouldn't cost a full vertical list
+   * above the thing people actually return to (query history). */
+  layout?: 'vertical' | 'horizontal' | 'icons';
   showChatCta?: boolean;
   /** Omit links from the nav (e.g. landing header defers pricing/agents to hero). */
   excludeHrefs?: readonly string[];
@@ -73,12 +77,49 @@ export function SiteNavLinks({
   const base =
     layout === 'horizontal'
       ? 'flex flex-wrap items-center gap-1'
-      : 'flex flex-col gap-0.5';
+      : layout === 'icons'
+        ? 'flex flex-wrap items-center gap-1'
+        : 'flex flex-col gap-0.5';
 
   const itemClass =
     layout === 'horizontal'
       ? 'px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap'
       : 'px-3 py-2 rounded-lg text-sm font-medium transition-colors locale-nowrap';
+
+  if (layout === 'icons') {
+    const iconItemClass = (href: string) =>
+      `relative flex items-center justify-center w-8 h-8 rounded-lg text-base transition-colors ${linkClass(href)}`;
+    return (
+      <nav className={base}>
+        {!hideHome && (
+          <Link href="/" onClick={onNavigate} title={t('nav.home')} aria-label={t('nav.home')} className={iconItemClass('/')}>
+            <span aria-hidden="true">🏠</span>
+          </Link>
+        )}
+        {visibleLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={onNavigate}
+            title={t(link.key)}
+            aria-label={t(link.key)}
+            className={iconItemClass(link.href)}
+          >
+            <span aria-hidden="true">{link.emoji}</span>
+            {link.group === 'community' && (
+              // Live-pulse dot — same "real-time crowd data" signal as the
+              // full-label vertical layout, just smaller since there's no
+              // room for a text badge on an icon button.
+              <span className="absolute top-0.5 right-0.5 flex h-1.5 w-1.5" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-nk-community opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-nk-community" />
+              </span>
+            )}
+          </Link>
+        ))}
+      </nav>
+    );
+  }
 
   return (
     <nav className={base}>
