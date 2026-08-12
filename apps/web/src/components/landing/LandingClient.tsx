@@ -247,7 +247,7 @@ export function LandingClient() {
         transition={{ duration: 0.6 }}
         className={`px-4 sm:px-6 py-16 sm:py-20 border-t ${borderClass} max-w-6xl mx-auto w-full`}
       >
-        <h2 className={`text-center text-xl sm:text-2xl font-bold mb-10 sm:mb-12 locale-text-balance ${sectionTitle}`}>
+        <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-10 sm:mb-12 locale-text-balance ${sectionTitle}`}>
           {t('landing.features.title')}
         </h2>
         <LandingFeatures isDark={isDark} />
@@ -261,7 +261,7 @@ export function LandingClient() {
         className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
       >
         <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
-          <h2 className={`text-xl sm:text-2xl font-bold mb-2 locale-text-balance ${sectionTitle}`}>
+          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
             {t('landing.preview.title')}
           </h2>
           <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.preview.desc')}</p>
@@ -277,7 +277,7 @@ export function LandingClient() {
         className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
       >
         <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
-          <h2 className={`text-xl sm:text-2xl font-bold mb-2 locale-text-balance ${sectionTitle}`}>
+          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
             {t('landing.trust.title')}
           </h2>
           <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.trust.desc')}</p>
@@ -293,7 +293,7 @@ export function LandingClient() {
         className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
       >
         <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
-          <h2 className={`text-xl sm:text-2xl font-bold mb-2 locale-text-balance ${sectionTitle}`}>
+          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
             {t('landing.spotlight.title')}
           </h2>
           <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.spotlight.desc')}</p>
@@ -308,7 +308,7 @@ export function LandingClient() {
         transition={{ duration: 0.6 }}
         className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
       >
-        <h2 className={`text-center text-xl sm:text-2xl font-bold mb-8 sm:mb-10 locale-text-balance ${sectionTitle}`}>
+        <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-8 sm:mb-10 locale-text-balance ${sectionTitle}`}>
           {t('landing.compare.title')}
         </h2>
         <ComparisonSection isDark={isDark} />
@@ -321,7 +321,7 @@ export function LandingClient() {
         transition={{ duration: 0.5 }}
         className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} flex flex-col items-center gap-6 max-w-6xl mx-auto w-full`}
       >
-        <h2 className={`text-xl sm:text-2xl font-bold locale-text-balance ${sectionTitle}`}>
+        <h2 className={`text-xl sm:text-2xl font-bold font-display locale-text-balance ${sectionTitle}`}>
           {t('landing.domains.title')}
         </h2>
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-2xl">

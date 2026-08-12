@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Globe, ChevronDown } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { UILocale } from '@/lib/types';
 
@@ -81,19 +82,14 @@ export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right
         aria-expanded={open}
         className={`flex items-center gap-1.5 border text-xs font-semibold transition-colors locale-nowrap ${isSidebar ? '' : 'rounded-full px-3 py-1.5'} ${buttonBase}`}
       >
-        {/* Globe icon (sidebar: emoji instead) */}
-        {isSidebar ? (
-          <span aria-hidden="true" className="flex-shrink-0 text-sm leading-none">🌐</span>
-        ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 opacity-60 flex-shrink-0">
-            <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm-1.465-9.398-.803.321A3.501 3.501 0 0 0 6.5 12.35V13h-.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 .75-.75v-1.288a2 2 0 0 1 1.17-1.814l.803-.321a4.5 4.5 0 0 0 .777-.395c.26-.174.62-.174.88 0 .222.148.46.271.712.366l.803.32a2 2 0 0 1 1.17 1.815v.288a.75.75 0 0 0 1.5 0v-.288a3.5 3.5 0 0 0-2.047-3.177l-.803-.32a3 3 0 0 1-.322-.15 1.8 1.8 0 0 0-1.756 0 3.003 3.003 0 0 1-.322.15l-.802.32ZM10 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" clipRule="evenodd" />
-          </svg>
-        )}
+        <Globe size={18} strokeWidth={1.75} className="flex-shrink-0 opacity-70" />
         <span className={isSidebar ? 'flex-1 text-left text-sm' : ''}>{isSidebar ? t('lang.label') : current.label}</span>
         <span className={isSidebar ? 'text-xs opacity-70' : ''}>{isSidebar ? current.label : null}</span>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3 h-3 opacity-50 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
-          <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-        </svg>
+        <ChevronDown
+          size={14}
+          strokeWidth={1.75}
+          className={`opacity-50 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}
+        />
       </motion.button>
 
       <AnimatePresence>

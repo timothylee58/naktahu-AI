@@ -314,6 +314,7 @@ const MS: Translations = {
   'landing.features.cited.title': 'Sumber Disahkan',
   'landing.features.cited.desc':
     'Setiap jawapan disertakan pautan ke dokumen rasmi kerajaan.',
+  'landing.features.cited.stamp': 'DISAHKAN',
   'landing.features.voice.title': 'Input Suara',
   'landing.features.voice.desc':
     'Sebut soalan anda — teknologi pengecaman suara terbina dalam.',
@@ -966,6 +967,7 @@ const EN: Translations = {
   'landing.features.cited.title': 'Verified Sources',
   'landing.features.cited.desc':
     'Every answer links back to official government documents.',
+  'landing.features.cited.stamp': 'VERIFIED',
   'landing.features.voice.title': 'Voice Input',
   'landing.features.voice.desc':
     'Speak your question — speech recognition built right in.',
@@ -1614,6 +1616,7 @@ const ZH: Translations = {
   'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
   'landing.features.cited.title': '经过验证的来源',
   'landing.features.cited.desc': '每个答案都链接到官方政府文件。',
+  'landing.features.cited.stamp': '已验证',
   'landing.features.voice.title': '语音输入',
   'landing.features.voice.desc': '说出您的问题，内置语音识别功能。',
   'landing.features.warung.title': 'Warung Watch 排队观察',
