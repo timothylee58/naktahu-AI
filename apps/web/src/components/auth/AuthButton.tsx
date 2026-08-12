@@ -200,6 +200,14 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     if (isSidebar) {
       const isDark = variant === 'dark';
       const suggestions = suggestQuery.trim() ? suggestForQuery(suggestQuery) : [];
+      // Show a plan pill only when it's meaningfully different from the
+      // default (free) tier — a "FREE" badge on every single account tells
+      // a user nothing they don't already know. Uses the plain plan tier
+      // ("Business"), not the internal role wording ("Primary Admin") that
+      // planBadgeLabel() surfaces elsewhere (e.g. /profile, where the role
+      // detail IS meaningful) — this compact card shouldn't leak internal
+      // role categorization into what should read as a normal account view.
+      const compactPlan = plan !== 'free' ? plan.charAt(0).toUpperCase() + plan.slice(1) : null;
 
       return (
         <div className="w-full flex flex-col gap-2 relative">
@@ -289,16 +297,20 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 {user.email}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${variant === 'dark' ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
-                {planBadgeLabel(user)}
-              </span>
-              {creditsLabel && (
-                <span className={`text-[10px] font-medium ${variant === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {creditsLabel}
-                </span>
-              )}
-            </div>
+            {(compactPlan || creditsLabel) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {compactPlan && (
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${variant === 'dark' ? 'bg-nk-official/20 text-nk-official' : 'bg-nk-official/10 text-nk-official-dim'}`}>
+                    {compactPlan}
+                  </span>
+                )}
+                {creditsLabel && (
+                  <span className={`text-[10px] font-medium ${variant === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {creditsLabel}
+                  </span>
+                )}
+              </div>
+            )}
           </button>
         </div>
       );

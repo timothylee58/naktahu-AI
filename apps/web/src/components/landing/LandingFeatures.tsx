@@ -92,8 +92,8 @@ export function LandingFeatures({ isDark = true }: LandingFeaturesProps) {
               key={f.key}
               whileHover={{ y: -4 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className={`flex flex-col gap-4 border rounded-2xl p-5 sm:p-6 transition-colors duration-200 ${cardBasis} ${
-                isDark ? 'bg-white/5 border-white/10 hover:border-white/20 border-l-4 border-l-nk-community' : 'bg-white border-zinc-200 shadow-sm hover:shadow-md border-l-4 border-l-nk-community'
+              className={`flex flex-col gap-4 border-y border-r rounded-2xl p-5 sm:p-6 transition-colors duration-200 border-l-4 border-l-nk-community ${cardBasis} ${
+                isDark ? 'bg-white/5 border-y-white/10 border-r-white/10 hover:border-y-white/20 hover:border-r-white/20' : 'bg-white border-y-zinc-200 border-r-zinc-200 shadow-sm hover:shadow-md'
               }`}
             >
               <span className={`inline-flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${isDark ? 'bg-nk-community/15' : 'bg-nk-community/10'}`}>

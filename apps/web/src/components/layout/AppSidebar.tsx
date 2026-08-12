@@ -6,6 +6,27 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
 import type { User } from '@supabase/supabase-js';
+import {
+  Home,
+  Info,
+  HelpCircle,
+  CreditCard,
+  Plug,
+  Bot,
+  Soup,
+  Moon,
+  Sun,
+  Globe,
+  UserRound,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronRight,
+  X,
+  Pencil,
+  Trash2,
+  MoreVertical,
+  type LucideIcon,
+} from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
@@ -214,9 +235,7 @@ function HistoryRow({
           className={`absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/15 text-zinc-400' : 'hover:bg-zinc-200 text-zinc-400'}`}
           aria-label="Options"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-            <path d="M8 2a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 6.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM9.5 12.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
-          </svg>
+          <MoreVertical size={14} strokeWidth={1.75} />
         </button>
       )}
 
@@ -231,7 +250,7 @@ function HistoryRow({
               onClick={(e) => { e.stopPropagation(); startRename(); }}
               className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs ${menuText} ${menuItemHover} transition-colors`}
             >
-              <span>✏️</span>
+              <Pencil size={14} strokeWidth={1.75} />
               <span>Rename</span>
             </button>
           )}
@@ -240,7 +259,7 @@ function HistoryRow({
               onClick={(e) => { e.stopPropagation(); void handleDelete(); }}
               className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 ${menuItemHover} transition-colors`}
             >
-              <span>🗑</span>
+              <Trash2 size={14} strokeWidth={1.75} />
               <span>Delete</span>
             </button>
           )}
@@ -315,6 +334,10 @@ function SidebarPanel({
   );
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
+  // Collapsed by default — history is secondary/return content, not
+  // something that should compete with primary nav for vertical space
+  // every time the sidebar opens.
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const handleDeleteEntry = async (entryId: string) => {
     await deleteHistoryEntry(supabase, entryId);
@@ -350,9 +373,7 @@ function SidebarPanel({
               title={t('sidebar.collapse')}
               className={`hidden lg:inline-flex p-1 rounded ${closeHover}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                <path fillRule="evenodd" d="M4.25 3A2.25 2.25 0 0 0 2 5.25v9.5A2.25 2.25 0 0 0 4.25 17h11.5A2.25 2.25 0 0 0 18 14.75v-9.5A2.25 2.25 0 0 0 15.75 3H4.25ZM8 4.5v11H4.25a.75.75 0 0 1-.75-.75v-9.5a.75.75 0 0 1 .75-.75H8Zm1.5 0h6.25a.75.75 0 0 1 .75.75v9.5a.75.75 0 0 1-.75.75H9.5v-11Z" clipRule="evenodd" />
-              </svg>
+              <PanelLeftClose size={18} strokeWidth={1.75} />
             </button>
           )}
           {/* close — mobile overlay only */}
@@ -362,9 +383,7 @@ function SidebarPanel({
               aria-label="Close sidebar"
               className={`p-1 rounded lg:hidden ${closeHover}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-              </svg>
+              <X size={18} strokeWidth={1.75} />
             </button>
           )}
         </div>
@@ -373,94 +392,118 @@ function SidebarPanel({
       <div className={`flex-shrink-0 px-2 py-2 border-b ${headerBorder}`}>
         <SiteNavLinks
           variant={variant}
-          layout="icons"
+          layout="vertical"
           onNavigate={onClose}
         />
       </div>
 
       {showHistory && (
-        <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-4 min-h-0">
+        <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-3 min-h-0">
           <DeadlineWidget accessToken={accessToken} variant={variant} />
-          <p className={`text-xs font-semibold uppercase tracking-wider px-3 locale-nowrap ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-            {t('history.title')}
-          </p>
-          {!user ? (
-            <p className={`text-sm text-center px-4 py-6 locale-text-balance ${mutedText}`}>
-              {t('history.sign_in_prompt')}
-            </p>
-          ) : !canAccessHistory(user) ? (
-            <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-              <p className={`text-sm locale-text-balance ${mutedText}`}>
-                {t('error.history_pro_required')}
-              </p>
-              <Link
-                href="/pricing"
-                className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
-              >
-                {t('nav.pricing')}
-              </Link>
-            </div>
-          ) : historyLoading ? (
-            <div className="flex flex-col gap-2 px-2 py-3">
-              {[1, 2, 3].map((n) => (
-                <div key={n} className={`h-12 rounded-lg animate-pulse ${isDark ? 'bg-white/5' : 'bg-zinc-100'}`} />
-              ))}
-            </div>
-          ) : historyError ? (
-            <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-              <p className={`text-sm locale-text-balance ${mutedText}`}>
-                {historyError instanceof HistoryFetchError && historyError.code === 'pro_required'
-                  ? t('error.history_pro_required')
-                  : t('error.history_fetch')}
-              </p>
-              {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
-                <Link
-                  href="/pricing"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
-                >
-                  {t('nav.pricing')}
-                </Link>
-              ) : (
-                <button
-                  onClick={() => mutate()}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors locale-nowrap"
-                >
-                  {t('error.retry')}
-                </button>
-              )}
-            </div>
-          ) : entries.length === 0 ? (
-            <p className={`text-sm text-center px-4 py-6 locale-text-balance ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-              {t('history.empty')}
-            </p>
-          ) : (
-            <>
-              <HistoryGroup
-                label={t('history.group.today')}
-                entries={groups.today}
-                onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
-                onDelete={handleDeleteEntry}
-                onRename={handleRenameEntry}
-                isDark={isDark}
+
+          {/* Collapsed by default — history is secondary content that
+              shouldn't compete with primary nav for space. Its own
+              background-shade boundary + scroll region (not just a label)
+              makes the demotion legible even when expanded. */}
+          <div className={`rounded-xl border ${isDark ? 'border-white/5 bg-black/10' : 'border-zinc-100 bg-zinc-50'}`}>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((o) => !o)}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold uppercase tracking-wider locale-nowrap transition-colors ${
+                isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-500 hover:text-zinc-700'
+              }`}
+              aria-expanded={historyOpen}
+            >
+              <span className="flex-1 text-left">{t('history.title')}</span>
+              <ChevronRight
+                size={16}
+                strokeWidth={1.75}
+                className={`transition-transform duration-150 ${historyOpen ? 'rotate-90' : ''}`}
               />
-              <HistoryGroup
-                label={t('history.group.yesterday')}
-                entries={groups.yesterday}
-                onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
-                onDelete={handleDeleteEntry}
-                onRename={handleRenameEntry}
-                isDark={isDark}
-              />
-              <HistoryGroup
-                label={t('history.group.earlier')}
-                entries={groups.earlier}
-                onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
-                onDelete={handleDeleteEntry}
-                onRename={handleRenameEntry}
-                isDark={isDark}
-              />
-            </>
-          )}
+            </button>
+
+            {historyOpen && (
+              <div className="px-2 pb-2 max-h-72 overflow-y-auto flex flex-col gap-3">
+                {!user ? (
+                  <p className={`text-sm text-center px-4 py-6 locale-text-balance ${mutedText}`}>
+                    {t('history.sign_in_prompt')}
+                  </p>
+                ) : !canAccessHistory(user) ? (
+                  <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                    <p className={`text-sm locale-text-balance ${mutedText}`}>
+                      {t('error.history_pro_required')}
+                    </p>
+                    <Link
+                      href="/pricing"
+                      className="text-xs font-medium text-nk-official-dim hover:text-nk-official transition-colors locale-nowrap"
+                    >
+                      {t('nav.pricing')}
+                    </Link>
+                  </div>
+                ) : historyLoading ? (
+                  <div className="flex flex-col gap-2 px-2 py-3">
+                    {[1, 2, 3].map((n) => (
+                      <div key={n} className={`h-12 rounded-lg animate-pulse ${isDark ? 'bg-white/5' : 'bg-zinc-100'}`} />
+                    ))}
+                  </div>
+                ) : historyError ? (
+                  <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                    <p className={`text-sm locale-text-balance ${mutedText}`}>
+                      {historyError instanceof HistoryFetchError && historyError.code === 'pro_required'
+                        ? t('error.history_pro_required')
+                        : t('error.history_fetch')}
+                    </p>
+                    {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
+                      <Link
+                        href="/pricing"
+                        className="text-xs font-medium text-nk-official-dim hover:text-nk-official transition-colors locale-nowrap"
+                      >
+                        {t('nav.pricing')}
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => mutate()}
+                        className="text-xs font-medium text-nk-official-dim hover:text-nk-official transition-colors locale-nowrap"
+                      >
+                        {t('error.retry')}
+                      </button>
+                    )}
+                  </div>
+                ) : entries.length === 0 ? (
+                  <p className={`text-sm text-center px-4 py-6 locale-text-balance ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    {t('history.empty')}
+                  </p>
+                ) : (
+                  <>
+                    <HistoryGroup
+                      label={t('history.group.today')}
+                      entries={groups.today}
+                      onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                      onDelete={handleDeleteEntry}
+                      onRename={handleRenameEntry}
+                      isDark={isDark}
+                    />
+                    <HistoryGroup
+                      label={t('history.group.yesterday')}
+                      entries={groups.yesterday}
+                      onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                      onDelete={handleDeleteEntry}
+                      onRename={handleRenameEntry}
+                      isDark={isDark}
+                    />
+                    <HistoryGroup
+                      label={t('history.group.earlier')}
+                      entries={groups.earlier}
+                      onSelect={(q) => { onSelectQuery?.(q); onClose?.(); }}
+                      onDelete={handleDeleteEntry}
+                      onRename={handleRenameEntry}
+                      isDark={isDark}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -479,15 +522,15 @@ function SidebarPanel({
   );
 }
 
-const RAIL_LINKS = [
-  { href: '/', emoji: '🏠', titleKey: 'nav.home' },
-  { href: '/about', emoji: 'ℹ️', titleKey: 'nav.about' },
-  { href: '/faq', emoji: '❓', titleKey: 'nav.faq' },
-  { href: '/pricing', emoji: '💳', titleKey: 'nav.pricing' },
-  { href: '/developer', emoji: '🔌', titleKey: 'nav.developer' },
-  { href: '/agents', emoji: '🤖', titleKey: 'nav.agents' },
-  { href: '/warung-watch', emoji: '🍜', titleKey: 'nav.warung_watch' },
-] as const;
+const RAIL_LINKS: { href: string; Icon: LucideIcon; titleKey: string; community?: boolean }[] = [
+  { href: '/', Icon: Home, titleKey: 'nav.home' },
+  { href: '/about', Icon: Info, titleKey: 'nav.about' },
+  { href: '/faq', Icon: HelpCircle, titleKey: 'nav.faq' },
+  { href: '/pricing', Icon: CreditCard, titleKey: 'nav.pricing' },
+  { href: '/developer', Icon: Plug, titleKey: 'nav.developer' },
+  { href: '/agents', Icon: Bot, titleKey: 'nav.agents' },
+  { href: '/warung-watch', Icon: Soup, titleKey: 'nav.warung_watch', community: true },
+];
 
 /** Icon-only collapsed rail — desktop only. Secondary controls (language,
  * account) need more room than a rail affords, so their buttons expand the
@@ -508,7 +551,7 @@ function SidebarRail({
     ? 'text-zinc-400 hover:text-white hover:bg-white/10'
     : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100';
   const activeItem = isDark ? 'bg-white/10 text-white' : 'bg-zinc-100 text-zinc-900';
-  const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-lg text-base transition-colors flex-shrink-0';
+  const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-lg transition-colors flex-shrink-0';
 
   return (
     <div className="flex flex-col items-center h-full py-3 gap-1">
@@ -518,23 +561,24 @@ function SidebarRail({
         title={t('sidebar.expand')}
         className={`${iconBtn} mb-2 ${itemBase}`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-          <path fillRule="evenodd" d="M7.72 12.53a.75.75 0 0 1 0-1.06l2.47-2.47-2.47-2.47a.75.75 0 0 1 1.06-1.06l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 0 1-1.06 0Z" clipRule="evenodd" />
-        </svg>
+        <PanelLeftOpen size={18} strokeWidth={1.75} />
       </button>
 
       <nav className="flex flex-col items-center gap-1 flex-1 min-h-0">
         {RAIL_LINKS.map((link) => {
           const active = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
+          const activeAccent = link.community
+            ? (isDark ? 'bg-nk-community/10 text-nk-community' : 'bg-nk-community/10 text-nk-community-dim')
+            : activeItem;
           return (
             <Link
               key={link.href}
               href={link.href}
               aria-label={t(link.titleKey)}
               title={t(link.titleKey)}
-              className={`${iconBtn} ${active ? activeItem : itemBase}`}
+              className={`${iconBtn} ${active ? activeAccent : itemBase}`}
             >
-              <span aria-hidden="true">{link.emoji}</span>
+              <link.Icon size={18} strokeWidth={1.75} aria-hidden />
             </Link>
           );
         })}
@@ -546,7 +590,7 @@ function SidebarRail({
         title={theme === 'dark' ? t('theme.switch_light') : t('theme.switch_dark')}
         className={`${iconBtn} ${itemBase}`}
       >
-        <span aria-hidden="true">{theme === 'dark' ? '🌙' : '☀️'}</span>
+        {theme === 'dark' ? <Moon size={18} strokeWidth={1.75} /> : <Sun size={18} strokeWidth={1.75} />}
       </button>
       <button
         onClick={onExpand}
@@ -554,7 +598,7 @@ function SidebarRail({
         title={t('lang.label')}
         className={`${iconBtn} ${itemBase}`}
       >
-        <span aria-hidden="true">🌐</span>
+        <Globe size={18} strokeWidth={1.75} />
       </button>
       <button
         onClick={onExpand}
@@ -562,7 +606,7 @@ function SidebarRail({
         title={t('sidebar.account')}
         className={`${iconBtn} ${itemBase}`}
       >
-        <span aria-hidden="true">👤</span>
+        <UserRound size={18} strokeWidth={1.75} />
       </button>
     </div>
   );
