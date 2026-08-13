@@ -30,6 +30,7 @@ const MS: Translations = {
   'chat.language_indicator': 'BM',
   'citation.confidence': 'Keyakinan',
   'citation.stale': 'Sumber mungkin sudah lapuk',
+  'citation.as_of': 'Berkuat kuasa {date}',
   'citation.view_source': 'Lihat sumber rasmi',
   'citation.no_link': 'Tiada pautan langsung tersedia untuk sumber ini.',
   'chat.empty':
@@ -259,7 +260,10 @@ const MS: Translations = {
   'auth.email.sent.desc': 'Pautan log masuk dihantar ke',
   'auth.email.back': 'Kembali',
   'auth.terms': 'Dengan log masuk, anda bersetuju dengan',
-  'auth.terms.link': 'terma penggunaan',
+  // Says "privacy policy", not "terms of use": the link has always pointed
+  // at /privacy and no terms-of-use document exists. Claiming agreement to
+  // a document that isn't there is the wrong half of the mismatch to keep.
+  'auth.terms.link': 'dasar privasi',
   'auth.microsoft': 'Teruskan dengan Microsoft',
   'auth.microsoft.loading': 'Menghubungi Microsoft…',
   'auth.error.title': 'Log masuk gagal',
@@ -684,6 +688,7 @@ const EN: Translations = {
   'chat.language_indicator': 'EN',
   'citation.confidence': 'Confidence',
   'citation.stale': 'This source may be outdated',
+  'citation.as_of': 'In effect from {date}',
   'citation.view_source': 'View official source',
   'citation.no_link': 'No direct link is available for this source.',
   'chat.empty': 'Ask me anything about Malaysian government services.',
@@ -912,7 +917,7 @@ const EN: Translations = {
   'auth.email.sent.desc': 'Login link sent to',
   'auth.email.back': 'Back',
   'auth.terms': 'By signing in, you agree to our',
-  'auth.terms.link': 'terms of use',
+  'auth.terms.link': 'privacy policy',
   'auth.microsoft': 'Continue with Microsoft',
   'auth.microsoft.loading': 'Connecting to Microsoft…',
   'auth.error.title': 'Sign-in failed',
@@ -1336,6 +1341,7 @@ const ZH: Translations = {
   'chat.language_indicator': '中文',
   'citation.confidence': '置信度',
   'citation.stale': '此来源可能已过时',
+  'citation.as_of': '自 {date} 起生效',
   'citation.view_source': '查看官方来源',
   'citation.no_link': '此来源暂无直接链接。',
   'chat.empty': '请向我询问有关马来西亚政府服务的问题。',
@@ -1564,7 +1570,7 @@ const ZH: Translations = {
   'auth.email.sent.desc': '登录链接已发送至',
   'auth.email.back': '返回',
   'auth.terms': '登录即表示您同意我们的',
-  'auth.terms.link': '使用条款',
+  'auth.terms.link': '隐私政策',
   'auth.microsoft': 'Microsoft 登录',
   'auth.microsoft.loading': '连接 Microsoft…',
   'auth.error.title': '登录失败',

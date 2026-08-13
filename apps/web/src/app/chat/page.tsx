@@ -536,6 +536,16 @@ function ChatPageInner() {
         <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
           {t('chat.keyboard_hint')}
         </p>
+        {/* The not-official-government-advice disclaimer previously appeared
+            only on landing, /about and shared-answer permalinks — i.e.
+            everywhere EXCEPT the surface where someone actually asks a tax
+            or immigration question. Persistent (not hidden on mobile, not
+            dismissible) because it's the compliance-relevant line, and
+            reusing landing.hero.disclaimer_note so the wording can't drift
+            between surfaces. */}
+        <p className={`text-center text-[10px] leading-snug locale-text-balance ${hintClass}`}>
+          {t('landing.hero.disclaimer_note')}
+        </p>
         </div>
       </div>
       </div>

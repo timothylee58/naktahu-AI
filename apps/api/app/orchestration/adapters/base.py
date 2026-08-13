@@ -47,6 +47,7 @@ def make_result(
                     url=c.get("url", ""),
                     confidence=float(c.get("confidence", 0.0)),
                     stale_disclaimer=c.get("stale_disclaimer", False),
+                    effective_date=c.get("effective_date"),
                 ))
             elif isinstance(c, Citation):
                 parsed_citations.append(c)

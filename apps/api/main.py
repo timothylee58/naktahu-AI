@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from supabase import create_client
 
+from app.core.telemetry import configure_telemetry
 from core.config import settings
 from middleware.prometheus_middleware import PrometheusMiddleware
 from middleware.rate_limit import anonymous_limiter
@@ -25,6 +26,12 @@ from routers.metrics import router as metrics_router
 from routers.observability import router as observability_router
 from routers.orchestrate import router as orchestrate_router
 from routers.orchestration import router as orchestration_router
+
+# Trap #1 (two mains): app/main.py has called this since Sentry was added,
+# root main.py never did — so whichever tree Railway actually serves
+# determined whether backend errors reached Sentry at all. configure_telemetry
+# is idempotent and no-ops without SENTRY_DSN, so calling it in both is safe.
+configure_telemetry()
 
 structlog.configure(
     processors=[

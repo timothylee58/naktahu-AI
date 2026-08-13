@@ -141,7 +141,15 @@ async def test_adversarial_prompt(case: dict) -> None:
     # quality, which is out of scope for a control-flow unit eval.
     guard_completion = _mock_guard_completion(harmful=expected_blocked)
 
+    # guard_llm_check_enabled defaults to False in config (deliberately — it's
+    # gated until the classifier's real-world false-positive rate is measured),
+    # so _is_harmful_by_llm returns before it ever reaches the mocked client.
+    # Without this patch every LLM-dependent case here asserts nothing: the
+    # mocked verdict is unreachable and only the keyword layer runs. Patching it
+    # True matches tests/test_guard_node.py:37 and is what actually puts the
+    # second pass under test.
     with patch("app.agents.guard_node.get_stream_writer") as mock_writer_factory, \
+         patch("app.agents.guard_node.settings.guard_llm_check_enabled", True), \
          patch("app.services.llm_client.ilmu_client") as mock_guard_client:
         mock_writer_factory.return_value = MagicMock()
         mock_guard_client.chat.completions.create = AsyncMock(return_value=guard_completion)
@@ -236,6 +244,39 @@ def test_language_accuracy_dataset_shape() -> None:
     assert by_lang.get("bm", 0) >= 20
     assert by_lang.get("en", 0) >= 20
     assert by_lang.get("zh", 0) >= 20
+
+
+# The 12 canonical domains — must stay byte-identical to router_node's
+# _VALID_DOMAINS and migration 016/030's valid_domain CHECK constraint
+# (Trap #6: this list has drifted across its copies before).
+_CANONICAL_DOMAINS = {
+    "government", "education", "legal", "finance", "healthcare", "epf",
+    "tax", "business", "immigration", "culture", "parliament", "property",
+}
+
+
+def test_language_dataset_covers_every_canonical_domain() -> None:
+    """Coverage must be measurable, not assumed.
+
+    Before the `domain` field existed, "we cover N domains x 3 languages" was
+    an unverifiable claim — nothing in the data recorded which domain a query
+    belonged to. This asserts the claim instead of trusting it, and fails
+    loudly when a new domain is added without eval coverage.
+    """
+    tagged = {case.get("domain") for case in _LANGUAGE_CASES}
+    assert None not in tagged, "every language case must carry a `domain`"
+    assert tagged <= _CANONICAL_DOMAINS, f"unknown domain(s): {tagged - _CANONICAL_DOMAINS}"
+    missing = _CANONICAL_DOMAINS - tagged
+    assert not missing, f"no language-eval coverage for domain(s): {sorted(missing)}"
+
+
+def test_answer_quality_covers_every_canonical_domain() -> None:
+    """Same guarantee for the answer-quality set, keyed on expected_topic."""
+    tagged = {case.get("expected_topic") for case in _ANSWER_QUALITY_CASES}
+    assert None not in tagged, "every answer-quality case must carry `expected_topic`"
+    assert tagged <= _CANONICAL_DOMAINS, f"unknown topic(s): {tagged - _CANONICAL_DOMAINS}"
+    missing = _CANONICAL_DOMAINS - tagged
+    assert not missing, f"no answer-quality coverage for domain(s): {sorted(missing)}"
 
 
 # ---------------------------------------------------------------------------

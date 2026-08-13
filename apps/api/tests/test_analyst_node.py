@@ -496,3 +496,65 @@ async def test_analyst_no_agency_contact_for_general_rules_question() -> None:
     })
 
     assert result["agency_contact"] is None
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_carries_effective_date() -> None:
+    """The date the UI shows must be the same value the staleness verdict is
+    computed from — a citation reading "in effect from X" while flagged stale
+    against some other date would be worse than showing no date at all."""
+    chunk = _make_chunk(
+        source_url="https://www.hasil.gov.my/a",
+        content="cukai pendapatan individu kadar 2024",
+        effective_date="2024-03-01",
+        chunk_id="a",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["citations"]
+    assert result["citations"][0]["effective_date"] == "2024-03-01"
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_effective_date_none_when_chunk_undated() -> None:
+    """Undated chunks must yield None, never a substituted "today" — the UI
+    contract is that a missing date renders nothing rather than implying the
+    government source is current."""
+    chunk = _make_chunk(
+        source_url="https://www.hasil.gov.my/a",
+        content="cukai pendapatan individu",
+        chunk_id="a",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["citations"]
+    assert result["citations"][0]["effective_date"] is None
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_effective_date_falls_back_to_source_date() -> None:
+    """expiry_aware chunks with no effective_date fall back to source_date —
+    mirrors _staleness_ref, so date and staleness flag stay consistent."""
+    chunk = _make_chunk(
+        source_url="https://www.kwsp.gov.my/a",
+        content="epf withdrawal cap",
+        expiry_aware=True,
+        source_date=_STALE_DATE,
+        chunk_id="a",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal cap",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["citations"]
+    citation = result["citations"][0]
+    assert citation["effective_date"] == _STALE_DATE
+    # The pair must agree: flagged stale AND dated with the date that made it so.
+    assert citation["stale_disclaimer"] is True

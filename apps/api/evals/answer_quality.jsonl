@@ -26,3 +26,11 @@
 {"query": "What is Pioneer Status tax exemption and how long does it last in Malaysia?", "expected_topic": "tax", "min_confidence": 0.6}
 {"query": "What qualifying capital expenditure is covered under Investment Tax Allowance (ITA)?", "expected_topic": "tax", "min_confidence": 0.6}
 {"query": "What is Reinvestment Allowance and which companies qualify for it?", "expected_topic": "tax", "min_confidence": 0.6}
+{"query": "How do I apply for an arts or heritage grant from the Ministry of Tourism, Arts and Culture?", "expected_topic": "culture", "min_confidence": 0.6}
+{"query": "How is a building gazetted as a national heritage site in Malaysia?", "expected_topic": "culture", "min_confidence": 0.6}
+{"query": "How can I access Dewan Rakyat Hansard debate records?", "expected_topic": "parliament", "min_confidence": 0.6}
+{"query": "What are the stages a bill goes through in the Malaysian Parliament?", "expected_topic": "parliament", "min_confidence": 0.6}
+{"query": "How do I make an EIS unemployment benefit claim after being retrenched?", "expected_topic": "legal", "min_confidence": 0.6}
+{"query": "What is the minimum contribution rate for SOCSO employers?", "expected_topic": "epf", "min_confidence": 0.6}
+{"query": "How do I renew my Malaysian passport and what does it cost?", "expected_topic": "immigration", "min_confidence": 0.6}
+{"query": "How do I register at a government clinic under the MySejahtera system?", "expected_topic": "healthcare", "min_confidence": 0.6}

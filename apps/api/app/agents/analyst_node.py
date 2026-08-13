@@ -208,6 +208,11 @@ async def analyst_node(state: AgentState) -> dict:
             url=chunk.source_url,
             confidence=score,
             stale_disclaimer=_is_stale(chunk, domain),
+            # Same value the staleness verdict above is computed from, so
+            # the date a user sees and the "may be outdated" flag can never
+            # disagree. None when the chunk has no date — the UI renders
+            # nothing rather than inventing one.
+            effective_date=_staleness_ref(chunk),
         )
         for score, _, chunk in top3
         if chunk.source_url  # omit fabricated / empty URLs per CLAUDE.md
