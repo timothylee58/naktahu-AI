@@ -1,7 +1,7 @@
 """AgentState TypedDict and Citation model for the LangGraph pipeline."""
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, Optional, TypedDict
 
 from app.services.vector_store import ChunkResult
 
@@ -12,6 +12,17 @@ class Citation(TypedDict):
     url: str
     confidence: float
     stale_disclaimer: bool  # True when expiry_aware chunk is >90 days old
+    # ISO date (YYYY-MM-DD) the cited rule/figure takes effect, or the
+    # source's own date for expiry_aware chunks — see analyst_node's
+    # _staleness_ref, which is the same value the staleness verdict is
+    # computed from. None when the chunk carries no date at all.
+    #
+    # This is deliberately surfaced to the UI: a bare "may be outdated"
+    # flag tells a user something is wrong but not whether it matters —
+    # "as of Jan 2024" on a tax figure lets them judge for themselves.
+    # Never synthesise a date here; None must render as no date, not as
+    # today's date or an ingestion timestamp.
+    effective_date: NotRequired[str | None]
 
 
 class AgentState(TypedDict, total=False):

@@ -72,6 +72,10 @@ class Citation(BaseModel):
     url: str = ""
     confidence: float = 0.0
     stale_disclaimer: bool = False
+    # ISO date the cited rule/figure takes effect. Mirrors the same field on
+    # app.models.state.Citation so a citation crossing the orchestration
+    # boundary keeps its date instead of degrading to a bare staleness bool.
+    effective_date: Optional[str] = None
 
 
 class AgentResult(BaseModel):

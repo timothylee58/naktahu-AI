@@ -106,6 +106,7 @@ class KnowledgeQAAdapter(AgentProtocol):
                     "url": c.url,
                     "confidence": c.confidence,
                     "stale_disclaimer": c.stale_disclaimer,
+                    "effective_date": getattr(c, "effective_date", None),
                 })
             elif isinstance(c, dict):
                 citations.append(c)

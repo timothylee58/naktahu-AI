@@ -18,6 +18,18 @@ function truncate(s: string, max: number) {
   return s.length <= max ? s : `${s.slice(0, max)}…`;
 }
 
+/** Formats the backend's ISO effective_date for display. Returns null for
+ * missing OR unparseable input so a malformed value renders as no date
+ * rather than "Invalid Date" — on a government-data product a broken date
+ * next to a tax figure reads as a broken figure. */
+function formatEffectiveDate(iso: string | null | undefined, locale: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const tag = locale === 'zh' ? 'zh-CN' : locale === 'ms' ? 'ms-MY' : 'en-MY';
+  return d.toLocaleDateString(tag, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 // The "stamp" is this app's one signature, brand-owned visual moment —
 // every other surface (nav, forms, cards) stays quiet and disciplined so
 // this doesn't compete with a second decorative element. A double border
@@ -27,7 +39,7 @@ function truncate(s: string, max: number) {
 // here specifically because this chip *is* the proof of official sourcing
 // — the product's core differentiator, encoded into the interface itself.
 export function CitationChip({ citation, index }: CitationChipProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const reduceMotion = useReducedMotion();
   const url = citation.url ?? citation.source_url;
   const title = citation.title ?? citation.source_title ?? '';
@@ -60,6 +72,7 @@ export function CitationChip({ citation, index }: CitationChipProps) {
     };
   }, [pinned]);
 
+  const effectiveDate = formatEffectiveDate(citation.effective_date, locale);
   const confidencePct = typeof citation.confidence === 'number' ? Math.round(citation.confidence * 100) : null;
   const confidenceColor =
     confidencePct === null
@@ -103,6 +116,14 @@ export function CitationChip({ citation, index }: CitationChipProps) {
         <span className="font-mono font-semibold uppercase tracking-tight truncate max-w-[6rem]">{citation.ministry}</span>
         <span className="opacity-70">·</span>
         <span className="truncate max-w-[12rem]">{truncate(title, 32)}</span>
+        {/* On the chip face, not only in the popover — a date behind a
+            hover/click isn't "visible" for someone reading a tax figure on
+            mobile. Mono matches the stamp motif's record/data register. */}
+        {effectiveDate && (
+          <span className="font-mono text-[10px] opacity-70 flex-shrink-0 locale-nowrap">
+            {effectiveDate}
+          </span>
+        )}
       </motion.button>
 
       <AnimatePresence>
@@ -118,6 +139,11 @@ export function CitationChip({ citation, index }: CitationChipProps) {
           >
             <p className="text-xs font-mono font-semibold uppercase tracking-tight text-zinc-900 dark:text-zinc-100">{citation.ministry}</p>
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 locale-text-balance">{title}</p>
+            {effectiveDate && (
+              <p className="mt-1.5 text-[11px] font-mono text-zinc-700 dark:text-zinc-300">
+                {t('citation.as_of').replace('{date}', effectiveDate)}
+              </p>
+            )}
             {confidencePct !== null && (
               <p className={`mt-1.5 text-[11px] font-medium ${confidenceColor}`}>
                 {t('citation.confidence')}: {confidencePct}%
