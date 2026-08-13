@@ -21,13 +21,31 @@ function truncate(s: string, max: number) {
 /** Formats the backend's ISO effective_date for display. Returns null for
  * missing OR unparseable input so a malformed value renders as no date
  * rather than "Invalid Date" — on a government-data product a broken date
- * next to a tax figure reads as a broken figure. */
+ * next to a tax figure reads as a broken figure.
+ *
+ * Parses the parts explicitly instead of `new Date(iso)`: ECMAScript reads a
+ * bare "YYYY-MM-DD" as UTC midnight, which toLocaleDateString then renders in
+ * the viewer's own zone — showing the PREVIOUS calendar day for anyone west
+ * of UTC. Building from parts gives local midnight, so the date a rule takes
+ * effect reads identically in KL and in Vancouver. (Confirmed Cursor Bugbot
+ * finding on PR #158.)
+ */
 function formatEffectiveDate(iso: string | null | undefined, locale: string): string | null {
   if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
+  const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!parts) return null;
+  const y = Number(parts[1]);
+  const mo = Number(parts[2]);
+  const d = Number(parts[3]);
+  const date = new Date(y, mo - 1, d);
+  // Reject out-of-range components (e.g. month 13, day 32), which the Date
+  // constructor silently rolls forward into a different — and wrong — date
+  // rather than reporting as invalid.
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) {
+    return null;
+  }
   const tag = locale === 'zh' ? 'zh-CN' : locale === 'ms' ? 'ms-MY' : 'en-MY';
-  return d.toLocaleDateString(tag, { year: 'numeric', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(tag, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // The "stamp" is this app's one signature, brand-owned visual moment —

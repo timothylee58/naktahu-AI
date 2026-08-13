@@ -81,10 +81,22 @@ jobs:
                     services app/services \
                     middleware app/middleware \
                     app/agents app/orchestration \
-                    tests
+                    tests evals
 
       - name: Run pytest
         run: pytest tests/ -q
+        env:
+          PYTHONPATH: .
+
+      # apps/api/evals/ was previously run by NO job: this `pytest` step only
+      # targets tests/, and the eval-gate job below only touches scripts/evals/.
+      # The three datasets (adversarial prompts, trilingual language accuracy,
+      # answer quality) were dead weight — and in fact could not even be
+      # collected, since evals/conftest.py imported fixtures that no longer
+      # existed. Live-LLM cases stay skipped unless RUN_LIVE_EVALS=1, so this
+      # step needs no API credentials.
+      - name: Run evals (adversarial + language accuracy + domain coverage)
+        run: pytest evals/ -q
         env:
           PYTHONPATH: .
 

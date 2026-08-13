@@ -270,3 +270,13 @@ This repo has an unusually detailed internal operating manual (`CLAUDE.md`) cove
 - **LLM provider order is a deliberate design decision**, not something to change casually — ILMU is primary, Claude is a synthesis-only fallback.
 
 Pull requests run through the same CI gate described above — typecheck, tests, and an automated answer-quality eval — before merge.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, the exact commands CI runs, and PR conventions.
+
+---
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
+
+NakTahu AI is an independent project and is **not** an official Malaysian government service. Answers are generated from published government sources but are not legal, tax, immigration, or medical advice — always verify anything important with the relevant agency.
