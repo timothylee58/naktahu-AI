@@ -24,11 +24,12 @@ import { useTheme } from '@/lib/theme';
 // app/chat/page.tsx's ?q= handling), and the Warung Watch chip links
 // straight to its own page rather than into chat, since it isn't a RAG
 // domain.
+// Trimmed to a representative spread (gov/finance, business, personal) —
+// the full 10-domain list is already one scroll away in "Knowledge
+// Domains" below; the hero chips are a taste, not the whole menu.
 const DOMAIN_CHIPS = [
   { key: 'tax', queryKey: 'landing.chip.tax.query' },
-  { key: 'epf', queryKey: 'landing.chip.epf.query' },
   { key: 'business', queryKey: 'landing.chip.business.query' },
-  { key: 'health', queryKey: 'landing.chip.health.query' },
   { key: 'immigration', queryKey: 'landing.chip.immigration.query' },
 ] as const;
 
@@ -111,14 +112,6 @@ export function LandingClient() {
           🇲🇾 {t('landing.badge')}
         </motion.div>
 
-        {/* Trust disclaimer surfaced right under the badge, not buried in
-            the footer — for tax/immigration-adjacent answers, "this isn't
-            official government advice" is reassurance a first-time visitor
-            needs before they start typing, not after they scroll away. */}
-        <p className={`text-xs max-w-md locale-text-balance ${mutedText}`}>
-          ℹ️ {t('landing.hero.disclaimer_note')}
-        </p>
-
         <motion.h1
           custom={1}
           variants={fadeUp}
@@ -173,8 +166,22 @@ export function LandingClient() {
           <TypewriterQueryWrapper isDark={isDark} />
         </motion.div>
 
-        <motion.div
+        {/* Trust disclaimer — moved from above the headline (where it
+            competed with it for first-glance attention) to a quiet
+            footnote right under the input, where a first-time visitor
+            actually needs it: the moment before they type. */}
+        <motion.p
           custom={4}
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className={`text-xs max-w-md -mt-2 locale-text-balance ${mutedText}`}
+        >
+          {t('landing.hero.disclaimer_note')}
+        </motion.p>
+
+        <motion.div
+          custom={5}
           variants={fadeUp}
           initial="hidden"
           animate="show"
@@ -198,7 +205,7 @@ export function LandingClient() {
         </motion.div>
 
         <motion.div
-          custom={5}
+          custom={6}
           variants={fadeUp}
           initial="hidden"
           animate="show"
@@ -222,20 +229,15 @@ export function LandingClient() {
               />
             </svg>
           </Link>
+          {/* Single secondary link instead of two stacked links (Explore
+              Agents + a separate pricing-note row) — freemium pricing is
+              one click away via the "Pricing" nav item and on /agents
+              itself; the hero doesn't need to restate it. */}
           <Link
             href="/agents"
             className="text-sm hover:text-[#3B6FE0] transition-colors locale-nowrap"
           >
             {t('landing.hero.secondary_cta')}
-          </Link>
-          {/* Real numbers pulled from the actual pricing page (pricing.free.feature.1,
-              pricing.pro.price, pricing.credits.subtitle) — not a separate marketing
-              claim that could drift from what /pricing actually charges. */}
-          <Link
-            href="/pricing"
-            className={`text-xs hover:text-[#3B6FE0] transition-colors locale-nowrap ${mutedText}`}
-          >
-            {t('landing.hero.pricing_note')}
           </Link>
         </motion.div>
       </section>
