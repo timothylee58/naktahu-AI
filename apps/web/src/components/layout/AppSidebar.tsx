@@ -362,7 +362,7 @@ function SidebarPanel({
   return (
     <>
       <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${headerBorder}`}>
-        <Link href="/chat" className={`text-sm ${titleClass}`}>
+        <Link href="/chat" className={`inline-flex items-center text-sm ${titleClass}`}>
           <NakTahuWordmark markSize={22} />
         </Link>
         <div className="flex items-center gap-1 flex-shrink-0">

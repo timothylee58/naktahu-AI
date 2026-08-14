@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
@@ -10,10 +10,27 @@ import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { effectivePlan, planBadgeLabel, userRole, ADMIN_ROLES } from '@/lib/auth-plan';
 import { fetchUserCredits } from '@/lib/credits';
-import { suggestForQuery } from '@/lib/agent-suggestions';
-import { SuggestionCard } from '@/components/agents/SuggestionCard';
 
 const FEEDBACK_EMAIL = 'feedback@naktahu.my';
+
+// mailto: prefilled subject/body — a placeholder until general product
+// feedback gets its own backend endpoint. The existing /api/v1/feedback
+// table (migration 006) is purpose-built for per-answer thumbs ratings —
+// query/response_summary/rating are all NOT NULL and negative-rated rows
+// feed the eval-harness mining pipeline (apps/api/scripts/mine_feedback_gaps.py).
+// Posting general text through it would inject non-answer rows into that
+// pipeline, so this stays a mailto: until a dedicated table/endpoint exists.
+function feedbackMailtoHref(subjectPrefix: string): string {
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subjectPrefix)}`;
+}
+
+function formatMemberSince(iso: string | undefined, locale: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const tag = locale === 'zh' ? 'zh-CN' : locale === 'ms' ? 'ms-MY' : 'en-MY';
+  return date.toLocaleDateString(tag, { year: 'numeric', month: 'long' });
+}
 
 function fmt(template: string, vars: Record<string, string | number>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), template);
@@ -25,7 +42,7 @@ type RedeemStatus =
   | { kind: 'error'; message: string };
 
 export default function ProfilePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { supabase, user, accessToken, ready } = useSupabaseSession();
@@ -33,7 +50,6 @@ export default function ProfilePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
-  const [suggestQuery, setSuggestQuery] = useState('');
 
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [completedReferrals, setCompletedReferrals] = useState(0);
@@ -141,7 +157,6 @@ export default function ProfilePage() {
     }
   };
 
-  const suggestions = useMemo(() => suggestForQuery(suggestQuery), [suggestQuery]);
   const plan = effectivePlan(user);
   const role = userRole(user);
   const isAdmin = role ? ADMIN_ROLES.has(role) : false;
@@ -233,6 +248,11 @@ export default function ProfilePage() {
                       </span>
                     )}
                   </div>
+                  {formatMemberSince(user.created_at, locale) && (
+                    <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                      {fmt(t('profile.member_since'), { date: formatMemberSince(user.created_at, locale)! })}
+                    </p>
+                  )}
                 </div>
               </section>
 
@@ -241,113 +261,126 @@ export default function ProfilePage() {
                   {t('profile.feedback.title')}
                 </span>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.feedback.desc')}</p>
+                {/* Scoped explicitly against the per-answer 👍/👎 in chat
+                    (ResponseActions.tsx) — that channel already captures the
+                    query, citations, and domain automatically; this one is
+                    for everything that isn't about one specific answer. */}
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">{t('profile.feedback.scope_note')}</p>
                 <a
-                  href={`mailto:${FEEDBACK_EMAIL}`}
+                  href={feedbackMailtoHref(t('profile.feedback.title'))}
                   className="self-start px-4 py-2 bg-nk-official/10 hover:bg-nk-official/20 text-nk-official-dim dark:text-nk-official rounded-full text-sm font-semibold transition-colors"
                 >
                   {t('profile.feedback.button')}
                 </a>
               </section>
 
-              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-                <h2 className="text-sm font-semibold">{t('profile.referral.title')}</h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.referral.desc')}</p>
+              {/* Referral (outbound: share your own code) and redeem
+                  (inbound: use someone else's/a promo code) used to be two
+                  visually identical full-width cards back to back — read at
+                  a glance, they looked like the same section twice. One
+                  "Codes" card with a share-out vs redeem-in sub-block keeps
+                  both actions but makes the direction legible immediately. */}
+              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-5 shadow-sm dark:bg-white/5 dark:border-white/10">
+                <h2 className="text-sm font-semibold">{t('profile.codes.title')}</h2>
 
-                {referralCode ? (
-                  <>
-                    <div className="flex items-center justify-between gap-2 border border-dashed border-nk-official/40 rounded-xl px-4 py-2.5">
-                      <span className="font-mono font-bold tracking-widest text-nk-official-dim dark:text-nk-official">
-                        {referralCode}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={copyReferralCode}
-                        className="text-xs font-medium text-zinc-500 hover:text-nk-official-dim dark:text-zinc-400 dark:hover:text-nk-official transition-colors"
-                      >
-                        {copyLabel === 'copied' ? t('profile.referral.copied') : t('profile.referral.copy')}
-                      </button>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={shareViaWhatsApp}
-                        className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors"
-                      >
-                        {t('profile.referral.whatsapp')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={copyReferralLink}
-                        className="flex-1 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-white/5 rounded-xl text-sm font-semibold transition-colors"
-                      >
-                        {linkCopied ? t('profile.referral.link_copied') : t('profile.referral.link')}
-                      </button>
-                    </div>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                      {fmt(t('profile.referral.completed_count'), { n: completedReferrals })}
-                    </p>
-                  </>
-                ) : (
-                  <div className="h-20 rounded-xl animate-pulse bg-zinc-100 dark:bg-white/5" />
-                )}
-              </section>
-
-              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-                <h2 className="text-sm font-semibold">{t('profile.redeem.title')}</h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.redeem.desc')}</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={redeemInput}
-                    onChange={(e) => setRedeemInput(e.target.value.toUpperCase())}
-                    placeholder={t('profile.redeem.placeholder')}
-                    className="flex-1 border border-zinc-200 rounded-xl p-2.5 text-sm font-mono tracking-wide bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
-                  />
-                  <button
-                    type="button"
-                    disabled={redeemLoading || !redeemInput.trim()}
-                    onClick={() => void submitRedeemCode()}
-                    className="px-4 py-2 bg-nk-official hover:bg-nk-official-dim text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
-                  >
-                    {t('profile.redeem.button')}
-                  </button>
-                </div>
-                {redeemStatus.kind !== 'idle' && (
-                  <p
-                    className={`text-xs font-medium ${
-                      redeemStatus.kind === 'success'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }`}
-                  >
-                    {redeemStatus.message}
-                  </p>
-                )}
-              </section>
-
-              {/* Smart suggestions — rule-based, no LLM call. Full experience
-                  here; a condensed version of the same engine lives in the
-                  sidebar's profile-card popover (AuthButton, layout="sidebar"). */}
-              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-                <h2 className="text-sm font-semibold">{t('profile.suggestions_title')}</h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.suggestions_desc')}</p>
-                <input
-                  type="text"
-                  value={suggestQuery}
-                  onChange={(e) => setSuggestQuery(e.target.value)}
-                  placeholder={t('profile.suggestions_placeholder')}
-                  className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
-                />
-                {suggestQuery.trim() && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {suggestions.map((s, i) => (
-                      <SuggestionCard key={i} suggestion={s} />
-                    ))}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 text-nk-official-dim dark:text-nk-official">
+                      <path fillRule="evenodd" d="M15.28 4.72a.75.75 0 0 1 0 1.06l-3.5 3.5a.75.75 0 0 1-1.06-1.06l2.22-2.22H5.75a.75.75 0 0 1 0-1.5h6.19l-2.22-2.22a.75.75 0 1 1 1.06-1.06l3.5 3.5ZM.75 9.25a.75.75 0 0 0 0 1.5h6.19l-2.22 2.22a.75.75 0 1 0 1.06 1.06l3.5-3.5a.75.75 0 0 0 0-1.06l-3.5-3.5a.75.75 0 0 0-1.06 1.06l2.22 2.22H.75Z" clipRule="evenodd" />
+                    </svg>
+                    {t('profile.codes.referral_label')}
                   </div>
-                )}
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-2">{t('profile.referral.desc')}</p>
+
+                  {referralCode ? (
+                    <>
+                      <div className="flex items-center justify-between gap-2 border border-dashed border-nk-official/40 rounded-xl px-4 py-2.5">
+                        <span className="font-mono font-bold tracking-widest text-nk-official-dim dark:text-nk-official">
+                          {referralCode}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={copyReferralCode}
+                          className="text-xs font-medium text-zinc-500 hover:text-nk-official-dim dark:text-zinc-400 dark:hover:text-nk-official transition-colors"
+                        >
+                          {copyLabel === 'copied' ? t('profile.referral.copied') : t('profile.referral.copy')}
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={shareViaWhatsApp}
+                          className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                        >
+                          {t('profile.referral.whatsapp')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={copyReferralLink}
+                          className="flex-1 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-white/5 rounded-xl text-sm font-semibold transition-colors"
+                        >
+                          {linkCopied ? t('profile.referral.link_copied') : t('profile.referral.link')}
+                        </button>
+                      </div>
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                        {fmt(t('profile.referral.completed_count'), { n: completedReferrals })}
+                      </p>
+                    </>
+                  ) : (
+                    <div className="h-20 rounded-xl animate-pulse bg-zinc-100 dark:bg-white/5" />
+                  )}
+                </div>
+
+                <div className="border-t border-zinc-100 dark:border-white/10" />
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 text-nk-official-dim dark:text-nk-official">
+                      <path d="M8 1a.75.75 0 0 1 .75.75v6.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06l2.22 2.22V1.75A.75.75 0 0 1 8 1ZM1.75 11a.75.75 0 0 1 .75.75v.5c0 .414.336.75.75.75h9.5a.75.75 0 0 0 .75-.75v-.5a.75.75 0 0 1 1.5 0v.5A2.25 2.25 0 0 1 12.75 14h-9.5A2.25 2.25 0 0 1 1 11.75v-.5a.75.75 0 0 1 .75-.75Z" />
+                    </svg>
+                    {t('profile.codes.redeem_label')}
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-2">{t('profile.redeem.desc')}</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={redeemInput}
+                      onChange={(e) => setRedeemInput(e.target.value.toUpperCase())}
+                      placeholder={t('profile.redeem.placeholder')}
+                      className="flex-1 border border-zinc-200 rounded-xl p-2.5 text-sm font-mono tracking-wide bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={redeemLoading || !redeemInput.trim()}
+                      onClick={() => void submitRedeemCode()}
+                      className="px-4 py-2 bg-nk-official hover:bg-nk-official-dim text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+                    >
+                      {t('profile.redeem.button')}
+                    </button>
+                  </div>
+                  {redeemStatus.kind !== 'idle' && (
+                    <p
+                      className={`text-xs font-medium ${
+                        redeemStatus.kind === 'success'
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }`}
+                    >
+                      {redeemStatus.message}
+                    </p>
+                  )}
+                </div>
               </section>
 
-              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-2 shadow-sm dark:bg-white/5 dark:border-white/10">
+              {/* lg:hidden — every destination here duplicates a link
+                  already in AppSidebar (history panel, developer, pricing,
+                  agents), which renders at the same time on desktop. Only
+                  earns its keep where the sidebar collapses behind the
+                  hamburger. The Smart Suggestions section that used to sit
+                  above this was removed outright for the same reason: its
+                  own code comment admitted it was a second full copy of the
+                  sidebar profile-popover's suggestion engine. */}
+              <section className="lg:hidden bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-2 shadow-sm dark:bg-white/5 dark:border-white/10">
                 <h2 className="text-sm font-semibold">{t('profile.quick_links_title')}</h2>
                 <div className="flex flex-wrap gap-2">
                   <Link href="/history" className="text-xs font-medium px-3 py-1.5 rounded-full border border-zinc-200 hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-white/5 transition-colors">
