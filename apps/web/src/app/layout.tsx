@@ -44,13 +44,17 @@ export const metadata: Metadata = {
     title: 'NakTahu',
   },
   icons: {
-    icon: '/icons/icon.svg',
-    apple: '/icons/icon.svg',
+    icon: [
+      { url: '/icons/icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: { url: '/icons/apple-touch-icon.png', sizes: '180x180' },
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#3B6FE0',
+  themeColor: '#3B5BFF',
 };
 
 export default function RootLayout({

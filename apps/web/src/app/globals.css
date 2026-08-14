@@ -22,6 +22,21 @@
   --nk-community-dim: #b3852c;
   --nk-text: #edeae3;       /* off-white, warm not clinical */
   --nk-text-muted: #8a8f98;
+
+  /* ── Brand identity (logo/wordmark) ─────────────────────────────────
+     Deliberately separate from the --nk-* UI accents above. These are
+     the identity colours the mark is drawn in; --nk-official is the UI's
+     functional "this came from an official source" blue.
+
+     NOTE: --brand-blue (#3B5BFF) and --nk-official (#3B6FE0) are two
+     near-identical but non-identical blues. That divergence is real and
+     currently intentional only in the sense that this change was scoped
+     to the logo — reconciling the UI accent to the brand blue is a
+     separate decision, flagged rather than silently applied. */
+  --brand-blue: #3b5bff;
+  --brand-blue-dark: #2540c9;
+  --brand-amber: #ffb238;
+  --brand-ink: #14162b;
   --font-display: var(--font-sans);
   --font-mono-citation: var(--font-mono), 'IBM Plex Mono', ui-monospace, monospace;
 }
@@ -40,6 +55,10 @@
   --color-nk-community-dim: var(--nk-community-dim);
   --color-nk-text: var(--nk-text);
   --color-nk-text-muted: var(--nk-text-muted);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-dark: var(--brand-blue-dark);
+  --color-brand-amber: var(--brand-amber);
+  --color-brand-ink: var(--brand-ink);
 }
 
 body {
