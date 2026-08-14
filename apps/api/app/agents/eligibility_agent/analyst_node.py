@@ -15,6 +15,9 @@ import structlog
 
 from app.agents.eligibility_agent.compatibility import _load_rules, canonical_name
 from app.agents.eligibility_agent.state import EligibilityState
+from langchain_core.runnables import RunnableConfig
+
+from app.agents.runtime import supabase_from_config
 
 log = structlog.get_logger(__name__)
 
@@ -299,7 +302,7 @@ def _build_stacking_matrix(
     }
 
 
-async def analyst_node(state: EligibilityState) -> dict[str, Any]:
+async def analyst_node(state: EligibilityState, config: RunnableConfig | None = None) -> dict[str, Any]:
     profile = state.get("business_profile") or {}
     grants = state.get("structured_grants") or []
 
@@ -316,11 +319,12 @@ async def analyst_node(state: EligibilityState) -> dict[str, Any]:
     )
     stacking_matrix = None
     if matched:
-        # analyst_node reads its Supabase client off state["_supabase"], the
-        # same way graph.py threads it into grant_rag_node. Absent client or
+        # Supabase client comes from the run config (never graph state — it
+        # isn't checkpoint-serialisable; see app/agents/runtime.py), the same
+        # way graph.py threads it into grant_rag_node. Absent client or
         # unapplied migration 021 -> empty rules -> binary-array behaviour.
         rules_by_pair = await _load_compatibility_rules(
-            state.get("_supabase"),
+            supabase_from_config(config),
             [g.get("programme_name") for g in matched if g.get("programme_name")],
         )
         stacking_matrix = _build_stacking_matrix(matched, rules_by_pair)

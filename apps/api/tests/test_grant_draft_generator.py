@@ -56,6 +56,13 @@ def make_state(**overrides: Any) -> GrantDraftState:
     return base
 
 
+# The Supabase client reaches nodes through the run config, never through
+# graph state — a live client is not checkpoint-serialisable, and putting it
+# in state made every /start 500 (see app/agents/runtime.py).
+def _config(supabase):
+    return {"configurable": {"thread_id": "t-test", "supabase": supabase}}
+
+
 # ── fetch_grant_node ─────────────────────────────────────────────────────────
 
 
@@ -67,9 +74,8 @@ class TestFetchGrantNode:
         mock_supabase = MagicMock()
         mock_execute = AsyncMock(return_value=MagicMock(data=[SAMPLE_GRANT]))
         mock_supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute = mock_execute
-        state["_supabase"] = mock_supabase
 
-        result = await fetch_grant_node(state)
+        result = await fetch_grant_node(state, _config(mock_supabase))
 
         assert result["grant_record"] == SAMPLE_GRANT
         assert result["error"] is None
@@ -80,9 +86,8 @@ class TestFetchGrantNode:
         mock_supabase = MagicMock()
         mock_execute = AsyncMock(return_value=MagicMock(data=[]))
         mock_supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute = mock_execute
-        state["_supabase"] = mock_supabase
 
-        result = await fetch_grant_node(state)
+        result = await fetch_grant_node(state, _config(mock_supabase))
 
         assert result["grant_record"] is None
         assert "not found" in result["error"].lower()
@@ -90,9 +95,8 @@ class TestFetchGrantNode:
     @pytest.mark.asyncio
     async def test_supabase_none_degrades_gracefully(self):
         state = make_state()
-        state["_supabase"] = None
 
-        result = await fetch_grant_node(state)
+        result = await fetch_grant_node(state, _config(None))
 
         assert result["grant_record"] is None
         assert result["error"]

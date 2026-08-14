@@ -6,6 +6,9 @@ from typing import Any
 import structlog
 
 from app.agents.compliance_drafter.state import ComplianceDrafterState
+from langchain_core.runnables import RunnableConfig
+
+from app.agents.runtime import supabase_from_config
 from app.agents.tools import query_rag_findings
 
 log = structlog.get_logger(__name__)
@@ -105,10 +108,10 @@ async def compile_node(state: ComplianceDrafterState) -> dict[str, Any]:
   }
 
 
-async def generate_pdf_node(state: ComplianceDrafterState) -> dict[str, Any]:
+async def generate_pdf_node(state: ComplianceDrafterState, config: RunnableConfig | None = None) -> dict[str, Any]:
   from app.agents.tools import generate_pdf as gen_pdf
 
-  supabase = state.get("_supabase")  # injected by runner
+  supabase = supabase_from_config(config)  # run-scoped, not checkpointed
   path, url, expires = await gen_pdf(
       state.get("report_html") or "<p>Empty report</p>",
       user_id=state.get("user_id") or "unknown",

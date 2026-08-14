@@ -13,6 +13,9 @@ from typing import Any
 import structlog
 
 from app.agents.grant_draft_generator.state import GrantDraftState
+from langchain_core.runnables import RunnableConfig
+
+from app.agents.runtime import supabase_from_config
 from app.agents.tools import llm_complete
 
 log = structlog.get_logger(__name__)
@@ -78,12 +81,12 @@ async def intake_node(state: GrantDraftState) -> dict[str, Any]:
     }
 
 
-async def fetch_grant_node(state: GrantDraftState) -> dict[str, Any]:
+async def fetch_grant_node(state: GrantDraftState, config: RunnableConfig | None = None) -> dict[str, Any]:
     """Look up the selected grant in `grant_database`. Degrades gracefully:
     a missing programme or unavailable Supabase sets `error` and downstream
     nodes no-op rather than crashing the graph (CLAUDE.md Trap #4 spirit)."""
     programme_name = state.get("programme_name") or ""
-    supabase = state.get("_supabase")
+    supabase = supabase_from_config(config)
 
     if not programme_name:
         return {"error": "programme_name is required", "grant_record": None}
@@ -277,11 +280,11 @@ async def compile_node(state: GrantDraftState) -> dict[str, Any]:
     }
 
 
-async def generate_export_node(state: GrantDraftState) -> dict[str, Any]:
+async def generate_export_node(state: GrantDraftState, config: RunnableConfig | None = None) -> dict[str, Any]:
     if state.get("error"):
         return {"awaiting_hitl": False}
 
-    supabase = state.get("_supabase")
+    supabase = supabase_from_config(config)
     export_format = state.get("export_format") or "pdf"
     html = state.get("report_html") or "<p>Empty report</p>"
     user_id = state.get("user_id") or "unknown"

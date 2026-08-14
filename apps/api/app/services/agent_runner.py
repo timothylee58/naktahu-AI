@@ -26,8 +26,24 @@ from app.agents.study_agent.graph import get_study_agent_graph
 log = structlog.get_logger(__name__)
 
 
-def _thread_config(session_id: str) -> dict[str, Any]:
-    return {"configurable": {"thread_id": session_id}}
+def _thread_config(session_id: str, *, supabase: Any = None) -> dict[str, Any]:
+    """Per-run LangGraph config.
+
+    `supabase` goes here rather than into graph state on purpose. Every state
+    key is serialised by the checkpointer on each write, and a Supabase
+    `Client` is neither msgpack- nor pickle-serialisable (it holds an
+    `_thread.RLock`), so putting it in state made `ainvoke` raise
+    `TypeError: Type is not msgpack serializable: Client` — an unhandled 500
+    on every start for the three agents that needed a client. `configurable`
+    entries are passed to nodes but not checkpointed, which is exactly what a
+    live connection handle wants.
+    """
+    configurable: dict[str, Any] = {"thread_id": session_id}
+    if supabase is not None:
+        configurable["supabase"] = supabase
+    return {"configurable": configurable}
+
+
 
 
 def _base_response(session_id: str, values: dict[str, Any], *, awaiting: tuple = ()) -> dict[str, Any]:
@@ -79,12 +95,14 @@ async def _run_graph(
     inputs: dict[str, Any],
     *,
     resume: bool = False,
+    supabase: Any = None,
 ) -> tuple[dict[str, Any], tuple]:
+    config = _thread_config(session_id, supabase=supabase)
     t0 = time.monotonic()
     if resume:
-        await graph.ainvoke(Command(resume=True), config=_thread_config(session_id))
+        await graph.ainvoke(Command(resume=True), config=config)
     else:
-        await graph.ainvoke(inputs, config=_thread_config(session_id))
+        await graph.ainvoke(inputs, config=config)
     latency_ms = round((time.monotonic() - t0) * 1000)
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
@@ -115,10 +133,9 @@ async def start_compliance_drafter(
         "language": payload.get("language", "bm"),
         "turns_count": 0,
         "tool_calls": [],
-        "_supabase": supabase_client,
         "_user_email": user_email,
     }
-    values, awaiting = await _run_graph(graph, session_id, inputs)
+    values, awaiting = await _run_graph(graph, session_id, inputs, supabase=supabase_client)
     _log_run(supabase_client, user_id, "compliance-drafter", session_id, payload, values, values.get("latency_ms", 0), "awaiting_hitl" if awaiting else "completed")
     resp = _base_response(session_id, values, awaiting=awaiting)
     resp["awaiting_hitl"] = bool(awaiting)
@@ -162,8 +179,8 @@ async def confirm_compliance_drafter(
     edits: Optional[dict[str, Any]] = None,  # unused — compliance-drafter has no editable-draft UI
 ) -> dict[str, Any]:
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"_supabase": supabase_client, "_user_email": user_email})
-    values, _ = await _run_graph(graph, session_id, {}, resume=True)
+    await graph.aupdate_state(_thread_config(session_id), {"_user_email": user_email})
+    values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
     _log_run(supabase_client, user_id, "compliance-drafter", session_id, {"confirm": True}, values, values.get("latency_ms", 0), "completed")
     if supabase_client and values.get("pdf_storage_path"):
         _persist_document(supabase_client, user_id, "compliance-drafter", values)
@@ -227,9 +244,8 @@ async def start_grant_draft_generator(
         "export_format": payload.get("export_format", "pdf"),
         "turns_count": 0,
         "tool_calls": [],
-        "_supabase": supabase_client,
     }
-    values, awaiting = await _run_graph(graph, session_id, inputs)
+    values, awaiting = await _run_graph(graph, session_id, inputs, supabase=supabase_client)
     status = "error" if values.get("error") else ("awaiting_hitl" if awaiting else "completed")
     _log_run(supabase_client, user_id, "grant-draft-generator", session_id, payload, values, values.get("latency_ms", 0), status)
     resp = _base_response(session_id, values, awaiting=awaiting)
@@ -254,7 +270,7 @@ async def confirm_grant_draft_generator(
     edits: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
-    state_update: dict[str, Any] = {"_supabase": supabase_client, "_user_email": user_email}
+    state_update: dict[str, Any] = {"_user_email": user_email}
     if edits:
         # compile_node already ran before the interrupt and baked the
         # ORIGINAL executive_summary/use_of_funds_narrative into report_html
@@ -266,11 +282,13 @@ async def confirm_grant_draft_generator(
             snapshot = await graph.aget_state(_thread_config(session_id))
             current = dict(snapshot.values) if snapshot and snapshot.values else {}
             current.update(clean_edits)
-            recompiled = await _grant_draft_compile_node(current)
+            recompiled = await _grant_draft_compile_node(
+                current, _thread_config(session_id, supabase=supabase_client)
+            )
             state_update.update(clean_edits)
             state_update.update(recompiled)
     await graph.aupdate_state(_thread_config(session_id), state_update)
-    values, _ = await _run_graph(graph, session_id, {}, resume=True)
+    values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
     status = "error" if values.get("error") else "completed"
     _log_run(supabase_client, user_id, "grant-draft-generator", session_id, {"confirm": True}, values, values.get("latency_ms", 0), status)
     if supabase_client and (values.get("pdf_storage_path") or values.get("docx_storage_path")):
@@ -617,9 +635,8 @@ async def start_eligibility_agent(*, user_id: str, payload: dict[str, Any], supa
         "intake_complete": False,
         "needs_more_info": True,
         "needs_clarification": False,
-        "_supabase": supabase_client,
     }
-    values, awaiting = await _run_graph(graph, session_id, inputs)
+    values, awaiting = await _run_graph(graph, session_id, inputs, supabase=supabase_client)
     status = "completed" if values.get("intake_complete") else "awaiting_hitl"
     _log_run(supabase_client, user_id, "eligibility-agent", session_id, payload, values, values.get("latency_ms", 0), status)
     resp = _base_response(session_id, values, awaiting=awaiting)
@@ -654,7 +671,12 @@ async def continue_eligibility_agent(
     # existing checkpointed state as its base.
     graph = get_eligibility_agent_graph(checkpointer=checkpointer)
     t0 = time.monotonic()
-    await graph.ainvoke({"latest_user_input": payload.get("message", "")}, config=_thread_config(session_id))
+    # The completing turn runs grant_rag + analyst, both of which need the
+    # client — so it goes in this turn's config too, not just start's.
+    await graph.ainvoke(
+        {"latest_user_input": payload.get("message", "")},
+        config=_thread_config(session_id, supabase=supabase_client),
+    )
     latency_ms = round((time.monotonic() - t0) * 1000)
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}

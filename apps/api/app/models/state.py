@@ -1,7 +1,7 @@
 """AgentState TypedDict and Citation model for the LangGraph pipeline."""
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, NotRequired, Optional, TypedDict
+from typing import Any, Literal, NotRequired, Optional, TypedDict
 
 from app.services.vector_store import ChunkResult
 
