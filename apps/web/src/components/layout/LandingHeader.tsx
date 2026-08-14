@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
@@ -28,8 +29,8 @@ export function LandingHeader() {
   return (
     <header className={`sticky top-0 z-30 border-b backdrop-blur-md ${shellClass}`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        <Link href="/" className="font-bold text-lg tracking-tight locale-nowrap flex-shrink-0">
-          NakTahu
+        <Link href="/" className="text-lg flex-shrink-0">
+          <NakTahuWordmark markSize={26} />
         </Link>
 
         <div className="hidden md:flex items-center gap-1">

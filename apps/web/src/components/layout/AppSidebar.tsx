@@ -30,6 +30,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { DeadlineWidget } from '@/components/agents/DeadlineWidget';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { LangToggle } from '@/components/LangToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
@@ -361,8 +362,8 @@ function SidebarPanel({
   return (
     <>
       <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${headerBorder}`}>
-        <Link href="/chat" className={`font-bold text-sm tracking-tight locale-nowrap ${titleClass}`}>
-          NakTahu
+        <Link href="/chat" className={`text-sm ${titleClass}`}>
+          <NakTahuWordmark markSize={22} />
         </Link>
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* collapse — desktop persistent panel only */}

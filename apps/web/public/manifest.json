@@ -4,8 +4,8 @@
   "description": "Tanya soalan berkaitan perkhidmatan kerajaan Malaysia dengan NakTahu AI.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0F1E",
-  "theme_color": "#2563EB",
+  "background_color": "#14162B",
+  "theme_color": "#3B5BFF",
   "orientation": "portrait-primary",
   "lang": "ms",
   "icons": [
@@ -14,8 +14,23 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "screenshots": [],
-  "categories": ["productivity", "utilities"]
+  "categories": [
+    "productivity",
+    "utilities"
+  ]
 }

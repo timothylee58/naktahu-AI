@@ -1,4 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="96" fill="#0A0F1E"/>
-  <text x="256" y="340" font-family="Arial, sans-serif" font-size="260" font-weight="800" text-anchor="middle" fill="#2563EB">N</text>
+  <!-- Hibiscus-Notch. Declared "purpose: any maskable" in manifest.json, so
+       the mark is scaled to ~62% and centred: a maskable icon may be cropped
+       to an inner circle by the launcher, and the bubble must survive that. -->
+  <rect width="512" height="512" rx="96" fill="#14162B"/>
+  <g transform="translate(97.6 97.6) scale(2.6)">
+    <rect x="14" y="14" width="92" height="74" rx="30" fill="#3B5BFF"/>
+    <path d="M32 88 L32 108 L52 88 Z" fill="#3B5BFF"/>
+    <circle cx="96.0" cy="17.0" r="4" fill="#FFB238"/>
+    <circle cx="104.6" cy="23.2" r="4" fill="#FFB238"/>
+    <circle cx="101.3" cy="33.3" r="4" fill="#FFB238"/>
+    <circle cx="90.7" cy="33.3" r="4" fill="#FFB238"/>
+    <circle cx="87.4" cy="23.2" r="4" fill="#FFB238"/>
+  </g>
 </svg>
