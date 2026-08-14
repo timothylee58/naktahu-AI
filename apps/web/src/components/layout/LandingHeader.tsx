@@ -29,7 +29,7 @@ export function LandingHeader() {
   return (
     <header className={`sticky top-0 z-30 border-b backdrop-blur-md ${shellClass}`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        <Link href="/" className="text-lg flex-shrink-0">
+        <Link href="/" className="inline-flex items-center text-lg flex-shrink-0">
           <NakTahuWordmark markSize={26} />
         </Link>
 
