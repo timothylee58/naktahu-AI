@@ -99,7 +99,21 @@ function ImmigrationNavigatorPageInner() {
       setTurnsCount((n) => n + 1);
 
       const out = (res.output as Record<string, unknown>) ?? res;
-      const botText = String(out.response ?? out.summary ?? out.output ?? JSON.stringify(out));
+      // This agent's state has no free-text "response"/"summary" field —
+      // ever (confirmed in app/agents/immigration_navigator/nodes.py: intake
+      // turns set next_prompt, the completion turn sets visa_type/checklist/
+      // warnings only). The old response ?? summary ?? output ?? JSON.stringify
+      // chain always fell through to JSON.stringify(out), dumping the raw
+      // state object into the chat bubble as a bug report caught (a
+      // {"session_id":...,"nationality":null,...} wall of text instead of a
+      // sentence). next_prompt covers "needs more info" turns; the
+      // completion turn's real content already renders in the visaType/
+      // checklist/warnings panel above the chat, so the bubble just
+      // acknowledges it — matching retrenchment-navigator's established
+      // next_prompt-or-result_ready pattern for the same agent shape.
+      const botText = String(
+        (res.next_prompt as string) ?? (out.next_prompt as string) ?? t('agents.immigration-navigator.result_ready'),
+      );
       const botMsg: ChatMessage = { id: `b_${Date.now()}`, role: 'bot', content: botText };
       setMessages((prev) => [...prev, botMsg]);
 
@@ -116,7 +130,7 @@ function ImmigrationNavigatorPageInner() {
         setQuickReplies([]);
       }
     } catch {
-      const errMsg: ChatMessage = { id: `e_${Date.now()}`, role: 'bot', content: 'Maaf, ralat berlaku. Sila cuba lagi.' };
+      const errMsg: ChatMessage = { id: `e_${Date.now()}`, role: 'bot', content: t('agents.immigration-navigator.error') };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
       setLoading(false);
