@@ -110,8 +110,16 @@ def _checkpointer(request: Request) -> Any:
     return getattr(request.app.state, "checkpointer", None) or get_checkpointer()
 
 
-def _thread_config(session_id: str) -> dict[str, Any]:
-    return {"configurable": {"thread_id": session_id}}
+def _thread_config(session_id: str, *, supabase: Any = None) -> dict[str, Any]:
+    """Mirror of agent_runner._thread_config — the Supabase client rides in
+    `configurable` (handed to nodes, never checkpointed) because a live client
+    is not serialisable; see app/agents/runtime.py. Putting it in state made
+    every call here fail the checkpoint write, which this router's except
+    blocks then reported as a 503."""
+    configurable: dict[str, Any] = {"thread_id": session_id}
+    if supabase is not None:
+        configurable["supabase"] = supabase
+    return {"configurable": configurable}
 
 
 async def _sse_stream(generator: AsyncGenerator[dict[str, Any], None]) -> AsyncGenerator[str, None]:
@@ -149,11 +157,10 @@ async def start_session(
         "intake_complete": False,
         "needs_more_info": True,
         "needs_clarification": False,
-        "_supabase": supabase,
     }
 
     try:
-        await graph.ainvoke(initial_state, config=_thread_config(session_id))
+        await graph.ainvoke(initial_state, config=_thread_config(session_id, supabase=supabase))
         snapshot = await graph.aget_state(_thread_config(session_id))
         result_state = dict(snapshot.values) if snapshot else initial_state
     except Exception as exc:
@@ -206,10 +213,9 @@ async def send_message(
     try:
         await graph.aupdate_state(thread, {
             "latest_user_input": body.message,
-            "_supabase": supabase,
             "language": language,
         })
-        await graph.ainvoke(None, config=thread)
+        await graph.ainvoke(None, config=_thread_config(body.session_id, supabase=supabase))
         snapshot = await graph.aget_state(thread)
         result_state = dict(snapshot.values) if snapshot else {}
     except Exception as exc:

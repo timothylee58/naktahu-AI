@@ -19,12 +19,15 @@ from app.agents.eligibility_agent.analyst_node import analyst_node
 from app.agents.eligibility_agent.grant_rag_node import grant_rag_node
 from app.agents.eligibility_agent.intake_node import intake_node
 from app.agents.eligibility_agent.state import EligibilityState
+from langchain_core.runnables import RunnableConfig
+
+from app.agents.runtime import supabase_from_config
 
 _compiled: Any = None
 
 
-async def _grant_rag_node(state: EligibilityState) -> dict[str, Any]:
-    return await grant_rag_node(state, state.get("_supabase"))
+async def _grant_rag_node(state: EligibilityState, config: RunnableConfig | None = None) -> dict[str, Any]:
+    return await grant_rag_node(state, supabase_from_config(config))
 
 
 def _route_after_intake(state: EligibilityState) -> str:
