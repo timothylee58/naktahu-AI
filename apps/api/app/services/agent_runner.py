@@ -21,28 +21,10 @@ from app.agents.immigration_navigator.graph import get_immigration_navigator_gra
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
 from app.agents.retrenchment_navigator.graph import get_retrenchment_navigator_graph
 from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
+from app.agents.runtime import thread_config as _thread_config
 from app.agents.study_agent.graph import get_study_agent_graph
 
 log = structlog.get_logger(__name__)
-
-
-def _thread_config(session_id: str, *, supabase: Any = None) -> dict[str, Any]:
-    """Per-run LangGraph config.
-
-    `supabase` goes here rather than into graph state on purpose. Every state
-    key is serialised by the checkpointer on each write, and a Supabase
-    `Client` is neither msgpack- nor pickle-serialisable (it holds an
-    `_thread.RLock`), so putting it in state made `ainvoke` raise
-    `TypeError: Type is not msgpack serializable: Client` — an unhandled 500
-    on every start for the three agents that needed a client. `configurable`
-    entries are passed to nodes but not checkpointed, which is exactly what a
-    live connection handle wants.
-    """
-    configurable: dict[str, Any] = {"thread_id": session_id}
-    if supabase is not None:
-        configurable["supabase"] = supabase
-    return {"configurable": configurable}
-
 
 
 
@@ -149,7 +131,14 @@ async def continue_compliance_drafter(
     user_id: str,
     payload: dict[str, Any],
     checkpointer: Any,
+    supabase_client: Any = None,
 ) -> dict[str, Any]:
+    # Confirmed cubic finding: this graph interrupt_before=["generate_pdf"]
+    # (compliance_drafter/graph.py), so a continue call against a thread
+    # already paused at that boundary resumes straight into generate_pdf_node
+    # — which needs the client. supabase_client wasn't even an accepted
+    # param here before, so that path always ran with no client. Threaded
+    # through the same way confirm_compliance_drafter already does.
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
     update: dict[str, Any] = {}
     for key in ("context", "business_type", "domains"):
@@ -158,7 +147,7 @@ async def continue_compliance_drafter(
     if update:
         await graph.aupdate_state(_thread_config(session_id), update)
     t0 = time.monotonic()
-    await graph.ainvoke(None, config=_thread_config(session_id))
+    await graph.ainvoke(None, config=_thread_config(session_id, supabase=supabase_client))
     latency_ms = round((time.monotonic() - t0) * 1000)
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
@@ -282,9 +271,12 @@ async def confirm_grant_draft_generator(
             snapshot = await graph.aget_state(_thread_config(session_id))
             current = dict(snapshot.values) if snapshot and snapshot.values else {}
             current.update(clean_edits)
-            recompiled = await _grant_draft_compile_node(
-                current, _thread_config(session_id, supabase=supabase_client)
-            )
+            # compile_node is a pure state -> report builder (mirrors
+            # compliance_drafter's compile_node) and takes no config — it
+            # never touches Supabase. Confirmed real Cursor/cubic finding:
+            # passing one here raised TypeError (2 args, 1 accepted) on
+            # every edited-draft confirm.
+            recompiled = await _grant_draft_compile_node(current)
             state_update.update(clean_edits)
             state_update.update(recompiled)
     await graph.aupdate_state(_thread_config(session_id), state_update)

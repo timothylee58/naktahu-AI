@@ -174,7 +174,13 @@ async def agent_continue(
     # directly).
     if agent_name == "compliance-drafter":
         kwargs["user_id"] = user.user_id
-    if agent_name in ("immigration-navigator", "retrenchment-navigator", "study-agent", "eligibility-agent"):
+    if agent_name in (
+        "immigration-navigator",
+        "retrenchment-navigator",
+        "study-agent",
+        "eligibility-agent",
+        "compliance-drafter",
+    ):
         kwargs["supabase_client"] = sb
 
     result = await handler(**kwargs)
