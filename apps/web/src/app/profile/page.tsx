@@ -6,21 +6,44 @@ import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
+import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { effectivePlan, planBadgeLabel, userRole, ADMIN_ROLES } from '@/lib/auth-plan';
 import { fetchUserCredits } from '@/lib/credits';
 import { suggestForQuery } from '@/lib/agent-suggestions';
 import { SuggestionCard } from '@/components/agents/SuggestionCard';
 
+const FEEDBACK_EMAIL = 'feedback@naktahu.my';
+
+function fmt(template: string, vars: Record<string, string | number>): string {
+  return Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), template);
+}
+
+type RedeemStatus =
+  | { kind: 'idle' }
+  | { kind: 'success'; message: string }
+  | { kind: 'error'; message: string };
+
 export default function ProfilePage() {
   const { t } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { supabase, user, accessToken, ready } = useSupabaseSession();
+  const { get, post } = useAgentApi();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
   const [suggestQuery, setSuggestQuery] = useState('');
+
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [completedReferrals, setCompletedReferrals] = useState(0);
+  const [copyLabel, setCopyLabel] = useState<'copy' | 'copied' | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [redeemStatus, setRedeemStatus] = useState<RedeemStatus>({ kind: 'idle' });
+  const [activeGrant, setActiveGrant] = useState<{ plan_tier: string; expires_at: string } | null>(null);
 
   useEffect(() => {
     if (!user?.id) {
@@ -35,6 +58,88 @@ export default function ProfilePage() {
       active = false;
     };
   }, [user?.id, supabase]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setReferralCode(null);
+      setActiveGrant(null);
+      return;
+    }
+    let active = true;
+    void get('/api/v1/referrals/me').then((res) => {
+      if (!active) return;
+      setReferralCode(typeof res.code === 'string' ? res.code : null);
+      setCompletedReferrals(Number(res.completed_referrals ?? 0));
+    }).catch(() => {
+      /* referrals temporarily unavailable — card degrades to a loading skeleton */
+    });
+    void get('/api/v1/billing/plan-status').then((res) => {
+      if (!active) return;
+      const grant = res.active_grant as { plan_tier: string; expires_at: string } | null;
+      setActiveGrant(grant ?? null);
+    }).catch(() => {
+      /* best-effort — plan badge elsewhere still reflects the JWT plan */
+    });
+    return () => {
+      active = false;
+    };
+  }, [user?.id, get]);
+
+  const referralLink = referralCode
+    ? `https://naktahu.my/?ref=${encodeURIComponent(referralCode)}`
+    : '';
+
+  const copyReferralCode = () => {
+    if (!referralCode) return;
+    void navigator.clipboard.writeText(referralCode).then(() => {
+      setCopyLabel('copied');
+      setTimeout(() => setCopyLabel(null), 2000);
+    });
+  };
+
+  const copyReferralLink = () => {
+    if (!referralLink) return;
+    void navigator.clipboard.writeText(referralLink).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
+
+  const shareViaWhatsApp = () => {
+    if (!referralCode) return;
+    const message = fmt(t('profile.referral.whatsapp_message'), { code: referralCode, link: referralLink });
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const submitRedeemCode = async () => {
+    const code = redeemInput.trim();
+    if (!code) return;
+    setRedeemLoading(true);
+    setRedeemStatus({ kind: 'idle' });
+    try {
+      const res = await post('/api/v1/billing/redeem', { code });
+      if (res.status === 'credits_granted') {
+        setRedeemStatus({ kind: 'success', message: fmt(t('profile.redeem.status.credits_granted'), { n: Number(res.credits_amount) }) });
+        void fetchUserCredits(supabase, user!.id).then(setCredits);
+      } else if (res.status === 'plan_granted') {
+        setRedeemStatus({
+          kind: 'success',
+          message: fmt(t('profile.redeem.status.plan_granted'), { plan: String(res.plan_tier), days: Number(res.duration_days) }),
+        });
+        void get('/api/v1/billing/plan-status').then((r) => setActiveGrant((r.active_grant as { plan_tier: string; expires_at: string } | null) ?? null));
+      } else {
+        setRedeemStatus({ kind: 'error', message: t('profile.redeem.status.error') });
+      }
+      setRedeemInput('');
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : '';
+      const key = `profile.redeem.status.${detail.replace(/\s+/g, '_')}`;
+      const resolved = t(key);
+      setRedeemStatus({ kind: 'error', message: resolved === key ? t('profile.redeem.status.error') : resolved });
+    } finally {
+      setRedeemLoading(false);
+    }
+  };
 
   const suggestions = useMemo(() => suggestForQuery(suggestQuery), [suggestQuery]);
   const plan = effectivePlan(user);
@@ -119,8 +224,105 @@ export default function ProfilePage() {
                           ? t('header.credits').replace('{n}', String(credits))
                           : '…'}
                     </span>
+                    {activeGrant && (
+                      <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                        {fmt(t('profile.plan_grant.active'), {
+                          plan: activeGrant.plan_tier,
+                          date: new Date(activeGrant.expires_at).toLocaleDateString(),
+                        })}
+                      </span>
+                    )}
                   </div>
                 </div>
+              </section>
+
+              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  {t('profile.feedback.title')}
+                </span>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.feedback.desc')}</p>
+                <a
+                  href={`mailto:${FEEDBACK_EMAIL}`}
+                  className="self-start px-4 py-2 bg-nk-official/10 hover:bg-nk-official/20 text-nk-official-dim dark:text-nk-official rounded-full text-sm font-semibold transition-colors"
+                >
+                  {t('profile.feedback.button')}
+                </a>
+              </section>
+
+              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
+                <h2 className="text-sm font-semibold">{t('profile.referral.title')}</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.referral.desc')}</p>
+
+                {referralCode ? (
+                  <>
+                    <div className="flex items-center justify-between gap-2 border border-dashed border-nk-official/40 rounded-xl px-4 py-2.5">
+                      <span className="font-mono font-bold tracking-widest text-nk-official-dim dark:text-nk-official">
+                        {referralCode}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={copyReferralCode}
+                        className="text-xs font-medium text-zinc-500 hover:text-nk-official-dim dark:text-zinc-400 dark:hover:text-nk-official transition-colors"
+                      >
+                        {copyLabel === 'copied' ? t('profile.referral.copied') : t('profile.referral.copy')}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={shareViaWhatsApp}
+                        className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                      >
+                        {t('profile.referral.whatsapp')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={copyReferralLink}
+                        className="flex-1 px-3 py-2 border border-zinc-200 hover:bg-zinc-50 dark:border-white/10 dark:hover:bg-white/5 rounded-xl text-sm font-semibold transition-colors"
+                      >
+                        {linkCopied ? t('profile.referral.link_copied') : t('profile.referral.link')}
+                      </button>
+                    </div>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                      {fmt(t('profile.referral.completed_count'), { n: completedReferrals })}
+                    </p>
+                  </>
+                ) : (
+                  <div className="h-20 rounded-xl animate-pulse bg-zinc-100 dark:bg-white/5" />
+                )}
+              </section>
+
+              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
+                <h2 className="text-sm font-semibold">{t('profile.redeem.title')}</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.redeem.desc')}</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={redeemInput}
+                    onChange={(e) => setRedeemInput(e.target.value.toUpperCase())}
+                    placeholder={t('profile.redeem.placeholder')}
+                    className="flex-1 border border-zinc-200 rounded-xl p-2.5 text-sm font-mono tracking-wide bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={redeemLoading || !redeemInput.trim()}
+                    onClick={() => void submitRedeemCode()}
+                    className="px-4 py-2 bg-nk-official hover:bg-nk-official-dim text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {t('profile.redeem.button')}
+                  </button>
+                </div>
+                {redeemStatus.kind !== 'idle' && (
+                  <p
+                    className={`text-xs font-medium ${
+                      redeemStatus.kind === 'success'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
+                  >
+                    {redeemStatus.message}
+                  </p>
+                )}
               </section>
 
               {/* Smart suggestions — rule-based, no LLM call. Full experience

@@ -1,11 +1,13 @@
+from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 import stripe
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field
 
 from core.config import settings
+from middleware.rate_limit import apply_query_rate_limit
 from services.auth import UserContext, get_current_user
 from services.billing import (
     HITPAY_VALID_ITEMS,
@@ -21,6 +23,8 @@ from services.billing import (
     unmark_hitpay_event_processed,
     verify_hitpay_webhook_signature,
 )
+from services.redeem_codes import redeem_code
+from services.referral import get_active_plan_grant, revert_expired_plan_grant
 
 logger = structlog.get_logger()
 
@@ -145,3 +149,57 @@ async def get_credits(
         raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
     remaining = await get_credits_remaining(request.app.state.supabase, user.user_id)
     return {"credits_remaining": remaining}
+
+
+class RedeemCodeRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=32)
+
+
+@router.post("/redeem")
+@apply_query_rate_limit()
+async def post_redeem_code(
+    request: Request,
+    response: Response,
+    body: RedeemCodeRequest,
+    user: Annotated[UserContext, Depends(get_current_user)],
+):
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
+    result = await redeem_code(request.app.state.supabase, body.code, user.user_id)
+    if result["status"] == "invalid_code":
+        raise HTTPException(status_code=404, detail="Redeem code not found")
+    if result["status"] in ("expired", "exhausted", "already_redeemed"):
+        raise HTTPException(status_code=409, detail=result["status"].replace("_", " "))
+    return result
+
+
+@router.get("/plan-status")
+async def get_plan_status(
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+):
+    """The caller's active temporary plan grant, if any — surfaced on the
+    profile page since a referral/redeem-code grant is not reflected in the
+    plan badge until the JWT is next refreshed (see migration 034's design
+    note). Also where lazy expiry reversion happens: an expired grant found
+    here is reverted immediately, before being reported, so the response
+    never claims an already-expired grant is still active."""
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Billing service temporarily unavailable")
+    sb = request.app.state.supabase
+    grant = await get_active_plan_grant(sb, user.user_id)
+    if not grant:
+        return {"active_grant": None}
+
+    expires_at = datetime.fromisoformat(grant["expires_at"].replace("Z", "+00:00"))
+    if expires_at < datetime.now(timezone.utc):
+        await revert_expired_plan_grant(sb, grant)
+        return {"active_grant": None}
+
+    return {
+        "active_grant": {
+            "plan_tier": grant["plan_tier"],
+            "source": grant["source"],
+            "expires_at": grant["expires_at"],
+        }
+    }
