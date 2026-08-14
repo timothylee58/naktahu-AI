@@ -26,9 +26,17 @@ from typing import Any
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from app.agents.checkpointer import reset_checkpointer_for_tests
 from app.agents.runtime import supabase_from_config
-from app.services.agent_runner import _thread_config, start_eligibility_agent
+from app.services.agent_runner import (
+    _thread_config,
+    confirm_grant_draft_generator,
+    continue_compliance_drafter,
+    start_eligibility_agent,
+    start_grant_draft_generator,
+)
 
 
 class FakeUnpickleableClient:
@@ -136,3 +144,63 @@ async def test_checkpointed_state_holds_no_client_handle():
     assert "_supabase" not in snapshot.values
     # Belt and braces: the whole state survives a round-trip.
     pickle.dumps(dict(snapshot.values))
+
+
+@pytest.mark.asyncio
+async def test_confirm_grant_draft_generator_with_edits_does_not_500():
+    """Confirmed cubic-dev-ai finding on this PR's own fix: passing edits
+    through confirm re-runs compile_node to reflect them in report_html/
+    report_json before resuming — but compile_node(state) takes exactly one
+    positional argument, and an early version of this fix passed a second
+    (the run config). Every edited-draft confirm would have raised
+    `TypeError: compile_node() takes 1 positional argument but 2 were given`
+    and 500'd. compile_node is a pure state->report builder and never reads
+    Supabase, so it must never receive config at all."""
+    cp = MemorySaver()
+    sb = MagicMock()
+    started = await start_grant_draft_generator(
+        user_id="u1",
+        payload={
+            "programme_name": "",  # empty -> fetch_grant_node short-circuits
+            "business_profile": {"sector": "technology"},
+            "language": "en",
+        },
+        supabase_client=sb,
+        checkpointer=cp,
+    )
+    session_id = started["session_id"]
+
+    result = await confirm_grant_draft_generator(
+        session_id=session_id,
+        user_id="u1",
+        user_email=None,
+        supabase_client=sb,
+        checkpointer=cp,
+        edits={"executive_summary": "Edited summary text."},
+    )
+    assert "session_id" in result
+
+
+@pytest.mark.asyncio
+async def test_continue_compliance_drafter_accepts_supabase_client():
+    """Confirmed cubic-dev-ai finding: continue_compliance_drafter had no
+    supabase_client parameter at all (and the router never passed one).
+    compliance_drafter's graph is compiled with
+    interrupt_before=["generate_pdf"] — a continue call against a thread
+    already paused there resumes straight into generate_pdf_node, which
+    needs the client for the actual upload.
+
+    No prior checkpoint exists for this session_id, so `ainvoke(None, ...)`
+    runs the graph from START — the RAG query nodes are mocked out (network
+    is blocked in this sandbox), matching test_agent_runner_continue.py's
+    established pattern for the sibling agents."""
+    cp = MemorySaver()
+    with patch("app.agents.compliance_drafter.nodes.query_rag_findings", AsyncMock(return_value=[])):
+        result = await continue_compliance_drafter(
+            session_id="cd-arity-check",
+            user_id="u1",
+            payload={"context": "still checking arity, not real state"},
+            checkpointer=cp,
+            supabase_client=MagicMock(),
+        )
+    assert isinstance(result, dict)

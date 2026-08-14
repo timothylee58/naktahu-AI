@@ -19,6 +19,23 @@ from __future__ import annotations
 from typing import Any
 
 
+def thread_config(session_id: str, *, supabase: Any = None) -> dict[str, Any]:
+    """Build a run's LangGraph config: `thread_id` for the checkpointer,
+    `supabase` (if given) for nodes that need a client — see module
+    docstring for why the client goes here and not into state.
+
+    Single canonical implementation. Previously duplicated byte-for-byte
+    into app/routers/eligibility.py's own module-local copy (confirmed
+    cubic-dev-ai finding) — a fix to one would have silently left the
+    other on the old behaviour and reintroduced the exact 500 this module
+    exists to prevent.
+    """
+    configurable: dict[str, Any] = {"thread_id": session_id}
+    if supabase is not None:
+        configurable["supabase"] = supabase
+    return {"configurable": configurable}
+
+
 def supabase_from_config(config: Any) -> Any:
     """Return the run-scoped Supabase client, or None when absent.
 

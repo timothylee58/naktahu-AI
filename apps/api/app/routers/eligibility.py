@@ -35,6 +35,7 @@ from app.agents.eligibility_agent.compatibility import grant_compatibility_check
 from app.agents.eligibility_agent.graph import get_eligibility_agent_graph
 from app.agents.eligibility_agent.state import EligibilityState
 from app.agents.eligibility_agent.synthesiser_node import synthesiser_node
+from app.agents.runtime import thread_config as _thread_config
 from routers._request_fields import Language, normalise_language
 from services.auth import UserContext, get_optional_user
 
@@ -109,17 +110,6 @@ class CompatibilityResponse(BaseModel):
 def _checkpointer(request: Request) -> Any:
     return getattr(request.app.state, "checkpointer", None) or get_checkpointer()
 
-
-def _thread_config(session_id: str, *, supabase: Any = None) -> dict[str, Any]:
-    """Mirror of agent_runner._thread_config — the Supabase client rides in
-    `configurable` (handed to nodes, never checkpointed) because a live client
-    is not serialisable; see app/agents/runtime.py. Putting it in state made
-    every call here fail the checkpoint write, which this router's except
-    blocks then reported as a 503."""
-    configurable: dict[str, Any] = {"thread_id": session_id}
-    if supabase is not None:
-        configurable["supabase"] = supabase
-    return {"configurable": configurable}
 
 
 async def _sse_stream(generator: AsyncGenerator[dict[str, Any], None]) -> AsyncGenerator[str, None]:
