@@ -26,6 +26,7 @@
     "remark-gfm": "^4.0.1",
     "swr": "^2.3.0",
     "tailwind-merge": "^3.6.0",
+    "tesseract.js": "^6.0.1",
     "use-sound": "^4.0.4"
   },
   "devDependencies": {

@@ -37,8 +37,12 @@ class AgentStartRequest(BaseModel):
     domains: list[str] = Field(default_factory=lambda: ["tax", "business", "epf"])
     # study-agent
     subject: str = "sejarah"
-    paper_text: str = ""
-    document_base64: str = ""
+    level: Literal["spm", "stpm", "a-level"] = "spm"
+    mode: Literal["explain", "quiz"] = "explain"
+    paper_text: str = Field(default="", max_length=20_000)
+    document_base64: str = Field(default="", max_length=15_000_000)
+    image_base64: str = Field(default="", max_length=15_000_000)
+    image_mime_type: str = "image/jpeg"
     # eligibility-agent (business_type/message/language shared with other agents above)
     sector: str = ""
     annual_revenue_myr: Optional[float] = None

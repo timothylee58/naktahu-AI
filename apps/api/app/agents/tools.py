@@ -138,6 +138,74 @@ async def llm_complete(
         return ""
 
 
+async def ocr_extract_text(
+    image_base64: str,
+    *,
+    mime_type: str = "image/jpeg",
+    language: str = "bm",
+) -> str:
+    """Extract exam-paper text from a photographed page via a vision-capable
+    chat completion. ILMU primary, Anthropic (the same FALLBACK_MODEL already
+    used by the synthesiser on failure/low confidence) as fallback — this
+    mirrors llm_complete's/embeddings' existing provider-fallback shape
+    rather than introducing a new one. Returns "" on total failure so callers
+    degrade the same way extract_pdf_text already does (Trap #4-style: never
+    crash on a missing/failed provider)."""
+    data_url = f"data:{mime_type};base64,{image_base64}"
+    system = (
+        "You transcribe photographed exam past-papers into plain text. "
+        "Preserve question numbering exactly as printed. Do not answer the "
+        "questions or add commentary — output only the transcribed text."
+    )
+    try:
+        resp = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Transcribe this exam paper page."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+            max_tokens=2000,
+            temperature=0.0,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        if text:
+            return text
+    except Exception as exc:
+        log.warning("ocr_ilmu_failed", error=str(exc))
+
+    try:
+        from app.services.llm_client import FALLBACK_MODEL, anthropic_client
+
+        resp = await anthropic_client.messages.create(
+            model=FALLBACK_MODEL,
+            max_tokens=2000,
+            system=system,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": mime_type, "data": image_base64},
+                        },
+                        {"type": "text", "text": "Transcribe this exam paper page."},
+                    ],
+                }
+            ],
+        )
+        parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+        return "".join(parts).strip()
+    except Exception as exc:
+        log.warning("ocr_anthropic_fallback_failed", error=str(exc))
+        return ""
+
+
 async def generate_pdf(
     html: str,
     *,
