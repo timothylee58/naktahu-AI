@@ -169,7 +169,7 @@ function RetrenchmentNavigatorPageInner() {
         <div ref={bottomRef} />
 
         <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-2 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
-          {nextPrompt && <p className="text-sm text-blue-700 dark:text-blue-400">{nextPrompt}</p>}
+          {nextPrompt && <p className="text-sm text-nk-official-dim dark:text-nk-official">{nextPrompt}</p>}
           <textarea
             className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:border-teal-500/50 focus:outline-none focus:ring-1 focus:ring-teal-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
             rows={3}

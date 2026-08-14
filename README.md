@@ -273,6 +273,8 @@ Pull requests run through the same CI gate described above — typecheck, tests,
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, the exact commands CI runs, and PR conventions.
 
+For exploratory product-direction notes (not a committed roadmap), see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
 ---
 
 ## License

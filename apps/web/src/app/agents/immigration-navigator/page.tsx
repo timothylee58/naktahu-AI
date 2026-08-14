@@ -203,7 +203,7 @@ function ImmigrationNavigatorPageInner() {
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
                 {t('agents.immigration-navigator.turn_step').replace('{n}', String(turnsCount + 1))}
               </p>
-              {nextPrompt && <p className="text-sm text-blue-700 dark:text-blue-400">{nextPrompt}</p>}
+              {nextPrompt && <p className="text-sm text-nk-official-dim dark:text-nk-official">{nextPrompt}</p>}
               <QuickReplies options={quickReplies} onSelect={(opt) => void send(opt)} />
               <textarea
                 className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:border-teal-500/50 focus:outline-none focus:ring-1 focus:ring-teal-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"

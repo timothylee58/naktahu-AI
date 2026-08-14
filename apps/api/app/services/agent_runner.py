@@ -39,7 +39,7 @@ def _base_response(session_id: str, values: dict[str, Any], *, awaiting: tuple =
 
 
 def _public_output(values: dict[str, Any]) -> dict[str, Any]:
-    skip = {"_supabase", "_user_email", "_rag_findings", "document_base64", "paper_text"}
+    skip = {"_supabase", "_user_email", "_rag_findings", "document_base64", "image_base64", "paper_text"}
     return {k: v for k, v in values.items() if not k.startswith("_") and k not in skip}
 
 
@@ -323,23 +323,28 @@ async def start_study_agent(*, user_id: str, payload: dict[str, Any], supabase_c
     inputs = {
         "session_id": session_id,
         "user_id": user_id,
+        "level": payload.get("level", "spm"),
         "subject": payload.get("subject", "sejarah"),
+        "mode": payload.get("mode", "explain"),
         "paper_text": payload.get("paper_text", ""),
         "document_base64": payload.get("document_base64", ""),
+        "image_base64": payload.get("image_base64", ""),
+        "image_mime_type": payload.get("image_mime_type", ""),
         "message": payload.get("message", ""),
         "language": payload.get("language", "bm"),
         "turns_count": 0,
         "tool_calls": [],
     }
     values, _ = await _run_graph(graph, session_id, inputs)
-    _log_run(supabase_client, user_id, "study-agent", session_id, payload, values, values.get("latency_ms", 0), "completed")
+    logged_payload = {k: v for k, v in payload.items() if k not in ("document_base64", "image_base64")}
+    _log_run(supabase_client, user_id, "study-agent", session_id, logged_payload, values, values.get("latency_ms", 0), "completed")
     return _base_response(session_id, values)
 
 
 async def continue_study_agent(
     *, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any
 ) -> dict[str, Any]:
-    from app.agents.study_agent.nodes import explain_node, track_topics_node
+    from app.agents.study_agent.nodes import explain_node, grade_quiz_answer_node, track_topics_node
 
     graph = get_study_agent_graph(checkpointer=checkpointer)
     snapshot = await graph.aget_state(_thread_config(session_id))
@@ -351,7 +356,10 @@ async def continue_study_agent(
         state["active_question_index"] = payload["question_index"]
     state["turns_count"] = int(state.get("turns_count") or 0) + 1
     t0 = time.monotonic()
-    state.update(await explain_node(state))
+    if state.get("mode") == "quiz" and state.get("quiz"):
+        state.update(await grade_quiz_answer_node(state))
+    else:
+        state.update(await explain_node(state))
     state.update(await track_topics_node(state))
     await graph.aupdate_state(_thread_config(session_id), state)
     state["latency_ms"] = round((time.monotonic() - t0) * 1000)

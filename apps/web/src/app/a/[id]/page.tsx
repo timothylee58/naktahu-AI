@@ -63,7 +63,7 @@ export default function SharedAnswerPage() {
         </Link>
         <Link
           href="/chat"
-          className="text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-4 py-2 transition-colors shadow-sm"
+          className="text-sm font-semibold bg-nk-official hover:bg-nk-official-dim text-white rounded-full px-4 py-2 transition-colors shadow-sm"
         >
           {t('share.cta')}
         </Link>
@@ -80,7 +80,7 @@ export default function SharedAnswerPage() {
         {status === 'not-found' && (
           <div className="text-center py-16">
             <p className="text-zinc-500">{t('share.not_found')}</p>
-            <Link href="/chat" className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:text-blue-500">
+            <Link href="/chat" className="mt-4 inline-block text-sm font-semibold text-nk-official-dim hover:text-nk-official">
               {t('share.cta')}
             </Link>
           </div>
@@ -100,13 +100,13 @@ export default function SharedAnswerPage() {
             className="flex flex-col gap-4"
           >
             <div className="flex justify-end">
-              <div className="max-w-[85%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-sm">
+              <div className="max-w-[85%] bg-nk-official text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-sm">
                 {answer.query}
               </div>
             </div>
 
             <div className="flex justify-start gap-2.5">
-              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center mt-1 shadow-sm">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-nk-official to-nk-official-dim flex items-center justify-center mt-1 shadow-sm">
                 <span className="text-white text-[10px] font-bold">AI</span>
               </div>
               <div className="max-w-[85%] flex flex-col gap-2">

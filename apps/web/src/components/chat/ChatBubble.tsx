@@ -52,7 +52,7 @@ export function ChatBubble(props: ChatBubbleProps) {
           initial={{ opacity: 0, y: 8, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={spring}
-          className="max-w-[75%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-md shadow-blue-900/10"
+          className="max-w-[75%] bg-nk-official text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-md shadow-blue-900/10"
         >
           {props.content}
         </motion.div>
@@ -66,7 +66,7 @@ export function ChatBubble(props: ChatBubbleProps) {
   return (
     <div className="flex justify-start gap-2.5">
       {/* Avatar */}
-      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center mt-1 shadow-sm">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-nk-official to-nk-official-dim flex items-center justify-center mt-1 shadow-sm">
         <span className="text-white text-[10px] font-bold">AI</span>
       </div>
 

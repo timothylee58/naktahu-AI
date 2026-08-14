@@ -24,9 +24,9 @@ export function SuggestionCard({ suggestion, onNavigate }: SuggestionCardProps) 
       <Link
         href={suggestion.href}
         onClick={onNavigate}
-        className="flex flex-col gap-1 rounded-xl border border-zinc-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50 dark:border-white/10 dark:hover:bg-blue-500/10"
+        className="flex flex-col gap-1 rounded-xl border border-zinc-200 p-3 transition-colors hover:border-nk-official/40 hover:bg-nk-official/10 dark:border-white/10 dark:hover:bg-nk-official-dim/10"
       >
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-nk-official-dim dark:text-nk-official">
           {t('suggestions.agent_badge')}
         </span>
         <span className="text-sm font-semibold">{t(suggestion.titleKey)}</span>

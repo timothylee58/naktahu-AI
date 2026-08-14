@@ -234,7 +234,7 @@ function ComplianceDrafterPageInner() {
             </div>
             <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden dark:bg-white/10">
               <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                className="h-full rounded-full bg-nk-official transition-all duration-300"
                 style={{ width: `${((STEP_ORDER.indexOf(step) + 1) / (STEP_ORDER.length - 1)) * 100}%` }}
               />
             </div>
@@ -257,7 +257,7 @@ function ComplianceDrafterPageInner() {
                     name="business"
                     checked={businessType === b.id}
                     onChange={() => { setBusinessType(b.id); setBusinessTypeTouched(true); }}
-                    className="accent-blue-600"
+                    className="accent-nk-official"
                   />
                   {t(b.labelKey)}
                 </label>
@@ -267,7 +267,7 @@ function ComplianceDrafterPageInner() {
               )}
             </div>
             <textarea
-              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-nk-official dark:border-white/10 dark:placeholder:text-zinc-500"
               placeholder={t('agents.compliance-drafter.context_placeholder')}
               rows={3}
               value={context}
@@ -282,7 +282,7 @@ function ComplianceDrafterPageInner() {
                 }
                 setStep('domains');
               }}
-              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold"
+              className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold"
             >
               {t('agents.compliance-drafter.next')}
             </button>
@@ -298,7 +298,7 @@ function ComplianceDrafterPageInner() {
                   type="checkbox"
                   checked={domains.includes(d.id)}
                   onChange={() => toggleDomain(d.id)}
-                  className="accent-blue-600"
+                  className="accent-nk-official"
                 />
                 {t(d.labelKey)}
               </label>
@@ -315,7 +315,7 @@ function ComplianceDrafterPageInner() {
                 type="button"
                 disabled={loading || domains.length === 0}
                 onClick={() => void startAgent()}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
               >
                 {loading ? t('agents.compliance-drafter.generating') : t('agents.compliance-drafter.generate')}
               </button>
@@ -328,7 +328,7 @@ function ComplianceDrafterPageInner() {
         )}
 
         {step === 'preview' && report && (
-          <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
+          <section className="bg-white rounded-2xl border border-nk-official/30 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-nk-official/40">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
               <button
@@ -389,7 +389,7 @@ function ComplianceDrafterPageInner() {
               type="button"
               disabled={loading}
               onClick={() => void confirmReport()}
-              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+              className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
             >
               {loading ? t('agents.compliance-drafter.confirming') : t('agents.compliance-drafter.confirm')}
             </button>
@@ -400,7 +400,7 @@ function ComplianceDrafterPageInner() {
           <section className="bg-white rounded-2xl border border-green-200 p-6 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-green-500/30">
             <h2 className="font-semibold text-green-800 dark:text-green-400">{t('agents.compliance-drafter.step4')}</h2>
             {downloadUrl ? (
-              <a href={downloadUrl} className="text-blue-600 underline text-sm dark:text-blue-400" target="_blank" rel="noreferrer">
+              <a href={downloadUrl} className="text-nk-official-dim underline text-sm dark:text-nk-official" target="_blank" rel="noreferrer">
                 {t('agents.compliance-drafter.download')}
               </a>
             ) : (
@@ -409,7 +409,7 @@ function ComplianceDrafterPageInner() {
             <button
               type="button"
               onClick={() => { setStep('business'); setReport(null); setSessionId(null); setDownloadUrl(null); }}
-              className="self-start text-sm text-blue-600 hover:underline"
+              className="self-start text-sm text-nk-official-dim hover:underline"
             >
               ← Jana laporan baru
             </button>

@@ -104,8 +104,8 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
   const { locale } = useI18n();
   const isDark = variant === 'dark';
   const chipClass = isDark
-    ? 'bg-white/5 hover:bg-blue-500/20 hover:text-blue-300 hover:border-blue-500/40 text-zinc-300 border-white/10'
-    : 'bg-zinc-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-zinc-600 border-zinc-200';
+    ? 'bg-white/5 hover:bg-nk-official-dim/20 hover:text-nk-official hover:border-nk-official/40 text-zinc-300 border-white/10'
+    : 'bg-zinc-100 hover:bg-nk-official/10 hover:text-nk-official-dim hover:border-nk-official/30 text-zinc-600 border-zinc-200';
 
   const getLabel = (chip: Chip) => {
     if (locale === 'zh') return chip.labelZh;

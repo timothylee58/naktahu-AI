@@ -60,12 +60,12 @@ function PlanCard({
     <div
       className={`relative flex flex-col rounded-2xl border p-6 shadow-sm ${
         highlighted
-          ? 'border-blue-200 ring-1 ring-blue-500/20 bg-blue-50/40 dark:border-blue-500/30 dark:ring-blue-500/20 dark:bg-blue-500/10'
+          ? 'border-nk-official/30 ring-1 ring-nk-official/20 bg-nk-official/10 dark:border-nk-official/30 dark:ring-nk-official/20 dark:bg-nk-official/10'
           : 'border-zinc-100 ring-1 ring-zinc-900/5 bg-white dark:border-white/10 dark:ring-white/5 dark:bg-white/5'
       }`}
     >
       {badge && (
-        <span className="absolute -top-3 left-6 rounded-full bg-blue-600 text-white text-[11px] font-bold uppercase tracking-wide px-3 py-1 shadow-sm locale-nowrap">
+        <span className="absolute -top-3 left-6 rounded-full bg-nk-official text-white text-[11px] font-bold uppercase tracking-wide px-3 py-1 shadow-sm locale-nowrap">
           {badge}
         </span>
       )}
@@ -84,7 +84,7 @@ function PlanCard({
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className="w-4 h-4 flex-shrink-0 text-blue-600 dark:text-blue-400 mt-0.5"
+              className="w-4 h-4 flex-shrink-0 text-nk-official-dim dark:text-nk-official mt-0.5"
             >
               <path
                 fillRule="evenodd"
@@ -101,7 +101,7 @@ function PlanCard({
         disabled={disabled || loading}
         className={`mt-6 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
           highlighted
-            ? 'bg-blue-600 hover:bg-blue-500 text-white'
+            ? 'bg-nk-official hover:bg-nk-official-dim text-white'
             : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-white/10 dark:hover:bg-white/15 dark:text-zinc-200'
         }`}
       >
@@ -134,7 +134,7 @@ function BillingToggle({
           onClick={() => onChange(c)}
           className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors locale-nowrap ${
             cycle === c
-              ? 'bg-blue-600 text-white shadow-sm'
+              ? 'bg-nk-official text-white shadow-sm'
               : isDark
                 ? 'text-zinc-300 hover:text-white'
                 : 'text-zinc-600 hover:text-zinc-900'

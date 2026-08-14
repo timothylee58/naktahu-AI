@@ -439,7 +439,7 @@ function ChatPageInner() {
             className="flex flex-col items-center justify-center text-center gap-5 select-none px-6 py-16"
           >
             {/* Logo mark */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/30 ring-1 ring-white/10">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-nk-official to-nk-official-dim flex items-center justify-center shadow-lg shadow-blue-900/30 ring-1 ring-white/10">
               <svg viewBox="0 0 32 32" className="w-9 h-9" fill="none" aria-hidden>
                 <circle cx="16" cy="16" r="12" fill="white" fillOpacity="0.15" />
                 <path d="M9 12h14M9 16h9M9 20h11" stroke="white" strokeWidth="2.2" strokeLinecap="round" />

@@ -296,7 +296,7 @@ export default function FAQPage() {
                                 target="_blank"
                                 rel="noreferrer"
                                 className={`self-start text-sm font-medium transition-colors ${
-                                  isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                                  isDark ? 'text-nk-official hover:text-nk-official' : 'text-nk-official-dim hover:text-nk-official-dim'
                                 }`}
                               >
                                 {SOURCE_LABEL[locale] ?? SOURCE_LABEL.en}
@@ -315,7 +315,7 @@ export default function FAQPage() {
               <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>{locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?'}</p>
               <Link
                 href="/chat"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
+                className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
               >
                 {t('landing.hero.cta')}
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

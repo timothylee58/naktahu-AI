@@ -81,7 +81,7 @@ export default function PrivacyPage() {
 
           <Section title="4. Data Storage and Retention">
             <ul>
-              <li><strong>Authentication data</strong> is stored by <a href="https://supabase.com/privacy" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Supabase</a> (hosted on AWS ap-southeast-1).</li>
+              <li><strong>Authentication data</strong> is stored by <a href="https://supabase.com/privacy" className="text-nk-official-dim hover:underline" target="_blank" rel="noopener noreferrer">Supabase</a> (hosted on AWS ap-southeast-1).</li>
               <li><strong>Query history</strong> is stored in Redis with a 30-day rolling TTL. History is automatically deleted after 30 days of inactivity.</li>
               <li><strong>Account deletion</strong> — you may request deletion of your account and all associated data by emailing us. We will process requests within 14 days.</li>
             </ul>
@@ -148,7 +148,7 @@ export default function PrivacyPage() {
           <Section title="10. Contact">
             <p>
               For privacy questions or data requests, contact us at:{' '}
-              <a href="mailto:privacy@naktahu.my" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@naktahu.my" className="text-nk-official-dim hover:underline">
                 privacy@naktahu.my
               </a>
             </p>

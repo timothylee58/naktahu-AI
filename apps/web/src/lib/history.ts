@@ -104,8 +104,14 @@ export interface AgentRunEntry {
 /** Fetch past vertical-agent runs (drafts, checklists, eligibility
  * results) — GET /api/v1/agent-runs, plain-auth (not pro-gated like
  * /history above), since the underlying agents span every plan tier. */
-export async function fetchAgentRunsAuthed(supabase: SupabaseClient): Promise<AgentRunEntry[]> {
-  const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/agent-runs`);
+export async function fetchAgentRunsAuthed(
+  supabase: SupabaseClient,
+  agentName?: string,
+): Promise<AgentRunEntry[]> {
+  const url = agentName
+    ? `${API_BASE}/api/v1/agent-runs?agent_name=${encodeURIComponent(agentName)}`
+    : `${API_BASE}/api/v1/agent-runs`;
+  const res = await fetchWithAuth(supabase, url);
   if (!res.ok) {
     throw new Error(`Failed to fetch agent run history (${res.status})`);
   }
@@ -114,6 +120,13 @@ export async function fetchAgentRunsAuthed(supabase: SupabaseClient): Promise<Ag
 
 export function agentRunsPageKey(userId: string): readonly ['agent-runs-page', string] {
   return ['agent-runs-page', userId];
+}
+
+export function agentRunsForAgentKey(
+  userId: string,
+  agentName: string,
+): readonly ['agent-runs-page', string, string] {
+  return ['agent-runs-page', userId, agentName];
 }
 
 /** sessionStorage key used to hand a clicked HistoryEntry off to /chat for

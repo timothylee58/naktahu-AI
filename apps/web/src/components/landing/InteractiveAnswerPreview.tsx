@@ -79,7 +79,7 @@ function ScenarioCard({ scenario, isDark, autoStart }: ScenarioCardProps) {
   const chromeClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const queryClass = isDark ? 'text-zinc-100' : 'text-zinc-900';
   const answerClass = isDark ? 'text-zinc-300' : 'text-zinc-700';
-  const linkClass = isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700';
+  const linkClass = isDark ? 'text-nk-official hover:text-nk-official' : 'text-nk-official-dim hover:text-nk-official-dim';
 
   return (
     <>
@@ -149,7 +149,7 @@ export function InteractiveAnswerPreview({ isDark = true }: InteractiveAnswerPre
     ? 'bg-white/5 border-white/10'
     : 'bg-white border-zinc-200 shadow-sm';
   const chromeClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const tabActiveClass = 'bg-[#3B6FE0] text-white';
+  const tabActiveClass = 'bg-nk-official text-white';
   const tabInactiveClass = isDark
     ? 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
     : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700';

@@ -11,7 +11,7 @@ export function AgentLoadingSkeleton({ message, className }: AgentLoadingSkeleto
   return (
     <div className={cn('flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5', className)}>
       <div className="flex items-center gap-3">
-        <div className="h-3 w-3 animate-pulse rounded-full bg-blue-400" />
+        <div className="h-3 w-3 animate-pulse rounded-full bg-nk-official" />
         <span className="text-sm font-medium text-zinc-600">{message ?? 'Processing…'}</span>
       </div>
       <div className="space-y-2.5">

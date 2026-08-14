@@ -71,7 +71,7 @@ export default function DeadlineMonitorPage() {
         {error === 'pro-required' && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('error.history_pro_required')}</p>
-            <Link href="/pricing" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+            <Link href="/pricing" className="text-sm font-semibold text-nk-official-dim hover:text-nk-official transition-colors">
               {t('nav.pricing')}
             </Link>
           </div>
@@ -118,7 +118,7 @@ export default function DeadlineMonitorPage() {
                     {d.recurrence && <span>· {d.recurrence}</span>}
                   </div>
                   {d.source_url && (
-                    <a href={d.source_url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline dark:text-blue-400 w-fit">
+                    <a href={d.source_url} target="_blank" rel="noreferrer" className="text-xs text-nk-official-dim hover:underline dark:text-nk-official w-fit">
                       {t('agents.deadline-monitor.source')}
                     </a>
                   )}

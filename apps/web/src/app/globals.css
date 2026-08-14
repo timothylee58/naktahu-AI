@@ -8,16 +8,35 @@
   --background: #ffffff;
   --foreground: #171717;
 
+  /* ── Brand identity (logo/wordmark) ─────────────────────────────────
+     The literal colours the Hibiscus-Notch mark is drawn in. */
+  --brand-blue: #3b5bff;
+  --brand-blue-dark: #2540c9;
+  --brand-amber: #ffb238;
+  --brand-ink: #14162b;
+
   /* ── NakTahu design tokens ──────────────────────────────────────────
      Two-accent system doubles as functional wayfinding, not decoration:
      "official" (blue) marks anything sourced from a government document
      — citations, agency badges, primary CTAs. "community" (gold) marks
      anything crowd-sourced — Warung Watch and user-contributed data. A
-     user learns the distinction once and it holds everywhere. */
+     user learns the distinction once and it holds everywhere.
+
+     --nk-official was previously its own colour (#3b6fe0), one hex step
+     from --brand-blue (#3b5bff) — two near-identical blues meaning two
+     different things (UI accent vs. logo identity), which is exactly the
+     kind of drift that makes a codebase's colour story stop being legible.
+     Contrast was checked before unifying, not assumed: brand-blue actually
+     has a HIGHER contrast ratio against both white text (5.09:1 vs 4.63:1)
+     and white backgrounds (7.91:1 vs 6.70:1 for the dim variant), so this
+     is a straight upgrade, not a compromise. --nk-official now aliases
+     --brand-blue directly — every one of its ~96 existing consumers
+     (bg-nk-official, text-nk-official-dim, etc.) picks up the identity
+     colour with no call-site changes. */
   --nk-bg: #12151c;         /* base dark background — warm charcoal, not flat near-black */
   --nk-surface: #1b2028;    /* card/surface, one step up from base */
-  --nk-official: #3b6fe0;   /* primary accent — official/verified content */
-  --nk-official-dim: #2f57b3;
+  --nk-official: var(--brand-blue);       /* primary accent — official/verified content */
+  --nk-official-dim: var(--brand-blue-dark);
   --nk-community: #e0a83b;  /* secondary accent — crowd-sourced content */
   --nk-community-dim: #b3852c;
   --nk-text: #edeae3;       /* off-white, warm not clinical */
