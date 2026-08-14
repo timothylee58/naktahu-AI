@@ -33,7 +33,23 @@ const plexMono = IBM_Plex_Mono({
   display: 'swap',
 });
 
+/**
+ * Absolute base for OG/Twitter asset URLs.
+ *
+ * Without this Next.js falls back to http://localhost:3000, and the built
+ * HTML really does ship `og:image=http://localhost:3000/og-image.png` — a
+ * URL no crawler can fetch, so the share card silently never renders. That
+ * fallback is only auto-populated on Vercel; this project deploys to
+ * Netlify, so it has to be set explicitly.
+ *
+ * Falls back to the current Netlify URL, matching the existing hardcoded
+ * fallback in developer/page.tsx. Point NEXT_PUBLIC_SITE_URL at
+ * https://naktahu.my once that domain is live.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://naktahu.netlify.app';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: 'NakTahu — Soal tentang kerajaan',
   description:
     'Tanya soalan berkaitan perkhidmatan kerajaan Malaysia dengan NakTahu AI.',
@@ -50,6 +66,31 @@ export const metadata: Metadata = {
       { url: '/icons/icon-16.png', sizes: '16x16', type: 'image/png' },
     ],
     apple: { url: '/icons/apple-touch-icon.png', sizes: '180x180' },
+  },
+  // Share card. Regenerate with apps/web/scripts/generate-og-image.py when
+  // the brand changes — it is a committed static asset, not a build step.
+  openGraph: {
+    type: 'website',
+    siteName: 'naktahu.my',
+    locale: 'ms_MY',
+    title: 'naktahu.my — Ilmu tempatan, jawapan seketika.',
+    description:
+      'Jawapan bersumber rasmi untuk soalan kerajaan Malaysia — LHDN, KWSP, SSM, PERKESO, KKM, JPN.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'naktahu.my — jawapan bersumber rasmi untuk soalan kerajaan Malaysia',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'naktahu.my — Ilmu tempatan, jawapan seketika.',
+    description:
+      'Jawapan bersumber rasmi untuk soalan kerajaan Malaysia — LHDN, KWSP, SSM, PERKESO, KKM, JPN.',
+    images: ['/og-image.png'],
   },
 };
 
