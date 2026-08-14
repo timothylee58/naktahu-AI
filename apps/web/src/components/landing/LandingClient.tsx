@@ -73,11 +73,11 @@ export function LandingClient() {
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-[#3B6FE0]/50'
-    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-[#3B6FE0]/40';
+    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-nk-official/50'
+    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-nk-official/40';
   const domainPillClass = isDark
-    ? 'border-[#3B6FE0]/40 text-[#3B6FE0] bg-[#3B6FE0]/10'
-    : 'border-blue-200 text-blue-700 bg-blue-50';
+    ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
+    : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
   const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
 
@@ -107,7 +107,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#3B6FE0] uppercase border border-[#3B6FE0]/30 rounded-full px-4 py-1.5 locale-nowrap"
+          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-nk-official uppercase border border-nk-official/30 rounded-full px-4 py-1.5 locale-nowrap"
         >
           🇲🇾 {t('landing.badge')}
         </motion.div>
@@ -127,7 +127,7 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-[#3B6FE0]">{highlight}</span>
+                <span className="text-nk-official">{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
@@ -213,7 +213,7 @@ export function LandingClient() {
         >
           <Link
             href="/chat"
-            className="inline-flex items-center gap-2 bg-[#3B6FE0] hover:bg-blue-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+            className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
           >
             {t('landing.hero.cta')}
             <svg
@@ -235,7 +235,7 @@ export function LandingClient() {
               itself; the hero doesn't need to restate it. */}
           <Link
             href="/agents"
-            className="text-sm hover:text-[#3B6FE0] transition-colors locale-nowrap"
+            className="text-sm hover:text-nk-official transition-colors locale-nowrap"
           >
             {t('landing.hero.secondary_cta')}
           </Link>

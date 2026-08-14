@@ -215,7 +215,7 @@ export default function HistoryPage() {
           ) : !canAccessHistory(user) ? (
             <div className="flex flex-col items-center gap-4 py-16 text-center">
               <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('error.history_pro_required')}</p>
-              <Link href="/pricing" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+              <Link href="/pricing" className="text-sm font-semibold text-nk-official-dim hover:text-nk-official transition-colors">
                 {t('nav.pricing')}
               </Link>
             </div>
@@ -238,11 +238,11 @@ export default function HistoryPage() {
                   : t('error.history_fetch')}
               </p>
               {historyError instanceof HistoryFetchError && historyError.code === 'pro_required' ? (
-                <Link href="/pricing" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+                <Link href="/pricing" className="text-sm font-semibold text-nk-official-dim hover:text-nk-official transition-colors">
                   {t('nav.pricing')}
                 </Link>
               ) : (
-                <button onClick={() => mutate()} className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+                <button onClick={() => mutate()} className="text-sm font-semibold text-nk-official-dim hover:text-nk-official transition-colors">
                   {t('error.retry')}
                 </button>
               )}

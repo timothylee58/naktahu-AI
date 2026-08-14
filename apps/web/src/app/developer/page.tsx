@@ -117,7 +117,7 @@ console.log(data.answer);`,
           href={`${base}/api/v1/public/docs`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline dark:text-blue-400"
+          className="text-nk-official-dim hover:underline dark:text-nk-official"
         >
           OpenAPI docs ↗
         </a>
@@ -272,7 +272,7 @@ export default function DeveloperPage() {
             <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-sm">{t('developer.sign_in')}</p>
             <Link
               href="/chat"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold"
+              className="px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold"
             >
               {t('header.sign_in')}
             </Link>
@@ -319,7 +319,7 @@ export default function DeveloperPage() {
                     const locked = p.paid && !canUsePaidPlans;
                     const cardClass = `relative text-left rounded-xl border p-3 transition-all duration-200 block ${
                       plan === p.id && !locked
-                        ? 'border-blue-500 ring-1 ring-blue-500/30 bg-blue-50/60 shadow-sm dark:bg-blue-500/10 dark:ring-blue-500/30'
+                        ? 'border-nk-official/40 ring-1 ring-nk-official/30 bg-nk-official/15 shadow-sm dark:bg-nk-official/10 dark:ring-nk-official/30'
                         : locked
                           ? 'border-zinc-200 opacity-70 hover:opacity-100 hover:border-zinc-300 dark:border-white/10 dark:hover:border-white/20'
                           : 'border-zinc-200 hover:border-zinc-300 hover:shadow-sm dark:border-white/10 dark:hover:border-white/20'
@@ -340,7 +340,7 @@ export default function DeveloperPage() {
                         <p className="text-sm font-semibold">{p.price}</p>
                         <p className="text-xs text-zinc-500 mt-1 leading-relaxed dark:text-zinc-400">{p.desc}</p>
                         {locked && (
-                          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-2 locale-nowrap">
+                          <p className="text-xs font-medium text-nk-official-dim dark:text-nk-official mt-2 locale-nowrap">
                             {t('developer.plan.locked')} · {t('nav.pricing')} ↗
                           </p>
                         )}
@@ -429,7 +429,7 @@ export default function DeveloperPage() {
                             : undefined
                         }
                       />
-                      <Line type="monotone" dataKey="count" stroke="#3B6FE0" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="count" stroke="#3B5BFF" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

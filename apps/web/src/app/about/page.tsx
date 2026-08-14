@@ -169,12 +169,12 @@ export default function AboutPage() {
               viewport={{ once: true, amount: 0.5 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
             >
-              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.mission.title}</h2>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.mission.title}</h2>
               <p className={`leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>{c.mission.desc}</p>
             </motion.section>
 
             <section className="space-y-6">
-              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.how.title}</h2>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.how.title}</h2>
               <div className="relative">
                 {/* Connecting line — draws left-to-right as the row scrolls into view.
                     Desktop only (the grid is single-column below md, where a horizontal
@@ -187,7 +187,7 @@ export default function AboutPage() {
                   transition={{ duration: 0.8, ease: 'easeOut' }}
                   style={{ transformOrigin: 'left' }}
                   className={`hidden md:block absolute top-5 left-[16.66%] right-[16.66%] h-px ${
-                    isDark ? 'bg-blue-500/30' : 'bg-blue-200'
+                    isDark ? 'bg-nk-official/30' : 'bg-nk-official/30'
                   }`}
                 />
                 <div className="grid md:grid-cols-3 gap-6">
@@ -203,7 +203,7 @@ export default function AboutPage() {
                       }`}
                     >
                       <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                        isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+                        isDark ? 'bg-nk-official/20 text-nk-official' : 'bg-nk-official/20 text-nk-official-dim'
                       }`}>
                         {i + 1}
                       </div>
@@ -240,7 +240,7 @@ export default function AboutPage() {
                 rather than looking like the (differently-styled) engineering list
                 below it. */}
             <section className="space-y-4">
-              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.sources.title}</h2>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.sources.title}</h2>
               <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.sources.desc}</p>
               <ul className={`grid md:grid-cols-2 gap-3 rounded-xl border p-4 ${
                 isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50/60 border-emerald-200'
@@ -266,7 +266,7 @@ export default function AboutPage() {
             {/* Engineering-credibility list — a distinct slate/monospace treatment
                 so it doesn't visually blend with the trust-signal card above it. */}
             <section className="space-y-4">
-              <h2 className={`text-2xl font-bold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{c.tech.title}</h2>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.tech.title}</h2>
               <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.tech.desc}</p>
               <ul className={`space-y-2 rounded-xl border p-4 ${
                 isDark ? 'bg-white/[0.03] border-white/10' : 'bg-zinc-50 border-zinc-200'
@@ -304,7 +304,7 @@ export default function AboutPage() {
             <div className="flex justify-center pt-6">
               <Link
                 href="/chat"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
+                className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
               >
                 {t('landing.hero.cta')}
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

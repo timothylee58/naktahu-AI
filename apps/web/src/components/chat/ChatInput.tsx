@@ -164,7 +164,7 @@ export function ChatInput({
     {showSuggestionBanner && liveSuggestion && (
       <div
         className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${
-          isDark ? 'border-blue-500/30 bg-blue-500/10 text-blue-200' : 'border-blue-200 bg-blue-50 text-blue-800'
+          isDark ? 'border-nk-official/30 bg-nk-official/10 text-nk-official' : 'border-nk-official/30 bg-nk-official/10 text-nk-official-dim'
         }`}
       >
         <span aria-hidden>💡</span>
@@ -265,7 +265,7 @@ export function ChatInput({
           onClick={handleSubmit}
           disabled={!value.trim() || isStreaming}
           aria-label={t('chat.send')}
-          className="flex-shrink-0 p-2 rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
+          className="flex-shrink-0 p-2 rounded-full bg-nk-official text-white transition-colors hover:bg-nk-official-dim disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -291,7 +291,7 @@ export function ChatInput({
       >
         <div
           className={`h-full rounded-full transition-all duration-200 ${
-            usagePercent > 85 ? 'bg-amber-500' : 'bg-blue-500'
+            usagePercent > 85 ? 'bg-amber-500' : 'bg-nk-official'
           }`}
           style={{ width: `${usagePercent}%` }}
         />

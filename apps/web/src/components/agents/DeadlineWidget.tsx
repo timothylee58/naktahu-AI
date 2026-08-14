@@ -69,7 +69,7 @@ export function DeadlineWidget({ accessToken, variant = 'light' }: DeadlineWidge
               href={d.source_url}
               target="_blank"
               rel="noreferrer"
-              className={isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-800 hover:text-blue-700'}
+              className={isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-800 hover:text-nk-official-dim'}
             >
               {d.deadline_name}
             </a>

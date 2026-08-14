@@ -18,9 +18,9 @@ export function ComparisonSection({ isDark = true }: ComparisonSectionProps) {
   const { t } = useI18n();
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const rowLabelClass = isDark ? 'text-zinc-300' : 'text-zinc-700';
-  const usClass = isDark ? 'text-blue-300' : 'text-blue-700';
+  const usClass = isDark ? 'text-nk-official' : 'text-nk-official-dim';
   const themClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
-  const headerUsClass = isDark ? 'text-blue-400 bg-blue-500/10' : 'text-blue-700 bg-blue-50';
+  const headerUsClass = isDark ? 'text-nk-official bg-nk-official/10' : 'text-nk-official-dim bg-nk-official/10';
   const headerThemClass = isDark ? 'text-zinc-400' : 'text-zinc-500';
 
   return (

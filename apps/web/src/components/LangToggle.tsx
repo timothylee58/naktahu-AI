@@ -70,8 +70,8 @@ export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right
 
   const activeClass =
     variant === 'light'
-      ? 'text-blue-600 font-bold'
-      : 'text-blue-400 font-bold';
+      ? 'text-nk-official-dim font-bold'
+      : 'text-nk-official font-bold';
 
   return (
     <div ref={ref} className={`relative ${isSidebar ? 'w-full' : ''}`}>

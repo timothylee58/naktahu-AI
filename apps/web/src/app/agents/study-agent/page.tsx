@@ -84,7 +84,7 @@ function StudyAgentPageInner() {
         <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
           <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Subject</label>
           <select
-            className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10"
+            className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
           >
@@ -92,7 +92,7 @@ function StudyAgentPageInner() {
           </select>
           <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Paste past-paper text</label>
           <textarea
-            className="border border-zinc-200 rounded-xl p-3 text-sm min-h-[120px] bg-transparent transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+            className="border border-zinc-200 rounded-xl p-3 text-sm min-h-[120px] bg-transparent transition-colors focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
             value={paperText}
             onChange={(e) => setPaperText(e.target.value)}
             placeholder="Soalan 1: ..."
@@ -101,7 +101,7 @@ function StudyAgentPageInner() {
             type="button"
             disabled={loading || !paperText.trim()}
             onClick={() => void runStart()}
-            className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white rounded-xl text-sm font-semibold shadow-sm shadow-blue-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
+            className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white rounded-xl text-sm font-semibold shadow-sm shadow-blue-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {loading ? 'Analysing…' : 'Extract & explain'}
           </button>
@@ -119,12 +119,12 @@ function StudyAgentPageInner() {
               <div className="text-xs text-zinc-500 dark:text-zinc-400">Topics: {Object.entries(topics).map(([k, v]) => `${k} (${v})`).join(', ')}</div>
             )}
             <input
-              className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+              className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
               placeholder="Ask about a question…"
               value={followUp}
               onChange={(e) => setFollowUp(e.target.value)}
             />
-            <button type="button" onClick={() => void runContinue()} className="self-end text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors dark:text-blue-400 dark:hover:text-blue-300">Follow up</button>
+            <button type="button" onClick={() => void runContinue()} className="self-end text-sm text-nk-official-dim hover:text-nk-official-dim hover:underline transition-colors dark:text-nk-official dark:hover:text-nk-official">Follow up</button>
           </section>
         )}
       </motion.div>

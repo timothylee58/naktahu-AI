@@ -421,7 +421,7 @@ function HealthTriagePageInner() {
                   <>
                     <h2 className="font-semibold text-sm">{t('agents.health-triage.step_details')}</h2>
                     <textarea
-                      className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+                      className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
                       rows={3}
                       value={extraDetails}
                       onChange={(e) => setExtraDetails(e.target.value)}
@@ -509,7 +509,7 @@ function HealthTriagePageInner() {
                         href={directionsUrl(f.name)}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex-shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap"
+                        className="flex-shrink-0 text-xs font-semibold text-nk-official-dim dark:text-nk-official whitespace-nowrap"
                       >
                         {t('agents.health-triage.get_directions')} →
                       </a>
@@ -530,7 +530,7 @@ function HealthTriagePageInner() {
                     href={exportUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                    className="text-sm font-semibold text-nk-official-dim hover:underline dark:text-nk-official"
                   >
                     {t('agents.health-triage.download')}
                   </a>
@@ -539,7 +539,7 @@ function HealthTriagePageInner() {
                     type="button"
                     onClick={() => void exportPdf()}
                     disabled={exporting}
-                    className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400 disabled:opacity-40"
+                    className="text-sm font-semibold text-nk-official-dim hover:underline dark:text-nk-official disabled:opacity-40"
                   >
                     {exporting ? t('agents.health-triage.exporting') : t('agents.health-triage.export_pdf')}
                   </button>
@@ -550,7 +550,7 @@ function HealthTriagePageInner() {
             <button
               type="button"
               onClick={reset}
-              className="self-start text-sm text-blue-600 hover:underline dark:text-blue-400"
+              className="self-start text-sm text-nk-official-dim hover:underline dark:text-nk-official"
             >
               {t('agents.health-triage.new_check')}
             </button>

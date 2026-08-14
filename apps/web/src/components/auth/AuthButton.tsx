@@ -225,7 +225,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   }`}
                 >
                   <div>
-                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>
                       {t('profile.suggestions_title')}
                     </p>
                     <input
@@ -249,7 +249,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                     href="/profile"
                     onClick={() => setProfileOpen(false)}
                     className={`text-xs font-semibold text-center rounded-lg px-3 py-2 transition-colors ${
-                      isDark ? 'bg-blue-500/15 text-blue-300 hover:bg-blue-500/25' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                      isDark ? 'bg-nk-official/15 text-nk-official hover:bg-nk-official-dim/25' : 'bg-nk-official/10 text-nk-official-dim hover:bg-nk-official/20'
                     }`}
                   >
                     {t('profile.view_full')}
@@ -289,7 +289,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-nk-official flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                   {(user.email ?? 'U')[0].toUpperCase()}
                 </div>
               )}
@@ -331,7 +331,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-7 h-7 rounded-full bg-nk-official flex items-center justify-center text-white text-xs font-bold">
               {(user.email ?? 'U')[0].toUpperCase()}
             </div>
           )}
@@ -353,7 +353,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <p className="text-xs font-medium text-zinc-500 truncate">{user.email}</p>
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-nk-official/10 text-nk-official-dim rounded-full px-2 py-0.5">
                       {planBadgeLabel(user)}
                     </span>
                     {creditsLabel && (
@@ -385,16 +385,16 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     isSidebar
       ? `w-full text-sm font-semibold rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
           variant === 'dark'
-            ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/30'
-            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20'
+            ? 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/30'
+            : 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/20'
         }`
-      : 'text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-4 py-2 transition-colors shadow-sm shadow-blue-900/20';
+      : 'text-sm font-semibold bg-nk-official hover:bg-nk-official-dim text-white rounded-full px-4 py-2 transition-colors shadow-sm shadow-blue-900/20';
 
   const registerButtonClass =
     `w-full text-sm font-semibold rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
       variant === 'dark'
-        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/30'
-        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20'
+        ? 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/30'
+        : 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/20'
     }`;
 
   const loginButtonClass =
@@ -558,10 +558,10 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                       <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && signInWithEmail()}
                         placeholder={t('auth.email.placeholder')}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-nk-official focus:border-transparent"
                         autoFocus />
                       <button onClick={signInWithEmail} disabled={!email || signingIn !== null}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
+                        className="w-full bg-nk-official hover:bg-nk-official-dim text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
                         {signingIn === 'email' ? t('auth.email.sending') : t('auth.email.send')}
                       </button>
                       <button onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">

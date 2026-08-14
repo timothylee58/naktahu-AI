@@ -88,14 +88,14 @@ function OptionCard({
       aria-pressed={selected}
       className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
         selected
-          ? 'border-blue-500 bg-blue-50 text-blue-800 ring-1 ring-blue-400'
-          : 'border-zinc-200 bg-white text-zinc-700 hover:border-blue-300 hover:bg-blue-50/40'
+          ? 'border-nk-official/40 bg-nk-official/10 text-nk-official-dim ring-1 ring-nk-official'
+          : 'border-zinc-200 bg-white text-zinc-700 hover:border-nk-official/30 hover:bg-nk-official/10'
       }`}
     >
       <span className="flex items-center gap-2">
         <span
           className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-            selected ? 'border-blue-500 bg-blue-500' : 'border-zinc-300'
+            selected ? 'border-nk-official/40 bg-nk-official' : 'border-zinc-300'
           }`}
         >
           {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -132,7 +132,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
         <div
           key={i}
           className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-            i < step ? 'bg-blue-500' : 'bg-zinc-200'
+            i < step ? 'bg-nk-official' : 'bg-zinc-200'
           }`}
         />
       ))}
@@ -215,7 +215,7 @@ export default function CareerPage() {
           </svg>
         </Link>
         <div>
-          <p className="text-xs font-semibold text-blue-600">{t('career.badge')}</p>
+          <p className="text-xs font-semibold text-nk-official-dim">{t('career.badge')}</p>
           <p className="text-sm font-bold text-zinc-900 leading-tight">{t('career.hero.title')}</p>
         </div>
       </header>
@@ -233,12 +233,12 @@ export default function CareerPage() {
               {/* Summary chips for completed steps */}
               <div className="flex gap-1.5 flex-wrap justify-end">
                 {step > 1 && s1.edu && (
-                  <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-medium">
                     {label(EDU_OPTIONS, s1.edu)}
                   </span>
                 )}
                 {step > 2 && s2.goal && (
-                  <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-medium">
                     {label(GOAL_OPTIONS, s2.goal)}
                   </span>
                 )}
@@ -382,7 +382,7 @@ export default function CareerPage() {
                 type="button"
                 disabled={!canAdvance}
                 onClick={() => setStep((s) => s + 1)}
-                className="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                className="flex-1 px-4 py-3 rounded-xl bg-nk-official hover:bg-nk-official-dim text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               >
                 {t('career.next')}
               </button>
@@ -391,7 +391,7 @@ export default function CareerPage() {
                 type="button"
                 disabled={!canAdvance}
                 onClick={handleGenerate}
-                className="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 rounded-xl bg-nk-official hover:bg-nk-official-dim text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center justify-center gap-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                   <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.184a1 1 0 0 1 .633.632l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.632l.551-.184a1 1 0 0 0 0-1.898l-.551-.183a1 1 0 0 1-.633-.633l-.183-.551Z" />

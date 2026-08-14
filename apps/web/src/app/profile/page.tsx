@@ -102,14 +102,14 @@ export default function ProfilePage() {
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold">
+                  <div className="w-14 h-14 rounded-full bg-nk-official flex items-center justify-center text-white text-xl font-bold">
                     {(user.email ?? 'U')[0].toUpperCase()}
                   </div>
                 )}
                 <div className="flex flex-col gap-1.5 min-w-0">
                   <p className="text-sm font-medium truncate">{user.email}</p>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 dark:bg-blue-500/20 dark:text-blue-200">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-nk-official/10 text-nk-official-dim rounded-full px-2 py-0.5 dark:bg-nk-official/20 dark:text-nk-official">
                       {planBadgeLabel(user)}
                     </span>
                     <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
@@ -134,7 +134,7 @@ export default function ProfilePage() {
                   value={suggestQuery}
                   onChange={(e) => setSuggestQuery(e.target.value)}
                   placeholder={t('profile.suggestions_placeholder')}
-                  className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+                  className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
                 />
                 {suggestQuery.trim() && (
                   <div className="grid gap-2 sm:grid-cols-2">

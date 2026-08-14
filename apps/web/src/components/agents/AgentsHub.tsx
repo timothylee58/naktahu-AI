@@ -43,7 +43,7 @@ interface BackendAgentInfo {
 const AGENT_VISUALS: Record<string, { icon: LucideIcon; tile: string }> = {
   'compliance-drafter': {
     icon: FileText,
-    tile: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+    tile: 'bg-nk-official/10 text-nk-official-dim dark:bg-nk-official/15 dark:text-nk-official',
   },
   'study-agent': {
     icon: GraduationCap,
@@ -138,7 +138,7 @@ export function AgentsHub() {
           transition={{ duration: 0.5, ease: 'easeOut' }}
           className="mb-10 flex flex-col items-start gap-4"
         >
-          <span className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400 locale-nowrap">
+          <span className="inline-flex items-center gap-2 rounded-full border border-nk-official/30 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-nk-official-dim dark:text-nk-official locale-nowrap">
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
             {t('agents.hub.title')}
           </span>
@@ -199,11 +199,11 @@ export function AgentsHub() {
                     {t(agentDescKey(agent.slug))}
                   </CardDescription>
                   {locked ? (
-                    <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400 locale-nowrap">
+                    <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-nk-official-dim dark:text-nk-official locale-nowrap">
                       {t('agents.hub.upgrade_cta')}
                     </span>
                   ) : (
-                    <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-blue-600 dark:text-blue-400 locale-nowrap">
+                    <span className="mt-auto inline-flex items-center gap-1 pt-1 text-sm font-semibold text-nk-official-dim dark:text-nk-official locale-nowrap">
                       {t('agents.hub.open')}
                       <ArrowRight
                         className="h-4 w-4 transition-transform group-hover:translate-x-1"

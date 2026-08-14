@@ -230,7 +230,7 @@ function GrantDraftGeneratorPageInner() {
             <h2 className="font-semibold">{t('agents.grant-draft-generator.step1')}</h2>
             <input
               type="text"
-              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
               value={programmeName}
               onChange={(e) => setProgrammeName(e.target.value)}
               placeholder={t('agents.grant-draft-generator.programme_placeholder')}
@@ -252,11 +252,11 @@ function GrantDraftGeneratorPageInner() {
                 {t('agents.grant-draft-generator.export_format')}
               </span>
               <label className="flex items-center gap-1.5">
-                <input type="radio" checked={exportFormat === 'pdf'} onChange={() => setExportFormat('pdf')} className="accent-blue-600" />
+                <input type="radio" checked={exportFormat === 'pdf'} onChange={() => setExportFormat('pdf')} className="accent-nk-official" />
                 PDF
               </label>
               <label className="flex items-center gap-1.5">
-                <input type="radio" checked={exportFormat === 'docx'} onChange={() => setExportFormat('docx')} className="accent-blue-600" />
+                <input type="radio" checked={exportFormat === 'docx'} onChange={() => setExportFormat('docx')} className="accent-nk-official" />
                 Word (.docx)
               </label>
             </div>
@@ -264,7 +264,7 @@ function GrantDraftGeneratorPageInner() {
               type="button"
               disabled={loading || !programmeName.trim()}
               onClick={() => void startAgent()}
-              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+              className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
             >
               {loading ? t('agents.grant-draft-generator.generating') : t('agents.grant-draft-generator.generate')}
             </button>
@@ -294,7 +294,7 @@ function GrantDraftGeneratorPageInner() {
                       </span>
                     </div>
                     {!expired && d.signed_url && (
-                      <a href={d.signed_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                      <a href={d.signed_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-xs font-semibold text-nk-official-dim dark:text-nk-official">
                         {t('agents.grant-draft-generator.download')}
                       </a>
                     )}
@@ -306,14 +306,14 @@ function GrantDraftGeneratorPageInner() {
         )}
 
         {step === 'preview' && report && (
-          <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
+          <section className="bg-white rounded-2xl border border-nk-official/30 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-nk-official/30">
             <h2 className="font-semibold">{t('agents.grant-draft-generator.step2')}</h2>
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">
                 {t('agents.grant-draft-generator.executive_summary')}
               </h3>
               <textarea
-                className="w-full text-sm bg-transparent border border-zinc-200 rounded-xl p-3 whitespace-pre-wrap focus:outline-none focus:border-blue-400 dark:border-white/10"
+                className="w-full text-sm bg-transparent border border-zinc-200 rounded-xl p-3 whitespace-pre-wrap focus:outline-none focus:border-nk-official/40 dark:border-white/10"
                 rows={5}
                 value={editedSummary}
                 onChange={(e) => setEditedSummary(e.target.value)}
@@ -324,7 +324,7 @@ function GrantDraftGeneratorPageInner() {
                 {t('agents.grant-draft-generator.use_of_funds')}
               </h3>
               <textarea
-                className="w-full text-sm bg-transparent border border-zinc-200 rounded-xl p-3 whitespace-pre-wrap focus:outline-none focus:border-blue-400 dark:border-white/10"
+                className="w-full text-sm bg-transparent border border-zinc-200 rounded-xl p-3 whitespace-pre-wrap focus:outline-none focus:border-nk-official/40 dark:border-white/10"
                 rows={5}
                 value={editedFunds}
                 onChange={(e) => setEditedFunds(e.target.value)}
@@ -394,7 +394,7 @@ function GrantDraftGeneratorPageInner() {
               type="button"
               disabled={loading}
               onClick={() => void confirmDraft()}
-              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+              className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
             >
               {loading ? t('agents.grant-draft-generator.confirming') : t('agents.grant-draft-generator.confirm')}
             </button>
@@ -415,7 +415,7 @@ function GrantDraftGeneratorPageInner() {
                     <iframe src={downloadUrl} title="Grant draft preview" className="w-full h-[480px] bg-white" />
                   </div>
                 ) : null}
-                <a href={downloadUrl} className="text-blue-600 underline text-sm dark:text-blue-400" target="_blank" rel="noreferrer">
+                <a href={downloadUrl} className="text-nk-official-dim underline text-sm dark:text-nk-official" target="_blank" rel="noreferrer">
                   {t('agents.grant-draft-generator.download')}
                 </a>
               </>
@@ -425,7 +425,7 @@ function GrantDraftGeneratorPageInner() {
             <button
               type="button"
               onClick={() => { setStep('intake'); setReport(null); setSessionId(null); setDownloadUrl(null); setProgrammeName(''); }}
-              className="self-start text-sm text-blue-600 hover:underline dark:text-blue-400"
+              className="self-start text-sm text-nk-official-dim hover:underline dark:text-nk-official"
             >
               {t('agents.grant-draft-generator.new_draft')}
             </button>

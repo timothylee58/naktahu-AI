@@ -21,14 +21,14 @@ export default function NotFound() {
 
   return (
     <div className={`flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center ${pageClass}`}>
-      <p className="text-5xl font-bold text-[#3B6FE0]" aria-hidden>
+      <p className="text-5xl font-bold text-nk-official" aria-hidden>
         404
       </p>
       <h1 className="text-lg font-semibold locale-text-balance">{t('not_found.title')}</h1>
       <p className={`max-w-sm text-sm locale-text-balance ${mutedText}`}>{t('not_found.desc')}</p>
       <Link
         href="/"
-        className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#3B6FE0] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 locale-nowrap"
+        className="mt-2 inline-flex items-center gap-2 rounded-full bg-nk-official px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-nk-official-dim locale-nowrap"
       >
         {t('not_found.cta')}
       </Link>

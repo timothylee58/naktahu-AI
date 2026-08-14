@@ -199,7 +199,7 @@ function HistoryRow({
             if (e.key === 'Escape') setRenaming(false);
           }}
           onBlur={() => void commitRename()}
-          className={`w-full text-sm rounded-md border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 ${inputClass}`}
+          className={`w-full text-sm rounded-md border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-nk-official ${inputClass}`}
           maxLength={150}
         />
       </div>

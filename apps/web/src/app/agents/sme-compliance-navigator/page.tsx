@@ -170,14 +170,14 @@ function SmeComplianceNavigatorPageInner() {
                 <button
                   type="button"
                   onClick={() => setMode('guided')}
-                  className={`px-3 py-1 rounded-full font-medium transition-colors ${mode === 'guided' ? 'bg-blue-600 text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
+                  className={`px-3 py-1 rounded-full font-medium transition-colors ${mode === 'guided' ? 'bg-nk-official text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
                 >
                   {t('agents.sme-compliance-navigator.mode_guided')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode('freetext')}
-                  className={`px-3 py-1 rounded-full font-medium transition-colors ${mode === 'freetext' ? 'bg-blue-600 text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
+                  className={`px-3 py-1 rounded-full font-medium transition-colors ${mode === 'freetext' ? 'bg-nk-official text-white' : 'text-zinc-500 dark:text-zinc-400'}`}
                 >
                   {t('agents.sme-compliance-navigator.mode_freetext')}
                 </button>
@@ -187,7 +187,7 @@ function SmeComplianceNavigatorPageInner() {
 
           {formStep === 'form' && mode === 'freetext' && (
             <textarea
-              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-nk-official dark:border-white/10 dark:placeholder:text-zinc-500"
               rows={5}
               value={businessProfile}
               onChange={(e) => setBusinessProfile(e.target.value)}
@@ -217,7 +217,7 @@ function SmeComplianceNavigatorPageInner() {
                   <input
                     type="number"
                     min={0}
-                    className="w-full border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10"
+                    className="w-full border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent transition-colors focus:outline-none focus:border-nk-official dark:border-white/10"
                     value={headcount}
                     onChange={(e) => setHeadcount(e.target.value)}
                     placeholder="8"
@@ -230,7 +230,7 @@ function SmeComplianceNavigatorPageInner() {
                   <input
                     type="number"
                     min={0}
-                    className="w-full border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10"
+                    className="w-full border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent transition-colors focus:outline-none focus:border-nk-official dark:border-white/10"
                     value={annualRevenue}
                     onChange={(e) => setAnnualRevenue(e.target.value)}
                     placeholder="800000"
@@ -250,7 +250,7 @@ function SmeComplianceNavigatorPageInner() {
                         onChange={() =>
                           setEvents((prev) => (prev.includes(opt.id) ? prev.filter((e) => e !== opt.id) : [...prev, opt.id]))
                         }
-                        className="accent-blue-600"
+                        className="accent-nk-official"
                       />
                       {t(opt.labelKey)}
                     </label>
@@ -282,7 +282,7 @@ function SmeComplianceNavigatorPageInner() {
                 type="button"
                 disabled={!canRun}
                 onClick={() => setFormStep('review')}
-                className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+                className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
               >
                 {t('agents.sme-compliance-navigator.review_next')}
               </button>
@@ -291,7 +291,7 @@ function SmeComplianceNavigatorPageInner() {
                 type="button"
                 disabled={loading || !canRun}
                 onClick={() => void run()}
-                className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+                className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
               >
                 {loading ? t('agents.sme-compliance-navigator.generating') : t('agents.sme-compliance-navigator.generate')}
               </button>
@@ -311,7 +311,7 @@ function SmeComplianceNavigatorPageInner() {
             </div>
             <div className="h-1.5 w-full rounded-full bg-zinc-100 dark:bg-white/10">
               <div
-                className="h-1.5 rounded-full bg-blue-600 transition-all"
+                className="h-1.5 rounded-full bg-nk-official transition-all"
                 style={{ width: `${checklist.length ? (doneCount / checklist.length) * 100 : 0}%` }}
               />
             </div>
@@ -324,7 +324,7 @@ function SmeComplianceNavigatorPageInner() {
                       type="checkbox"
                       checked={done}
                       onChange={() => setDoneItems((prev) => ({ ...prev, [i]: !prev[i] }))}
-                      className="accent-blue-600 mt-1 flex-shrink-0"
+                      className="accent-nk-official mt-1 flex-shrink-0"
                     />
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${DOMAIN_COLORS[c.domain] ?? 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'}`}>
                       {c.label || c.domain}

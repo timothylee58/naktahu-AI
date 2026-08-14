@@ -119,7 +119,7 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
     >
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold text-zinc-900 dark:text-white">{grant.programme_name}</p>
-        <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+        <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-nk-official/10 text-nk-official-dim dark:bg-nk-official/15 dark:text-nk-official">
           {Math.round(grant.eligibility_score * 100)}% match
         </span>
       </div>
@@ -136,7 +136,7 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
         {grant.application_url && (
           <a
             href={grant.application_url}
-            className="text-blue-600 text-xs dark:text-blue-400"
+            className="text-nk-official-dim text-xs dark:text-nk-official"
             target="_blank"
             rel="noreferrer"
           >
@@ -288,7 +288,7 @@ function GrantFinderPageInner() {
     <>
       <div className="flex items-center gap-2 px-4 pt-4 sm:px-6">
         <h1 className="text-lg font-bold tracking-tight">Grant Finder</h1>
-        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold dark:bg-blue-500/15 dark:text-blue-300">Recommended</span>
+        <span className="text-xs bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-semibold dark:bg-nk-official/15 dark:text-nk-official">Recommended</span>
       </div>
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -336,7 +336,7 @@ function GrantFinderPageInner() {
                   value={registeredMonths}
                   onChange={(e) => setRegisteredMonths(e.target.value)}
                   placeholder="e.g. 18"
-                  className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+                  className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
                 />
                 {attemptedSubmit && registeredMonths.trim() === '' && (
                   <span className="text-xs text-red-600 dark:text-red-400">Required.</span>
@@ -354,7 +354,7 @@ function GrantFinderPageInner() {
                     value={annualRevenue}
                     onChange={(e) => setAnnualRevenue(e.target.value)}
                     placeholder="e.g. 250000"
-                    className="w-full border border-zinc-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+                    className="w-full border border-zinc-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
                   />
                 </div>
                 {revenueInvalid && (
@@ -377,7 +377,7 @@ function GrantFinderPageInner() {
                     onClick={() => setIsBumiputera(opt.id)}
                     className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       isBumiputera === opt.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/15 dark:text-blue-300'
+                        ? 'border-nk-official/40 bg-nk-official/10 text-nk-official-dim dark:border-nk-official/40 dark:bg-nk-official/15 dark:text-nk-official'
                         : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300'
                     }`}
                   >
@@ -393,7 +393,7 @@ function GrantFinderPageInner() {
               type="button"
               disabled={loading}
               onClick={() => void submitIntake()}
-              className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
               {loading ? 'Matching…' : 'Find grants'}
             </button>
@@ -403,9 +403,9 @@ function GrantFinderPageInner() {
 
         {phase === 'chat' && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-            {nextQuestion && <p className="text-sm text-blue-700 dark:text-blue-400">{nextQuestion}</p>}
+            {nextQuestion && <p className="text-sm text-nk-official-dim dark:text-nk-official">{nextQuestion}</p>}
             <textarea
-              className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+              className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
               rows={2}
               value={chatReply}
               onChange={(e) => setChatReply(e.target.value)}
@@ -415,7 +415,7 @@ function GrantFinderPageInner() {
               type="button"
               disabled={loading || !chatReply.trim()}
               onClick={() => void sendChatReply()}
-              className="self-end px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
               {loading ? '…' : 'Continue'}
             </button>
@@ -462,7 +462,7 @@ function GrantFinderPageInner() {
                 setMatchedGrants([]);
                 setNearMissGrants([]);
               }}
-              className="self-start text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="self-start text-xs font-semibold text-nk-official-dim hover:text-nk-official dark:text-nk-official"
             >
               Start a new search
             </button>
