@@ -7,6 +7,22 @@ import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
+import { useI18n } from '@/lib/i18n';
+
+// This agent's `language` field is the target language for grant matching —
+// deriving it from the active UI locale instead of hardcoding 'bm' follows
+// the same precedented pattern used by grant-draft-generator/
+// sme-compliance-navigator's `queryLanguage`.
+function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
+  if (locale === 'ms') return 'bm';
+  if (locale === 'zh') return 'zh';
+  return 'en';
+}
+
+function fmt(template: string, vars: Record<string, string | number>): string {
+  return Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), template);
+}
 
 // Sectors matching grant_database.eligible_sectors seed values (migration
 // 020) — NOT arbitrary labels. A mismatch here silently zeroes out every
@@ -74,19 +90,22 @@ function parseGrants(raw: unknown): Grant[] {
   return raw.map(parseGrant).filter((g): g is Grant => g !== null);
 }
 
-function formatAmount(g: Grant): string {
+function formatAmount(g: Grant, t: (key: string) => string): string {
   if (g.amount_min_myr == null && g.amount_max_myr == null) return '';
   if (g.amount_min_myr != null && g.amount_max_myr != null) {
-    return `RM ${g.amount_min_myr.toLocaleString()} – RM ${g.amount_max_myr.toLocaleString()}`;
+    return fmt(t('agents.grant-finder.amount.range'), {
+      min: g.amount_min_myr.toLocaleString(),
+      max: g.amount_max_myr.toLocaleString(),
+    });
   }
   const amt = g.amount_max_myr ?? g.amount_min_myr;
-  return amt != null ? `Up to RM ${amt.toLocaleString()}` : '';
+  return amt != null ? fmt(t('agents.grant-finder.amount.up_to'), { amt: amt.toLocaleString() }) : '';
 }
 
-function formatDeadline(g: Grant): string {
-  if (g.deadline_is_rolling) return 'Rolling applications';
+function formatDeadline(g: Grant, t: (key: string) => string): string {
+  if (g.deadline_is_rolling) return t('agents.grant-finder.deadline.rolling');
   if (!g.application_deadline) return '';
-  return `Closes ${g.application_deadline}`;
+  return fmt(t('agents.grant-finder.deadline.closes'), { date: g.application_deadline });
 }
 
 interface ProfileForDraftLink {
@@ -108,6 +127,9 @@ function draftLinkHref(programmeName: string, profile: ProfileForDraftLink): str
 }
 
 function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean; profile: ProfileForDraftLink }) {
+  const { t } = useI18n();
+  const amount = formatAmount(grant, t);
+  const deadline = formatDeadline(grant, t);
   return (
     <motion.li
       whileHover={{ y: -2 }}
@@ -120,14 +142,14 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold text-zinc-900 dark:text-white">{grant.programme_name}</p>
         <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-nk-official/10 text-nk-official-dim dark:bg-nk-official/15 dark:text-nk-official">
-          {Math.round(grant.eligibility_score * 100)}% match
+          {fmt(t('agents.grant-finder.card.match'), { n: Math.round(grant.eligibility_score * 100) })}
         </span>
       </div>
       {grant.agency && <p className="text-zinc-500 text-xs mt-0.5 dark:text-zinc-500">{grant.agency}</p>}
       <p className="text-xs text-zinc-500 mt-1 dark:text-zinc-500">
-        {formatAmount(grant)}
-        {formatAmount(grant) && formatDeadline(grant) ? ' · ' : ''}
-        {formatDeadline(grant)}
+        {amount}
+        {amount && deadline ? ' · ' : ''}
+        {deadline}
       </p>
       {dimmed && grant.ineligibility_reasons.length > 0 && (
         <p className="text-xs text-amber-700 mt-2 dark:text-amber-400">{grant.ineligibility_reasons[0]}</p>
@@ -140,7 +162,7 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
             target="_blank"
             rel="noreferrer"
           >
-            Apply now →
+            {t('agents.grant-finder.card.apply')}
           </a>
         )}
         {!dimmed && (
@@ -148,7 +170,7 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
             href={draftLinkHref(grant.programme_name, profile)}
             className="text-emerald-600 text-xs font-medium dark:text-emerald-400"
           >
-            Draft application →
+            {t('agents.grant-finder.card.draft')}
           </Link>
         )}
       </div>
@@ -157,6 +179,7 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
 }
 
 function GrantFinderPageInner() {
+  const { t, locale } = useI18n();
   const { start, continue: cont, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [sector, setSector] = useState<string[]>([]);
@@ -258,11 +281,11 @@ function GrantFinderPageInner() {
         registered_months: Number(registeredMonths) || 0,
         annual_revenue_myr: Number(annualRevenue) || 0,
         is_bumiputera: isBumiputera,
-        language: 'bm',
+        language: localeToApiLanguage(locale),
       });
       applyResult(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      setError(e instanceof Error ? e.message : t('agents.error.generic'));
     } finally {
       setLoading(false);
     }
@@ -278,7 +301,7 @@ function GrantFinderPageInner() {
       const res = await cont('eligibility-agent', { session_id: sessionId, message: msg });
       applyResult(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      setError(e instanceof Error ? e.message : t('agents.error.generic'));
     } finally {
       setLoading(false);
     }
@@ -286,64 +309,57 @@ function GrantFinderPageInner() {
 
   return (
     <>
-      <div className="flex items-center gap-2 px-4 pt-4 sm:px-6">
-        <h1 className="text-lg font-bold tracking-tight">Grant Finder</h1>
-        <span className="text-xs bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-semibold dark:bg-nk-official/15 dark:text-nk-official">Recommended</span>
-      </div>
+      <AgentPageHeader title={t('agents.grant-finder.title')} badge={t('agents.grant-finder.badge')} />
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="max-w-2xl mx-auto p-4 flex flex-col gap-4"
       >
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Match your business profile to Malaysian government grants — Cradle, MDEC, SME Corp, MTDC, and more — with scoring, near-miss detection, and a recommended application sequence.
-        </p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('agents.grant-finder.intro')}</p>
 
         {phase === 'intake' && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
             <div>
               <p className="text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400">
-                Sector <span className="text-red-500">*</span>
-                <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">(choose one)</span>
+                {t('agents.grant-finder.sector.label')} <span className="text-red-500">*</span>
+                <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">{t('agents.grant-finder.choose_one')}</span>
               </p>
               <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
               {attemptedSubmit && sector.length === 0 && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Pick a sector to continue.</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('agents.grant-finder.sector.required')}</p>
               )}
             </div>
             <div>
               <p className="text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400">
-                Business type <span className="text-red-500">*</span>
-                <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">(choose one)</span>
+                {t('agents.grant-finder.business_type.label')} <span className="text-red-500">*</span>
+                <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">{t('agents.grant-finder.choose_one')}</span>
               </p>
               <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
-              <p className="text-xs text-zinc-400 mt-1 dark:text-zinc-500">
-                &quot;Startup&quot; means an early-stage company, not a legal structure — pick it if you haven&apos;t formally registered a company type yet.
-              </p>
+              <p className="text-xs text-zinc-400 mt-1 dark:text-zinc-500">{t('agents.grant-finder.business_type.note')}</p>
               {attemptedSubmit && businessType.length === 0 && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Pick a business type to continue.</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('agents.grant-finder.business_type.required')}</p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                  Months registered <span className="text-red-500">*</span>
+                  {t('agents.grant-finder.months.label')} <span className="text-red-500">*</span>
                 </span>
                 <input
                   type="number"
                   min={0}
                   value={registeredMonths}
                   onChange={(e) => setRegisteredMonths(e.target.value)}
-                  placeholder="e.g. 18"
+                  placeholder={t('agents.grant-finder.months.placeholder')}
                   className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
                 />
                 {attemptedSubmit && registeredMonths.trim() === '' && (
-                  <span className="text-xs text-red-600 dark:text-red-400">Required.</span>
+                  <span className="text-xs text-red-600 dark:text-red-400">{t('agents.grant-finder.months.required')}</span>
                 )}
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Annual revenue (yearly, RM)</span>
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{t('agents.grant-finder.revenue.label')}</span>
                 <div className="relative">
                   <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400 dark:text-zinc-500">
                     RM
@@ -353,24 +369,25 @@ function GrantFinderPageInner() {
                     min={0}
                     value={annualRevenue}
                     onChange={(e) => setAnnualRevenue(e.target.value)}
-                    placeholder="e.g. 250000"
+                    placeholder={t('agents.grant-finder.revenue.placeholder')}
                     className="w-full border border-zinc-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
                   />
                 </div>
                 {revenueInvalid && (
-                  <span className="text-xs text-red-600 dark:text-red-400">Enter a revenue of 0 or more.</span>
+                  <span className="text-xs text-red-600 dark:text-red-400">{t('agents.grant-finder.revenue.invalid')}</span>
                 )}
               </label>
             </div>
             <div>
               <p className="text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400">
-                Bumiputera-owned? <span className="text-red-500">*</span>
+                {t('agents.grant-finder.bumiputera.label')} <span className="text-red-500">*</span>
               </p>
-              <p className="text-xs text-zinc-400 mb-2 dark:text-zinc-500">
-                Some grants (e.g. TERAJU, MARA-linked funds) are reserved for or prioritise Bumiputera-owned businesses — this helps us match you to the right ones.
-              </p>
+              <p className="text-xs text-zinc-400 mb-2 dark:text-zinc-500">{t('agents.grant-finder.bumiputera.note')}</p>
               <div className="flex gap-2">
-                {[{ id: true, label: 'Yes' }, { id: false, label: 'No' }].map((opt) => (
+                {[
+                  { id: true, label: t('agents.grant-finder.bumiputera.yes') },
+                  { id: false, label: t('agents.grant-finder.bumiputera.no') },
+                ].map((opt) => (
                   <button
                     key={String(opt.id)}
                     type="button"
@@ -386,7 +403,7 @@ function GrantFinderPageInner() {
                 ))}
               </div>
               {attemptedSubmit && isBumiputera === null && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">Please select yes or no.</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('agents.grant-finder.bumiputera.required')}</p>
               )}
             </div>
             <button
@@ -395,7 +412,7 @@ function GrantFinderPageInner() {
               onClick={() => void submitIntake()}
               className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
-              {loading ? 'Matching…' : 'Find grants'}
+              {loading ? t('agents.grant-finder.matching') : t('agents.grant-finder.submit')}
             </button>
             {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           </section>
@@ -409,7 +426,7 @@ function GrantFinderPageInner() {
               rows={2}
               value={chatReply}
               onChange={(e) => setChatReply(e.target.value)}
-              placeholder="Type your answer…"
+              placeholder={t('agents.grant-finder.chat_placeholder')}
             />
             <button
               type="button"
@@ -417,21 +434,24 @@ function GrantFinderPageInner() {
               onClick={() => void sendChatReply()}
               className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white rounded-xl text-sm font-semibold disabled:opacity-50"
             >
-              {loading ? '…' : 'Continue'}
+              {loading ? t('agents.processing') : t('agents.grant-finder.continue')}
             </button>
             {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
             <div ref={bottomRef} />
           </section>
         )}
 
-        {loading && phase !== 'results' && <AgentLoadingSkeleton />}
+        {loading && phase !== 'results' && <AgentLoadingSkeleton message={t('agents.grant-finder.matching')} />}
 
         {phase === 'results' && (
           <>
             {matchedGrants.length > 0 ? (
               <div>
                 <p className="text-xs font-semibold text-zinc-500 mb-2 dark:text-zinc-400">
-                  {matchedGrants.length} matching grant{matchedGrants.length === 1 ? '' : 's'}
+                  {fmt(t('agents.grant-finder.results_count'), {
+                    n: matchedGrants.length,
+                    s: matchedGrants.length === 1 ? '' : 's',
+                  })}
                 </p>
                 <ul className="flex flex-col gap-3">
                   {matchedGrants.map((g) => (
@@ -440,12 +460,12 @@ function GrantFinderPageInner() {
                 </ul>
               </div>
             ) : (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">No fully-matching grants found for this profile.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('agents.grant-finder.no_matches')}</p>
             )}
             {nearMissGrants.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-zinc-500 mb-2 mt-2 dark:text-zinc-400">
-                  Near-miss — close, but doesn&apos;t fully qualify yet
+                  {t('agents.grant-finder.near_miss_title')}
                 </p>
                 <ul className="flex flex-col gap-3">
                   {nearMissGrants.map((g) => (
@@ -464,7 +484,7 @@ function GrantFinderPageInner() {
               }}
               className="self-start text-xs font-semibold text-nk-official-dim hover:text-nk-official dark:text-nk-official"
             >
-              Start a new search
+              {t('agents.grant-finder.new_search')}
             </button>
           </>
         )}

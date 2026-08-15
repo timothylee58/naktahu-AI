@@ -8,8 +8,19 @@ import useSWR from 'swr';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
+import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { useI18n } from '@/lib/i18n';
 import { agentTitleKey } from '@/lib/agents';
+
+// This agent's `language` field is the target language for explanations —
+// deriving it from the active UI locale instead of hardcoding 'bm' follows
+// the same precedented pattern used by grant-draft-generator/
+// sme-compliance-navigator's `queryLanguage`.
+function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
+  if (locale === 'ms') return 'bm';
+  if (locale === 'zh') return 'zh';
+  return 'en';
+}
 import {
   agentRunsForAgentKey,
   fetchAgentRunsAuthed,
@@ -53,7 +64,7 @@ function fmt(template: string, vars: Record<string, string | number>): string {
 }
 
 function StudyAgentPageInner() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { start, continue: cont, get } = useAgentApi();
   const { supabase, userId } = useSupabaseSession();
   const searchParams = useSearchParams();
@@ -77,6 +88,7 @@ function StudyAgentPageInner() {
   const [activeQuizIndex, setActiveQuizIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: pastPapers = [] } = useSWR<AgentRunEntry[]>(
@@ -120,6 +132,10 @@ function StudyAgentPageInner() {
   };
 
   const runStart = async () => {
+    if (!canSubmit) {
+      setAttemptedSubmit(true);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -131,7 +147,7 @@ function StudyAgentPageInner() {
         document_base64: inputTab === 'pdf' ? pdfBase64 : '',
         image_base64: inputTab === 'photo' ? imageBase64 : '',
         image_mime_type: imageMime,
-        language: 'bm',
+        language: localeToApiLanguage(locale),
       });
       setSessionId(String(res.session_id));
       setOutput((res.output as Record<string, unknown>) ?? res);
@@ -197,11 +213,11 @@ function StudyAgentPageInner() {
         : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10'
     }`;
 
-  const canSubmit =
-    !loading &&
-    ((inputTab === 'paste' && paperText.trim().length > 0) ||
-      (inputTab === 'pdf' && pdfBase64.length > 0) ||
-      (inputTab === 'photo' && imageBase64.length > 0));
+  const hasInput =
+    (inputTab === 'paste' && paperText.trim().length > 0) ||
+    (inputTab === 'pdf' && pdfBase64.length > 0) ||
+    (inputTab === 'photo' && imageBase64.length > 0);
+  const canSubmit = !loading && hasInput;
 
   return (
     <>
@@ -237,7 +253,7 @@ function StudyAgentPageInner() {
               </select>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
-              <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Subject</label>
+              <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{t('agents.study-agent.subject.label')}</label>
               <select
                 className="border border-zinc-200 rounded-lg p-2 text-sm bg-transparent transition-colors focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10"
                 value={subject}
@@ -332,19 +348,31 @@ function StudyAgentPageInner() {
             </div>
           )}
 
-          <button
-            type="button"
-            disabled={!canSubmit}
-            onClick={() => void runStart()}
-            className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white rounded-xl text-sm font-semibold shadow-sm shadow-blue-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
-          >
-            {loading
-              ? t('agents.study-agent.analysing')
-              : mode === 'quiz'
-                ? t('agents.study-agent.submit_quiz')
-                : t('agents.study-agent.submit_explain')}
-          </button>
+          <div className="flex flex-col items-end gap-1.5">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void runStart()}
+              className="self-end px-4 py-2 bg-nk-official hover:bg-nk-official-dim hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white rounded-xl text-sm font-semibold shadow-sm shadow-blue-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
+            >
+              {loading
+                ? t('agents.study-agent.analysing')
+                : mode === 'quiz'
+                  ? t('agents.study-agent.submit_quiz')
+                  : t('agents.study-agent.submit_explain')}
+            </button>
+            {/* Was a silently-disabled button with no explanation — same
+                anti-pattern grant-finder's own code comment already
+                identified and fixed as "a real UX complaint" on that page.
+                Button now always clickable; this message only appears once
+                someone actually tries with no input, not before. */}
+            {attemptedSubmit && !hasInput && (
+              <p className="text-xs text-red-600 dark:text-red-400">{t('agents.study-agent.input_required')}</p>
+            )}
+          </div>
         </section>
+
+        {loading && <AgentLoadingSkeleton message={t('agents.study-agent.analysing')} />}
 
         {mode === 'explain' && explanations.length > 0 && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
