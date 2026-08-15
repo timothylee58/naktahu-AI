@@ -7,6 +7,7 @@ import structlog
 import weave
 
 from app.models.state import AgentState
+from app.orchestration.circuit_breaker import CircuitOpenError, ilmu_breaker
 from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
 
 log = structlog.get_logger(__name__)
@@ -69,7 +70,14 @@ async def router_node(state: AgentState) -> dict:
     script_lang = _script_detect(query)
 
     try:
-        resp = await ilmu_client.chat.completions.create(
+        # Routed through ilmu_breaker so a degraded/hanging ILMU provider
+        # fails fast (CircuitOpenError, same except-Exception fallback
+        # below) instead of every request in the classification hot path
+        # queuing up behind individual timeouts. Was previously called
+        # directly — the breaker existed but wrapped nothing anywhere in
+        # the codebase (found during a full-codebase complexity trace).
+        resp = await ilmu_breaker.call(
+            ilmu_client.chat.completions.create,
             model=ILMU_CHAT_MODEL,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
@@ -84,6 +92,9 @@ async def router_node(state: AgentState) -> dict:
         # see its docstring for why a greedy regex here silently corrupts
         # correct classifications).
         parsed = extract_json_object(raw)
+    except CircuitOpenError:
+        log.warning("router_node_circuit_open", provider="ilmu", query_len=len(query))
+        parsed = {}
     except Exception as exc:
         log.warning("router_node_error", error=str(exc), query_len=len(query))
         parsed = {}

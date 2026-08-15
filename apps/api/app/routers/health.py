@@ -6,7 +6,9 @@ import os
 import structlog
 from fastapi import APIRouter
 
+from app.agents.checkpointer import get_checkpointer_backend
 from app.services.cache import ping as redis_ping
+from middleware.rate_limit import get_rate_limit_backend
 
 log = structlog.get_logger(__name__)
 
@@ -34,5 +36,22 @@ async def _supabase_ping() -> bool:
 async def health() -> dict:
     redis_ok = await redis_ping()
     supabase_ok = await _supabase_ping()
-    log.info("health_check", redis=redis_ok, supabase=supabase_ok)
-    return {"status": "ok", "redis": redis_ok, "supabase": supabase_ok}
+    # "memory" here (when a Postgres checkpointer was actually configured)
+    # means every multi-turn agent session gets wiped on the next restart —
+    # previously only a single warning log line at boot, easy to miss.
+    checkpointer_backend = get_checkpointer_backend()
+    rate_limit_backend = get_rate_limit_backend()
+    log.info(
+        "health_check",
+        redis=redis_ok,
+        supabase=supabase_ok,
+        checkpointer=checkpointer_backend,
+        rate_limiter=rate_limit_backend,
+    )
+    return {
+        "status": "ok",
+        "redis": redis_ok,
+        "supabase": supabase_ok,
+        "checkpointer": checkpointer_backend,
+        "rate_limiter": rate_limit_backend,
+    }

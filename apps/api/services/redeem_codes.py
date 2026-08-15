@@ -84,8 +84,13 @@ async def redeem_code(supabase: Client, code: str, user_id: str) -> dict[str, An
         await asyncio.to_thread(_release)
         raise
 
+    # Atomic increment via RPC (migration 036) — was a Python
+    # read-then-write using `row["uses_count"]` captured before the claim
+    # insert above, which let a multi-use code's max_uses cap be exceeded
+    # under concurrent redemption by different users (each request racing
+    # off the same stale count). Same fix shape as add_agent_credits.
     def _increment() -> None:
-        supabase.table("redeem_codes").update({"uses_count": row.get("uses_count", 0) + 1}).eq("id", row["id"]).execute()
+        supabase.rpc("increment_redeem_code_uses", {"p_code_id": row["id"]}).execute()
 
     await asyncio.to_thread(_increment)
     log.info("redeem_code_fulfilled", code=code.upper(), user_id=user_id, kind=row["kind"])
