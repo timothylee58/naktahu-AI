@@ -156,10 +156,16 @@ async def _is_harmful_by_llm(query: str) -> bool:
 
     # Imported lazily so tests can patch app.agents.guard_node.ilmu_client
     # without requiring ILMU credentials at import time.
+    from app.orchestration.circuit_breaker import CircuitOpenError, ilmu_breaker
     from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
 
     try:
-        resp = await ilmu_client.chat.completions.create(
+        # Routed through ilmu_breaker (same reasoning as router_node) — this
+        # check already fails open on any error, so a fast CircuitOpenError
+        # here just gets there sooner instead of waiting out a full
+        # per-request timeout when ILMU is degraded.
+        resp = await ilmu_breaker.call(
+            ilmu_client.chat.completions.create,
             model=ILMU_CHAT_MODEL,
             messages=[
                 {"role": "system", "content": _GUARD_LLM_SYSTEM_PROMPT},
@@ -175,6 +181,9 @@ async def _is_harmful_by_llm(query: str) -> bool:
         # the model appended any text containing a brace.
         parsed = extract_json_object(raw)
         return bool(parsed.get("harmful", False))
+    except CircuitOpenError:
+        log.warning("guard_llm_check_circuit_open", provider="ilmu", query_len=len(query))
+        return False
     except Exception as exc:
         log.warning("guard_llm_check_failed_open", error=str(exc), query_len=len(query))
         return False

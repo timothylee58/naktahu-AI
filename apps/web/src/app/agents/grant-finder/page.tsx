@@ -1,14 +1,15 @@
 'use client';
 
-import { Suspense, useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
-import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
+import { ChipSelector } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
+import { extendedSectorOptions, businessTypeOptions } from '@/lib/agent-catalogs';
 
 // This agent's `language` field is the target language for grant matching —
 // deriving it from the active UI locale instead of hardcoding 'bm' follows
@@ -23,33 +24,6 @@ function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
 function fmt(template: string, vars: Record<string, string | number>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), template);
 }
-
-// Sectors matching grant_database.eligible_sectors seed values (migration
-// 020) — NOT arbitrary labels. A mismatch here silently zeroes out every
-// grant match, since eligibility_agent/analyst_node.py does an exact string
-// membership check against each grant's eligible_sectors array.
-const SECTOR_OPTIONS: ChipOption[] = [
-  { id: 'technology', label: 'Technology', icon: '🖥' },
-  { id: 'ai', label: 'AI', icon: '🤖' },
-  { id: 'fintech', label: 'Fintech', icon: '💳' },
-  { id: 'edtech', label: 'EdTech', icon: '📚' },
-  { id: 'healthtech', label: 'HealthTech', icon: '⚕️' },
-  { id: 'digital', label: 'Digital', icon: '📱' },
-  { id: 'deeptech', label: 'DeepTech', icon: '🔬' },
-  { id: 'biotech', label: 'BioTech', icon: '🧬' },
-  { id: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
-  { id: 'agriculture', label: 'Agriculture', icon: '🌾' },
-  { id: 'services', label: 'Services', icon: '🛎' },
-];
-
-// eligibility_agent/state.py: business_type: sole_prop|sdn_bhd|startup|llp|cooperative
-const BUSINESS_TYPE_OPTIONS: ChipOption[] = [
-  { id: 'sole_prop', label: 'Sole Proprietor', icon: '🏪' },
-  { id: 'sdn_bhd', label: 'Sdn Bhd', icon: '🏢' },
-  { id: 'startup', label: 'Startup', icon: '🚀' },
-  { id: 'llp', label: 'LLP', icon: '🤝' },
-  { id: 'cooperative', label: 'Cooperative', icon: '👥' },
-];
 
 interface Grant {
   programme_name: string;
@@ -180,6 +154,8 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
 
 function GrantFinderPageInner() {
   const { t, locale } = useI18n();
+  const sectors = useMemo(() => extendedSectorOptions(t), [t]);
+  const businessTypes = useMemo(() => businessTypeOptions(t), [t]);
   const { start, continue: cont, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [sector, setSector] = useState<string[]>([]);
@@ -325,7 +301,7 @@ function GrantFinderPageInner() {
                 {t('agents.grant-finder.sector.label')} <span className="text-red-500">*</span>
                 <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">{t('agents.grant-finder.choose_one')}</span>
               </p>
-              <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
+              <ChipSelector options={sectors} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
               {attemptedSubmit && sector.length === 0 && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('agents.grant-finder.sector.required')}</p>
               )}
@@ -335,7 +311,7 @@ function GrantFinderPageInner() {
                 {t('agents.grant-finder.business_type.label')} <span className="text-red-500">*</span>
                 <span className="ml-1 font-normal normal-case text-zinc-400 dark:text-zinc-500">{t('agents.grant-finder.choose_one')}</span>
               </p>
-              <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
+              <ChipSelector options={businessTypes} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
               <p className="text-xs text-zinc-400 mt-1 dark:text-zinc-500">{t('agents.grant-finder.business_type.note')}</p>
               {attemptedSubmit && businessType.length === 0 && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('agents.grant-finder.business_type.required')}</p>

@@ -136,9 +136,12 @@ function ComplianceDrafterPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Was mapping zh -> 'en' — a real correctness bug, not just a hardcoded
+  // default: a Chinese-locale user's report generation request was silently
+  // tagged as English.
   const queryLanguage = useMemo(() => {
     if (locale === 'ms') return 'bm';
-    if (locale === 'zh') return 'en';
+    if (locale === 'zh') return 'zh';
     return 'en';
   }, [locale]);
 
@@ -251,15 +254,22 @@ function ComplianceDrafterPageInner() {
             </div>
             <div className="flex flex-col gap-2">
               {BUSINESS_TYPES.map((b) => (
-                <label key={b.id} className="flex items-center gap-2 text-sm">
+                <label key={b.id} className="flex items-start gap-2 text-sm">
                   <input
                     type="radio"
                     name="business"
                     checked={businessType === b.id}
                     onChange={() => { setBusinessType(b.id); setBusinessTypeTouched(true); }}
-                    className="accent-nk-official"
+                    className="accent-nk-official mt-0.5"
                   />
-                  {t(b.labelKey)}
+                  <span className="flex flex-col">
+                    <span>{t(b.labelKey)}</span>
+                    {/* Official SSM registration-category name — kept as-is
+                        rather than translated, the same way "Sdn Bhd" isn't
+                        translated in the label above; was defined on this
+                        const array but never actually rendered anywhere. */}
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500">{b.desc}</span>
+                  </span>
                 </label>
               ))}
               {businessTypeTouched && !businessType && (
@@ -324,7 +334,7 @@ function ComplianceDrafterPageInner() {
         )}
 
         {loading && step === 'domains' && (
-          <AgentLoadingSkeleton message="Menjana laporan pematuhan…" />
+          <AgentLoadingSkeleton message={t('agents.compliance-drafter.generating')} />
         )}
 
         {step === 'preview' && report && (
@@ -351,7 +361,7 @@ function ComplianceDrafterPageInner() {
                   >
                     <summary className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
                       <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${colors.badge}`}>
-                        {section.domain}
+                        {t(DOMAIN_OPTIONS.find((d) => d.id === section.domain)?.labelKey ?? '') || section.domain}
                       </span>
                       <span className={colors.text}>{section.title}</span>
                     </summary>
@@ -411,7 +421,7 @@ function ComplianceDrafterPageInner() {
               onClick={() => { setStep('business'); setReport(null); setSessionId(null); setDownloadUrl(null); }}
               className="self-start text-sm text-nk-official-dim hover:underline"
             >
-              ← Jana laporan baru
+              {t('agents.compliance-drafter.new_report')}
             </button>
           </section>
         )}

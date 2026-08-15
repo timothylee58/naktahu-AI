@@ -35,7 +35,6 @@ from routers.developer import router as developer_router
 from app.routers.metrics import router as metrics_router
 from app.routers.observability import router as observability_router
 from app.orchestration.adapters import ALL_ADAPTERS
-from app.orchestration.context_bus import ContextBus
 from app.orchestration.registry import load_enhanced_registry, register_adapter
 from app.routers.orchestrate import router as orchestrate_router
 from app.routers.orchestration import router as orchestration_router
@@ -83,7 +82,6 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
             log.info("startup_session_cleanup", deleted=cleanup_result.deleted_count)
     # ── Orchestration layer bootstrap ──────────────────────────────────────
     load_enhanced_registry(application.state.supabase)
-    application.state.context_bus = ContextBus(application.state.redis)
     for adapter_cls in ALL_ADAPTERS:
         register_adapter(adapter_cls())
     log.info("orchestration_ready", adapters=len(ALL_ADAPTERS))
