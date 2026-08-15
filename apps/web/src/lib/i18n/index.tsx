@@ -787,6 +787,8 @@ const MS: Translations = {
   'agents.deadline-monitor.empty': 'Tiada tarikh akhir dijadualkan buat masa ini.',
 
   /* ── agent UI strings ── */
+  'agents.deadline-monitor.recurrence.annual': 'Tahunan',
+  'agents.deadline-monitor.recurrence.monthly': 'Bulanan',
   'agents.health.disclaimer': 'Bukan diagnosis perubatan. Untuk kecemasan, hubungi 999 segera. Alat sivik percuma ini hanya memberi panduan am.',
   'agents.health.select_symptoms': 'Pilih simptom anda',
   'agents.health.select_symptoms_hint': 'Tekan untuk memilih (boleh pilih banyak)',
@@ -1591,6 +1593,8 @@ const EN: Translations = {
   'agents.deadline-monitor.empty': 'No deadlines scheduled right now.',
 
   /* ── agent UI strings ── */
+  'agents.deadline-monitor.recurrence.annual': 'Annual',
+  'agents.deadline-monitor.recurrence.monthly': 'Monthly',
   'agents.health.disclaimer': 'Not a medical diagnosis. For emergencies, call 999 immediately. This free civic tool provides general guidance only.',
   'agents.health.select_symptoms': 'Select your symptoms',
   'agents.health.select_symptoms_hint': 'Tap to select (multiple allowed)',
@@ -2368,6 +2372,8 @@ const ZH: Translations = {
   'agents.deadline-monitor.empty': '目前没有安排的截止日期。',
 
   /* ── agent UI strings ── */
+  'agents.deadline-monitor.recurrence.annual': '每年',
+  'agents.deadline-monitor.recurrence.monthly': '每月',
   'agents.health.disclaimer': '非医学诊断。紧急情况请立即拨打 999。这是免费的公民工具，仅提供一般指导。',
   'agents.health.select_symptoms': '选择您的症状',
   'agents.health.select_symptoms_hint': '点击选择（可多选）',
