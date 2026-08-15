@@ -25,21 +25,31 @@ const DOMAIN_COLORS: Record<string, string> = {
 type Mode = 'guided' | 'freetext';
 type FormStep = 'form' | 'review';
 
-const BUSINESS_TYPE_OPTIONS: ChipOption[] = [
-  { id: 'sole_prop', label: 'Sole Proprietor', icon: '🏪' },
-  { id: 'sdn_bhd', label: 'Sdn Bhd', icon: '🏢' },
-  { id: 'partnership', label: 'Partnership', icon: '🤝' },
-  { id: 'llp', label: 'LLP', icon: '📋' },
-];
+// Both catalogs were hardcoded English-only labels — every chip showed
+// English text regardless of UI locale, unlike EVENT_OPTIONS right below
+// them, which already correctly used labelKey + t(). Converted to
+// functions of `t` for the same reason health-triage's option catalogs
+// were: called from inside the component where locale context exists,
+// option ids (used in composedProfile and the backend payload) unchanged.
+function businessTypeOptions(t: (key: string) => string): ChipOption[] {
+  return [
+    { id: 'sole_prop', label: t('agents.sme-compliance-navigator.businesstype.sole_prop'), icon: '🏪' },
+    { id: 'sdn_bhd', label: t('agents.sme-compliance-navigator.businesstype.sdn_bhd'), icon: '🏢' },
+    { id: 'partnership', label: t('agents.sme-compliance-navigator.businesstype.partnership'), icon: '🤝' },
+    { id: 'llp', label: t('agents.sme-compliance-navigator.businesstype.llp'), icon: '📋' },
+  ];
+}
 
-const SECTOR_OPTIONS: ChipOption[] = [
-  { id: 'technology', label: 'Technology', icon: '🖥' },
-  { id: 'retail', label: 'Retail', icon: '🛍' },
-  { id: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
-  { id: 'services', label: 'Services', icon: '🛎' },
-  { id: 'fnb', label: 'F&B', icon: '🍽' },
-  { id: 'construction', label: 'Construction', icon: '🏗' },
-];
+function sectorOptions(t: (key: string) => string): ChipOption[] {
+  return [
+    { id: 'technology', label: t('agents.sme-compliance-navigator.sector.technology'), icon: '🖥' },
+    { id: 'retail', label: t('agents.sme-compliance-navigator.sector.retail'), icon: '🛍' },
+    { id: 'manufacturing', label: t('agents.sme-compliance-navigator.sector.manufacturing'), icon: '🏭' },
+    { id: 'services', label: t('agents.sme-compliance-navigator.sector.services'), icon: '🛎' },
+    { id: 'fnb', label: t('agents.sme-compliance-navigator.sector.fnb'), icon: '🍽' },
+    { id: 'construction', label: t('agents.sme-compliance-navigator.sector.construction'), icon: '🏗' },
+  ];
+}
 
 const EVENT_OPTIONS: { id: string; labelKey: string }[] = [
   { id: 'hiring_foreign_workers', labelKey: 'agents.sme-compliance-navigator.event.hiring_foreign_workers' },
@@ -72,7 +82,12 @@ function SmeComplianceNavigatorPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const queryLanguage = locale === 'ms' ? 'bm' : 'en';
+  // Was missing the zh case entirely (fell through to 'en'), same bug
+  // class already fixed on research-synthesiser/retrenchment-navigator.
+  const queryLanguage = locale === 'ms' ? 'bm' : locale === 'zh' ? 'zh' : 'en';
+
+  const businessTypes = useMemo(() => businessTypeOptions(t), [t]);
+  const sectors = useMemo(() => sectorOptions(t), [t]);
 
   // The backend agent still takes a single free-text business_profile string
   // (no structured fields in the API) — the guided form composes into that
@@ -80,23 +95,28 @@ function SmeComplianceNavigatorPageInner() {
   // uploaded PDF/DOCX would need new backend document-parsing infrastructure,
   // which is out of scope here; this form is the no-backend-change middle
   // ground between "one text box" and "upload a document."
+  //
+  // The "N employees" / "annual revenue RM..." fragments were raw hardcoded
+  // English regardless of locale — this composed string is both the actual
+  // backend payload AND what's shown back to the user in the Review step,
+  // so it needs the same localization as everything else on the page.
   const composedProfile = useMemo(() => {
     if (mode === 'freetext') return businessProfile;
     const parts: string[] = [];
-    const btLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.id === businessType[0])?.label;
-    const secLabel = SECTOR_OPTIONS.find((o) => o.id === sector[0])?.label;
+    const btLabel = businessTypes.find((o) => o.id === businessType[0])?.label;
+    const secLabel = sectors.find((o) => o.id === sector[0])?.label;
     if (btLabel && secLabel) parts.push(`${secLabel} ${btLabel}`);
     else if (btLabel) parts.push(btLabel);
     else if (secLabel) parts.push(secLabel);
-    if (headcount) parts.push(`${headcount} employees`);
-    if (annualRevenue) parts.push(`annual revenue RM${annualRevenue}`);
+    if (headcount) parts.push(`${headcount} ${t('agents.sme-compliance-navigator.employees_suffix')}`);
+    if (annualRevenue) parts.push(`${t('agents.sme-compliance-navigator.revenue_prefix')}${annualRevenue}`);
     const eventLabels = events
       .map((id) => EVENT_OPTIONS.find((e) => e.id === id))
       .filter((e): e is { id: string; labelKey: string } => Boolean(e))
       .map((e) => t(e.labelKey));
     if (eventLabels.length > 0) parts.push(eventLabels.join(', '));
     return parts.join(', ');
-  }, [mode, businessProfile, businessType, sector, headcount, annualRevenue, events, t]);
+  }, [mode, businessProfile, businessTypes, businessType, sectors, sector, headcount, annualRevenue, events, t]);
 
   const canRun = mode === 'freetext' ? businessProfile.trim().length > 0 : composedProfile.trim().length > 0;
 
@@ -201,13 +221,13 @@ function SmeComplianceNavigatorPageInner() {
                 <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {t('agents.sme-compliance-navigator.business_type')}
                 </span>
-                <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
+                <ChipSelector options={businessTypes} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
               </div>
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {t('agents.sme-compliance-navigator.sector')}
                 </span>
-                <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
+                <ChipSelector options={sectors} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
