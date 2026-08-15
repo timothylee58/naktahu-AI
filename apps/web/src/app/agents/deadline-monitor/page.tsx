@@ -19,17 +19,60 @@ interface Deadline {
   last_verified: string | null;
 }
 
+// deadline_schedule.domain has no CHECK constraint of its own, but
+// migration 023's comment confirms it reuses the canonical 10-domain list
+// from 016_widen_domain_constraint.sql (government, education, legal,
+// finance, healthcare, epf, tax, business, immigration, culture) — this
+// used to cover only 3 of those 10, so any deadline outside tax/epf/
+// business silently fell back to plain gray with no visual distinction.
 const DOMAIN_COLORS: Record<string, string> = {
   tax: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
   epf: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
   business: 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300',
+  government: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  education: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+  legal: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+  finance: 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300',
+  healthcare: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+  immigration: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300',
+  culture: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300',
 };
+
+// The DB value is 'healthcare' but this app's existing domain.* i18n keys
+// (shared with the main query pipeline's domain chips) use 'domain.health'
+// — a mismatch that would silently break a direct `domain.${d}` lookup.
+// Guards the same way research-synthesiser's domainLabel() does: falls
+// back to the raw slug rather than leaking an unresolved i18n key to the
+// user if a future domain value has no key at all.
+const DOMAIN_KEY_OVERRIDES: Record<string, string> = { healthcare: 'health' };
+
+function recurrenceLabel(t: (key: string) => string, recurrence: string): string {
+  const key = `agents.deadline-monitor.recurrence.${recurrence}`;
+  const resolved = t(key);
+  return resolved === key ? recurrence : resolved;
+}
 
 function daysUntil(dateStr: string): number {
   const due = new Date(dateStr).getTime();
   const now = new Date().setHours(0, 0, 0, 0);
   return Math.round((due - now) / 86_400_000);
 }
+
+type Urgency = 'overdue' | 'today' | 'soon' | 'normal';
+
+function urgencyOf(days: number): Urgency {
+  if (days < 0) return 'overdue';
+  if (days === 0) return 'today';
+  if (days <= 7) return 'soon';
+  return 'normal';
+}
+
+const URGENCY_STYLES: Record<Urgency, { card: string; text: string }> = {
+  overdue: { card: 'border-red-300 dark:border-red-500/40', text: 'text-red-700 dark:text-red-400 font-semibold' },
+  today: { card: 'border-amber-300 dark:border-amber-500/40', text: 'text-amber-700 dark:text-amber-400 font-semibold' },
+  soon: { card: 'border-zinc-200 dark:border-white/10', text: 'text-amber-600 dark:text-amber-400 font-medium' },
+  normal: { card: 'border-zinc-200 dark:border-white/10', text: 'text-zinc-500 dark:text-zinc-400' },
+};
 
 export default function DeadlineMonitorPage() {
   const { t } = useI18n();
@@ -95,27 +138,33 @@ export default function DeadlineMonitorPage() {
           <ul className="flex flex-col gap-2">
             {deadlines.map((d) => {
               const days = daysUntil(d.due_date);
+              const urgency = urgencyOf(days);
+              const style = URGENCY_STYLES[urgency];
+              const domainKey = `domain.${DOMAIN_KEY_OVERRIDES[d.domain] ?? d.domain}`;
+              const domainLabel = t(domainKey);
               return (
                 <li
                   key={d.id}
-                  className="bg-white border border-zinc-200 rounded-xl px-4 py-3 flex flex-col gap-1.5 shadow-sm dark:bg-white/5 dark:border-white/10"
+                  className={`bg-white border rounded-xl px-4 py-3 flex flex-col gap-1.5 shadow-sm dark:bg-white/5 ${style.card}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium">{d.deadline_name}</span>
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${DOMAIN_COLORS[d.domain] ?? 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300'}`}>
-                      {d.domain}
+                      {domainLabel === domainKey ? d.domain : domainLabel}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    <span>{new Date(d.due_date).toLocaleDateString()}</span>
-                    <span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-zinc-500 dark:text-zinc-400">{new Date(d.due_date).toLocaleDateString()}</span>
+                    <span className={style.text}>
                       {days < 0
                         ? t('agents.deadline-monitor.overdue')
                         : days === 0
                           ? t('agents.deadline-monitor.today')
                           : `${days} ${t('agents.deadline-monitor.days_left')}`}
                     </span>
-                    {d.recurrence && <span>· {d.recurrence}</span>}
+                    {d.recurrence && (
+                      <span className="text-zinc-500 dark:text-zinc-400">· {recurrenceLabel(t, d.recurrence)}</span>
+                    )}
                   </div>
                   {d.source_url && (
                     <a href={d.source_url} target="_blank" rel="noreferrer" className="text-xs text-nk-official-dim hover:underline dark:text-nk-official w-fit">
