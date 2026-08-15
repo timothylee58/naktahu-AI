@@ -12,108 +12,128 @@ import { useI18n } from '@/lib/i18n';
 
 type BodyArea = 'general' | 'head' | 'chest' | 'abdomen' | 'skin';
 
-const BODY_AREA_OPTIONS: (ChipOption & { id: BodyArea })[] = [
-  { id: 'general', label: 'Umum', icon: '🌡' },
-  { id: 'head', label: 'Kepala', icon: '🧠' },
-  { id: 'chest', label: 'Dada', icon: '🫁' },
-  { id: 'abdomen', label: 'Perut', icon: '🫃' },
-  { id: 'skin', label: 'Kulit', icon: '🖐' },
-];
+// Option catalogs were previously module-level constants with hardcoded
+// Bahasa Malaysia labels — every chip (body area, symptom, duration,
+// severity) showed Malay text regardless of the UI locale, for a health
+// tool where clearly understanding your own symptom back to you matters.
+// Built as functions of `t` instead, called from inside the component
+// where locale context exists; ids (used for backend payloads and
+// REDFLAG_QUESTIONS lookups) are unchanged, only the display `label`
+// is now localized.
+function bodyAreaOptions(t: (key: string) => string): (ChipOption & { id: BodyArea })[] {
+  return [
+    { id: 'general', label: t('agents.health-triage.body.general'), icon: '🌡' },
+    { id: 'head', label: t('agents.health-triage.body.head'), icon: '🧠' },
+    { id: 'chest', label: t('agents.health-triage.body.chest'), icon: '🫁' },
+    { id: 'abdomen', label: t('agents.health-triage.body.abdomen'), icon: '🫃' },
+    { id: 'skin', label: t('agents.health-triage.body.skin'), icon: '🖐' },
+  ];
+}
 
-// Same symptom set as before, now grouped by body area so the guided flow
+// Same symptom set as before, grouped by body area so the guided flow
 // shows a shorter, more relevant chip list per step instead of one flat
 // list of 10.
-const SYMPTOMS_BY_AREA: Record<BodyArea, ChipOption[]> = {
-  general: [
-    { id: 'demam', label: 'Demam', icon: '🤒' },
-    { id: 'batuk', label: 'Batuk', icon: '😷' },
-  ],
-  head: [
-    { id: 'sakit_kepala', label: 'Sakit kepala', icon: '🤕' },
-    { id: 'pening', label: 'Pening', icon: '😵' },
-  ],
-  chest: [
-    { id: 'sesak_nafas', label: 'Sesak nafas', icon: '💨' },
-    { id: 'sakit_dada', label: 'Sakit dada', icon: '💔' },
-  ],
-  abdomen: [
-    { id: 'sakit_perut', label: 'Sakit perut', icon: '🤧' },
-    { id: 'loya', label: 'Loya / Muntah', icon: '🤢' },
-    { id: 'cirit_birit', label: 'Cirit-birit', icon: '💧' },
-  ],
-  skin: [{ id: 'ruam', label: 'Ruam kulit', icon: '🔴' }],
-};
+function symptomsByArea(t: (key: string) => string): Record<BodyArea, ChipOption[]> {
+  return {
+    general: [
+      { id: 'demam', label: t('agents.health-triage.symptom.demam'), icon: '🤒' },
+      { id: 'batuk', label: t('agents.health-triage.symptom.batuk'), icon: '😷' },
+    ],
+    head: [
+      { id: 'sakit_kepala', label: t('agents.health-triage.symptom.sakit_kepala'), icon: '🤕' },
+      { id: 'pening', label: t('agents.health-triage.symptom.pening'), icon: '😵' },
+    ],
+    chest: [
+      { id: 'sesak_nafas', label: t('agents.health-triage.symptom.sesak_nafas'), icon: '💨' },
+      { id: 'sakit_dada', label: t('agents.health-triage.symptom.sakit_dada'), icon: '💔' },
+    ],
+    abdomen: [
+      { id: 'sakit_perut', label: t('agents.health-triage.symptom.sakit_perut'), icon: '🤧' },
+      { id: 'loya', label: t('agents.health-triage.symptom.loya'), icon: '🤢' },
+      { id: 'cirit_birit', label: t('agents.health-triage.symptom.cirit_birit'), icon: '💧' },
+    ],
+    skin: [{ id: 'ruam', label: t('agents.health-triage.symptom.ruam'), icon: '🔴' }],
+  };
+}
 
-const DURATION_OPTIONS: ChipOption[] = [
-  { id: 'less_1', label: '< 1 hari' },
-  { id: '1_3', label: '1–3 hari' },
-  { id: '3_7', label: '3–7 hari' },
-  { id: 'more_7', label: '> 1 minggu' },
-];
+function durationOptions(t: (key: string) => string): ChipOption[] {
+  return [
+    { id: 'less_1', label: t('agents.health-triage.duration.less_1') },
+    { id: '1_3', label: t('agents.health-triage.duration.1_3') },
+    { id: '3_7', label: t('agents.health-triage.duration.3_7') },
+    { id: 'more_7', label: t('agents.health-triage.duration.more_7') },
+  ];
+}
 
 type Severity = 'mild' | 'moderate' | 'severe';
 
-const SEVERITY_OPTIONS: (ChipOption & { id: Severity })[] = [
-  { id: 'mild', label: 'Ringan', icon: '🟢' },
-  { id: 'moderate', label: 'Sederhana', icon: '🟡' },
-  { id: 'severe', label: 'Teruk', icon: '🔴' },
-];
+function severityOptions(t: (key: string) => string): (ChipOption & { id: Severity })[] {
+  return [
+    { id: 'mild', label: t('agents.health-triage.severity.mild'), icon: '🟢' },
+    { id: 'moderate', label: t('agents.health-triage.severity.moderate'), icon: '🟡' },
+    { id: 'severe', label: t('agents.health-triage.severity.severe'), icon: '🔴' },
+  ];
+}
 
 // Per-symptom red-flag follow-up, one conditional question each — mirrors
 // CVS Health's "more questions appear based on your responses" pattern
 // (Mobbin: symptom-intake flow) rather than special-casing only chest pain.
 // Each entry maps a symptom id to the i18n key for its follow-up question
-// and the free-text fragments appended to buildMessage() for yes/no.
-const REDFLAG_QUESTIONS: Record<string, { questionKey: string; yesText: string; noText: string }> = {
+// and the i18n keys for the yes/no fragments appended to buildMessage() —
+// these were raw hardcoded Malay strings, but buildMessage()'s output is
+// both the message actually sent to the backend and the text rendered
+// back to the user in the Review step and "Your Symptoms" panel, so it
+// needs the same localization as everything else on the page.
+const REDFLAG_QUESTIONS: Record<string, { questionKey: string; yesKey: string; noKey: string }> = {
   sakit_dada: {
     questionKey: 'agents.health-triage.redflag_chest',
-    yesText: 'Sakit dada merebak ke lengan/rahang.',
-    noText: 'Sakit dada tidak merebak ke lengan/rahang.',
+    yesKey: 'agents.health-triage.redflag.sakit_dada.yes',
+    noKey: 'agents.health-triage.redflag.sakit_dada.no',
   },
   sesak_nafas: {
     questionKey: 'agents.health-triage.redflag_breath',
-    yesText: 'Sukar bercakap dalam ayat penuh kerana sesak nafas.',
-    noText: 'Masih boleh bercakap dalam ayat penuh.',
+    yesKey: 'agents.health-triage.redflag.sesak_nafas.yes',
+    noKey: 'agents.health-triage.redflag.sesak_nafas.no',
   },
   sakit_kepala: {
     questionKey: 'agents.health-triage.redflag_headache',
-    yesText: 'Ini sakit kepala paling teruk pernah dialami / disertai kekakuan leher.',
-    noText: 'Bukan sakit kepala paling teruk, tiada kekakuan leher.',
+    yesKey: 'agents.health-triage.redflag.sakit_kepala.yes',
+    noKey: 'agents.health-triage.redflag.sakit_kepala.no',
   },
   pening: {
     questionKey: 'agents.health-triage.redflag_dizzy',
-    yesText: 'Pernah pengsan atau hilang kesedaran.',
-    noText: 'Tidak pernah pengsan atau hilang kesedaran.',
+    yesKey: 'agents.health-triage.redflag.pening.yes',
+    noKey: 'agents.health-triage.redflag.pening.no',
   },
   loya: {
     questionKey: 'agents.health-triage.redflag_vomit',
-    yesText: 'Terdapat darah dalam muntah.',
-    noText: 'Tiada darah dalam muntah.',
+    yesKey: 'agents.health-triage.redflag.loya.yes',
+    noKey: 'agents.health-triage.redflag.loya.no',
   },
   sakit_perut: {
     questionKey: 'agents.health-triage.redflag_abdomen',
-    yesText: 'Kesakitan sangat teruk dan tiba-tiba, atau disertai muntah darah.',
-    noText: 'Kesakitan tidak teruk secara tiba-tiba, tiada muntah darah.',
+    yesKey: 'agents.health-triage.redflag.sakit_perut.yes',
+    noKey: 'agents.health-triage.redflag.sakit_perut.no',
   },
   cirit_birit: {
     questionKey: 'agents.health-triage.redflag_diarrhea',
-    yesText: 'Terdapat darah dalam najis atau tanda dehidrasi (mulut kering, pening).',
-    noText: 'Tiada darah dalam najis, tiada tanda dehidrasi.',
+    yesKey: 'agents.health-triage.redflag.cirit_birit.yes',
+    noKey: 'agents.health-triage.redflag.cirit_birit.no',
   },
   ruam: {
     questionKey: 'agents.health-triage.redflag_rash',
-    yesText: 'Ruam disertai bengkak muka/bibir atau kesukaran bernafas.',
-    noText: 'Ruam tidak disertai bengkak muka/bibir atau kesukaran bernafas.',
+    yesKey: 'agents.health-triage.redflag.ruam.yes',
+    noKey: 'agents.health-triage.redflag.ruam.no',
   },
   demam: {
     questionKey: 'agents.health-triage.redflag_fever',
-    yesText: 'Suhu melebihi 39.5°C atau berlaku sawan.',
-    noText: 'Suhu tidak melebihi 39.5°C, tiada sawan.',
+    yesKey: 'agents.health-triage.redflag.demam.yes',
+    noKey: 'agents.health-triage.redflag.demam.no',
   },
   batuk: {
     questionKey: 'agents.health-triage.redflag_cough',
-    yesText: 'Terdapat darah dalam kahak.',
-    noText: 'Tiada darah dalam kahak.',
+    yesKey: 'agents.health-triage.redflag.batuk.yes',
+    noKey: 'agents.health-triage.redflag.batuk.no',
   },
 };
 
@@ -122,11 +142,25 @@ const STEP_ORDER: Step[] = ['body', 'symptoms', 'duration', 'severity', 'details
 
 type UrgencyLevel = 'emergency' | 'moderate' | 'mild' | 'unknown';
 
+// This keyword match runs against `output.facility_recommendation`, which
+// the backend synthesises in the query's own language (this page's
+// `language` field, now locale-derived instead of always 'bm' — see
+// localeToApiLanguage below). Before that fix, the field was hardcoded to
+// 'bm' so this text was always Malay and the bm-only keyword list always
+// matched; fixing the hardcoded language exposed this as a real gap for
+// en/zh responses, so it needs the same three-language coverage as the
+// rest of the page, not just bm+partial-en.
 function getUrgencyLevel(output: Record<string, unknown>): UrgencyLevel {
   const rec = String(output.facility_recommendation ?? '').toLowerCase();
-  if (rec.includes('999') || rec.includes('kecemasan') || rec.includes('emergency')) return 'emergency';
-  if (rec.includes('klinik') || rec.includes('today') || rec.includes('hari ini')) return 'moderate';
-  if (rec.includes('pantau') || rec.includes('monitor') || rec.includes('rest')) return 'mild';
+  if (rec.includes('999') || rec.includes('kecemasan') || rec.includes('emergency') || rec.includes('紧急')) {
+    return 'emergency';
+  }
+  if (rec.includes('klinik') || rec.includes('clinic') || rec.includes('hari ini') || rec.includes('today') || rec.includes('诊所') || rec.includes('今天')) {
+    return 'moderate';
+  }
+  if (rec.includes('pantau') || rec.includes('monitor') || rec.includes('rest') || rec.includes('rehat') || rec.includes('观察') || rec.includes('休息')) {
+    return 'mild';
+  }
   return 'moderate';
 }
 
@@ -141,8 +175,18 @@ function directionsUrl(facilityName: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facilityName)}`;
 }
 
+// This agent's `language` field is the target language for the guided
+// intake — deriving it from the active UI locale instead of hardcoding
+// 'bm' follows the same precedented pattern used by grant-draft-generator/
+// sme-compliance-navigator's `queryLanguage`.
+function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
+  if (locale === 'ms') return 'bm';
+  if (locale === 'zh') return 'zh';
+  return 'en';
+}
+
 function HealthTriagePageInner() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { start, post, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('body');
@@ -168,11 +212,12 @@ function HealthTriagePageInner() {
   const [exporting, setExporting] = useState(false);
   const [exportUrl, setExportUrl] = useState<string | null>(null);
 
-  const symptomOptions = useMemo(() => (bodyArea ? SYMPTOMS_BY_AREA[bodyArea] : []), [bodyArea]);
-  const allSymptomLabels = useMemo(
-    () => Object.values(SYMPTOMS_BY_AREA).flat(),
-    [],
-  );
+  const bodyAreas = useMemo(() => bodyAreaOptions(t), [t]);
+  const symptomGroups = useMemo(() => symptomsByArea(t), [t]);
+  const durations = useMemo(() => durationOptions(t), [t]);
+  const severities = useMemo(() => severityOptions(t), [t]);
+  const symptomOptions = useMemo(() => (bodyArea ? symptomGroups[bodyArea] : []), [bodyArea, symptomGroups]);
+  const allSymptomLabels = useMemo(() => Object.values(symptomGroups).flat(), [symptomGroups]);
   // Applicable red-flag questions — one per selected symptom that has an
   // entry in REDFLAG_QUESTIONS, in selection order. A concrete example of
   // the guided flow surfacing questions the old flat chip list never asked.
@@ -218,16 +263,16 @@ function HealthTriagePageInner() {
     const symptomLabels = selectedSymptoms
       .map((id) => allSymptomLabels.find((o) => o.id === id)?.label ?? id)
       .join(', ');
-    const dur = DURATION_OPTIONS.find((o) => o.id === duration[0])?.label ?? '';
-    const sevLabel = SEVERITY_OPTIONS.find((o) => o.id === severity)?.label ?? '';
+    const dur = durations.find((o) => o.id === duration[0])?.label ?? '';
+    const sevLabel = severities.find((o) => o.id === severity)?.label ?? '';
     let msg = symptomLabels;
-    if (dur) msg += ` sejak ${dur}`;
-    if (sevLabel) msg += `, tahap keterukan: ${sevLabel}`;
+    if (dur) msg += ` ${t('agents.health-triage.since')} ${dur}`;
+    if (sevLabel) msg += `, ${t('agents.health-triage.severity_label')}: ${sevLabel}`;
     for (const id of applicableRedFlags) {
       const answer = redFlagAnswers[id];
       if (answer === null || answer === undefined) continue;
       const flag = REDFLAG_QUESTIONS[id];
-      msg += `. ${answer ? flag.yesText : flag.noText}`;
+      msg += `. ${t(answer ? flag.yesKey : flag.noKey)}`;
     }
     if (extraDetails.trim()) msg += `. ${extraDetails.trim()}`;
     return msg;
@@ -261,11 +306,11 @@ function HealthTriagePageInner() {
     setLoading(true);
     setError(null);
     try {
-      const res = await start('health-triage', { message: buildMessage(), language: 'bm' });
+      const res = await start('health-triage', { message: buildMessage(), language: localeToApiLanguage(locale) });
       setOutput((res.output as Record<string, unknown>) ?? res);
       setSessionId(typeof res.session_id === 'string' ? res.session_id : null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ralat berlaku');
+      setError(e instanceof Error ? e.message : t('agents.error.generic'));
     } finally {
       setLoading(false);
     }
@@ -279,7 +324,7 @@ function HealthTriagePageInner() {
       const res = await post(`/api/v1/agents/health-triage/${sessionId}/export`, {});
       setExportUrl(typeof res.signed_url === 'string' ? res.signed_url : null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ralat berlaku');
+      setError(e instanceof Error ? e.message : t('agents.error.generic'));
     } finally {
       setExporting(false);
     }
@@ -355,7 +400,7 @@ function HealthTriagePageInner() {
                   <>
                     <h2 className="font-semibold text-sm">{t('agents.health-triage.step_body')}</h2>
                     <ChipSelector
-                      options={BODY_AREA_OPTIONS}
+                      options={bodyAreas}
                       selected={bodyArea ? [bodyArea] : []}
                       onToggle={(id) => {
                         setBodyArea(id as BodyArea);
@@ -376,7 +421,7 @@ function HealthTriagePageInner() {
                 {step === 'duration' && (
                   <>
                     <h2 className="font-semibold text-sm">{t('agents.health-triage.step_duration')}</h2>
-                    <ChipSelector options={DURATION_OPTIONS} selected={duration} onToggle={(id) => setDuration([id])} multiple={false} size="sm" />
+                    <ChipSelector options={durations} selected={duration} onToggle={(id) => setDuration([id])} multiple={false} size="sm" />
                   </>
                 )}
 
@@ -384,7 +429,7 @@ function HealthTriagePageInner() {
                   <>
                     <h2 className="font-semibold text-sm">{t('agents.health-triage.step_severity')}</h2>
                     <ChipSelector
-                      options={SEVERITY_OPTIONS}
+                      options={severities}
                       selected={severity ? [severity] : []}
                       onToggle={(id) => setSeverity(id as Severity)}
                       multiple={false}
