@@ -31,11 +31,11 @@ export function ChatBubbles({ messages, className }: ChatBubblesProps) {
               'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
               msg.role === 'user'
                 ? 'rounded-br-md bg-nk-official text-white'
-                : 'rounded-bl-md border border-zinc-200 bg-zinc-50 text-zinc-800',
+                : 'rounded-bl-md border border-zinc-200 bg-zinc-50 text-zinc-800 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100',
             )}
           >
             {msg.role === 'bot' && (
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                 NakTahu
               </span>
             )}

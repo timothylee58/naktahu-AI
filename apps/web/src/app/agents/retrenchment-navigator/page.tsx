@@ -6,7 +6,18 @@ import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { ChatBubbles, type ChatMessage } from '@/components/agents/ChatBubbles';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
+import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { useI18n } from '@/lib/i18n';
+
+// This agent's `language` field is the target language for its guided
+// intake, not free-text detection — deriving it from the active UI locale
+// instead of hardcoding 'bm' follows the same precedented pattern already
+// used by grant-draft-generator/sme-compliance-navigator's `queryLanguage`.
+function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
+  if (locale === 'ms') return 'bm';
+  if (locale === 'zh') return 'zh';
+  return 'en';
+}
 
 interface StatutoryBenefits {
   days_per_year_of_service?: number;
@@ -21,7 +32,7 @@ interface EisEligibility {
 }
 
 function RetrenchmentNavigatorPageInner() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { start, continue: cont, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState('');
@@ -83,7 +94,7 @@ function RetrenchmentNavigatorPageInner() {
     try {
       const res = sessionId
         ? await cont('retrenchment-navigator', { session_id: sessionId, message: msg })
-        : await start('retrenchment-navigator', { message: msg, language: 'bm' });
+        : await start('retrenchment-navigator', { message: msg, language: localeToApiLanguage(locale) });
 
       if (!sessionId && res.session_id) setSessionId(String(res.session_id));
 
@@ -118,47 +129,99 @@ function RetrenchmentNavigatorPageInner() {
         className="max-w-2xl mx-auto p-4 flex flex-col gap-4"
       >
         {(statutoryBenefits || eisEligibility || noticePeriodStatus) && (
-          <section className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10 flex flex-col gap-3">
+          <section className="flex flex-col gap-3">
+            {/* Hero stat — the one number the user came here for gets its
+                own visual weight instead of sitting in the same h2 style as
+                secondary details like the checklist. Tabular nums so the
+                figure doesn't jitter as digits stream in turn by turn. */}
             {statutoryBenefits?.estimated_benefit_myr != null && (
-              <div>
-                <h2 className="font-semibold text-teal-800 dark:text-teal-300">{t('agents.retrenchment-navigator.section.benefits')}</h2>
-                <p className="text-lg font-bold mt-1">RM {statutoryBenefits.estimated_benefit_myr.toLocaleString()}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{statutoryBenefits.basis}</p>
-              </div>
-            )}
-            {eisEligibility && (
-              <div>
-                <h2 className="font-semibold text-teal-800 dark:text-teal-300">{t('agents.retrenchment-navigator.section.eis')}</h2>
-                <p className="text-sm mt-1">
-                  {eisEligibility.likely_eligible === true
-                    ? t('agents.retrenchment-navigator.eis.likely')
-                    : eisEligibility.likely_eligible === false
-                      ? t('agents.retrenchment-navigator.eis.unlikely')
-                      : t('agents.retrenchment-navigator.eis.unknown')}
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 dark:bg-teal-500/10 dark:border-teal-500/30">
+                <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                  {t('agents.retrenchment-navigator.section.benefits')}
                 </p>
-                {eisEligibility.note && <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{eisEligibility.note}</p>}
-              </div>
-            )}
-            {noticePeriodStatus && noticePeriodStatus !== 'unknown' && (
-              <div>
-                <h2 className="font-semibold text-teal-800 dark:text-teal-300">{t('agents.retrenchment-navigator.section.notice')}</h2>
-                <p className="text-sm mt-1">
-                  {noticePeriodStatus === 'sufficient'
-                    ? t('agents.retrenchment-navigator.notice.sufficient')
-                    : t('agents.retrenchment-navigator.notice.owed')}
+                <p className="text-3xl font-bold tracking-tight mt-1 font-mono [font-variant-numeric:tabular-nums] text-teal-900 dark:text-teal-100">
+                  RM {statutoryBenefits.estimated_benefit_myr.toLocaleString()}
                 </p>
+                {statutoryBenefits.basis && (
+                  <p className="text-xs text-teal-700/80 dark:text-teal-300/80 mt-1.5">{statutoryBenefits.basis}</p>
+                )}
               </div>
             )}
+
+            {/* Status chips — EIS eligibility and notice-period status are
+                each a single state, not paragraphs; a 2-up glance-able grid
+                reads faster than two stacked prose blocks did. */}
+            {(eisEligibility || (noticePeriodStatus && noticePeriodStatus !== 'unknown')) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {eisEligibility && (
+                  <div className="bg-white border border-zinc-200 rounded-xl p-3.5 dark:bg-white/5 dark:border-white/10">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                      {t('agents.retrenchment-navigator.section.eis')}
+                    </p>
+                    <p
+                      className={`text-sm font-medium mt-1 ${
+                        eisEligibility.likely_eligible === true
+                          ? 'text-green-700 dark:text-green-400'
+                          : eisEligibility.likely_eligible === false
+                            ? 'text-zinc-600 dark:text-zinc-400'
+                            : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
+                      {eisEligibility.likely_eligible === true
+                        ? t('agents.retrenchment-navigator.eis.likely')
+                        : eisEligibility.likely_eligible === false
+                          ? t('agents.retrenchment-navigator.eis.unlikely')
+                          : t('agents.retrenchment-navigator.eis.unknown')}
+                    </p>
+                    {eisEligibility.note && (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{eisEligibility.note}</p>
+                    )}
+                  </div>
+                )}
+                {noticePeriodStatus && noticePeriodStatus !== 'unknown' && (
+                  <div className="bg-white border border-zinc-200 rounded-xl p-3.5 dark:bg-white/5 dark:border-white/10">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                      {t('agents.retrenchment-navigator.section.notice')}
+                    </p>
+                    <p
+                      className={`text-sm font-medium mt-1 ${
+                        noticePeriodStatus === 'sufficient'
+                          ? 'text-green-700 dark:text-green-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
+                      {noticePeriodStatus === 'sufficient'
+                        ? t('agents.retrenchment-navigator.notice.sufficient')
+                        : t('agents.retrenchment-navigator.notice.owed')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Checklist — this is literally a to-do list of next steps, so
+                it's styled as one (checkbox glyph) instead of a plain
+                bulleted list indistinguishable from prose. */}
             {checklist.length > 0 && (
-              <div>
-                <h2 className="font-semibold text-teal-800 dark:text-teal-300">{t('agents.retrenchment-navigator.section.checklist')}</h2>
-                <ul className="mt-1 text-sm list-disc pl-5 space-y-1 text-zinc-700 dark:text-zinc-300">
-                  {checklist.map((c) => <li key={c}>{c}</li>)}
+              <div className="bg-white border border-zinc-200 rounded-xl p-4 dark:bg-white/5 dark:border-white/10">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">
+                  {t('agents.retrenchment-navigator.section.checklist')}
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {checklist.map((c) => (
+                    <li key={c} className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" className="w-4 h-4 mt-0.5 flex-shrink-0 text-teal-600 dark:text-teal-400" aria-hidden>
+                        <rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke="currentColor" strokeWidth="1.3" />
+                      </svg>
+                      <span>{c}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}
+
             {warnings.length > 0 && (
-              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 p-2 rounded-lg space-y-1 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
+              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 p-3 rounded-xl space-y-1 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
                 {warnings.map((w) => <p key={w}>{w}</p>)}
               </div>
             )}
@@ -166,6 +229,7 @@ function RetrenchmentNavigatorPageInner() {
         )}
 
         <ChatBubbles messages={messages} />
+        {loading && <AgentLoadingSkeleton message={t('agents.retrenchment-navigator.thinking')} />}
         <div ref={bottomRef} />
 
         <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-2 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
@@ -179,11 +243,15 @@ function RetrenchmentNavigatorPageInner() {
           />
           <button
             type="button"
-            disabled={loading}
+            disabled={loading || !message.trim()}
             onClick={() => void send()}
             className="self-end px-4 py-2 bg-teal-600 hover:bg-teal-500 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white rounded-xl text-sm font-semibold shadow-sm shadow-teal-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {loading ? '…' : sessionId ? t('agents.retrenchment-navigator.button.continue') : t('agents.retrenchment-navigator.button.start')}
+            {loading
+              ? t('agents.retrenchment-navigator.thinking')
+              : sessionId
+                ? t('agents.retrenchment-navigator.button.continue')
+                : t('agents.retrenchment-navigator.button.start')}
           </button>
         </section>
       </motion.div>
