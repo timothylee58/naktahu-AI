@@ -5,34 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
-import { ChipSelector, type ChipOption } from '@/components/agents/ChipSelector';
+import { ChipSelector } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
+import { sectorOptions, businessTypeOptions } from '@/lib/agent-catalogs';
 
 type Step = 'intake' | 'preview' | 'done';
-
-// Same seed values as grant-finder's ChipSelector options — the backend
-// does an exact string match against grant_database.eligible_sectors and
-// eligibility_agent's business_type enum, not arbitrary labels.
-const SECTOR_OPTIONS: ChipOption[] = [
-  { id: 'technology', label: 'Technology', icon: '🖥' },
-  { id: 'ai', label: 'AI', icon: '🤖' },
-  { id: 'fintech', label: 'Fintech', icon: '💳' },
-  { id: 'edtech', label: 'EdTech', icon: '📚' },
-  { id: 'healthtech', label: 'HealthTech', icon: '⚕️' },
-  { id: 'digital', label: 'Digital', icon: '📱' },
-  { id: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
-  { id: 'services', label: 'Services', icon: '🛎' },
-];
-
-const BUSINESS_TYPE_OPTIONS: ChipOption[] = [
-  { id: 'sole_prop', label: 'Sole Proprietor', icon: '🏪' },
-  { id: 'sdn_bhd', label: 'Sdn Bhd', icon: '🏢' },
-  { id: 'startup', label: 'Startup', icon: '🚀' },
-  { id: 'llp', label: 'LLP', icon: '🤝' },
-  { id: 'cooperative', label: 'Cooperative', icon: '👥' },
-];
 
 interface FinancialProjectionSkeleton {
   is_template?: boolean;
@@ -93,7 +72,16 @@ function GrantDraftGeneratorPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [pastDrafts, setPastDrafts] = useState<PastDraft[] | null>(null);
 
-  const queryLanguage = useMemo(() => (locale === 'ms' ? 'bm' : 'en'), [locale]);
+  // Was missing the zh case entirely (fell through to 'en'), same bug
+  // class already fixed on research-synthesiser/sme-compliance-navigator.
+  const queryLanguage = useMemo(() => {
+    if (locale === 'ms') return 'bm';
+    if (locale === 'zh') return 'zh';
+    return 'en';
+  }, [locale]);
+
+  const sectors = useMemo(() => sectorOptions(t), [t]);
+  const businessTypes = useMemo(() => businessTypeOptions(t), [t]);
 
   // Deep-linked from Grant Finder's results (draftLinkHref()) — prefill the
   // exact programme_name + business profile so the user doesn't retype
@@ -239,13 +227,13 @@ function GrantDraftGeneratorPageInner() {
               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 {t('agents.grant-draft-generator.sector')}
               </span>
-              <ChipSelector options={SECTOR_OPTIONS} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
+              <ChipSelector options={sectors} selected={sector} onToggle={(id) => setSector([id])} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 {t('agents.grant-draft-generator.business_type')}
               </span>
-              <ChipSelector options={BUSINESS_TYPE_OPTIONS} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
+              <ChipSelector options={businessTypes} selected={businessType} onToggle={(id) => setBusinessType([id])} multiple={false} size="sm" />
             </div>
             <div className="flex items-center gap-4 text-sm">
               <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -412,7 +400,7 @@ function GrantDraftGeneratorPageInner() {
                   // preview modal). DOCX has no reliable inline browser viewer,
                   // so it keeps the plain download link.
                   <div className="rounded-xl border border-zinc-200 overflow-hidden dark:border-white/10">
-                    <iframe src={downloadUrl} title="Grant draft preview" className="w-full h-[480px] bg-white" />
+                    <iframe src={downloadUrl} title={t('agents.grant-draft-generator.preview_title')} className="w-full h-[480px] bg-white" />
                   </div>
                 ) : null}
                 <a href={downloadUrl} className="text-nk-official-dim underline text-sm dark:text-nk-official" target="_blank" rel="noreferrer">
