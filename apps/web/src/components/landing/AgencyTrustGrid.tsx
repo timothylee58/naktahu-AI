@@ -26,13 +26,19 @@ interface AgencyTrustGridProps {
 
 export function AgencyTrustGrid({ isDark = true }: AgencyTrustGridProps) {
   const { t } = useI18n();
-  const cardClass = isDark
-    ? 'bg-white/5 border-white/10 hover:border-white/20'
-    : 'bg-white border-zinc-200 shadow-sm hover:shadow-md';
-  // Same stamp motif as CitationChip (double border, mono face) — every
-  // official-source touchpoint should read as one visual language, not a
-  // one-off. Static here (no hover-rotate/entrance spring) since this grid
-  // is a static trust list, not a live streamed answer earning motion.
+  // One shared-border container instead of 6 individually-bordered floating
+  // cards — the V7-reference pattern ("Pick your industry"'s bordered
+  // comparison grid) applied here: a trust list of official sources reads
+  // as one coherent register, not 6 separate loose tiles, and it's a direct
+  // fix for the "same-size cards" default the design system's craft floor
+  // flags. A subtle hover wash per cell stands in for the old per-card
+  // border-brighten-on-hover, without needing grid-row-aware interior
+  // divider lines (CSS `divide-x`/`divide-y` utilities aren't grid-aware —
+  // they'd draw a rule on every item after the first in DOM order
+  // regardless of row/column position, producing a wrong line at the start
+  // of row 2; not worth the complexity for what's a subtle grouping cue).
+  const containerClass = isDark ? 'border-white/10' : 'border-zinc-200 bg-white';
+  const cellHoverClass = isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-zinc-50/80';
   const badgeClass = isDark
     ? 'bg-nk-official/10 text-nk-official border-nk-official/40'
     : 'bg-nk-official/5 text-nk-official-dim border-nk-official/30';
@@ -40,16 +46,17 @@ export function AgencyTrustGrid({ isDark = true }: AgencyTrustGridProps) {
   const tagClass = isDark ? 'text-zinc-400' : 'text-zinc-600';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 max-w-4xl mx-auto w-full">
+    <div
+      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 rounded-2xl border max-w-4xl mx-auto w-full overflow-hidden ${containerClass}`}
+    >
       {AGENCIES.map((agency, i) => (
         <motion.div
           key={agency.abbr}
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 8 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: i * 0.05, duration: 0.4 }}
-          whileHover={{ y: -3 }}
-          className={`flex flex-col gap-2 border rounded-xl px-4 py-3.5 transition-all duration-200 ${cardClass}`}
+          className={`flex flex-col gap-2 px-4 py-3.5 transition-colors duration-200 ${cellHoverClass}`}
         >
           <span className={`self-start inline-flex items-center border-2 border-double rounded-md px-2 py-0.5 text-[11px] font-mono font-bold uppercase tracking-wide locale-nowrap ${badgeClass}`}>
             {agency.abbr}

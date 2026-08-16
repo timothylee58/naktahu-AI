@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
-import { LandingFeatures } from './LandingFeatures';
+import { LandingFeatureShowcase } from './LandingFeatureShowcase';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { AgentSpotlight } from './AgentSpotlight';
 import { ComparisonSection } from './ComparisonSection';
@@ -68,7 +68,7 @@ export function LandingClient() {
 
   const pageClass = isDark
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
-    : 'flex-1 min-h-0 overflow-y-auto bg-zinc-50 text-zinc-900';
+    : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
@@ -83,6 +83,13 @@ export function LandingClient() {
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
+      {/* Two-tone ambient glow (official blue + heritage terracotta) instead
+          of one flat blue blob — a small step toward the section-to-section
+          "color storytelling" explored from the Fixa/V7 references: still a
+          single quiet moment behind the hero (not a saturated per-section
+          repaint, which would fight this product's restrained register),
+          but it now carries both of NakTahu's identity accents instead of
+          only the functional blue. */}
       <div
         aria-hidden
         className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
@@ -94,6 +101,13 @@ export function LandingClient() {
             isDark
               ? 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.22),transparent)]'
               : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
+          }`}
+        />
+        <div
+          className={`absolute left-[68%] top-[-60px] h-[360px] w-[520px] -translate-x-1/2 rounded-full blur-3xl ${
+            isDark
+              ? 'bg-[radial-gradient(closest-side,rgba(224,141,91,0.14),transparent)]'
+              : 'bg-[radial-gradient(closest-side,rgba(156,74,42,0.07),transparent)]'
           }`}
         />
       </div>
@@ -127,7 +141,7 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-nk-official">{highlight}</span>
+                <span className="text-nk-official font-extrabold">{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
@@ -252,7 +266,7 @@ export function LandingClient() {
         <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-10 sm:mb-12 locale-text-balance ${sectionTitle}`}>
           {t('landing.features.title')}
         </h2>
-        <LandingFeatures isDark={isDark} />
+        <LandingFeatureShowcase isDark={isDark} />
       </motion.section>
 
       <motion.section
@@ -282,7 +296,26 @@ export function LandingClient() {
           <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
             {t('landing.trust.title')}
           </h2>
-          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.trust.desc')}</p>
+          {/* Same inline-bold-highlight technique as the hero headline above
+              (indexOf a marked substring, wrap it in a heavier span) — V7's
+              "bold the keywords that matter, inline" pattern applied to the
+              one sentence on this page making the sourcing claim, instead of
+              only saying it via the chip grid below. */}
+          <p className={`text-sm locale-text-balance ${mutedText}`}>
+            {(() => {
+              const desc = t('landing.trust.desc');
+              const highlight = t('landing.trust.desc.highlight');
+              const idx = desc.indexOf(highlight);
+              if (idx === -1) return desc;
+              return (
+                <>
+                  {desc.slice(0, idx)}
+                  <span className={`font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>{highlight}</span>
+                  {desc.slice(idx + highlight.length)}
+                </>
+              );
+            })()}
+          </p>
         </div>
         <AgencyTrustGrid isDark={isDark} />
       </motion.section>

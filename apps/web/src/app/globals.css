@@ -72,6 +72,13 @@
   --brand-ink: #14162b;
   --font-display: var(--font-sans);
   --font-mono-citation: var(--font-mono), 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Light-mode counterpart to --nk-bg's "warm charcoal, not flat near-black"
+     intent (see that token's comment above) — the landing page's light
+     background was plain Tailwind zinc-50 (a cool, clinical gray-white),
+     which never matched that stated warmth intent on the light side. A
+     warm off-white/cream, same idea as --nk-bg but inverted for light mode. */
+  --nk-bg-warm: #faf8f4;
 }
 
 @theme inline {
@@ -86,6 +93,7 @@
   --color-nk-official-dim: var(--nk-official-dim);
   --color-nk-community: var(--nk-community);
   --color-nk-community-dim: var(--nk-community-dim);
+  --color-nk-bg-warm: var(--nk-bg-warm);
   --color-nk-heritage: var(--nk-heritage);
   --color-nk-heritage-dim: var(--nk-heritage-dim);
   --color-nk-text: var(--nk-text);

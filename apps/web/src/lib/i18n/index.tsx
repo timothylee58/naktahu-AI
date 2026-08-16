@@ -370,6 +370,7 @@ const MS: Translations = {
   'landing.trust.title': 'Disambungkan Terus ke Agensi Rasmi',
   'landing.trust.desc':
     'Jawapan disemak silang dengan dokumen dan garis panduan rasmi daripada agensi berikut.',
+  'landing.trust.desc.highlight': 'dokumen dan garis panduan rasmi',
   'landing.trust.lhdn.name': 'Lembaga Hasil Dalam Negeri',
   'landing.trust.lhdn.desc': 'Cukai pendapatan & pelepasan cukai',
   'landing.trust.lhdn.tag2': 'Warta & pekeliling',
@@ -1300,6 +1301,7 @@ const EN: Translations = {
   'landing.trust.title': 'Connected to Official Agencies',
   'landing.trust.desc':
     'Answers are cross-checked against official documents and guidelines from these agencies.',
+  'landing.trust.desc.highlight': 'official documents and guidelines',
   'landing.trust.lhdn.name': 'Inland Revenue Board',
   'landing.trust.lhdn.desc': 'Income tax & tax relief',
   'landing.trust.lhdn.tag2': 'Gazettes & circulars',
@@ -2221,6 +2223,7 @@ const ZH: Translations = {
   'landing.domains.title': '知识领域',
   'landing.trust.title': '直接对接官方机构',
   'landing.trust.desc': '答案与以下机构的官方文件及指南交叉核对。',
+  'landing.trust.desc.highlight': '官方文件及指南',
   'landing.trust.lhdn.name': '内陆税收局',
   'landing.trust.lhdn.desc': '所得税与税务减免',
   'landing.trust.lhdn.tag2': '宪报与通令',
