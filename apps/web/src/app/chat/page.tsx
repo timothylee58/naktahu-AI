@@ -15,6 +15,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
 import { canAccessHistory } from '@/lib/auth-plan';
 import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } from '@/lib/history';
@@ -402,9 +403,7 @@ function ChatPageInner() {
           </button>
 
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">
-              {t('header.title')}
-            </span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
           </Link>
         </div>

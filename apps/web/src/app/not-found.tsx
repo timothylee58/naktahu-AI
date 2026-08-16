@@ -24,7 +24,7 @@ export default function NotFound() {
       <p className="text-5xl font-bold text-nk-official" aria-hidden>
         404
       </p>
-      <h1 className="text-lg font-semibold locale-text-balance">{t('not_found.title')}</h1>
+      <h1 className="font-display text-lg font-semibold locale-text-balance">{t('not_found.title')}</h1>
       <p className={`max-w-sm text-sm locale-text-balance ${mutedText}`}>{t('not_found.desc')}</p>
       <Link
         href="/"

@@ -70,7 +70,6 @@
   --brand-blue-dark: #2540c9;
   --brand-amber: #ffb238;
   --brand-ink: #14162b;
-  --font-display: var(--font-sans);
   --font-mono-citation: var(--font-mono), 'IBM Plex Mono', ui-monospace, monospace;
 
   /* Light-mode counterpart to --nk-bg's "warm charcoal, not flat near-black"

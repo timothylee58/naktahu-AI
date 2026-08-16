@@ -158,7 +158,7 @@ export default function AboutPage() {
         <main className="flex-1 min-h-0 overflow-y-auto px-6 py-12 max-w-4xl mx-auto w-full">
           <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-12">
             <header className="text-center space-y-3">
-              <h1 className="text-4xl font-bold tracking-tight">{c.title}</h1>
+              <h1 className="font-display text-4xl font-bold tracking-tight">{c.title}</h1>
               <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{c.subtitle}</p>
             </header>
 

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { useI18n } from '@/lib/i18n';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import {
   fetchHistoryAuthed,
   HistoryFetchError,
@@ -185,7 +186,7 @@ export default function HistoryPage() {
             </svg>
           </button>
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">{t('header.title')}</span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('header.subtitle')}</span>
           </Link>
         </header>

@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm px-8 py-10 flex flex-col gap-8">
           {/* Title */}
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900">Privacy Policy</h1>
+            <h1 className="font-display text-2xl font-bold text-zinc-900">Privacy Policy</h1>
             <p className="text-sm text-zinc-500 mt-1">Effective date: {EFFECTIVE_DATE}</p>
           </div>
 

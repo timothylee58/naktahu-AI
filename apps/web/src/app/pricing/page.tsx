@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useI18n } from '@/lib/i18n';
 import { API_BASE } from '@/lib/api-base';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
 import { Badge } from '@/components/ui/badge';
 
@@ -394,7 +395,7 @@ export default function PricingPage() {
             </svg>
           </button>
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">{t('header.title')}</span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('header.subtitle')}</span>
           </Link>
         </header>
@@ -402,7 +403,7 @@ export default function PricingPage() {
         <main className="max-w-5xl mx-auto px-4 py-12 w-full flex flex-col gap-14">
           <div>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t('pricing.title')}</h1>
+              <h1 className="font-display text-2xl font-bold text-zinc-900 dark:text-white">{t('pricing.title')}</h1>
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{t('pricing.subtitle')}</p>
             </div>
 
