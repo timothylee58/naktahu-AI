@@ -910,6 +910,19 @@ const MS: Translations = {
   'agents.deadline-monitor.days_left': 'hari lagi',
   'agents.deadline-monitor.source': 'Lihat sumber rasmi',
   'agents.deadline-monitor.empty': 'Tiada tarikh akhir dijadualkan buat masa ini.',
+  'calendar.title': 'Segerak ke kalendar anda',
+  'calendar.desc':
+    'NakTahu menambah tarikh akhir yang anda langgan terus ke kalendar anda, dan mengemas kini acara tersebut jika tarikh berubah. Kami tidak membaca acara sedia ada anda.',
+  'calendar.google': 'Google Calendar',
+  'calendar.microsoft': 'Microsoft Calendar',
+  'calendar.connect': 'Sambung',
+  'calendar.disconnect': 'Putuskan sambungan',
+  'calendar.connected': 'Disambungkan',
+  'calendar.last_synced': 'Segerak terakhir',
+  'calendar.never_synced': 'Belum disegerak',
+  'calendar.error.connect': 'Sambungan kalendar gagal. Sila cuba lagi.',
+  'calendar.error.reconnect': 'Sambungan terputus — sila sambung semula.',
+  'calendar.unavailable': 'Segerak kalendar belum tersedia.',
 
   /* ── agent UI strings ── */
   'agents.deadline-monitor.recurrence.annual': 'Tahunan',
@@ -1841,6 +1854,19 @@ const EN: Translations = {
   'agents.deadline-monitor.days_left': 'days left',
   'agents.deadline-monitor.source': 'View official source',
   'agents.deadline-monitor.empty': 'No deadlines scheduled right now.',
+  'calendar.title': 'Sync to your calendar',
+  'calendar.desc':
+    'NakTahu adds the deadlines you subscribe to straight into your calendar, and updates those events if a date changes. We never read your existing events.',
+  'calendar.google': 'Google Calendar',
+  'calendar.microsoft': 'Microsoft Calendar',
+  'calendar.connect': 'Connect',
+  'calendar.disconnect': 'Disconnect',
+  'calendar.connected': 'Connected',
+  'calendar.last_synced': 'Last synced',
+  'calendar.never_synced': 'Not synced yet',
+  'calendar.error.connect': 'Calendar connection failed. Please try again.',
+  'calendar.error.reconnect': 'Connection lost — please reconnect.',
+  'calendar.unavailable': 'Calendar sync is not available yet.',
 
   /* ── agent UI strings ── */
   'agents.deadline-monitor.recurrence.annual': 'Annual',
@@ -2744,6 +2770,18 @@ const ZH: Translations = {
   'agents.deadline-monitor.days_left': '天后',
   'agents.deadline-monitor.source': '查看官方来源',
   'agents.deadline-monitor.empty': '目前没有安排的截止日期。',
+  'calendar.title': '同步到您的日历',
+  'calendar.desc': 'NakTahu 会将您订阅的截止日期直接添加到您的日历中，日期变更时也会更新这些事件。我们绝不读取您现有的日程。',
+  'calendar.google': 'Google 日历',
+  'calendar.microsoft': 'Microsoft 日历',
+  'calendar.connect': '连接',
+  'calendar.disconnect': '断开连接',
+  'calendar.connected': '已连接',
+  'calendar.last_synced': '最后同步',
+  'calendar.never_synced': '尚未同步',
+  'calendar.error.connect': '日历连接失败，请重试。',
+  'calendar.error.reconnect': '连接已断开 — 请重新连接。',
+  'calendar.unavailable': '日历同步尚未开放。',
 
   /* ── agent UI strings ── */
   'agents.deadline-monitor.recurrence.annual': '每年',

@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { CitationChip } from '@/components/chat/CitationChip';
 import type { Citation } from '@/lib/types';
 import { API_BASE } from '@/lib/api-base';
@@ -55,10 +56,8 @@ export default function SharedAnswerPage() {
   return (
     <div className="min-h-screen bg-zinc-50/50 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-        <Link href="/" className="flex flex-col">
-          <span className="text-base font-bold text-zinc-900 tracking-tight">
-            {t('header.title')}
-          </span>
+        <Link href="/" className="flex flex-col text-zinc-900">
+          <NakTahuWordmark markSize={20} className="text-base" />
           <span className="text-xs text-zinc-500">{t('header.subtitle')}</span>
         </Link>
         <Link

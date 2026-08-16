@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm px-8 py-10 flex flex-col gap-8">
           {/* Title */}
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900">Privacy Policy</h1>
+            <h1 className="font-display text-2xl font-bold text-zinc-900">Privacy Policy</h1>
             <p className="text-sm text-zinc-500 mt-1">Effective date: {EFFECTIVE_DATE}</p>
           </div>
 
@@ -78,6 +78,24 @@ export default function PrivacyPage() {
                 to our database</strong>. Once your result is returned, that information is discarded; we retain
                 no record of the specific answers you gave. This mirrors the stateless-intake approach used by
                 Malaysia&rsquo;s own Ihsan MADANI portal for the same category of information.
+              </p>
+            </Subsection>
+            <Subsection title="2.5 Calendar sync (Deadline Monitor)">
+              <p>
+                If you connect a Google or Microsoft calendar to Deadline Monitor, we store an{' '}
+                <strong>encrypted refresh token</strong> for that account so we can add and update deadline
+                events on your behalf. We request write access to your calendar events only —{' '}
+                <strong>we do not read your existing calendar events, meetings, or availability</strong>. On
+                Google this is enforced by the narrower <code>calendar.events</code> permission; Microsoft
+                Graph offers no write-only equivalent, so its permission is technically read-and-write even
+                though we never read.
+              </p>
+              <p>
+                The only data we write is the deadline name, its due date, and a link to the official source
+                — all of which already come from public government sources, not from you. Disconnecting a
+                calendar deletes the stored token immediately (and revokes it at Google&rsquo;s end, where
+                revocation is supported); events already added remain in your calendar for you to keep or
+                delete.
               </p>
             </Subsection>
           </Section>

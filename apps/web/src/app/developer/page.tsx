@@ -262,7 +262,7 @@ export default function DeveloperPage() {
 
       <main className="max-w-5xl mx-auto px-4 py-10 flex flex-col gap-8 w-full">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }}>
-          <h1 className="text-2xl font-bold tracking-tight">{t('developer.title')}</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">{t('developer.title')}</h1>
           <p className="mt-2 text-sm text-zinc-600 max-w-2xl leading-relaxed dark:text-zinc-400">{t('developer.subtitle')}</p>
         </motion.div>
 

@@ -8,6 +8,7 @@ import { useTheme } from '@/lib/theme';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { effectivePlan, planBadgeLabel, userRole, ADMIN_ROLES } from '@/lib/auth-plan';
 import { fetchUserCredits } from '@/lib/credits';
 
@@ -191,7 +192,7 @@ export default function ProfilePage() {
             </svg>
           </button>
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">{t('header.title')}</span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('header.subtitle')}</span>
           </Link>
         </header>
@@ -202,7 +203,7 @@ export default function ProfilePage() {
           transition={{ duration: 0.4, ease: 'easeOut' }}
           className="max-w-2xl mx-auto px-4 py-8 w-full flex flex-col gap-5"
         >
-          <h1 className="text-lg font-bold">{t('profile.title')}</h1>
+          <h1 className="font-display text-lg font-bold">{t('profile.title')}</h1>
 
           {!ready ? (
             <div className="h-32 rounded-2xl animate-pulse bg-zinc-100 dark:bg-white/5" />

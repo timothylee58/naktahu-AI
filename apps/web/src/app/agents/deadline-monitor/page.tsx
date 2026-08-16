@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchWithAuth } from '@/lib/auth-headers';
 import { API_BASE } from '@/lib/api-base';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
+import { CalendarConnectCards } from '@/components/agents/CalendarConnectCards';
 import { useI18n } from '@/lib/i18n';
 
 interface Deadline {
@@ -110,6 +111,13 @@ export default function DeadlineMonitorPage() {
         className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-4"
       >
         <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('agents.deadline-monitor.desc')}</p>
+
+        {/* Only shown to users who actually have access to the feature —
+            rendering connect-cards above a "Pro plan required" wall would
+            invite someone to connect a calendar that will never receive a
+            push (calendar sync uses the same Pro gate as email alerts, see
+            scripts/agents/deadline_monitor.py's _dispatch_calendar_sync). */}
+        {error !== 'pro-required' && <CalendarConnectCards />}
 
         {error === 'pro-required' && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">

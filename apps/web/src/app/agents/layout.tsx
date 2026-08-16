@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 
@@ -97,7 +98,7 @@ export default function AgentsLayout({ children }: { children: React.ReactNode }
             </svg>
           </button>
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">{t('header.title')}</span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('header.subtitle')}</span>
           </Link>
         </header>

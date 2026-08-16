@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { API_BASE } from '@/lib/api-base';
 import { WarungPriceChart, type PriceHistoryPoint } from '@/components/warung-watch/WarungPriceChart';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
@@ -295,7 +296,7 @@ export default function WarungWatchPage() {
             </svg>
           </button>
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">{t('header.title')}</span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{t('header.subtitle')}</span>
           </Link>
         </header>
@@ -307,7 +308,7 @@ export default function WarungWatchPage() {
           className="max-w-xl mx-auto px-4 py-8 w-full flex flex-col gap-5"
         >
           <div>
-            <h1 className="text-lg font-bold">{t('warung_watch.title')}</h1>
+            <h1 className="font-display text-lg font-bold">{t('warung_watch.title')}</h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t('warung_watch.desc')}</p>
           </div>
 

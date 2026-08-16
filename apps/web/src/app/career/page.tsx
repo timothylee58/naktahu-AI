@@ -256,7 +256,7 @@ export default function CareerPage() {
                 transition={spring}
                 className="flex flex-col gap-5"
               >
-                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('career.s1.title')}</h2>
+                <h2 className="font-display text-lg font-bold text-zinc-900 dark:text-white">{t('career.s1.title')}</h2>
 
                 <StepSection label={t('career.s1.edu')}>
                   {EDU_OPTIONS.map((o) => (
@@ -302,7 +302,7 @@ export default function CareerPage() {
                 transition={spring}
                 className="flex flex-col gap-5"
               >
-                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('career.s2.title')}</h2>
+                <h2 className="font-display text-lg font-bold text-zinc-900 dark:text-white">{t('career.s2.title')}</h2>
 
                 <StepSection label={t('career.s2.goal')}>
                   {GOAL_OPTIONS.map((o) => (
@@ -337,7 +337,7 @@ export default function CareerPage() {
                 transition={spring}
                 className="flex flex-col gap-5"
               >
-                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('career.s3.title')}</h2>
+                <h2 className="font-display text-lg font-bold text-zinc-900 dark:text-white">{t('career.s3.title')}</h2>
 
                 <StepSection label={t('career.s3.state')}>
                   {STATE_OPTIONS.map((o) => (

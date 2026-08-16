@@ -142,7 +142,7 @@ export function AgentsHub() {
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
             {t('agents.hub.title')}
           </span>
-          <h2 className="max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl locale-text-balance">
+          <h2 className="font-display max-w-2xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl locale-text-balance">
             {t('agents.hub.subtitle')}
           </h2>
           <p className="max-w-2xl text-sm text-zinc-500 dark:text-zinc-400">

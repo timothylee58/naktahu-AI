@@ -15,6 +15,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
 import { canAccessHistory } from '@/lib/auth-plan';
 import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } from '@/lib/history';
@@ -360,7 +361,6 @@ function ChatPageInner() {
     ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
     : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800';
   const emptyTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
-  const emptyDesc = isDark ? 'text-zinc-500' : 'text-zinc-400';
   const inputBarClass = isDark
     ? 'border-white/10 bg-[#12151C]/90'
     : 'border-zinc-100 bg-white/90';
@@ -403,9 +403,7 @@ function ChatPageInner() {
           </button>
 
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">
-              {t('header.title')}
-            </span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
           </Link>
         </div>
@@ -478,14 +476,18 @@ function ChatPageInner() {
               </svg>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <p className={`text-2xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
-                {t('chat.empty.greeting')}
-              </p>
-              <p className={`text-sm max-w-[280px] leading-relaxed locale-text-balance ${emptyDesc}`}>
-                {t('chat.empty')}
-              </p>
-            </div>
+            {/* Greeting only — the separate muted subtitle line (chat.empty:
+                "Ask me anything about Malaysian government services") was
+                dropped rather than kept alongside both the greeting and the
+                trust strip below: three stacked sentences saying overlapping
+                things ("ask a question" / "about gov services" / "answers
+                are sourced") read as one message repeated three ways. The
+                trust strip below already implies the scope+sourcing promise
+                in one line; chat.empty stays defined in i18n (harmless to
+                leave unused) in case a future surface wants it again. */}
+            <p className={`text-2xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
+              {t('chat.empty.greeting')}
+            </p>
 
             {/* Trust strip — the concrete differentiator ("this isn't just an
                 LLM, every answer is sourced") stated up front rather than only
