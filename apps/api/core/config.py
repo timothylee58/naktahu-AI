@@ -180,5 +180,41 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("HITPAY_BASE_URL", "hitpay_base_url"),
     )
 
+    # ── Deadline Monitor calendar sync (migration 039) ──────────────────────
+    # Write-only OAuth: NakTahu creates/updates/deletes calendar EVENTS for a
+    # user's subscribed deadlines, never reads their existing calendar. All
+    # four *_client_id/_client_secret values come from apps YOU must register
+    # yourself (Google Cloud Console + Microsoft Entra — this sandbox has no
+    # account/browser access to do it) — see services/calendar_sync.py's
+    # module docstring for the exact registration steps and redirect URIs.
+    # Empty default (not a placeholder-looking value) so a missing credential
+    # fails loudly/obviously rather than silently trying garbage against the
+    # real OAuth endpoint.
+    google_calendar_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CALENDAR_CLIENT_ID", "google_calendar_client_id"),
+    )
+    google_calendar_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CALENDAR_CLIENT_SECRET", "google_calendar_client_secret"),
+    )
+    microsoft_calendar_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("MICROSOFT_CALENDAR_CLIENT_ID", "microsoft_calendar_client_id"),
+    )
+    microsoft_calendar_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("MICROSOFT_CALENDAR_CLIENT_SECRET", "microsoft_calendar_client_secret"),
+    )
+    # Fernet key (44-char urlsafe-base64, from `Fernet.generate_key()`) used
+    # to encrypt refresh tokens at rest in calendar_connections — the only
+    # long-lived calendar secret this app stores. Never derived from
+    # jwt_secret or any other existing secret: a leak of one must not also
+    # compromise the other.
+    calendar_token_encryption_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CALENDAR_TOKEN_ENCRYPTION_KEY", "calendar_token_encryption_key"),
+    )
+
 
 settings = Settings()

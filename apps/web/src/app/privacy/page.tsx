@@ -80,6 +80,24 @@ export default function PrivacyPage() {
                 Malaysia&rsquo;s own Ihsan MADANI portal for the same category of information.
               </p>
             </Subsection>
+            <Subsection title="2.5 Calendar sync (Deadline Monitor)">
+              <p>
+                If you connect a Google or Microsoft calendar to Deadline Monitor, we store an{' '}
+                <strong>encrypted refresh token</strong> for that account so we can add and update deadline
+                events on your behalf. We request write access to your calendar events only —{' '}
+                <strong>we do not read your existing calendar events, meetings, or availability</strong>. On
+                Google this is enforced by the narrower <code>calendar.events</code> permission; Microsoft
+                Graph offers no write-only equivalent, so its permission is technically read-and-write even
+                though we never read.
+              </p>
+              <p>
+                The only data we write is the deadline name, its due date, and a link to the official source
+                — all of which already come from public government sources, not from you. Disconnecting a
+                calendar deletes the stored token immediately (and revokes it at Google&rsquo;s end, where
+                revocation is supported); events already added remain in your calendar for you to keep or
+                delete.
+              </p>
+            </Subsection>
           </Section>
 
           <Section title="3. How We Use Your Data">

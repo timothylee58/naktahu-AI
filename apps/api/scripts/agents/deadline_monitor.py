@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Nightly Deadline Monitor cron — scrape LHDN/EPF/SSM/SST sources, diff dates,
-and email Pro-plan subscribers approaching deadlines (email is the only
-delivery channel — see migration 023_grant_deadline_windows.sql).
+and notify Pro-plan subscribers approaching deadlines. Two delivery channels
+as of migration 039: email (unconditional, at the 30/14/7/1-day alert
+windows) and calendar push (Google/Microsoft, for whoever has connected —
+runs every night regardless of alert window, since a connected calendar's
+job is to always reflect the current due date, not just fire at specific
+countdown thresholds).
 
 Run via Railway cron at 02:00 MYT (18:00 UTC):
   python scripts/agents/deadline_monitor.py
@@ -13,6 +17,9 @@ Dedup is enforced by the deadline_alert_sends ledger (PK-based, no
 read-then-write race). Until migration 023 is applied, the subscription/
 dedup queries below degrade to no-ops (empty subscriber list) rather than
 crashing the cron run — Trap #5/#4 spirit applied to a standalone script.
+Calendar push (migration 039) degrades the same way if its tables aren't
+applied yet, or if a user's OAuth client isn't configured — see
+services/calendar_sync.py's module docstring.
 """
 from __future__ import annotations
 
@@ -224,6 +231,57 @@ async def _dispatch_all_alerts(supabase, due_alerts: list[tuple[dict, int]]) -> 
         await _dispatch_alert(supabase, entry, alert_day)
 
 
+def _load_calendar_connections(supabase, user_ids: set[str]) -> list[dict]:
+    """Every connected Google/Microsoft calendar for the given users.
+    Returns [] (not a crash) if migration 039's table doesn't exist yet."""
+    if not user_ids:
+        return []
+    try:
+        res = (
+            supabase.table("calendar_connections")
+            .select("*")
+            .in_("user_id", list(user_ids))
+            .execute()
+        )
+        return res.data or []
+    except Exception as exc:  # noqa: BLE001
+        log.warning("calendar_connections_query_failed", error=str(exc))
+        return []
+
+
+async def _dispatch_calendar_sync(supabase, entries: list[dict]) -> None:
+    """Push every deadline to every connected calendar for a subscriber of
+    that domain — same Pro-plan gate as email (calendar sync is a richer
+    delivery channel for the same feature, not a free-tier bypass of it),
+    same domain-wide subscription list (deadline_alert_subscriptions).
+    Runs for ALL entries, not just alert-day ones: a connected calendar
+    should always show the current due date.
+    """
+    from services.calendar_sync import sync_deadline_to_connection
+
+    entries_by_domain: dict[str, list[dict]] = {}
+    for entry in entries:
+        entries_by_domain.setdefault(entry.get("domain"), []).append(entry)
+
+    for domain, domain_entries in entries_by_domain.items():
+        subscriptions = _load_subscriptions(supabase, domain)
+        if not subscriptions:
+            continue
+
+        subscriber_user_ids = set()
+        for sub in subscriptions:
+            plan, _ = _resolve_user_plan(supabase, sub.get("user_id"))
+            if _PLAN_RANK.get(plan, 0) >= _PLAN_RANK.get(_MIN_ALERT_PLAN, 0):
+                subscriber_user_ids.add(sub.get("user_id"))
+        if not subscriber_user_ids:
+            continue
+
+        connections = _load_calendar_connections(supabase, subscriber_user_ids)
+        for connection in connections:
+            for entry in domain_entries:
+                await sync_deadline_to_connection(supabase, connection, entry)
+
+
 def main() -> None:
     from supabase import create_client
 
@@ -265,9 +323,18 @@ def main() -> None:
                     "due_date": nearest.isoformat(),
                     "last_verified": datetime.now(timezone.utc).isoformat(),
                 }).eq("id", entry["id"]).execute()
+                # Keep this run's in-memory copy in sync with the DB write
+                # above — calendar push below reads `entries` directly, and
+                # must push the corrected date, not the stale one it was
+                # loaded with at the top of this function.
+                entry["due_date"] = nearest.isoformat()
 
-    if due_alerts:
-        asyncio.run(_dispatch_all_alerts(sb, due_alerts))
+    async def _run_notifications() -> None:
+        if due_alerts:
+            await _dispatch_all_alerts(sb, due_alerts)
+        await _dispatch_calendar_sync(sb, entries)
+
+    asyncio.run(_run_notifications())
 
     log.info("deadline_monitor_complete", checked=len(entries), alerts_due=len(due_alerts))
 
