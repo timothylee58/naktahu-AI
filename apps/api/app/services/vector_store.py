@@ -72,3 +72,63 @@ async def hybrid_search(
             )
         )
     return results
+
+
+async def hybrid_search_madani_schemes(
+    query: str,
+    embedding: list[float],
+    *,
+    category: str | None = None,
+    scope: str | None = None,
+    limit: int = 5,
+) -> list[ChunkResult]:
+    """Call the DEDICATED hybrid_search_madani_schemes RPC (migration 038)
+    — not the shared hybrid_search() function above, which is hardcoded to
+    document_chunks's column shape and is every domain's retrieval path.
+    See that migration's header comment for why this is isolated.
+
+    Results are normalized into ChunkResult (content = the same
+    title+description+category+scope blob madani_scheme_ingest.py embeds,
+    source_title = scheme_name, ministry = implementing_agency) so a
+    matched scheme flows through analyst_node's existing scoring/
+    staleness/supersede logic identically to a document_chunks row —
+    no changes needed to analyst_node.py or synthesiser_node.py for this
+    to work. aggregator_url is intentionally NOT carried into ChunkResult
+    (no field for it there) — the two-tier citation (aggregator + primary
+    source) only matters to the structured WelfareEligibilityAgent path
+    (match_node.py), which reads madani_scheme directly, not through
+    this semantic-search path.
+    """
+    from app.services.madani_scheme_ingest import build_scheme_embedding_text
+
+    client = await _get_client()
+    params: dict = {
+        "query_text": query,
+        "query_embedding": embedding,
+        "match_count": limit,
+    }
+    if category is not None:
+        params["category_filter"] = category
+    if scope is not None:
+        params["scope_filter"] = scope
+
+    resp = await client.rpc("hybrid_search_madani_schemes", params).execute()
+
+    results: list[ChunkResult] = []
+    for row in (resp.data or []):
+        results.append(
+            ChunkResult(
+                id=row["id"],
+                content=build_scheme_embedding_text(row),
+                source_title=row["scheme_name"],
+                source_url=row["source_url"],
+                ministry=row.get("implementing_agency") or "",
+                language=row.get("language") or "bm",
+                similarity=float(row["similarity"]),
+                expiry_aware=row.get("effective_date") is not None,
+                source_date=None,
+                effective_date=row.get("effective_date"),
+                superseded_by=row.get("superseded_by"),
+            )
+        )
+    return results

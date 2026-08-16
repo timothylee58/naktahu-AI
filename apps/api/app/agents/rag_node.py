@@ -15,7 +15,7 @@ from app.services.llm_client import (
     openai_client,
 )
 from app.services.reranker import rerank_chunks, rerank_enabled
-from app.services.vector_store import ChunkResult, hybrid_search
+from app.services.vector_store import ChunkResult, hybrid_search, hybrid_search_madani_schemes
 
 log = structlog.get_logger(__name__)
 
@@ -122,6 +122,20 @@ async def rag_node(state: AgentState) -> dict:
         if not chunks and domain is not None:
             log.info("rag_domain_fallback", domain=domain)
             chunks = await hybrid_search(query, embedding, domain=None, limit=search_limit)
+
+        # Additive, welfare-only: merge in madani_scheme's own semantic
+        # search (migration 038's dedicated RPC) alongside whatever
+        # document_chunks already found for this domain. Its own try/except
+        # (not the outer one) so a failure here — e.g. migration 038 not yet
+        # applied, or the still-empty table — degrades to "just the
+        # document_chunks results," never aborts retrieval for the whole
+        # query the way letting this exception hit the outer handler would.
+        if domain == "welfare":
+            try:
+                scheme_chunks = await hybrid_search_madani_schemes(query, embedding, limit=search_limit)
+                chunks = chunks + scheme_chunks
+            except Exception as exc:
+                log.warning("rag_madani_scheme_search_failed", error=str(exc))
 
         if do_rerank and chunks:
             chunks = await rerank_chunks(query=query, chunks=chunks, top_n=_FINAL_CHUNK_COUNT)

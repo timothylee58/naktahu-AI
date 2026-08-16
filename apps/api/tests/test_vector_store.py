@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.vector_store import ChunkResult, hybrid_search
+from app.services.vector_store import ChunkResult, hybrid_search, hybrid_search_madani_schemes
 
 
 # ---------------------------------------------------------------------------
@@ -185,3 +185,102 @@ async def test_hybrid_search_rpc_called_without_domain(mock_supabase_client: Asy
     call_kwargs = mock_supabase_client.rpc.call_args
     params = call_kwargs[0][1]
     assert "domain_filter" not in params
+
+
+# ---------------------------------------------------------------------------
+# hybrid_search_madani_schemes (migration 038) — isolated RPC, normalizes
+# into the SAME ChunkResult shape hybrid_search() uses, so a matched scheme
+# flows through analyst_node unchanged.
+# ---------------------------------------------------------------------------
+
+def _make_scheme_row(
+    *,
+    id: str = "sch-1",
+    scheme_name: str = "Test Scheme",
+    category: str = "pendapatan",
+    scope: str = "federal",
+    description: str = "A test assistance scheme.",
+    implementing_agency: str = "Test Agency",
+    source_url: str = "https://example.gov.my/scheme",
+    aggregator_url: str = "https://ihsanmadani.gov.my/inisiatif/pendapatan/test-scheme",
+    language: str = "bm",
+    similarity: float = 0.88,
+    effective_date: str | None = None,
+    superseded_by: str | None = None,
+) -> dict:
+    return {
+        "id": id, "scheme_name": scheme_name, "category": category, "scope": scope,
+        "description": description, "implementing_agency": implementing_agency,
+        "source_url": source_url, "aggregator_url": aggregator_url, "language": language,
+        "similarity": similarity, "effective_date": effective_date, "superseded_by": superseded_by,
+    }
+
+
+@pytest.fixture
+def mock_scheme_supabase_client() -> AsyncMock:
+    execute_result = MagicMock()
+    execute_result.data = [_make_scheme_row()]
+    rpc_chain = MagicMock()
+    rpc_chain.execute = AsyncMock(return_value=execute_result)
+    client = AsyncMock()
+    client.rpc = MagicMock(return_value=rpc_chain)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_madani_schemes_calls_dedicated_rpc_not_shared_one(
+    mock_scheme_supabase_client: AsyncMock,
+) -> None:
+    with patch("app.services.vector_store._get_client", AsyncMock(return_value=mock_scheme_supabase_client)):
+        await hybrid_search_madani_schemes("bantuan pendapatan", FAKE_EMBEDDING)
+
+    rpc_name = mock_scheme_supabase_client.rpc.call_args[0][0]
+    assert rpc_name == "hybrid_search_madani_schemes"
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_madani_schemes_normalizes_to_chunk_result(
+    mock_scheme_supabase_client: AsyncMock,
+) -> None:
+    with patch("app.services.vector_store._get_client", AsyncMock(return_value=mock_scheme_supabase_client)):
+        results = await hybrid_search_madani_schemes("bantuan pendapatan", FAKE_EMBEDDING)
+
+    assert len(results) == 1
+    r = results[0]
+    assert isinstance(r, ChunkResult)
+    # scheme_name -> source_title, implementing_agency -> ministry — the
+    # exact mapping that lets this flow through analyst_node unchanged.
+    assert r.source_title == "Test Scheme"
+    assert r.ministry == "Test Agency"
+    assert r.source_url == "https://example.gov.my/scheme"
+    # content is the SAME blob build_scheme_embedding_text() embeds, not
+    # just the raw description — matches what was actually indexed.
+    assert "Test Scheme" in r.content
+    assert "pendapatan" in r.content
+    assert "federal" in r.content
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_madani_schemes_category_and_scope_filters(
+    mock_scheme_supabase_client: AsyncMock,
+) -> None:
+    with patch("app.services.vector_store._get_client", AsyncMock(return_value=mock_scheme_supabase_client)):
+        await hybrid_search_madani_schemes("query", FAKE_EMBEDDING, category="pendidikan", scope="state:selangor")
+
+    params = mock_scheme_supabase_client.rpc.call_args[0][1]
+    assert params["category_filter"] == "pendidikan"
+    assert params["scope_filter"] == "state:selangor"
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_madani_schemes_empty_table_returns_empty_list(
+    mock_scheme_supabase_client: AsyncMock,
+) -> None:
+    empty_result = MagicMock()
+    empty_result.data = []
+    mock_scheme_supabase_client.rpc.return_value.execute = AsyncMock(return_value=empty_result)
+
+    with patch("app.services.vector_store._get_client", AsyncMock(return_value=mock_scheme_supabase_client)):
+        results = await hybrid_search_madani_schemes("query", FAKE_EMBEDDING)
+
+    assert results == []

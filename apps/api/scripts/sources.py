@@ -18,10 +18,11 @@ Usage:
 
 Adding a source: append a Source(...) below. Domain MUST be one of the
 canonical domains in migration 016 as widened by migration 026, renamed
-by migration 027, and further widened by migration 030 (Trap #6:
-government, education, legal, finance, healthcare, epf, tax, business,
-immigration, culture, parliament, property) — never invent a new one here.
-URLs must be real, verified pages; never guess a feed URL.
+by migration 027, further widened by migration 030, and by migration 037
+(Trap #6: government, education, legal, finance, healthcare, epf, tax,
+business, immigration, culture, parliament, property, welfare) — never
+invent a new one here. URLs must be real, verified pages; never guess a
+feed URL.
 
 The property/business/epf/legal entries below were found via WebSearch
 (confirmed as real, indexed, official .gov.my / statutory-body domains —
@@ -264,6 +265,82 @@ SOURCES: tuple[Source, ...] = (
             "expanding, modernising, or diversifying manufacturing/processing "
             "activity, under Schedule 7A of the Income Tax Act 1967."
         ),
+    ),
+
+    # ── government (cost-of-living / social assistance — Ihsan MADANI) ─────
+    # Confirmed real via WebSearch: the official one-stop portal for social
+    # welfare/cost-of-living assistance under the National Cost of Living
+    # Action Council (NACCOL), Ministry of Domestic Trade and Cost of Living
+    # (KPDN) — cross-referenced against malaysia.gov.my's own "low-income
+    # families" persona page linking to this exact domain, not a lookalike.
+    # NOT content-verified via a direct fetch — this sandbox's network
+    # egress proxy returns EGRESS_BLOCKED for ihsanmadani.gov.my specifically
+    # (confirmed via both curl and WebFetch this session), same restriction
+    # documented for the property/business/epf/legal/tax sources above.
+    # Classified "government" (general civic-assistance portal spanning
+    # several programme types — electricity rebates, food aid, education
+    # financing, entrepreneurship grants) rather than a narrower domain like
+    # "finance" or "business", since no single one of those covers the
+    # portal's actual scope.
+    Source(
+        name="ihsan-madani-home",
+        url="https://ihsanmadani.gov.my/",
+        kind="html",
+        domain="welfare",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes="Ihsan MADANI portal homepage — entry point for the full assistance catalogue.",
+    ),
+    Source(
+        name="ihsan-madani-inisiatif",
+        url="https://ihsanmadani.gov.my/inisiatif",
+        kind="html",
+        domain="welfare",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes=(
+            "Index of assistance initiatives across categories (education, "
+            "income/entrepreneurship, housing, utilities) — the main listing "
+            "page RAG needs for cross-programme questions."
+        ),
+    ),
+    # These two category segments ("pendapatan", "pendidikan") are the only
+    # two independently corroborated by this repo's own earlier WebSearch
+    # results (/inisiatif/pendapatan/inisiatif-pendapatan-rakyat-ipr and
+    # /inisiatif/pendidikan/program-sulung both came back as real, indexed
+    # scheme-detail URLs, not just from a user-supplied description) — the
+    # user reported these as the two highest-volume categories (income and
+    # education) but also named 6 more category segments (Perumahan,
+    # Utiliti, Pengangkutan, etc.) that have no independent corroboration
+    # here. Deliberately NOT adding those 6: a plausible-looking but wrong
+    # slug is a silently broken source entry, not a harmless guess, on a
+    # page whose whole job is aggregating real citations.
+    Source(
+        name="ihsan-madani-pendapatan",
+        url="https://ihsanmadani.gov.my/inisiatif/pendapatan",
+        kind="html",
+        domain="welfare",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes="Income/entrepreneurship assistance category listing (IPR, INTAN, INSAN, IKHSAN and similar schemes).",
+    ),
+    Source(
+        name="ihsan-madani-pendidikan",
+        url="https://ihsanmadani.gov.my/inisiatif/pendidikan",
+        kind="html",
+        domain="welfare",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes="Education assistance category listing (Program SULUNG and similar financing/exemption schemes).",
+    ),
+    Source(
+        name="ihsan-madani-faq",
+        url="https://ihsanmadani.gov.my/faq",
+        kind="html",
+        domain="welfare",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes="Official FAQ — eligibility/registration process questions (eKasih linkage, how to check status).",
     ),
 )
 

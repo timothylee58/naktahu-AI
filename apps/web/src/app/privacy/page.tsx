@@ -66,7 +66,19 @@ export default function PrivacyPage() {
                 <li>We do not collect payment information.</li>
                 <li>We do not collect device fingerprints or persistent tracking cookies.</li>
                 <li>We do not store the full AI-generated responses server-side — only a short summary for history display.</li>
+                <li>We do not store the household/eligibility details you enter into the Welfare Eligibility Agent (Check Assistance) — see 2.4 below.</li>
               </ul>
+            </Subsection>
+            <Subsection title="2.4 Welfare Eligibility Agent — stateless processing">
+              <p>
+                The Welfare Eligibility Agent (&ldquo;Check Assistance&rdquo;) asks for demographic, household, and
+                status information to match you against cost-of-living assistance schemes. This information —
+                birth year, income, dependents, employment/education/housing status, and similar fields — is
+                processed <strong>in memory for the single request that generates your result, and is not written
+                to our database</strong>. Once your result is returned, that information is discarded; we retain
+                no record of the specific answers you gave. This mirrors the stateless-intake approach used by
+                Malaysia&rsquo;s own Ihsan MADANI portal for the same category of information.
+              </p>
             </Subsection>
           </Section>
 

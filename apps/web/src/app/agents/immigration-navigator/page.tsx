@@ -9,6 +9,16 @@ import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
 
+// This agent's `language` field is the target language for its guided
+// intake — deriving it from the active UI locale instead of hardcoding
+// 'bm' follows the same precedented pattern used by grant-draft-generator/
+// sme-compliance-navigator's `queryLanguage`.
+function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
+  if (locale === 'ms') return 'bm';
+  if (locale === 'zh') return 'zh';
+  return 'en';
+}
+
 // Deel-style binary/multi intent-select cards shown before any form field
 // (Mobbin reference: Deel's Visa Eligibility Check flow) — replaces jumping
 // straight into an open free-text box with an explicit "what are you trying
@@ -22,7 +32,7 @@ const INTENTS: { id: string; icon: string; titleKey: string; descKey: string; me
 ];
 
 function ImmigrationNavigatorPageInner() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { start, continue: cont, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [intentChosen, setIntentChosen] = useState(false);
@@ -30,7 +40,7 @@ function ImmigrationNavigatorPageInner() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [turnsCount, setTurnsCount] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'welcome', role: 'bot', content: 'Selamat datang! Saya boleh bantu anda dengan maklumat visa dan imigresen Malaysia. Dari mana anda berasal, dan jenis visa apa yang anda perlukan?' },
+    { id: 'welcome', role: 'bot', content: t('agents.immigration-navigator.welcome') },
   ]);
   const [nextPrompt, setNextPrompt] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
@@ -93,7 +103,7 @@ function ImmigrationNavigatorPageInner() {
     try {
       const res = sessionId
         ? await cont('immigration-navigator', { session_id: sessionId, message: msg })
-        : await start('immigration-navigator', { message: msg, language: 'bm' });
+        : await start('immigration-navigator', { message: msg, language: localeToApiLanguage(locale) });
 
       if (!sessionId && res.session_id) setSessionId(String(res.session_id));
       setTurnsCount((n) => n + 1);
@@ -123,9 +133,19 @@ function ImmigrationNavigatorPageInner() {
       if (Array.isArray(out.warnings)) setWarnings(out.warnings as string[]);
       setNextPrompt((res.next_prompt as string) ?? (out.next_prompt as string) ?? null);
 
-      // Generate contextual quick replies
+      // Generate contextual quick replies. QuickReplies sends the label text
+      // itself as the next message (see onSelect below) — these were
+      // hardcoded English regardless of locale, so a bm/zh conversation
+      // would suddenly get an English reply injected mid-thread. Localized;
+      // this also makes the language tag fix above actually consistent end
+      // to end, not just on the first turn.
       if (res.next_prompt || out.next_prompt) {
-        setQuickReplies(['Yes', 'No', 'I need more details', 'What documents do I need?']);
+        setQuickReplies([
+          t('agents.immigration-navigator.quick_reply.yes'),
+          t('agents.immigration-navigator.quick_reply.no'),
+          t('agents.immigration-navigator.quick_reply.more_details'),
+          t('agents.immigration-navigator.quick_reply.documents'),
+        ]);
       } else {
         setQuickReplies([]);
       }
@@ -191,7 +211,7 @@ function ImmigrationNavigatorPageInner() {
             )}
 
             <ChatBubbles messages={messages} />
-            {loading && <AgentLoadingSkeleton message="…" />}
+            {loading && <AgentLoadingSkeleton message={t('agents.immigration-navigator.thinking')} />}
             <div ref={bottomRef} />
 
             <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-2 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
@@ -210,15 +230,19 @@ function ImmigrationNavigatorPageInner() {
                 rows={3}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="I'm from Mainland China, want to work in KL for 2 years…"
+                placeholder={t('agents.immigration-navigator.placeholder')}
               />
               <button
                 type="button"
-                disabled={loading}
+                disabled={loading || !message.trim()}
                 onClick={() => void send()}
                 className="self-end px-4 py-2 bg-teal-600 hover:bg-teal-500 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white rounded-xl text-sm font-semibold shadow-sm shadow-teal-900/20 disabled:opacity-50 disabled:hover:translate-y-0"
               >
-                {loading ? '…' : sessionId ? 'Continue' : 'Start intake'}
+                {loading
+                  ? t('agents.immigration-navigator.thinking')
+                  : sessionId
+                    ? t('agents.immigration-navigator.button.continue')
+                    : t('agents.immigration-navigator.button.start')}
               </button>
             </section>
           </>

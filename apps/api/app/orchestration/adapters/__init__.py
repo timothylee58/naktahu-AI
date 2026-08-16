@@ -13,6 +13,7 @@ from app.orchestration.adapters.knowledge_qa import KnowledgeQAAdapter
 from app.orchestration.adapters.research_synthesiser import ResearchSynthesiserAdapter
 from app.orchestration.adapters.sme_compliance_navigator import SMEComplianceNavigatorAdapter
 from app.orchestration.adapters.study_agent import StudyAgentAdapter
+from app.orchestration.adapters.welfare_eligibility_agent import WelfareEligibilityAgentAdapter
 
 ALL_ADAPTERS = [
     ComplianceDrafterAdapter,
@@ -23,6 +24,7 @@ ALL_ADAPTERS = [
     ResearchSynthesiserAdapter,
     SMEComplianceNavigatorAdapter,
     StudyAgentAdapter,
+    WelfareEligibilityAgentAdapter,
 ]
 
 __all__ = [
@@ -34,5 +36,6 @@ __all__ = [
     "ResearchSynthesiserAdapter",
     "SMEComplianceNavigatorAdapter",
     "StudyAgentAdapter",
+    "WelfareEligibilityAgentAdapter",
     "ALL_ADAPTERS",
 ]

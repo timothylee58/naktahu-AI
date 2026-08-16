@@ -52,6 +52,25 @@ class AgentStartRequest(BaseModel):
     programme_name: str = ""
     business_profile: dict[str, Any] = Field(default_factory=dict)
     export_format: Literal["pdf", "docx"] = "pdf"
+    # welfare-eligibility-agent — bounds are sanity limits (a household of
+    # 50 dependents is a data-entry error, not a real household), not
+    # income-eligibility thresholds themselves (those live in each scheme's
+    # eligibility_rules, not here)
+    birth_year: Optional[int] = Field(default=None, ge=1900, le=2020)
+    gender: Optional[Literal["male", "female"]] = None
+    state: str = ""
+    ethnic_group: Optional[Literal["malay", "chinese", "indian", "bumiputera_sabah_sarawak", "other"]] = None
+    marital_status: Optional[Literal["single", "married", "divorced", "widowed"]] = None
+    individual_monthly_income_myr: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+    household_monthly_income_myr: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+    dependents_children: Optional[int] = Field(default=None, ge=0, le=30)
+    dependents_elderly: Optional[int] = Field(default=None, ge=0, le=30)
+    dependents_oku: Optional[int] = Field(default=None, ge=0, le=30)
+    dependents_chronic_ill: Optional[int] = Field(default=None, ge=0, le=30)
+    employment_status: Optional[Literal["employed", "self_employed", "unemployed", "retired", "student"]] = None
+    education_level: Optional[Literal["none", "primary", "secondary", "spm", "diploma", "degree", "postgrad"]] = None
+    is_oku: Optional[bool] = None
+    housing_ownership: Optional[Literal["own", "rented", "family_owned", "no_fixed_housing"]] = None
 
 
 class AgentContinueRequest(BaseModel):
