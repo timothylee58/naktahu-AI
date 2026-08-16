@@ -45,6 +45,7 @@ class AgentCapability(str, Enum):
     finance_knowledge = "finance_knowledge"
     culture_knowledge = "culture_knowledge"
     property_knowledge = "property_knowledge"
+    welfare_knowledge = "welfare_knowledge"
 
     # Functional capabilities
     pdf_generation = "pdf_generation"
@@ -53,6 +54,7 @@ class AgentCapability(str, Enum):
     document_processing = "document_processing"
     deadline_tracking = "deadline_tracking"
     grant_matching = "grant_matching"
+    welfare_matching = "welfare_matching"
     symptom_triage = "symptom_triage"
     study_assistance = "study_assistance"
     compliance_analysis = "compliance_analysis"

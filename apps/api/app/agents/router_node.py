@@ -15,10 +15,13 @@ log = structlog.get_logger(__name__)
 _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
     "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
-    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property), intent (string summary max 10 words), "
+    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property, welfare), intent (string summary max 10 words), "
     "is_live_status_query (boolean), place_name (string or null). "
     "Use 'parliament' for questions about Members of Parliament, constituencies, voting records, bills, or Hansard. "
     "Use 'property' for land titles, strata management, tenancy, or e-Tanah matters. "
+    "Use 'welfare' for cost-of-living assistance, social welfare aid, or government relief schemes "
+    "(electricity/utility rebates, food aid, housing assistance, income-support initiatives) — "
+    "distinct from 'finance' (personal financial products/advice) and 'government' (general civic services). "
     "Set is_live_status_query=true ONLY for questions asking whether a specific named "
     "restaurant/warung/kopitiam/food stall is currently busy, packed, crowded, or has a "
     "queue right now (e.g. 'Is Pelita packed right now?', 'Ada line tak kat Village Park sekarang?'). "
@@ -28,7 +31,7 @@ _SYSTEM_PROMPT = (
     "Detect language from the query text itself, not from any metadata."
 )
 
-_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property"}
+_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property", "welfare"}
 # Map common LLM outputs to stored domain values
 _DOMAIN_ALIASES = {
     "health": "healthcare",

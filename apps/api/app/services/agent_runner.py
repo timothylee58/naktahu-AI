@@ -23,6 +23,7 @@ from app.agents.retrenchment_navigator.graph import get_retrenchment_navigator_g
 from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
 from app.agents.runtime import thread_config as _thread_config
 from app.agents.study_agent.graph import get_study_agent_graph
+from app.agents.welfare_eligibility_agent.graph import get_welfare_eligibility_agent_graph
 
 log = structlog.get_logger(__name__)
 
@@ -753,6 +754,57 @@ async def start_sme_compliance_navigator(*, user_id: str, payload: dict[str, Any
     }
 
 
+# ── Welfare Eligibility Agent ────────────────────────────────────────────────
+
+
+async def start_welfare_eligibility_agent(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    """Single-shot: one complete WelfareProfile in, matched madani_scheme
+    rows + an LLM explanation out. No checkpointer needed — same single-shot
+    shape as sme_compliance_navigator, not eligibility_agent's multi-turn
+    intake. match_node needs supabase (queries madani_scheme directly), so
+    unlike sme_compliance_navigator's bare ainvoke(), this threads a config
+    the same way eligibility_agent's grant_rag_node does.
+
+    Deliberately does NOT call _log_run(). Every other agent here logs its
+    full input_payload to agent_runs — for this agent that payload is a
+    demographic/income/disability profile, and privacy/page.tsx's §2.4
+    explicitly promises this data is processed in memory for one request
+    and never written to our database. _log_run(payload=...) would
+    silently break that promise the same way it would for every other
+    agent (it wasn't designed with a sensitive-payload case in mind).
+    No agent_runs row means no History entry and no resume-from-history
+    for this agent — an intentional consequence of actually being
+    stateless, not an oversight.
+    """
+    session_id = str(uuid.uuid4())
+    graph = get_welfare_eligibility_agent_graph()
+    profile_fields = (
+        "birth_year", "gender", "state", "ethnic_group", "marital_status",
+        "individual_monthly_income_myr", "household_monthly_income_myr",
+        "dependents_children", "dependents_elderly", "dependents_oku", "dependents_chronic_ill",
+        "employment_status", "education_level", "is_oku", "housing_ownership",
+    )
+    profile = {k: payload[k] for k in profile_fields if payload.get(k) is not None}
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "language": payload.get("language", "bm"),
+        "profile": profile,
+    }
+    config = _thread_config(session_id, supabase=supabase_client)
+    t0 = time.monotonic()
+    values = await graph.ainvoke(inputs, config=config)
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "output": _public_output(values),
+        "matched_schemes": values.get("matched_schemes") or [],
+        "no_schemes_loaded": values.get("no_schemes_loaded", False),
+        "summary": values.get("summary", ""),
+    }
+
+
 # ── Dispatch table ────────────────────────────────────────────────────────────
 
 AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -765,6 +817,7 @@ AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "research-synthesiser": start_research_synthesiser,
     "grant-draft-generator": start_grant_draft_generator,
     "retrenchment-navigator": start_retrenchment_navigator,
+    "welfare-eligibility-agent": start_welfare_eligibility_agent,
 }
 
 AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {

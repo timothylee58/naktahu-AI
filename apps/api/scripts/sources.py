@@ -18,10 +18,11 @@ Usage:
 
 Adding a source: append a Source(...) below. Domain MUST be one of the
 canonical domains in migration 016 as widened by migration 026, renamed
-by migration 027, and further widened by migration 030 (Trap #6:
-government, education, legal, finance, healthcare, epf, tax, business,
-immigration, culture, parliament, property) — never invent a new one here.
-URLs must be real, verified pages; never guess a feed URL.
+by migration 027, further widened by migration 030, and by migration 037
+(Trap #6: government, education, legal, finance, healthcare, epf, tax,
+business, immigration, culture, parliament, property, welfare) — never
+invent a new one here. URLs must be real, verified pages; never guess a
+feed URL.
 
 The property/business/epf/legal entries below were found via WebSearch
 (confirmed as real, indexed, official .gov.my / statutory-body domains —
@@ -285,7 +286,7 @@ SOURCES: tuple[Source, ...] = (
         name="ihsan-madani-home",
         url="https://ihsanmadani.gov.my/",
         kind="html",
-        domain="government",
+        domain="welfare",
         ministry="National Cost of Living Action Council (NACCOL) / KPDN",
         language="bm",
         notes="Ihsan MADANI portal homepage — entry point for the full assistance catalogue.",
@@ -294,7 +295,7 @@ SOURCES: tuple[Source, ...] = (
         name="ihsan-madani-inisiatif",
         url="https://ihsanmadani.gov.my/inisiatif",
         kind="html",
-        domain="government",
+        domain="welfare",
         ministry="National Cost of Living Action Council (NACCOL) / KPDN",
         language="bm",
         notes=(
@@ -318,7 +319,7 @@ SOURCES: tuple[Source, ...] = (
         name="ihsan-madani-pendapatan",
         url="https://ihsanmadani.gov.my/inisiatif/pendapatan",
         kind="html",
-        domain="government",
+        domain="welfare",
         ministry="National Cost of Living Action Council (NACCOL) / KPDN",
         language="bm",
         notes="Income/entrepreneurship assistance category listing (IPR, INTAN, INSAN, IKHSAN and similar schemes).",
@@ -327,7 +328,7 @@ SOURCES: tuple[Source, ...] = (
         name="ihsan-madani-pendidikan",
         url="https://ihsanmadani.gov.my/inisiatif/pendidikan",
         kind="html",
-        domain="government",
+        domain="welfare",
         ministry="National Cost of Living Action Council (NACCOL) / KPDN",
         language="bm",
         notes="Education assistance category listing (Program SULUNG and similar financing/exemption schemes).",
@@ -336,7 +337,7 @@ SOURCES: tuple[Source, ...] = (
         name="ihsan-madani-faq",
         url="https://ihsanmadani.gov.my/faq",
         kind="html",
-        domain="government",
+        domain="welfare",
         ministry="National Cost of Living Action Council (NACCOL) / KPDN",
         language="bm",
         notes="Official FAQ — eligibility/registration process questions (eKasih linkage, how to check status).",

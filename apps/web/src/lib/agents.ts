@@ -74,6 +74,13 @@ export const WIRED_AGENTS: WiredAgent[] = [
     href: '/agents/deadline-monitor',
     planKey: 'pro',
   },
+  {
+    slug: 'welfare-eligibility',
+    href: '/agents/welfare-eligibility',
+    planKey: 'free',
+    badgeKey: 'new',
+    backendName: 'welfare-eligibility-agent',
+  },
 ];
 
 export function agentTitleKey(slug: string): string {

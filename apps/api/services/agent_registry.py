@@ -84,6 +84,13 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=1,
         ),
+        "welfare-eligibility-agent": AgentDefinition(
+            name="welfare-eligibility-agent",
+            description="Matches a household profile against cost-of-living / social assistance schemes (Ihsan MADANI and similar). Free civic tool.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
         "grant-draft-generator": AgentDefinition(
             name="grant-draft-generator",
             description=(
