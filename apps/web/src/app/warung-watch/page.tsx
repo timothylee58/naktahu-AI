@@ -9,6 +9,7 @@ import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { API_BASE } from '@/lib/api-base';
 import { WarungPriceChart, type PriceHistoryPoint } from '@/components/warung-watch/WarungPriceChart';
+import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 
@@ -36,6 +37,19 @@ interface NearbyPlace {
   address: string | null;
   lat: number | null;
   lng: number | null;
+}
+
+// lat/lng were fetched from the Places API and carried on every NearbyPlace,
+// but never actually used anywhere — the list only offered "load this
+// warung's status," no direct way to see where it is. Mirrors the
+// directionsUrl() pattern already used for health-triage's facility list:
+// prefer real coordinates when the API gave them, fall back to a
+// name-based search (still correct, just less pinpoint) when it didn't.
+function placeDirectionsUrl(place: NearbyPlace): string {
+  if (place.lat !== null && place.lng !== null) {
+    return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`;
 }
 
 const STATUS_STYLE: Record<Status, { emoji: string; bg: string; text: string }> = {
@@ -137,8 +151,15 @@ export default function WarungWatchPage() {
     );
   };
 
+  // priceItem/priceMyr previously carried over across a warung switch — a
+  // half-typed price meant for warung A could get silently attached to a
+  // check-in for warung B if the user picked a different suggestion/nearby
+  // place without noticing the fields were still filled. Cleared alongside
+  // the selection everywhere the target warung changes.
   const selectNearbyPlace = (name: string) => {
     setQuery(name);
+    setPriceItem('');
+    setPriceMyr('');
     void loadStatus(name);
   };
 
@@ -326,15 +347,30 @@ export default function WarungWatchPage() {
                 </p>
                 <ul className="flex flex-col gap-1.5">
                   {nearbyPlaces.map((place) => (
-                    <li key={place.place_id ?? place.name}>
+                    <li key={place.place_id ?? place.name} className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => selectNearbyPlace(place.name)}
-                        className="w-full text-left px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/10 text-sm hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                        className="flex-1 min-w-0 text-left px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/10 text-sm hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
                       >
                         {place.name}
-                        {place.address && <span className="block text-xs text-zinc-400">{place.address}</span>}
+                        {place.address && <span className="block text-xs text-zinc-400 truncate">{place.address}</span>}
                       </button>
+                      <a
+                        href={placeDirectionsUrl(place)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={t('warung_watch.get_directions')}
+                        title={t('warung_watch.get_directions')}
+                        className="flex-shrink-0 p-2 rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-white/5 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
+                      >
+                        {/* Same diagonal external-link arrow already used by
+                            CitationChip's "view source" affordance elsewhere
+                            in the app — consistent iconography, not a new mark. */}
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4" aria-hidden>
+                          <path fillRule="evenodd" d="M4.5 11.5a.75.75 0 0 0 1.06 0l5-5v2.69a.75.75 0 0 0 1.5 0V5a.75.75 0 0 0-.75-.75H7.06a.75.75 0 0 0 0 1.5H9.75l-5 5a.75.75 0 0 0 0 1.06Z" clipRule="evenodd" />
+                        </svg>
+                      </a>
                     </li>
                   ))}
                 </ul>
@@ -354,6 +390,8 @@ export default function WarungWatchPage() {
                 setSelectedName(null);
                 setStatus(null);
                 setSubmitted(false);
+                setPriceItem('');
+                setPriceMyr('');
               }}
               placeholder={t('warung_watch.search_placeholder')}
               className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:outline-none focus:border-orange-400 dark:border-white/10 dark:placeholder:text-zinc-500"
@@ -366,6 +404,8 @@ export default function WarungWatchPage() {
                       type="button"
                       onClick={() => {
                         setQuery(s.name);
+                        setPriceItem('');
+                        setPriceMyr('');
                         void loadStatus(s.name);
                       }}
                       className="w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
@@ -386,6 +426,13 @@ export default function WarungWatchPage() {
               {statusLoading ? t('warung_watch.checking') : t('warung_watch.check_status')}
             </button>
           </section>
+
+          {/* Skeleton only for the genuine first load (no status yet) — a
+              re-check of the same warung keeps the last good status visible
+              while it refreshes underneath, rather than flashing a skeleton
+              over content that's still perfectly readable and about to be
+              replaced by very similar content a moment later. */}
+          {statusLoading && !status && <AgentLoadingSkeleton message={t('warung_watch.checking')} />}
 
           {status && (
             <section
