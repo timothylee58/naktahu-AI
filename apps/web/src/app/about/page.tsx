@@ -222,7 +222,16 @@ export default function AboutPage() {
                           // sourcing), and this product's whole pitch is "calm and
                           // precise, not playful." Short ease-out only.
                           transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : 0.35 }}
-                          className={`absolute -top-2 -right-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm ${
+                          // Inset within the card's own bounds (not
+                          // overflowing past its top/right edge) — as the
+                          // rightmost card in the 3-col grid, a negative
+                          // offset here pushed the badge into the page's
+                          // right-edge scroll-progress rail, and painted
+                          // over the horizontal line connecting the three
+                          // step circles (this card's segment of that line
+                          // was rendering underneath the badge, breaking
+                          // the connecting-line effect only for step 3).
+                          className={`absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm ${
                             isDark ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700'
                           }`}
                         >
