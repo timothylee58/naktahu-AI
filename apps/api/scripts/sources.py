@@ -303,6 +303,35 @@ SOURCES: tuple[Source, ...] = (
             "page RAG needs for cross-programme questions."
         ),
     ),
+    # These two category segments ("pendapatan", "pendidikan") are the only
+    # two independently corroborated by this repo's own earlier WebSearch
+    # results (/inisiatif/pendapatan/inisiatif-pendapatan-rakyat-ipr and
+    # /inisiatif/pendidikan/program-sulung both came back as real, indexed
+    # scheme-detail URLs, not just from a user-supplied description) — the
+    # user reported these as the two highest-volume categories (income and
+    # education) but also named 6 more category segments (Perumahan,
+    # Utiliti, Pengangkutan, etc.) that have no independent corroboration
+    # here. Deliberately NOT adding those 6: a plausible-looking but wrong
+    # slug is a silently broken source entry, not a harmless guess, on a
+    # page whose whole job is aggregating real citations.
+    Source(
+        name="ihsan-madani-pendapatan",
+        url="https://ihsanmadani.gov.my/inisiatif/pendapatan",
+        kind="html",
+        domain="government",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes="Income/entrepreneurship assistance category listing (IPR, INTAN, INSAN, IKHSAN and similar schemes).",
+    ),
+    Source(
+        name="ihsan-madani-pendidikan",
+        url="https://ihsanmadani.gov.my/inisiatif/pendidikan",
+        kind="html",
+        domain="government",
+        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
+        language="bm",
+        notes="Education assistance category listing (Program SULUNG and similar financing/exemption schemes).",
+    ),
     Source(
         name="ihsan-madani-faq",
         url="https://ihsanmadani.gov.my/faq",
