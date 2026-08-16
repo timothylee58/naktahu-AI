@@ -42,6 +42,20 @@
   --nk-text: #edeae3;       /* off-white, warm not clinical */
   --nk-text-muted: #8a8f98;
 
+  /* Third accent, deliberately distinct from both functional colours above:
+     --nk-official (blue) = "sourced from an official document", --nk-community
+     (gold) = "crowd-sourced". This one carries no source-provenance meaning —
+     it's identity/warmth only, for moments that need to feel distinctly local
+     without claiming anything about where an answer came from (the /chat empty
+     state mark, prompt-chip category headers). A warm batik-terracotta, chosen
+     to read as "Malaysian textile/craft" rather than flag-literal. Same
+     light/dim pairing convention as --nk-community: -heritage for dark
+     surfaces, -heritage-dim for light surfaces (contrast-checked: #E08D5B is
+     7.07:1 on --nk-bg, #9C4A2A is 6.13:1 on white — both comfortably above
+     the 4.5:1 floor for the small-text uses this token is meant for). */
+  --nk-heritage: #e08d5b;
+  --nk-heritage-dim: #9c4a2a;
+
   /* ── Brand identity (logo/wordmark) ─────────────────────────────────
      Deliberately separate from the --nk-* UI accents above. These are
      the identity colours the mark is drawn in; --nk-official is the UI's
@@ -72,6 +86,8 @@
   --color-nk-official-dim: var(--nk-official-dim);
   --color-nk-community: var(--nk-community);
   --color-nk-community-dim: var(--nk-community-dim);
+  --color-nk-heritage: var(--nk-heritage);
+  --color-nk-heritage-dim: var(--nk-heritage-dim);
   --color-nk-text: var(--nk-text);
   --color-nk-text-muted: var(--nk-text-muted);
   --color-brand-blue: var(--brand-blue);

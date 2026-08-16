@@ -436,18 +436,73 @@ function ChatPageInner() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="flex flex-col items-center justify-center text-center gap-5 select-none px-6 py-16"
+            className="flex flex-col items-center justify-center text-center gap-5 select-none px-6 py-14"
           >
-            {/* Logo mark */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-nk-official to-nk-official-dim flex items-center justify-center shadow-lg shadow-blue-900/30 ring-1 ring-white/10">
-              <svg viewBox="0 0 32 32" className="w-9 h-9" fill="none" aria-hidden>
-                <circle cx="16" cy="16" r="12" fill="white" fillOpacity="0.15" />
-                <path d="M9 12h14M9 16h9M9 20h11" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            {/* Identity mark — abstract batik/kawung roundel (overlapping
+                circles) ringed by a stripe-rhythm tick pattern, in the two
+                functional accents (nk-official blue, nk-heritage terracotta).
+                Deliberately not a literal crest or flag: geometry evoking
+                Malaysian textile pattern-making, not government letterhead. */}
+            <div
+              className={`relative w-[72px] h-[72px] rounded-full flex items-center justify-center ${
+                isDark ? 'bg-white/5' : 'bg-white'
+              }`}
+              style={{ boxShadow: isDark ? '0 8px 24px -8px rgba(59,91,255,0.35)' : '0 8px 24px -8px rgba(59,91,255,0.25)' }}
+            >
+              <svg viewBox="0 0 64 64" className="w-full h-full" aria-hidden>
+                {/* stripe-rhythm ring: 12 short radial ticks, alternating accents */}
+                {Array.from({ length: 12 }).map((_, i) => {
+                  const angle = (i / 12) * Math.PI * 2;
+                  const x1 = 32 + Math.cos(angle) * 26;
+                  const y1 = 32 + Math.sin(angle) * 26;
+                  const x2 = 32 + Math.cos(angle) * 30;
+                  const y2 = 32 + Math.sin(angle) * 30;
+                  return (
+                    <line
+                      key={i}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={i % 3 === 0 ? 'var(--nk-heritage)' : 'var(--nk-official)'}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      opacity={0.85}
+                    />
+                  );
+                })}
+                {/* kawung roundel: three overlapping circles */}
+                <circle cx="26" cy="28" r="12" fill="var(--nk-official)" fillOpacity={isDark ? 0.35 : 0.18} />
+                <circle cx="38" cy="28" r="12" fill="var(--nk-heritage)" fillOpacity={isDark ? 0.35 : 0.18} />
+                <circle cx="32" cy="38" r="12" fill="var(--nk-official)" fillOpacity={isDark ? 0.25 : 0.12} />
               </svg>
             </div>
-            <div className="flex flex-col gap-1">
-              <p className={`text-lg font-bold ${emptyTitle}`}>NakTahu AI</p>
-              <p className={`text-sm max-w-[260px] leading-relaxed ${emptyDesc}`}>{t('chat.empty')}</p>
+
+            <div className="flex flex-col gap-1.5">
+              <p className={`text-2xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
+                {t('chat.empty.greeting')}
+              </p>
+              <p className={`text-sm max-w-[280px] leading-relaxed locale-text-balance ${emptyDesc}`}>
+                {t('chat.empty')}
+              </p>
+            </div>
+
+            {/* Trust strip — the concrete differentiator ("this isn't just an
+                LLM, every answer is sourced") stated up front rather than only
+                surfacing once an answer streams in. Deliberately doesn't name
+                specific ministries: only real, currently-ingested sources
+                should ever be named here, and that set changes as ingestion
+                grows — a generic, structurally-true claim beats a specific
+                but stale or fabricated one. */}
+            <div
+              className={`flex items-center gap-1.5 text-[11px] font-medium rounded-full px-3 py-1.5 ${
+                isDark ? 'bg-nk-heritage/10 text-nk-heritage' : 'bg-nk-heritage/10 text-nk-heritage-dim'
+              }`}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0" aria-hidden>
+                <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.362-3.29 9.95-7.96 11.878a.514.514 0 0 1-.4 0C5.29 17.05 2 12.463 2 7.1c0-.539.035-1.07.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.75Zm4.196 5.954a.75.75 0 0 0-1.214-.882l-3.236 4.53L7.53 9.963a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.137-.089l3.75-5.25Z" clipRule="evenodd" />
+              </svg>
+              <span className="locale-text-balance">{t('chat.trust.strip')}</span>
             </div>
           </motion.div>
         )}
