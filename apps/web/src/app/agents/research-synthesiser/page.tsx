@@ -34,6 +34,13 @@ function ResearchSynthesiserPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [planRequired, setPlanRequired] = useState<string | null>(null);
+  // Distinguishes "never run yet" from "ran, found nothing" — the backend
+  // (graph.py) is pure parallel RAG citation aggregation with no LLM
+  // synthesis step, so a query that matches nothing in the corpus legitimately
+  // comes back with domains but zero citations. Previously that rendered as
+  // an empty page with no feedback, indistinguishable from the form having
+  // done nothing at all.
+  const [hasRun, setHasRun] = useState(false);
 
   const run = async () => {
     setLoading(true);
@@ -43,6 +50,7 @@ function ResearchSynthesiserPageInner() {
       const res = await start('research-synthesiser', { query, language: localeToApiLanguage(locale) });
       setCitations((res.citations as Array<Record<string, unknown>>) ?? []);
       setDomains((res.detected_domains as string[]) ?? []);
+      setHasRun(true);
     } catch (e) {
       // Backend's plan gate (routers/agents.py::_require_agent_access) always
       // phrases its 403 as "This agent requires the <plan> plan or higher." —
@@ -78,6 +86,7 @@ function ResearchSynthesiserPageInner() {
         const restoredCitations = (out.merged_citations ?? out.citations) as Array<Record<string, unknown>> | undefined;
         setCitations(restoredCitations ?? []);
         setDomains((out.detected_domains as string[]) ?? []);
+        setHasRun(true);
       } catch {
         /* stale/invalid run id — stays on the fresh intake flow */
       }
@@ -145,6 +154,11 @@ function ResearchSynthesiserPageInner() {
               <CitationChip key={i} citation={c as unknown as Citation} index={i + 1} />
             ))}
           </div>
+        )}
+        {!loading && hasRun && citations.length === 0 && !error && !planRequired && (
+          <p className="text-sm text-center py-8 text-zinc-400 dark:text-zinc-500">
+            {t('agents.research-synthesiser.no_results')}
+          </p>
         )}
       </motion.div>
     </>

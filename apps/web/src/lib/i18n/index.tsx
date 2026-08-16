@@ -542,6 +542,7 @@ const MS: Translations = {
   'agents.research-synthesiser.run_button': 'Jalankan sintesis',
   'agents.research-synthesiser.synthesising': 'Mensintesis…',
   'agents.research-synthesiser.domains_label': 'Domain',
+  'agents.research-synthesiser.no_results': 'Tiada sumber relevan ditemui untuk soalan ini. Cuba jadikan soalan lebih spesifik.',
   'agents.study-agent.title': 'Ejen Pelajaran',
   'agents.study-agent.desc':
     'Muat naik kertas SPM anda — dapatkan penjelasan setiap soalan dan topik mana perlu diberi tumpuan.',
@@ -1387,6 +1388,7 @@ const EN: Translations = {
   'agents.research-synthesiser.run_button': 'Run synthesis',
   'agents.research-synthesiser.synthesising': 'Synthesising…',
   'agents.research-synthesiser.domains_label': 'Domains',
+  'agents.research-synthesiser.no_results': 'No relevant sources found for this question. Try making it more specific.',
   'agents.study-agent.title': 'Study Agent',
   'agents.study-agent.desc':
     'Upload your SPM past paper — get an explanation for every question and see which topics to focus on.',
@@ -2212,6 +2214,7 @@ const ZH: Translations = {
   'agents.research-synthesiser.run_button': '开始综合分析',
   'agents.research-synthesiser.synthesising': '综合分析中…',
   'agents.research-synthesiser.domains_label': '领域',
+  'agents.research-synthesiser.no_results': '未找到与此问题相关的来源。请尝试提出更具体的问题。',
   'agents.study-agent.title': '学习 Agent',
   'agents.study-agent.desc': '上传您的 SPM 试卷 — 获取每道题目的讲解，并了解应重点复习的主题。',
   'agents.study-agent.level.label': '级别',
