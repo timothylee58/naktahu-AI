@@ -88,14 +88,14 @@ function OptionCard({
       aria-pressed={selected}
       className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
         selected
-          ? 'border-nk-official/40 bg-nk-official/10 text-nk-official-dim ring-1 ring-nk-official'
-          : 'border-zinc-200 bg-white text-zinc-700 hover:border-nk-official/30 hover:bg-nk-official/10'
+          ? 'border-nk-official/40 bg-nk-official/10 text-nk-official-dim ring-1 ring-nk-official dark:bg-nk-official/15 dark:text-nk-official'
+          : 'border-zinc-200 bg-white text-zinc-700 hover:border-nk-official/30 hover:bg-nk-official/10 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-nk-official/10'
       }`}
     >
       <span className="flex items-center gap-2">
         <span
           className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-            selected ? 'border-nk-official/40 bg-nk-official' : 'border-zinc-300'
+            selected ? 'border-nk-official/40 bg-nk-official' : 'border-zinc-300 dark:border-white/20'
           }`}
         >
           {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -117,7 +117,7 @@ function StepSection({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{label}</p>
+      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider dark:text-zinc-400">{label}</p>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   );
@@ -132,7 +132,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
         <div
           key={i}
           className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-            i < step ? 'bg-nk-official' : 'bg-zinc-200'
+            i < step ? 'bg-nk-official' : 'bg-zinc-200 dark:bg-white/10'
           }`}
         />
       ))}
@@ -206,17 +206,17 @@ export default function CareerPage() {
   }, [s1, s2, s3, locale, router]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col">
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col bg-zinc-50 dark:bg-[#0A0F1E]">
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <Link href="/" aria-label={t('career.back')} className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-500 transition-colors">
+      <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10 dark:bg-[#0A0F1E]/90 dark:border-white/10 backdrop-blur-md">
+        <Link href="/" aria-label={t('career.back')} className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-500 transition-colors dark:hover:bg-white/10 dark:text-zinc-400">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5" aria-hidden="true">
             <path fillRule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clipRule="evenodd" />
           </svg>
         </Link>
         <div>
-          <p className="text-xs font-semibold text-nk-official-dim">{t('career.badge')}</p>
-          <p className="text-sm font-bold text-zinc-900 leading-tight">{t('career.hero.title')}</p>
+          <p className="text-xs font-semibold text-nk-official-dim dark:text-nk-official">{t('career.badge')}</p>
+          <p className="text-sm font-bold text-zinc-900 leading-tight dark:text-white">{t('career.hero.title')}</p>
         </div>
       </header>
 
@@ -225,20 +225,18 @@ export default function CareerPage() {
           {/* Progress */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-zinc-500">
-                {locale === 'zh'
-                  ? `${t('career.step')} ${step} ${t('career.of')} ${TOTAL_STEPS} 步`
-                  : `${t('career.step')} ${step} ${t('career.of')} ${TOTAL_STEPS}`}
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {t('career.step_of').replace('{n}', String(step)).replace('{total}', String(TOTAL_STEPS))}
               </p>
               {/* Summary chips for completed steps */}
               <div className="flex gap-1.5 flex-wrap justify-end">
                 {step > 1 && s1.edu && (
-                  <span className="text-[10px] bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-medium dark:bg-nk-official/20 dark:text-nk-official">
                     {label(EDU_OPTIONS, s1.edu)}
                   </span>
                 )}
                 {step > 2 && s2.goal && (
-                  <span className="text-[10px] bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-[10px] bg-nk-official/20 text-nk-official-dim px-2 py-0.5 rounded-full font-medium dark:bg-nk-official/20 dark:text-nk-official">
                     {label(GOAL_OPTIONS, s2.goal)}
                   </span>
                 )}
@@ -258,7 +256,7 @@ export default function CareerPage() {
                 transition={spring}
                 className="flex flex-col gap-5"
               >
-                <h2 className="text-lg font-bold text-zinc-900">{t('career.s1.title')}</h2>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('career.s1.title')}</h2>
 
                 <StepSection label={t('career.s1.edu')}>
                   {EDU_OPTIONS.map((o) => (
@@ -304,7 +302,7 @@ export default function CareerPage() {
                 transition={spring}
                 className="flex flex-col gap-5"
               >
-                <h2 className="text-lg font-bold text-zinc-900">{t('career.s2.title')}</h2>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('career.s2.title')}</h2>
 
                 <StepSection label={t('career.s2.goal')}>
                   {GOAL_OPTIONS.map((o) => (
@@ -339,7 +337,7 @@ export default function CareerPage() {
                 transition={spring}
                 className="flex flex-col gap-5"
               >
-                <h2 className="text-lg font-bold text-zinc-900">{t('career.s3.title')}</h2>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t('career.s3.title')}</h2>
 
                 <StepSection label={t('career.s3.state')}>
                   {STATE_OPTIONS.map((o) => (
@@ -372,7 +370,7 @@ export default function CareerPage() {
               <button
                 type="button"
                 onClick={() => setStep((s) => s - 1)}
-                className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
+                className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5"
               >
                 {t('career.back')}
               </button>
