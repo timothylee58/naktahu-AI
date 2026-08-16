@@ -42,7 +42,7 @@ from typing import Literal
 import httpx
 import structlog
 
-from app.services.token_encryption import decrypt_token, encrypt_token
+from app.services.token_encryption import decrypt_token
 from core.config import settings
 
 log = structlog.get_logger(__name__)
