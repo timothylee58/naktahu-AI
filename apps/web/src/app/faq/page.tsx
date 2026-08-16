@@ -214,114 +214,151 @@ export default function FAQPage() {
   };
 
   const content = locale === 'zh' ? faqs.zh : locale === 'en' ? faqs.en : faqs.ms;
+  const stillHaveQuestions = locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?';
+  const railTitleClass = isDark ? 'text-white' : 'text-zinc-900';
+  const railSubClass = isDark ? 'text-zinc-400' : 'text-zinc-500';
+  const groupLabelClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
+  const dividerBorderClass = isDark ? 'border-white/10' : 'border-zinc-200';
+  const itemHoverClass = isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-zinc-50';
 
   return (
-    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#12151C] text-white' : 'bg-nk-bg-warm text-zinc-900'}`}>
       <LandingHeader />
 
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
-        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-10 sm:py-12 max-w-3xl mx-auto w-full">
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-10 sm:py-12 max-w-5xl mx-auto w-full">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="space-y-8"
+            /* Two-column on desktop (V7's "sticky rail + flat list" pattern) —
+               single stacked column on mobile, no room for a side rail at
+               narrow widths. */
+            className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-14"
           >
-            <header className="text-center space-y-3">
-              <h1 className="text-4xl font-bold tracking-tight">{content.title}</h1>
-              <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{content.subtitle}</p>
+            {/* Rail — left-aligned within its own narrow column deliberately,
+                not centered like /about's full-width header: this is a
+                sidebar next to a list, not a page hero, so forcing
+                text-center here would fight the column it sits in. Sticky
+                on desktop so the title (and the quiet "Contact us" prompt)
+                stays in view across the whole scrolling list below, instead
+                of scrolling away after the first screen. */}
+            <header className="mb-10 lg:mb-0 lg:sticky lg:top-10 lg:self-start flex flex-col gap-3">
+              <h1 className={`text-3xl sm:text-4xl font-bold tracking-tight ${railTitleClass}`}>{content.title}</h1>
+              <p className={`text-base leading-relaxed ${railSubClass}`}>{content.subtitle}</p>
+              <div className="mt-3 flex flex-col gap-1">
+                <span className={`text-sm ${railSubClass}`}>{stillHaveQuestions}</span>
+                <Link
+                  href="/chat"
+                  className={`inline-flex items-center gap-1 text-sm font-semibold transition-colors locale-nowrap ${
+                    isDark ? 'text-nk-official hover:text-nk-official-dim' : 'text-nk-official-dim hover:text-nk-official'
+                  }`}
+                >
+                  {t('landing.hero.cta')} →
+                </Link>
+              </div>
             </header>
 
-            {GROUP_INDEXES.map((group, groupIdx) => (
-              <div key={groupIdx} className="space-y-3">
-                <h2 className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                  {(GROUP_LABELS[locale] ?? GROUP_LABELS.en)[groupIdx]}
-                </h2>
-                {group.map((index) => {
-                  const faq = content.items[index];
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: reduceMotion ? 0 : index * 0.04, duration: 0.3, ease: 'easeOut' }}
-                      className={`rounded-xl overflow-hidden border ${
-                        isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
-                      }`}
-                    >
-                      <button
-                        onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                        aria-expanded={openIndex === index}
-                        className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
-                          isDark ? 'hover:bg-white/5' : 'hover:bg-zinc-50'
-                        }`}
-                      >
-                        <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
-                        <svg
-                          style={{
-                            transform: `rotate(${openIndex === index ? 135 : 0}deg)`,
-                            transition: reduceMotion ? 'none' : 'transform 0.15s ease-out',
-                          }}
-                          className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          aria-hidden
+            <div className="flex flex-col gap-8">
+              {GROUP_INDEXES.map((group, groupIdx) => (
+                <div key={groupIdx} className="flex flex-col gap-1">
+                  <h2 className={`text-xs font-semibold uppercase tracking-wider mb-2 ${groupLabelClass}`}>
+                    {(GROUP_LABELS[locale] ?? GROUP_LABELS.en)[groupIdx]}
+                  </h2>
+                  {/* Flat hairline-divided list instead of one bordered card
+                      per item — a single shared top/bottom border with
+                      internal dividers, same "shared border, not separate
+                      floating cards" fix already applied to
+                      AgencyTrustGrid.tsx. The question text carries the
+                      weight now, not a stack of card chrome around it. */}
+                  <div className={`border-t border-b ${dividerBorderClass}`}>
+                    {group.map((index, i) => {
+                      const faq = content.items[index];
+                      return (
+                        <motion.div
+                          key={index}
+                          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: reduceMotion ? 0 : index * 0.03, duration: 0.3, ease: 'easeOut' }}
+                          className={i > 0 ? `border-t ${dividerBorderClass}` : undefined}
                         >
-                          {/* A "+" that rotates into an "×" reads as opening/closing a
-                              panel, not just flipping a chevron. */}
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
+                          <button
+                            onClick={() => setOpenIndex(openIndex === index ? null : index)}
+                            aria-expanded={openIndex === index}
+                            className={`w-full flex items-center justify-between px-2 sm:px-3 py-4 text-left transition-colors ${itemHoverClass}`}
+                          >
+                            <span className={`font-semibold pr-4 ${isDark ? 'text-white' : 'text-zinc-900'}`}>{faq.question}</span>
+                            <svg
+                              style={{
+                                transform: `rotate(${openIndex === index ? 135 : 0}deg)`,
+                                transition: reduceMotion ? 'none' : 'transform 0.15s ease-out',
+                              }}
+                              className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              aria-hidden
+                            >
+                              {/* A "+" that rotates into an "×" reads as opening/closing a
+                                  panel, not just flipping a chevron. */}
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </button>
 
-                      {/* grid-template-rows 0fr -> 1fr instead of height:auto / max-height
-                          hacks — the inner content's real height animates smoothly with no
-                          snap or overshoot, and no exit-animation choreography is needed.
-                          Only the interacted panel's rows value changes on any given
-                          click — siblings that are already open/closed don't re-render
-                          their transition, so there's no visual noise from neighbors. */}
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateRows: openIndex === index ? '1fr' : '0fr',
-                          transition: reduceMotion ? 'none' : 'grid-template-rows 0.2s ease-out',
-                        }}
-                      >
-                        <div className="overflow-hidden">
-                          <div className={`px-6 pb-4 leading-relaxed flex flex-col gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
-                            <p>{faq.answer}</p>
-                            {faq.sourceUrl && (
-                              <a
-                                href={faq.sourceUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={`self-start text-sm font-medium transition-colors ${
-                                  isDark ? 'text-nk-official hover:text-nk-official' : 'text-nk-official-dim hover:text-nk-official-dim'
-                                }`}
-                              >
-                                {SOURCE_LABEL[locale] ?? SOURCE_LABEL.en}
-                              </a>
-                            )}
+                          {/* grid-template-rows 0fr -> 1fr instead of height:auto / max-height
+                              hacks — the inner content's real height animates smoothly with no
+                              snap or overshoot, and no exit-animation choreography is needed.
+                              Only the interacted panel's rows value changes on any given
+                              click — siblings that are already open/closed don't re-render
+                              their transition, so there's no visual noise from neighbors. */}
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateRows: openIndex === index ? '1fr' : '0fr',
+                              transition: reduceMotion ? 'none' : 'grid-template-rows 0.2s ease-out',
+                            }}
+                          >
+                            <div className="overflow-hidden">
+                              <div className={`px-2 sm:px-3 pb-4 leading-relaxed flex flex-col gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                                <p>{faq.answer}</p>
+                                {faq.sourceUrl && (
+                                  <a
+                                    href={faq.sourceUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`self-start text-sm font-medium transition-colors ${
+                                      isDark ? 'text-nk-official hover:text-nk-official' : 'text-nk-official-dim hover:text-nk-official-dim'
+                                    }`}
+                                  >
+                                    {SOURCE_LABEL[locale] ?? SOURCE_LABEL.en}
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            ))}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
 
-            <div className="flex flex-col items-center gap-4 pt-8 text-center">
-              <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>{locale === 'zh' ? '还有问题？' : locale === 'en' ? 'Still have questions?' : 'Masih ada soalan?'}</p>
-              <Link
-                href="/chat"
-                className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
-              >
-                {t('landing.hero.cta')}
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
-                </svg>
-              </Link>
+              {/* Bottom CTA stays in addition to the rail's quiet prompt
+                  above — stronger visual weight (full pill button) for
+                  whoever scrolls all the way to the end without using the
+                  rail's link. */}
+              <div className="flex flex-col items-center gap-4 pt-4 pb-4 text-center">
+                <p className={isDark ? 'text-zinc-400' : 'text-zinc-500'}>{stillHaveQuestions}</p>
+                <Link
+                  href="/chat"
+                  className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
+                >
+                  {t('landing.hero.cta')}
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+              </div>
             </div>
           </motion.div>
         </main>
