@@ -451,10 +451,18 @@ function ChatPageInner() {
                 {/* stripe-rhythm ring: 12 short radial ticks, alternating accents */}
                 {Array.from({ length: 12 }).map((_, i) => {
                   const angle = (i / 12) * Math.PI * 2;
-                  const x1 = 32 + Math.cos(angle) * 26;
-                  const y1 = 32 + Math.sin(angle) * 26;
-                  const x2 = 32 + Math.cos(angle) * 30;
-                  const y2 = 32 + Math.sin(angle) * 30;
+                  // .toFixed(3) — not just cosmetic. Server (Node) and
+                  // client (V8-in-Chrome/etc) can serialize the same
+                  // Math.cos/sin float to a different number of decimal
+                  // digits (e.g. "9.483339501604604" vs "9.4833395016046"),
+                  // which React's hydration diff treats as a real mismatch
+                  // and logs on every single page load. Fixing the string
+                  // representation to a set precision makes server and
+                  // client emit byte-identical attribute values.
+                  const x1 = (32 + Math.cos(angle) * 26).toFixed(3);
+                  const y1 = (32 + Math.sin(angle) * 26).toFixed(3);
+                  const x2 = (32 + Math.cos(angle) * 30).toFixed(3);
+                  const y2 = (32 + Math.sin(angle) * 30).toFixed(3);
                   return (
                     <line
                       key={i}
