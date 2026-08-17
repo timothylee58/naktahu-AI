@@ -428,7 +428,16 @@ function ChatPageInner() {
         onScroll={handleScroll}
         className="h-full overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
-        <div className="max-w-3xl mx-auto w-full space-y-5">
+        <div
+          className={`max-w-3xl mx-auto w-full space-y-5 ${
+            // With no messages yet the identity block is the ONLY thing in
+            // this scroll area, so it should sit in the optical centre of the
+            // conversation column rather than clinging to the top. min-h-full
+            // + centred flex does that without affecting the normal
+            // message-list layout once a conversation starts.
+            messages.length === 0 ? 'min-h-full flex flex-col justify-center' : ''
+          }`}
+        >
         {messages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -493,7 +502,7 @@ function ChatPageInner() {
                 trust strip below already implies the scope+sourcing promise
                 in one line; chat.empty stays defined in i18n (harmless to
                 leave unused) in case a future surface wants it again. */}
-            <p className={`text-2xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
+            <p className={`text-3xl sm:text-4xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
               {t('chat.empty.greeting')}
             </p>
 
@@ -566,6 +575,10 @@ function ChatPageInner() {
 
       <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
+        {/* Suggestions sit directly above the input they fill in — the
+            control and its target adjacent, and out of the conversation
+            area so the identity block above can be the full centred
+            moment. */}
         {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
         )}
