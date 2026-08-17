@@ -151,19 +151,23 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
   const agentFor = (chip: Chip): AgentSuggestion | null =>
     matchAgentRules(chip.queryEn).find((s): s is AgentSuggestion => s.kind === 'agent') ?? null;
 
-  // Everything on one flowing line per group — a label prefix immediately
-  // followed by its chips in the same flex-wrap run, instead of a separate
-  // header row (with icon) sitting above a separate chip row. Halves the
-  // vertical stack (4 groups x 2 rows -> 4 groups x ~1 row) and drops the 4
-  // icon SVGs entirely; the label prefix alone still carries the grouping/
-  // scanability benefit the row-per-group structure existed for.
+  // Each group is a label line followed by ONE horizontally-scrolling row
+  // of chips, not a flex-wrap that breaks to a new line mid-group. Wrapping
+  // read as cluttered on narrow viewports specifically — a group's chips
+  // would break into jagged, unevenly-filled lines (one chip alone on its
+  // own row while a sibling group's row was full), which is worse than the
+  // horizontal-scroll affordance it's replaced with here (same pattern as
+  // ChatGPT/Claude mobile's own suggestion-chip rows: swipe to see more,
+  // nothing removed, no jagged wrap). scrollbar-hide keeps the native
+  // scrollbar off without hiding the ability to scroll.
   return (
-    <div className="flex flex-col gap-2 pb-1">
+    <div className="flex flex-col gap-3 pb-1">
       {GROUPS.map((group) => (
-        <div key={group.titleKey} className="flex flex-wrap items-center gap-2">
+        <div key={group.titleKey} className="flex flex-col gap-1.5 min-w-0">
           <span className={`flex-shrink-0 text-[11px] font-bold uppercase tracking-wide ${headerClass}`}>
             {t(group.titleKey)}
           </span>
+          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
           {group.chips.map((chip) => {
               const agent = agentFor(chip);
               if (agent) {
@@ -172,10 +176,10 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
                     key={chip.labelEn}
                     href={agent.href}
                     aria-label={t('chat.chip.opens_agent').replace('{agent}', t(agent.titleKey))}
-                    className={`inline-flex items-center gap-1 px-3 py-1.5 border rounded-full text-xs font-medium transition-colors ${agentChipClass}`}
+                    className={`flex-shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-3 py-1.5 border rounded-full text-xs font-medium transition-colors ${agentChipClass}`}
                   >
                     {getLabel(chip)}
-                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3" aria-hidden>
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 flex-shrink-0" aria-hidden>
                       <path fillRule="evenodd" d="M12.97 3.97a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06l2.72-2.72H3a.75.75 0 0 1 0-1.5h12.69l-2.72-2.72a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
                     </svg>
                   </Link>
@@ -186,12 +190,13 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
                   key={chip.labelEn}
                   onClick={() => onSelect(getQuery(chip))}
                   disabled={disabled}
-                  className={`px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
+                  className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
                 >
                   {getLabel(chip)}
                 </button>
               );
             })}
+          </div>
         </div>
       ))}
     </div>
