@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, MotionConfig, useScroll, useTransform } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { matchAgentRules, type AgentSuggestion } from '@/lib/agent-suggestions';
 
@@ -26,10 +26,9 @@ interface ChipGroup {
   chips: Chip[];
 }
 
-// Same 10 example queries as before, regrouped into 4 domain clusters
-// instead of one flat 10-item row (Chunking rule: ≤4 per group). Grouping
-// mirrors the domains these queries actually route to via matchAgentRules
-// below, not an arbitrary taxonomy.
+// Same 10 example queries as before, in the same 4 domain clusters.
+// Grouping mirrors the domains these queries actually route to via
+// matchAgentRules below, not an arbitrary taxonomy.
 const GROUPS: ChipGroup[] = [
   {
     titleKey: 'chat.groups.tax_epf',
@@ -119,25 +118,31 @@ interface PromptChipsProps {
   variant?: 'light' | 'dark';
 }
 
-// Restrained motion timings throughout this file — short durations, small
-// stagger, no spring/bounce — matching this product's established "calm,
-// precise, not playful" register (the same principle CitationChip.tsx and
-// /about's verified-badge state explicitly for their own motion choices).
-const containerVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const groupVariants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } },
-};
-
+/**
+ * Suggestion chips as a segmented category selector.
+ *
+ * Previously all 4 groups rendered stacked at once (4 label rows + 4 chip
+ * rows = 8 rows of vertical space), which read as cluttered and as four
+ * bold labels competing for the same attention. Now the group labels ARE
+ * the control: a tab strip whose active pill slides between categories via
+ * a shared layoutId, with only the active category's chips rendered below.
+ * Two rows total instead of eight.
+ *
+ * Uses the WAI-ARIA tabs pattern with automatic activation (arrow keys move
+ * and select in one step) — the standard for a tablist whose panels are
+ * cheap to swap, which these are.
+ */
 export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChipsProps) {
   const { t, locale } = useI18n();
-  const reduceMotion = useReducedMotion();
   const isDark = variant === 'dark';
+  const [active, setActive] = useState(0);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const headerClass = isDark ? 'text-nk-heritage' : 'text-nk-heritage-dim';
+  const activeTabClass = isDark ? 'text-nk-heritage' : 'text-nk-heritage-dim';
+  const idleTabClass = isDark
+    ? 'text-zinc-500 hover:text-zinc-300'
+    : 'text-zinc-400 hover:text-zinc-600';
+  const pillClass = isDark ? 'bg-nk-heritage/15' : 'bg-nk-heritage/10';
   const askChipClass = isDark
     ? 'bg-white/5 hover:bg-nk-official-dim/20 hover:text-nk-official hover:border-nk-official/40 text-zinc-300 border-white/10'
     : 'bg-zinc-100 hover:bg-nk-official/10 hover:text-nk-official-dim hover:border-nk-official/30 text-zinc-600 border-zinc-200';
@@ -172,35 +177,101 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
   const agentFor = (chip: Chip): AgentSuggestion | null =>
     matchAgentRules(chip.queryEn).find((s): s is AgentSuggestion => s.kind === 'agent') ?? null;
 
-  // Each group is a label line followed by ONE horizontally-scrolling row
-  // of chips, not a flex-wrap that breaks to a new line mid-group. Wrapping
-  // read as cluttered on narrow viewports specifically — a group's chips
-  // would break into jagged, unevenly-filled lines (one chip alone on its
-  // own row while a sibling group's row was full), which is worse than the
-  // horizontal-scroll affordance it's replaced with here (same pattern as
-  // ChatGPT/Claude mobile's own suggestion-chip rows: swipe to see more,
-  // nothing removed, no jagged wrap). scrollbar-hide keeps the native
-  // scrollbar off without hiding the ability to scroll — GroupRow renders
-  // its own animated scroll-position indicator instead, which is the real
-  // affordance telling a user there's more to swipe.
+  const selectTab = useCallback((index: number) => {
+    const next = (index + GROUPS.length) % GROUPS.length;
+    setActive(next);
+    tabRefs.current[next]?.focus();
+    // Keep the newly-active tab visible when the strip itself is scrolled
+    // (4 category names overflow a narrow viewport), so arrow-keying to an
+    // off-screen tab doesn't move focus somewhere the user can't see.
+    tabRefs.current[next]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, []);
+
+  const onTabKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); selectTab(index + 1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); selectTab(index - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); selectTab(0); }
+      else if (e.key === 'End') { e.preventDefault(); selectTab(GROUPS.length - 1); }
+    },
+    [selectTab],
+  );
+
+  const activeGroup = GROUPS[active];
+
   return (
-    <motion.div
-      className="flex flex-col gap-3 pb-1"
-      variants={reduceMotion ? undefined : containerVariants}
-      initial={reduceMotion ? false : 'hidden'}
-      animate="show"
-    >
-      {GROUPS.map((group) => (
-        <motion.div
-          key={group.titleKey}
-          variants={reduceMotion ? undefined : groupVariants}
-          className="flex flex-col gap-1.5 min-w-0"
-        >
-          <span className={`flex-shrink-0 text-[11px] font-bold uppercase tracking-wide ${headerClass}`}>
-            {t(group.titleKey)}
-          </span>
-          <GroupRow
-            group={group}
+    // reducedMotion="user" is how motion reduction is honoured here, rather
+    // than branching variants/initial on useReducedMotion(). That branching
+    // is an SSR hydration bug: useReducedMotion() is false on the server and
+    // true on a reduced-motion client, so the two render DIFFERENT inline
+    // styles (server style={{opacity:"1"}} vs client style={{}}) and React
+    // logs a mismatch it says it "won't patch up". Passing identical props
+    // in both environments and letting MotionConfig strip the animations at
+    // runtime keeps the markup byte-identical. It also gives more correct
+    // semantics than the manual branch did: framer-motion drops transforms
+    // (the y-offsets, the scale-on-tap, the layout spring) while keeping
+    // opacity fades, which is what reduced-motion is actually asking for —
+    // movement is the problem, not cross-fades.
+    <MotionConfig reducedMotion="user">
+    <div className="flex flex-col gap-2">
+      {/* Tab strip. Horizontally scrollable because 4 category names (esp.
+          in BM: "Imigresen & Dokumen") overflow a phone viewport. */}
+      <div
+        role="tablist"
+        aria-label={t('chat.groups.tablist_label')}
+        aria-orientation="horizontal"
+        className="flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0"
+      >
+        {GROUPS.map((group, i) => {
+          const selected = i === active;
+          return (
+            <button
+              key={group.titleKey}
+              ref={(el) => { tabRefs.current[i] = el; }}
+              role="tab"
+              id={`prompt-tab-${i}`}
+              aria-selected={selected}
+              aria-controls={`prompt-panel-${i}`}
+              // Roving tabindex: only the active tab is in the page's tab
+              // order; arrow keys move between tabs from there (WAI-ARIA
+              // tabs pattern), so Tab doesn't have to walk all 4.
+              tabIndex={selected ? 0 : -1}
+              onClick={() => selectTab(i)}
+              onKeyDown={(e) => onTabKeyDown(e, i)}
+              className={`relative flex-shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                selected ? activeTabClass : idleTabClass
+              }`}
+            >
+              {selected && (
+                <motion.span
+                  // The signature shared-layout move: one element whose
+                  // layoutId is stable across tabs, so framer-motion slides
+                  // it from the old tab to the new one instead of
+                  // cross-fading two separate backgrounds.
+                  layoutId="prompt-chip-tab-pill"
+                  className={`absolute inset-0 rounded-full ${pillClass}`}
+                  transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
+                />
+              )}
+              <span className="relative z-10">{t(group.titleKey)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Panel. min-h reserves the row's height so the empty beat between
+          exit and enter (AnimatePresence mode="wait") doesn't collapse the
+          container and shift everything below it. */}
+      <div
+        role="tabpanel"
+        id={`prompt-panel-${active}`}
+        aria-labelledby={`prompt-tab-${active}`}
+        className="min-h-[30px]"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <ChipRow
+            key={activeGroup.titleKey}
+            group={activeGroup}
             isDark={isDark}
             disabled={disabled}
             askChipClass={askChipClass}
@@ -209,15 +280,18 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
             getQuery={getQuery}
             agentFor={agentFor}
             onSelect={onSelect}
-            opensAgentLabel={(agent: AgentSuggestion) => t('chat.chip.opens_agent').replace('{agent}', t(agent.titleKey))}
+            opensAgentLabel={(agent: AgentSuggestion) =>
+              t('chat.chip.opens_agent').replace('{agent}', t(agent.titleKey))
+            }
           />
-        </motion.div>
-      ))}
-    </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+    </MotionConfig>
   );
 }
 
-interface GroupRowProps {
+interface ChipRowProps {
   group: ChipGroup;
   isDark: boolean;
   disabled?: boolean;
@@ -230,13 +304,21 @@ interface GroupRowProps {
   opensAgentLabel: (agent: AgentSuggestion) => string;
 }
 
-/** One group's horizontally-scrolling chip row, plus its own scroll-
- * position indicator. Split into its own component (rather than inlined in
- * PromptChips' .map) because useScroll needs one hook instance per
- * scrollable element — four independent rows means four independent hooks,
- * which the rules of hooks don't allow inside a single render's loop body.
- */
-function GroupRow({
+const rowVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.035 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+};
+const chipVariants = {
+  hidden: { opacity: 0, y: 6 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' as const } },
+  exit: { opacity: 0 },
+};
+
+/** The active category's chips, plus a scroll-position indicator for when
+ * that row overflows. Split out so useScroll gets a fresh hook instance per
+ * mounted row — AnimatePresence remounts this on every tab change. */
+function ChipRow({
   group,
   isDark,
   disabled,
@@ -247,7 +329,7 @@ function GroupRow({
   agentFor,
   onSelect,
   opensAgentLabel,
-}: GroupRowProps) {
+}: ChipRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
   const { scrollXProgress } = useScroll({ container: rowRef });
@@ -258,9 +340,8 @@ function GroupRow({
   const thumbLeft = useTransform(scrollXProgress, [0, 1], ['0%', '75%']);
 
   // Only show the indicator when the row actually overflows — a 2-chip
-  // group that fits its full width at typical viewport widths (e.g.
-  // Imigresen & Dokumen) shouldn't get a fake "swipe for more" affordance
-  // for content that isn't actually swipeable.
+  // group that fits its full width shouldn't get a "swipe for more"
+  // affordance for content that isn't actually swipeable.
   useEffect(() => {
     const el = rowRef.current;
     if (!el) return;
@@ -279,7 +360,7 @@ function GroupRow({
   const thumbClass = isDark ? 'bg-nk-official/60' : 'bg-nk-official/50';
 
   return (
-    <>
+    <motion.div variants={rowVariants} initial="hidden" animate="show" exit="exit">
       <div
         ref={rowRef}
         className="flex flex-nowrap items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0"
@@ -292,8 +373,8 @@ function GroupRow({
                 key={chip.labelEn}
                 href={agent.href}
                 aria-label={opensAgentLabel(agent)}
+                variants={chipVariants}
                 whileTap={{ scale: 0.96 }}
-                transition={{ duration: 0.1 }}
                 className={`flex-shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-3 py-1.5 border rounded-full text-xs font-medium transition-colors ${agentChipClass}`}
               >
                 {getLabel(chip)}
@@ -308,8 +389,8 @@ function GroupRow({
               key={chip.labelEn}
               onClick={() => onSelect(getQuery(chip))}
               disabled={disabled}
+              variants={chipVariants}
               whileTap={disabled ? undefined : { scale: 0.96 }}
-              transition={{ duration: 0.1 }}
               className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
             >
               {getLabel(chip)}
@@ -318,10 +399,10 @@ function GroupRow({
         })}
       </div>
       {overflowing && (
-        <div className={`relative h-1 rounded-full overflow-hidden mt-1 ${trackClass}`} aria-hidden>
+        <div className={`relative h-1 rounded-full overflow-hidden mt-1.5 ${trackClass}`} aria-hidden>
           <motion.div className={`absolute inset-y-0 w-1/4 rounded-full ${thumbClass}`} style={{ left: thumbLeft }} />
         </div>
       )}
-    </>
+    </motion.div>
   );
 }
