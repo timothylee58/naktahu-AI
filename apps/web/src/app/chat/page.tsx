@@ -350,6 +350,8 @@ function ChatPageInner() {
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
+  const showChips = messages.length === 0 && !isStreaming;
+
   const pageBg = isDark ? 'bg-[#12151C]' : 'bg-zinc-50/50';
   const headerClass = isDark
     ? 'border-white/10 bg-[#12151C]/90 text-white'
@@ -426,7 +428,16 @@ function ChatPageInner() {
         onScroll={handleScroll}
         className="h-full overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
-        <div className="max-w-3xl mx-auto w-full space-y-5">
+        <div
+          className={`max-w-3xl mx-auto w-full space-y-5 ${
+            // With no messages yet the identity block is the ONLY thing in
+            // this scroll area, so it should sit in the optical centre of the
+            // conversation column rather than clinging to the top. min-h-full
+            // + centred flex does that without affecting the normal
+            // message-list layout once a conversation starts.
+            messages.length === 0 ? 'min-h-full flex flex-col justify-center' : ''
+          }`}
+        >
         {messages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -491,7 +502,7 @@ function ChatPageInner() {
                 trust strip below already implies the scope+sourcing promise
                 in one line; chat.empty stays defined in i18n (harmless to
                 leave unused) in case a future surface wants it again. */}
-            <p className={`text-2xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
+            <p className={`text-3xl sm:text-4xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
               {t('chat.empty.greeting')}
             </p>
 
@@ -511,32 +522,6 @@ function ChatPageInner() {
                 <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.362-3.29 9.95-7.96 11.878a.514.514 0 0 1-.4 0C5.29 17.05 2 12.463 2 7.1c0-.539.035-1.07.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.75Zm4.196 5.954a.75.75 0 0 0-1.214-.882l-3.236 4.53L7.53 9.963a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.137-.089l3.75-5.25Z" clipRule="evenodd" />
               </svg>
               <span className="locale-text-balance">{t('chat.trust.strip')}</span>
-            </div>
-
-            {/* Suggestions now live in this same block, directly under the
-                trust strip, instead of sitting below a hard border-t divider
-                in the separate input-bar container further down — that seam
-                made the identity block and the suggestions read as two
-                unrelated zones instead of one "here's what to ask" moment.
-                w-full overrides this block's items-center (needed for the
-                mark/headline/trust-strip above) so the chips span the full
-                row instead of shrink-wrapping to content width.
-                text-left is deliberate, not leftover: without it, the
-                inherited text-center from this same parent centers each
-                group's LABEL text within the full-width row, while the chip
-                row below it is a flex container with default justify-start
-                — the two visibly drift apart (label centered, chips flush
-                left) at any width wide enough to show the gap, which desktop
-                immediately exposed even though it read as fine on a narrow
-                mobile viewport. justify-center on the (horizontally-
-                scrolling) chip rows was considered and rejected — centering
-                an overflowing flex container is a known cross-browser
-                pitfall where the start of the content can end up outside
-                the initial scroll position. Left-aligning both is the
-                robust fix, and matches how these chips were aligned before
-                this consolidation moved them out of the input bar. */}
-            <div className="w-full text-left">
-              <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
             </div>
           </motion.div>
         )}
@@ -590,6 +575,13 @@ function ChatPageInner() {
 
       <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
+        {/* Suggestions sit directly above the input they fill in — the
+            control and its target adjacent, and out of the conversation
+            area so the identity block above can be the full centred
+            moment. */}
+        {showChips && (
+          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
+        )}
         {queuedQuery && (
           <div
             className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${
