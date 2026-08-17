@@ -1,8 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { matchAgentRules, type AgentSuggestion } from '@/lib/agent-suggestions';
+
+// framer-motion v12's replacement for the deprecated motion(Component)
+// factory — lets a Next.js <Link> take whileTap/variants like any other
+// motion element.
+const MotionLink = motion.create(Link);
 
 interface Chip {
   labelMs: string;
@@ -112,8 +119,22 @@ interface PromptChipsProps {
   variant?: 'light' | 'dark';
 }
 
+// Restrained motion timings throughout this file — short durations, small
+// stagger, no spring/bounce — matching this product's established "calm,
+// precise, not playful" register (the same principle CitationChip.tsx and
+// /about's verified-badge state explicitly for their own motion choices).
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+const groupVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } },
+};
+
 export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChipsProps) {
   const { t, locale } = useI18n();
+  const reduceMotion = useReducedMotion();
   const isDark = variant === 'dark';
 
   const headerClass = isDark ? 'text-nk-heritage' : 'text-nk-heritage-dim';
@@ -159,46 +180,148 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
   // horizontal-scroll affordance it's replaced with here (same pattern as
   // ChatGPT/Claude mobile's own suggestion-chip rows: swipe to see more,
   // nothing removed, no jagged wrap). scrollbar-hide keeps the native
-  // scrollbar off without hiding the ability to scroll.
+  // scrollbar off without hiding the ability to scroll — GroupRow renders
+  // its own animated scroll-position indicator instead, which is the real
+  // affordance telling a user there's more to swipe.
   return (
-    <div className="flex flex-col gap-3 pb-1">
+    <motion.div
+      className="flex flex-col gap-3 pb-1"
+      variants={reduceMotion ? undefined : containerVariants}
+      initial={reduceMotion ? false : 'hidden'}
+      animate="show"
+    >
       {GROUPS.map((group) => (
-        <div key={group.titleKey} className="flex flex-col gap-1.5 min-w-0">
+        <motion.div
+          key={group.titleKey}
+          variants={reduceMotion ? undefined : groupVariants}
+          className="flex flex-col gap-1.5 min-w-0"
+        >
           <span className={`flex-shrink-0 text-[11px] font-bold uppercase tracking-wide ${headerClass}`}>
             {t(group.titleKey)}
           </span>
-          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-          {group.chips.map((chip) => {
-              const agent = agentFor(chip);
-              if (agent) {
-                return (
-                  <Link
-                    key={chip.labelEn}
-                    href={agent.href}
-                    aria-label={t('chat.chip.opens_agent').replace('{agent}', t(agent.titleKey))}
-                    className={`flex-shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-3 py-1.5 border rounded-full text-xs font-medium transition-colors ${agentChipClass}`}
-                  >
-                    {getLabel(chip)}
-                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 flex-shrink-0" aria-hidden>
-                      <path fillRule="evenodd" d="M12.97 3.97a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06l2.72-2.72H3a.75.75 0 0 1 0-1.5h12.69l-2.72-2.72a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                  </Link>
-                );
-              }
-              return (
-                <button
-                  key={chip.labelEn}
-                  onClick={() => onSelect(getQuery(chip))}
-                  disabled={disabled}
-                  className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
-                >
-                  {getLabel(chip)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          <GroupRow
+            group={group}
+            isDark={isDark}
+            disabled={disabled}
+            askChipClass={askChipClass}
+            agentChipClass={agentChipClass}
+            getLabel={getLabel}
+            getQuery={getQuery}
+            agentFor={agentFor}
+            onSelect={onSelect}
+            opensAgentLabel={(agent: AgentSuggestion) => t('chat.chip.opens_agent').replace('{agent}', t(agent.titleKey))}
+          />
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
+  );
+}
+
+interface GroupRowProps {
+  group: ChipGroup;
+  isDark: boolean;
+  disabled?: boolean;
+  askChipClass: string;
+  agentChipClass: string;
+  getLabel: (chip: Chip) => string;
+  getQuery: (chip: Chip) => string;
+  agentFor: (chip: Chip) => AgentSuggestion | null;
+  onSelect: (query: string) => void;
+  opensAgentLabel: (agent: AgentSuggestion) => string;
+}
+
+/** One group's horizontally-scrolling chip row, plus its own scroll-
+ * position indicator. Split into its own component (rather than inlined in
+ * PromptChips' .map) because useScroll needs one hook instance per
+ * scrollable element — four independent rows means four independent hooks,
+ * which the rules of hooks don't allow inside a single render's loop body.
+ */
+function GroupRow({
+  group,
+  isDark,
+  disabled,
+  askChipClass,
+  agentChipClass,
+  getLabel,
+  getQuery,
+  agentFor,
+  onSelect,
+  opensAgentLabel,
+}: GroupRowProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const { scrollXProgress } = useScroll({ container: rowRef });
+  // A fixed-width thumb sliding across the track, not a literally
+  // proportional scrollbar (which would shrink to near-nothing for a
+  // 2-4-chip row and stop being visible as a UI element at all) — just
+  // enough to signal "there's more, swipe" and roughly where you are.
+  const thumbLeft = useTransform(scrollXProgress, [0, 1], ['0%', '75%']);
+
+  // Only show the indicator when the row actually overflows — a 2-chip
+  // group that fits its full width at typical viewport widths (e.g.
+  // Imigresen & Dokumen) shouldn't get a fake "swipe for more" affordance
+  // for content that isn't actually swipeable.
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const check = () => setOverflowing(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    window.addEventListener('resize', check);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', check);
+    };
+  }, [group]);
+
+  const trackClass = isDark ? 'bg-white/10' : 'bg-zinc-200';
+  const thumbClass = isDark ? 'bg-nk-official/60' : 'bg-nk-official/50';
+
+  return (
+    <>
+      <div
+        ref={rowRef}
+        className="flex flex-nowrap items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0"
+      >
+        {group.chips.map((chip) => {
+          const agent = agentFor(chip);
+          if (agent) {
+            return (
+              <MotionLink
+                key={chip.labelEn}
+                href={agent.href}
+                aria-label={opensAgentLabel(agent)}
+                whileTap={{ scale: 0.96 }}
+                transition={{ duration: 0.1 }}
+                className={`flex-shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-3 py-1.5 border rounded-full text-xs font-medium transition-colors ${agentChipClass}`}
+              >
+                {getLabel(chip)}
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 flex-shrink-0" aria-hidden>
+                  <path fillRule="evenodd" d="M12.97 3.97a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06l2.72-2.72H3a.75.75 0 0 1 0-1.5h12.69l-2.72-2.72a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                </svg>
+              </MotionLink>
+            );
+          }
+          return (
+            <motion.button
+              key={chip.labelEn}
+              onClick={() => onSelect(getQuery(chip))}
+              disabled={disabled}
+              whileTap={disabled ? undefined : { scale: 0.96 }}
+              transition={{ duration: 0.1 }}
+              className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
+            >
+              {getLabel(chip)}
+            </motion.button>
+          );
+        })}
+      </div>
+      {overflowing && (
+        <div className={`relative h-1 rounded-full overflow-hidden mt-1 ${trackClass}`} aria-hidden>
+          <motion.div className={`absolute inset-y-0 w-1/4 rounded-full ${thumbClass}`} style={{ left: thumbLeft }} />
+        </div>
+      )}
+    </>
   );
 }
