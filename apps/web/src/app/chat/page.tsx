@@ -350,8 +350,6 @@ function ChatPageInner() {
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
-  const showChips = messages.length === 0 && !isStreaming;
-
   const pageBg = isDark ? 'bg-[#12151C]' : 'bg-zinc-50/50';
   const headerClass = isDark
     ? 'border-white/10 bg-[#12151C]/90 text-white'
@@ -514,6 +512,32 @@ function ChatPageInner() {
               </svg>
               <span className="locale-text-balance">{t('chat.trust.strip')}</span>
             </div>
+
+            {/* Suggestions now live in this same block, directly under the
+                trust strip, instead of sitting below a hard border-t divider
+                in the separate input-bar container further down — that seam
+                made the identity block and the suggestions read as two
+                unrelated zones instead of one "here's what to ask" moment.
+                w-full overrides this block's items-center (needed for the
+                mark/headline/trust-strip above) so the chips span the full
+                row instead of shrink-wrapping to content width.
+                text-left is deliberate, not leftover: without it, the
+                inherited text-center from this same parent centers each
+                group's LABEL text within the full-width row, while the chip
+                row below it is a flex container with default justify-start
+                — the two visibly drift apart (label centered, chips flush
+                left) at any width wide enough to show the gap, which desktop
+                immediately exposed even though it read as fine on a narrow
+                mobile viewport. justify-center on the (horizontally-
+                scrolling) chip rows was considered and rejected — centering
+                an overflowing flex container is a known cross-browser
+                pitfall where the start of the content can end up outside
+                the initial scroll position. Left-aligning both is the
+                robust fix, and matches how these chips were aligned before
+                this consolidation moved them out of the input bar. */}
+            <div className="w-full text-left">
+              <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
+            </div>
           </motion.div>
         )}
         {messages.map((msg) =>
@@ -566,9 +590,6 @@ function ChatPageInner() {
 
       <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
-        {showChips && (
-          <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
-        )}
         {queuedQuery && (
           <div
             className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${
