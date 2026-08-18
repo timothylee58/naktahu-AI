@@ -400,6 +400,27 @@ SOURCES: tuple[Source, ...] = (
         language="bm",
         notes="LPM portal home — general exam-board contact/structure info, catch-all for queries the more specific pages above don't cover.",
     ),
+    # Registered from a user-supplied source (URL + the official PDF itself,
+    # "JWP_SPM_2026_18_OGOS_2026.pdf"), not found via WebSearch — this one IS
+    # content-verified: pdftotext was run directly against the PDF in this
+    # session and confirmed a real LPM/KPM "Jadual Waktu Peperiksaan SPM 2026"
+    # document (spoken/oral papers 26–29 Oct and 2–5 Nov 2026; written papers
+    # 23 Nov–17 Dec 2026). Distinct from lpm-jadual-waktu-spmu-2026 above,
+    # which is the SPM *Ulangan* (resit) 2026 timetable — a different exam
+    # cycle, different candidates, different page.
+    Source(
+        name="lpm-jadual-waktu-spm-2026",
+        url="https://lp.moe.gov.my/index.php/jw-spm/1447-jadual-waktu-peperiksaan-sijil-pelajaran-malaysia-2026",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes=(
+            "SPM 2026 (regular, non-resit) exam timetable. Content-verified via "
+            "the official JWP SPM 2026 PDF: oral/speaking-listening tests 26-29 "
+            "Oct and 2-5 Nov 2026; written papers 23 Nov-17 Dec 2026."
+        ),
+    ),
 
     # ── First registrations for 5 domains that had ZERO sources ─────────────
     # government/finance/healthcare/immigration/culture — found via WebSearch,

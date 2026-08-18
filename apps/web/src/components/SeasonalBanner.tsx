@@ -3,22 +3,15 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
+import { inSeasonalWindow } from '@/lib/seasonal-window';
 
 // Merdeka (31 Aug) + Hari Malaysia (16 Sep) — one banner covering both, live
-// for a window either side rather than exactly on the two dates. Checked by
-// month/day only (year-agnostic) so this doesn't need touching again next
-// year. Dismissal is versioned by year (naktahu_seasonal_2026) so a past
-// dismissal doesn't silently suppress next year's banner.
-const WINDOW_START = { month: 8, day: 25 }; // 25 Aug
-const WINDOW_END = { month: 9, day: 20 }; // 20 Sep
+// for a window either side rather than exactly on the two dates. Window
+// definition lives in lib/seasonal-window.ts, shared with the landing-page
+// hero video so the two seasonal surfaces don't drift apart. Dismissal is
+// versioned by year (naktahu_seasonal_2026) so a past dismissal doesn't
+// silently suppress next year's banner.
 const DISMISS_KEY = `naktahu_seasonal_${new Date().getFullYear()}`;
-
-function inSeasonalWindow(now: Date): boolean {
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
-  const value = month * 100 + day;
-  return value >= WINDOW_START.month * 100 + WINDOW_START.day && value <= WINDOW_END.month * 100 + WINDOW_END.day;
-}
 
 export function SeasonalBanner() {
   const { t } = useI18n();
