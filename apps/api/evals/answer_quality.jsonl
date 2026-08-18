@@ -36,3 +36,4 @@
 {"query": "How do I register at a government clinic under the MySejahtera system?", "expected_topic": "healthcare", "min_confidence": 0.6}
 {"query": "When is the SPM 2026 examination timetable and when does it start?", "expected_topic": "education", "min_confidence": 0.6}
 {"query": "Which subjects are compulsory for SPM under the Malaysia Education Blueprint 2026-2035?", "expected_topic": "education", "min_confidence": 0.6}
+{"query": "What government cost-of-living assistance schemes am I eligible for as a low-income household?", "expected_topic": "welfare", "min_confidence": 0.6}
