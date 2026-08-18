@@ -342,6 +342,64 @@ SOURCES: tuple[Source, ...] = (
         language="bm",
         notes="Official FAQ — eligibility/registration process questions (eKasih linkage, how to check status).",
     ),
+
+    # ── education domain — first-ever entries ──────────────────────────────
+    # Registered zero sources until now (confirmed by grep before adding
+    # these), despite study_agent/nodes.py's explain_node and
+    # generate_quiz_node both calling query_rag_findings(..., "education",
+    # ...) on every request — the agent has been architecturally live with
+    # no real content backing it, silently degrading to citation-less
+    # LLM-only answers. Found via WebSearch (this sandbox blocks direct
+    # fetch to moe.gov.my/lp.moe.gov.my, confirmed again when trying —
+    # EGRESS_BLOCKED via WebFetch, curl CONNECT tunnel 403), same
+    # not-content-verified caveat as the property/business/epf/legal
+    # entries above. All five are Lembaga Peperiksaan Malaysia (LPM) —
+    # the statutory exam board under KPM, not a third-party exam-prep site.
+    Source(
+        name="lpm-spm-overview",
+        url="https://lp.moe.gov.my/index.php/peperiksaan-pentaksiran/peringkat-menengah-atas/sijil-pelajaran-malaysia-spm",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="Official SPM overview — structure, subjects, assessment components.",
+    ),
+    Source(
+        name="lpm-makluman-spm",
+        url="https://lp.moe.gov.my/index.php/makluman-spm",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="Official SPM announcements index — the actual source of truth for exam-cycle changes, not a third-party recap.",
+    ),
+    Source(
+        name="lpm-takwim-pentaksiran-2026",
+        url="https://lp.moe.gov.my/index.php/makluman-spm/1405-takwim-pentaksiran-pusat-tingkatan-5-peperiksaan-sijil-pelajaran-malaysia-spm-tahun-2026-dan-tingkatan-4-peperiksaan-spm-tahun-2027",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="Central-assessment calendar for Form 5 SPM 2026 and Form 4 SPM 2027 candidates.",
+    ),
+    Source(
+        name="lpm-jadual-waktu-spmu-2026",
+        url="https://lp.moe.gov.my/index.php/jadual-waktu/1436-jadual-waktu-peperiksaan-sijil-pelajaran-malaysia-ulangan-spmu-2026ngan-2026",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="SPM Ulangan (repeat/resit) 2026 exam timetable page.",
+    ),
+    Source(
+        name="lpm-home",
+        url="https://lp.moe.gov.my/",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="LPM portal home — general exam-board contact/structure info, catch-all for queries the more specific pages above don't cover.",
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
