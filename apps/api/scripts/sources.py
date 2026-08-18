@@ -400,6 +400,106 @@ SOURCES: tuple[Source, ...] = (
         language="bm",
         notes="LPM portal home — general exam-board contact/structure info, catch-all for queries the more specific pages above don't cover.",
     ),
+
+    # ── First registrations for 5 domains that had ZERO sources ─────────────
+    # government/finance/healthcare/immigration/culture — found via WebSearch,
+    # confirmed as real official ministry domains (.gov.my, verified against
+    # each ministry's own name, not a lookalike). Same not-content-verified
+    # caveat as every other WebSearch-found entry in this file: this sandbox
+    # blocks direct fetch to all of these (re-confirmed — WebFetch/curl both
+    # 403 on malaysia.gov.my, mof.gov.my, moh.gov.my, imi.gov.my, motac.gov.my).
+    # Two pages per domain: the general portal (broad coverage, catch-all) and
+    # one topic-specific page (the thing people actually search for).
+    Source(
+        name="mygovernment-portal-home",
+        url="https://www.malaysia.gov.my/en",
+        kind="html",
+        domain="government",
+        ministry="MyGovernment / National Digital Department (JDN)",
+        language="en",
+        notes="Central government-services directory — the single broadest 'which agency handles X' catch-all.",
+    ),
+    Source(
+        name="mygovernment-services-noncitizen",
+        url="https://rai.malaysia.gov.my/digital-services/apply---i-services-registration-service-provider--user",
+        kind="html",
+        domain="government",
+        ministry="MyGovernment / National Digital Department (JDN)",
+        language="en",
+        notes="Non-citizen-facing government services index (immigration/employment/education/healthcare cross-references).",
+    ),
+    Source(
+        name="mof-portal-home",
+        url="https://www.mof.gov.my/portal/en",
+        kind="html",
+        domain="finance",
+        ministry="Kementerian Kewangan Malaysia (MOF)",
+        language="en",
+        notes="MOF official portal — fiscal/tax policy, budget announcements, exemption guidelines.",
+    ),
+    Source(
+        name="mof-belanjawan-portal",
+        url="https://belanjawan.mof.gov.my/en",
+        kind="html",
+        domain="finance",
+        ministry="Kementerian Kewangan Malaysia (MOF)",
+        language="en",
+        notes="Federal Budget portal — Budget Speech text, fiscal outlook, revenue/expenditure estimates.",
+    ),
+    Source(
+        name="moh-portal-home",
+        url="https://www.moh.gov.my/en",
+        kind="html",
+        domain="healthcare",
+        ministry="Kementerian Kesihatan Malaysia (KKM)",
+        language="en",
+        notes="MOH official portal — public health programmes, facility directory.",
+    ),
+    Source(
+        name="moh-directory",
+        url="https://www.moh.gov.my/en/directory",
+        kind="html",
+        domain="healthcare",
+        ministry="Kementerian Kesihatan Malaysia (KKM)",
+        language="en",
+        notes="Government clinic/hospital directory — the actual 'where do I go' lookup, not just ministry-org info.",
+    ),
+    Source(
+        name="imi-portal-home",
+        url="https://www.imi.gov.my/index.php/en/home/",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Immigration Department official portal home.",
+    ),
+    Source(
+        name="imi-visa-services",
+        url="https://www.imi.gov.my/index.php/en/main-services/visa/",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Visa services page — pass/permit types, the highest-volume immigration query category.",
+    ),
+    Source(
+        name="motac-portal-home",
+        url="https://www.motac.gov.my/en/",
+        kind="html",
+        domain="culture",
+        ministry="Kementerian Pelancongan, Kesenian dan Kebudayaan (MOTAC)",
+        language="en",
+        notes="MOTAC official portal — tourism/arts/culture/heritage/museum/archives remit.",
+    ),
+    Source(
+        name="motac-policy",
+        url="https://www.motac.gov.my/en/profile/policy",
+        kind="html",
+        domain="culture",
+        ministry="Kementerian Pelancongan, Kesenian dan Kebudayaan (MOTAC)",
+        language="en",
+        notes="Ministry policy page — heritage-designation and cultural-preservation policy specifics.",
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}

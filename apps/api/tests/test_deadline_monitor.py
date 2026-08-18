@@ -222,3 +222,77 @@ class TestDegradeGracefully:
             'relation "deadline_alert_subscriptions" does not exist'
         )
         assert deadline_monitor._load_subscriptions(sb, "business") == []
+
+
+class TestAdvanceRecurrence:
+    """The recurrence-advance gap: nothing previously rolled a passed
+    monthly/annual deadline forward to its next cycle (confirmed by grep —
+    zero hits for "recurrence" outside deadline_monitor.py before this
+    change). Migration 010's seed rows are a live example of the bug this
+    closes: 3 of its 5 seeded deadlines are already stale."""
+
+    def test_non_recurring_left_unchanged(self):
+        from datetime import date
+        due = date(2026, 1, 15)
+        today = date(2026, 6, 1)
+        assert deadline_monitor._advance_recurrence(due, None, today) == due
+        assert deadline_monitor._advance_recurrence(due, "once", today) == due
+
+    def test_not_yet_due_left_unchanged(self):
+        from datetime import date
+        due = date(2026, 12, 31)
+        today = date(2026, 6, 1)
+        assert deadline_monitor._advance_recurrence(due, "monthly", today) == due
+
+    def test_monthly_advances_one_cycle(self):
+        from datetime import date
+        due = date(2026, 4, 30)   # Form BE — matches migration 010's real seed row
+        today = date(2026, 8, 18)
+        result = deadline_monitor._advance_recurrence(due, "monthly", today)
+        assert result >= today
+        assert result == date(2026, 8, 30)
+
+    def test_monthly_advances_multiple_cycles(self):
+        # Starting on the 31st, the Feb clamp to 28 becomes the new anchor
+        # day for every later step (same behaviour real month-end billing
+        # cycles use) — so this lands on the 28th, not the 31st. Chose a
+        # day (15th) with no clamping in the sibling test below to isolate
+        # "does it skip multiple cycles" from "does clamping compound".
+        from datetime import date
+        due = date(2026, 1, 31)
+        today = date(2026, 8, 18)
+        result = deadline_monitor._advance_recurrence(due, "monthly", today)
+        assert result >= today
+        assert result == date(2026, 8, 28)
+
+    def test_monthly_advances_multiple_cycles_no_clamping(self):
+        # 15 Jan -> 15 Aug is still < today (18 Aug), so the loop correctly
+        # continues one more cycle to 15 Sep, not 15 Aug.
+        from datetime import date
+        due = date(2026, 1, 15)
+        today = date(2026, 8, 18)
+        result = deadline_monitor._advance_recurrence(due, "monthly", today)
+        assert result >= today
+        assert result == date(2026, 9, 15)
+
+    def test_annual_advances_one_cycle(self):
+        from datetime import date
+        due = date(2026, 6, 30)   # CP204 — matches migration 010's real seed row
+        today = date(2026, 8, 18)
+        result = deadline_monitor._advance_recurrence(due, "annual", today)
+        assert result == date(2027, 6, 30)
+
+    def test_month_end_overflow_clamped(self):
+        # 31 Jan + 1 month must land on the LAST day of February, not roll
+        # over into March — the exact bug a naive "day + 30" approach hits.
+        from datetime import date
+        due = date(2026, 1, 31)
+        today = date(2026, 2, 1)
+        result = deadline_monitor._advance_recurrence(due, "monthly", today)
+        assert result == date(2026, 2, 28)
+
+    def test_unrecognised_recurrence_left_unchanged(self):
+        from datetime import date
+        due = date(2026, 1, 1)
+        today = date(2026, 6, 1)
+        assert deadline_monitor._advance_recurrence(due, "weekly", today) == due
