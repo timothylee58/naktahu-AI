@@ -91,3 +91,15 @@ jobs:
             echo "::endgroup::"
           done
           exit $status
+
+      - name: Domain coverage report
+        # Informational, same as the health-check step above — never fails
+        # the job on its own (check_domain_coverage.py degrades to a plain
+        # message rather than raising if it can't reach Supabase). Answers
+        # "did every domain that has sources registered actually end up
+        # with real chunks", not just "were the URLs reachable".
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -m scripts.check_domain_coverage
