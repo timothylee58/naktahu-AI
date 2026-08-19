@@ -155,3 +155,128 @@ html[lang='zh-Hans'] .locale-text-balance {
 .chat-content li { margin: 0.1rem 0; }
 .chat-content strong { font-weight: 600; }
 .chat-content p { margin: 0.25rem 0; }
+
+/* ── /chat ambient mesh backdrop ──────────────────────────────────────── */
+.chat-ambient-mesh__grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--nk-official) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--nk-official) 7%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 85%);
+}
+.chat-ambient-mesh__field {
+  width: 60vmin;
+  height: 60vmin;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.55;
+  animation: chat-mesh-drift 22s ease-in-out infinite;
+}
+.chat-ambient-mesh__field--official {
+  top: -10%;
+  left: 8%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--nk-official) 55%, transparent), transparent);
+  animation-delay: 0s;
+}
+.chat-ambient-mesh__field--heritage {
+  top: 12%;
+  right: 4%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--nk-heritage) 55%, transparent), transparent);
+  animation-delay: -7s;
+  animation-duration: 26s;
+}
+.chat-ambient-mesh__field--crimson {
+  bottom: -18%;
+  left: 32%;
+  width: 48vmin;
+  height: 48vmin;
+  background: radial-gradient(closest-side, color-mix(in srgb, #b3282d 45%, transparent), transparent);
+  animation-delay: -14s;
+  animation-duration: 30s;
+}
+@keyframes chat-mesh-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(3%, 4%) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-ambient-mesh__field { animation: none; }
+}
+
+/* ── ChatInput conic light-sweep focus ring ───────────────────────────── */
+.chat-input-sweep {
+  position: relative;
+}
+.chat-input-sweep::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--chat-sweep-angle, 0deg),
+    var(--nk-official),
+    var(--nk-heritage),
+    #b3282d,
+    var(--nk-official)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+  animation: chat-sweep-rotate 3.2s linear infinite;
+  pointer-events: none;
+}
+.chat-input-sweep--active::before {
+  opacity: 1;
+}
+@keyframes chat-sweep-rotate {
+  to { --chat-sweep-angle: 360deg; }
+}
+@property --chat-sweep-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-input-sweep::before { animation: none; }
+}
+
+/* ── Prompt-chip status dot ────────────────────────────────────────────── */
+.chat-chip-dot {
+  animation: chat-chip-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-chip-dot { animation: none; }
+}
+@keyframes chat-chip-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+/* ── Voice-input waveform bars ─────────────────────────────────────────── */
+.chat-waveform {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+.chat-waveform span {
+  display: block;
+  width: 2.5px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: chat-waveform-scale 0.9s ease-in-out infinite;
+}
+.chat-waveform span:nth-child(1) { height: 40%; animation-delay: -0.6s; }
+.chat-waveform span:nth-child(2) { height: 100%; animation-delay: -0.4s; }
+.chat-waveform span:nth-child(3) { height: 65%; animation-delay: -0.2s; }
+.chat-waveform span:nth-child(4) { height: 85%; animation-delay: -0.8s; }
+.chat-waveform span:nth-child(5) { height: 50%; animation-delay: 0s; }
+@keyframes chat-waveform-scale {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-waveform span { animation: none; height: 60% !important; }
+}

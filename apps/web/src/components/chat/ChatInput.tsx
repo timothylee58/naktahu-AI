@@ -23,6 +23,32 @@ import { matchAgentRules, type AgentSuggestion } from '@/lib/agent-suggestions';
 // applied to a live-typing consumer instead of a submitted query.
 const MIN_CHARS_FOR_LIVE_SUGGESTION = 6;
 
+// A small, representative spread for the auto-cycling placeholder — not the
+// full 10-query PromptChips set, just enough to signal "ask about anything
+// civic" without the placeholder text itself becoming a second suggestion
+// system competing with the chips below the input.
+const CYCLING_EXAMPLES: Record<'ms' | 'en' | 'zh', string[]> = {
+  ms: [
+    'Bagaimana cara mendaftar syarikat di SSM?',
+    'Bila tarikh tutup permohonan geran ini?',
+    'Apa yang perlu dilakukan jika MyKad hilang?',
+    'Bagaimana cara mengeluarkan wang KWSP?',
+  ],
+  en: [
+    'How do I register a company with SSM?',
+    "When does this grant's window close?",
+    'What should I do if I lose my MyKad?',
+    'How do I withdraw EPF for a home purchase?',
+  ],
+  zh: [
+    '如何在SSM注册公司？',
+    '这项资助的申请截止日期是什么时候？',
+    '如果身份证遗失了该怎么办？',
+    '如何提取公积金用于购房？',
+  ],
+};
+const CYCLE_INTERVAL_MS = 4200;
+
 interface ChatInputProps {
   onSend: (query: string) => void;
   isStreaming: boolean;
@@ -48,6 +74,7 @@ export function ChatInput({
   const { t, locale } = useI18n();
   const isDark = variant === 'dark';
   const [value, setValue] = useState('');
+  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Guards against a same-tick double-submit (e.g. a duplicate/repeated
   // Enter keydown before `value` state has cleared) — released on the next
@@ -79,6 +106,32 @@ export function ChatInput({
   useEffect(() => {
     if (transcript) setValue(transcript);
   }, [transcript]);
+
+  // Auto-cycling placeholder — only while the field is genuinely empty and
+  // unfocused, so it never fights with what the user is actually typing or
+  // reads as it changed mid-thought.
+  const cyclingSet = CYCLING_EXAMPLES[locale as 'ms' | 'en' | 'zh'] ?? CYCLING_EXAMPLES.en;
+  const [cycleIndex, setCycleIndex] = useState(0);
+  useEffect(() => {
+    if (focused || value) return;
+    const id = window.setInterval(() => {
+      setCycleIndex((i) => (i + 1) % cyclingSet.length);
+    }, CYCLE_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [focused, value, cyclingSet.length]);
+
+  // ⌘K / Ctrl+K — jump straight to the input from anywhere on the page,
+  // matching the command-palette convention rather than inventing a new one.
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        textareaRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   // Inject query from history sidebar or prompt chips
   useEffect(() => {
@@ -187,6 +240,9 @@ export function ChatInput({
         </button>
       </div>
     )}
+    <div
+      className={`chat-input-sweep rounded-2xl ${focused ? 'chat-input-sweep--active' : ''}`}
+    >
     <div className={`flex items-end gap-2 border rounded-2xl px-3 py-2 ${shellClass}`}>
       <span className={`flex-shrink-0 text-[10px] font-semibold rounded-full px-2 py-0.5 mb-1 select-none ${langBadgeClass}`}>
         {langLabel}
@@ -201,11 +257,25 @@ export function ChatInput({
           autoResize();
         }}
         onKeyDown={handleKeyDown}
-        placeholder={isStreaming ? t('chat.placeholder_queue') : t('chat.placeholder')}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={isStreaming ? t('chat.placeholder_queue') : cyclingSet[cycleIndex]}
         rows={1}
         className={`flex-1 resize-none bg-transparent text-sm focus:outline-none leading-6 py-0.5 max-h-24 overflow-y-auto ${inputClass}`}
         aria-label={t('chat.placeholder')}
       />
+
+      {/* keyboard hotkey hint — hidden once the field has content or focus,
+          same "don't compete with what's typed" rule as the cycling placeholder */}
+      {!focused && !value && (
+        <kbd
+          className={`hidden sm:inline-flex flex-shrink-0 items-center gap-0.5 text-[10px] font-mono rounded px-1.5 py-0.5 mb-1 select-none ${
+            isDark ? 'bg-white/10 text-zinc-400' : 'bg-zinc-100 text-zinc-400'
+          }`}
+        >
+          ⌘K
+        </kbd>
+      )}
 
       {/* mic button */}
       {available && (
@@ -221,22 +291,28 @@ export function ChatInput({
           aria-label={t('chat.mic')}
           className={`p-2 rounded-full transition-colors mb-0.5 ${
             isListening
-              ? 'bg-red-100 text-red-600 animate-pulse'
+              ? 'bg-red-100 text-red-600'
               : voiceError
               ? 'text-red-400 hover:text-red-600 hover:bg-red-50'
               : micIdleClass
           }`}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="w-5 h-5"
-            aria-hidden
-          >
-            <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4Z" />
-            <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357Z" />
-          </svg>
+          {isListening ? (
+            <span className="chat-waveform" aria-hidden>
+              <span /><span /><span /><span /><span />
+            </span>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="w-5 h-5"
+              aria-hidden
+            >
+              <path d="M7 4a3 3 0 0 1 6 0v6a3 3 0 1 1-6 0V4Z" />
+              <path d="M5.5 9.643a.75.75 0 0 0-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.546A6.001 6.001 0 0 0 16 10v-.357a.75.75 0 0 0-1.5 0V10a4.5 4.5 0 0 1-9 0v-.357Z" />
+            </svg>
+          )}
         </button>
         </div>
       )}
@@ -278,6 +354,7 @@ export function ChatInput({
           </svg>
         </button>
       )}
+    </div>
     </div>
 
     <div className="flex items-center gap-2 px-1">

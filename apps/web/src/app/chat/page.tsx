@@ -11,6 +11,7 @@ import { useI18n } from '@/lib/i18n';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import type { Message } from '@/lib/types';
+import { ChatAmbientMesh } from '@/components/chat/ChatAmbientMesh';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
@@ -423,6 +424,7 @@ function ChatPageInner() {
 
       {/* message list */}
       <div className="relative flex-1 min-h-0">
+      {messages.length === 0 && <ChatAmbientMesh />}
       <div
         ref={listRef}
         onScroll={handleScroll}
@@ -506,22 +508,37 @@ function ChatPageInner() {
               {t('chat.empty.greeting')}
             </p>
 
-            {/* Trust strip — the concrete differentiator ("this isn't just an
-                LLM, every answer is sourced") stated up front rather than only
-                surfacing once an answer streams in. Deliberately doesn't name
-                specific ministries: only real, currently-ingested sources
-                should ever be named here, and that set changes as ingestion
-                grows — a generic, structurally-true claim beats a specific
-                but stale or fabricated one. */}
-            <div
-              className={`flex items-center gap-1.5 text-[11px] font-medium rounded-full px-3 py-1.5 ${
-                isDark ? 'bg-nk-heritage/10 text-nk-heritage' : 'bg-nk-heritage/10 text-nk-heritage-dim'
-              }`}
-            >
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0" aria-hidden>
-                <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.362-3.29 9.95-7.96 11.878a.514.514 0 0 1-.4 0C5.29 17.05 2 12.463 2 7.1c0-.539.035-1.07.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.75Zm4.196 5.954a.75.75 0 0 0-1.214-.882l-3.236 4.53L7.53 9.963a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.137-.089l3.75-5.25Z" clipRule="evenodd" />
-              </svg>
-              <span className="locale-text-balance">{t('chat.trust.strip')}</span>
+            {/* Civic HUD — the trust strip's successor: two honestly-sourced
+                status chips instead of one sentence. Neither value is
+                fabricated telemetry: the language-engine chip reflects the
+                real active UI locale, and the verified-sources chip restates
+                the same structural, always-true claim the old trust strip
+                made (real gov.my sources only) — just styled as an
+                instrument reading, not dressed up with a fake number. No
+                "live latency" chip: there's no request in flight yet on an
+                empty state, and a static placeholder number would be exactly
+                the kind of fabricated live data this surface must not show. */}
+            <div className="flex flex-wrap items-center justify-center gap-2 font-mono text-[10px] tabular-nums tracking-wide">
+              <div
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                  isDark ? 'border-nk-official/30 bg-nk-official/10 text-nk-official' : 'border-nk-official/25 bg-nk-official/10 text-nk-official-dim'
+                }`}
+              >
+                <span className="chat-chip-dot w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" aria-hidden />
+                <span className="locale-nowrap">
+                  {t('chat.hud.language_engine')} · {locale.toUpperCase()}
+                </span>
+              </div>
+              <div
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                  isDark ? 'border-nk-heritage/30 bg-nk-heritage/10 text-nk-heritage' : 'border-nk-heritage/25 bg-nk-heritage/10 text-nk-heritage-dim'
+                }`}
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 flex-shrink-0" aria-hidden>
+                  <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.362-3.29 9.95-7.96 11.878a.514.514 0 0 1-.4 0C5.29 17.05 2 12.463 2 7.1c0-.539.035-1.07.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.75Zm4.196 5.954a.75.75 0 0 0-1.214-.882l-3.236 4.53L7.53 9.963a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.137-.089l3.75-5.25Z" clipRule="evenodd" />
+                </svg>
+                <span className="locale-nowrap">{t('chat.hud.verified_sources')}</span>
+              </div>
             </div>
           </motion.div>
         )}

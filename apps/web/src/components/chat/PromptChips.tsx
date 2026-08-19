@@ -391,8 +391,13 @@ function ChipRow({
               disabled={disabled}
               variants={chipVariants}
               whileTap={disabled ? undefined : { scale: 0.96 }}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
             >
+              {/* Decorative "domain available" indicator — a status node,
+                  not a live-data feed: this breathes to read as active, but
+                  represents "this topic is ready to ask about", never a
+                  fabricated real-time count or server metric. */}
+              <span className={`chat-chip-dot flex-shrink-0 w-1.5 h-1.5 rounded-full ${isDark ? 'bg-nk-heritage' : 'bg-nk-heritage-dim'}`} aria-hidden />
               {getLabel(chip)}
             </motion.button>
           );
