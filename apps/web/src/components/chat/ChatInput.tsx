@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useVoiceInput } from '@/lib/hooks/useVoiceInput';
+import { inSeasonalWindow } from '@/lib/seasonal-window';
 import {
   contextUsagePercent,
   formatContextUsage,
@@ -76,6 +77,10 @@ export function ChatInput({
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [seasonal, setSeasonal] = useState(false);
+  useEffect(() => {
+    setSeasonal(inSeasonalWindow(new Date()));
+  }, []);
   // Guards against a same-tick double-submit (e.g. a duplicate/repeated
   // Enter keydown before `value` state has cleared) — released on the next
   // microtask rather than tied to isStreaming, since sending while a
@@ -298,8 +303,23 @@ export function ChatInput({
           }`}
         >
           {isListening ? (
+            // "Suara Merdeka" mode: during the seasonal window, recolor the
+            // waveform bars to the four Jalur Gemilang colours instead of
+            // the default currentColor — a real, honest visual (this IS
+            // the live mic waveform, just recoloured), not a fabricated
+            // audio-analysis feature.
             <span className="chat-waveform" aria-hidden>
-              <span /><span /><span /><span /><span />
+              {seasonal ? (
+                <>
+                  <span style={{ backgroundColor: '#b3282d' }} />
+                  <span style={{ backgroundColor: '#ffffff', outline: '1px solid currentColor' }} />
+                  <span style={{ backgroundColor: '#ffcc00' }} />
+                  <span style={{ backgroundColor: '#010066' }} />
+                  <span style={{ backgroundColor: '#b3282d' }} />
+                </>
+              ) : (
+                <><span /><span /><span /><span /><span /></>
+              )}
             </span>
           ) : (
             <svg

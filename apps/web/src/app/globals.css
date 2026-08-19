@@ -202,6 +202,24 @@ html[lang='zh-Hans'] .locale-text-balance {
   .chat-ambient-mesh__field { animation: none; }
 }
 
+/* Seasonal Bintang 14 starburst — Aug25-Sep20 only, layered on top of the
+   permanent fields above rather than a second ambient component. */
+.chat-ambient-mesh__starburst {
+  width: 70vmin;
+  height: 70vmin;
+  max-width: 640px;
+  max-height: 640px;
+  transform: translate(-50%, -50%);
+  opacity: 0.16;
+  animation: chat-starburst-spin 90s linear infinite;
+}
+@keyframes chat-starburst-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-ambient-mesh__starburst { animation: none; }
+}
+
 /* ── ChatInput conic light-sweep focus ring ───────────────────────────── */
 .chat-input-sweep {
   position: relative;
@@ -240,6 +258,20 @@ html[lang='zh-Hans'] .locale-text-balance {
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-input-sweep::before { animation: none; }
+}
+
+/* ── Merdeka keyword-triggered confetti burst (one-shot) ──────────────── */
+.merdeka-confetti-particle {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  left: calc(50% + var(--mc-left, 0));
+  transform: translateX(-50%) rotate(var(--mc-rotate, 0deg));
+  animation: merdeka-confetti-fall var(--mc-duration, 1.3s) var(--mc-delay, 0s) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes merdeka-confetti-fall {
+  0% { transform: translate(-50%, -10px) rotate(var(--mc-rotate, 0deg)); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--mc-drift, 0)), 70vh) rotate(calc(var(--mc-rotate, 0deg) + 340deg)); opacity: 0; }
 }
 
 /* ── Prompt-chip status dot ────────────────────────────────────────────── */

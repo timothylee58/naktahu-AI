@@ -521,6 +521,53 @@ SOURCES: tuple[Source, ...] = (
         language="en",
         notes="Ministry policy page — heritage-designation and cultural-preservation policy specifics.",
     ),
+
+    # ── "Edisi Kemerdekaan" seasonal AI lens (Aug25-Sep20) — the two
+    # sub-topics that have a real, verifiable official source today: 1957
+    # Merdeka history and MA63 (Malaysia Day). Both found via WebSearch on
+    # confirmed .gov.my domains (Arkib Negara, JPM/BHESS, MyGOV) — same
+    # not-content-verified caveat as every other WebSearch-found entry here.
+    # Deliberately NOT registering parade-logistics or JPJ-discount
+    # sources for this lens: no real official source was found for either
+    # in this session, and inventing one would violate this file's own
+    # "URLs must be real, verified pages; never guess" rule — the frontend
+    # lens surfaces only the sub-topics that have sources.
+    Source(
+        name="arkib-pengisytiharan-kemerdekaan",
+        url="https://pustakailmu.arkib.gov.my/index.php/ms/pustaka-ilmu/imbasan-fakta/dokumen-perisytiharan-kemerdekaan",
+        kind="html",
+        domain="culture",
+        ministry="Arkib Negara Malaysia (National Archives)",
+        language="bm",
+        notes="Official 31 Aug 1957 Proclamation of Independence document and its historical context.",
+    ),
+    Source(
+        name="arkib-menjejaki-31-ogos-1957",
+        url="https://pustakailmu.arkib.gov.my/index.php/ms/pustaka-ilmu/jendela-sejarah/menjejaki-31-ogos-1957",
+        kind="html",
+        domain="culture",
+        ministry="Arkib Negara Malaysia (National Archives)",
+        language="bm",
+        notes="Narrative history of the 31 Aug 1957 independence ceremony at Stadium Merdeka.",
+    ),
+    Source(
+        name="bhess-perjanjian-ma63",
+        url="https://bhess.jpm.gov.my/index.php/perjanjian-ma63/",
+        kind="html",
+        domain="culture",
+        ministry="Bahagian Hal Ehwal Sabah & Sarawak (BHESS), Jabatan Perdana Menteri (JPM)",
+        language="bm",
+        notes="Official JPM page on the Malaysia Agreement 1963 (MA63) — the Hari Malaysia / 16 Sep source.",
+    ),
+    Source(
+        name="mygov-rukun-negara",
+        url="https://www.malaysia.gov.my/portal/content/30110?language=my",
+        kind="html",
+        domain="culture",
+        ministry="MyGovernment Portal (MAMPU)",
+        language="bm",
+        notes="Official Rukun Negara text — the 5 national principles and their formation context (est. 1970).",
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
