@@ -24,6 +24,7 @@ services/calendar_sync.py's module docstring.
 from __future__ import annotations
 
 import asyncio
+import calendar
 import re
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -59,6 +60,43 @@ _BM_MONTHS = {
 }
 
 _ALERT_DAYS = (30, 14, 7, 1)
+
+# Months to add per cycle for each recurrence value stored in
+# deadline_schedule.recurrence. Anything else (None, "once", an unrecognised
+# string) is left alone — a one-off deadline SHOULD go stale once it passes,
+# there's no "next cycle" to roll it forward to.
+_RECURRENCE_STEP_MONTHS = {"monthly": 1, "annual": 12}
+
+
+def _advance_recurrence(due: date, recurrence: str | None, today: date) -> date:
+    """Roll `due` forward by whole recurrence cycles until it's >= today.
+
+    Pre-existing gap this closes: nothing in this codebase advanced a
+    recurring deadline once its due_date passed (confirmed by grep — zero
+    hits for "recurrence" outside this file before this change). The
+    scrape-based date-drift correction a few lines below only ever nudges a
+    date that's within 7 days of the stored one, which can't catch an
+    annual deadline that's now ~11 months stale. Migration 010's seed data
+    (CP204/Form BE/SST/EPF rows) is a live example: 3 of 5 seeded rows are
+    already past due as of this change, with nothing that would ever
+    correct them. Returns `due` unchanged for a non-recurring or
+    unrecognised recurrence value, or when it isn't overdue yet.
+    """
+    step = _RECURRENCE_STEP_MONTHS.get(recurrence or "")
+    if not step or due >= today:
+        return due
+    next_due = due
+    while next_due < today:
+        month_index = next_due.month - 1 + step
+        year = next_due.year + month_index // 12
+        month = month_index % 12 + 1
+        # Clamp the day for month-end overflow (e.g. 31 Jan + 1 month must
+        # not silently become 3 Mar) — same defensive pattern _parse_dates
+        # already uses via date()'s own ValueError-on-invalid behaviour,
+        # applied proactively here instead of catching after the fact.
+        day = min(next_due.day, calendar.monthrange(year, month)[1])
+        next_due = date(year, month, day)
+    return next_due
 
 # Minimum plan rank required to receive email alerts (Trap #6-adjacent: this
 # imports the canonical _PLAN_RANK from middleware/plan_gate.py rather than
@@ -296,6 +334,26 @@ def main() -> None:
             due = date.fromisoformat(due)
         if not due:
             continue
+
+        # Roll a passed recurring deadline to its next cycle BEFORE anything
+        # below reads `due` — the alert-window check, the calendar push, and
+        # the scrape-drift correction all need the current cycle's date, not
+        # a stale one sitting months in the past.
+        advanced = _advance_recurrence(due, entry.get("recurrence"), today)
+        if advanced != due:
+            log.info(
+                "deadline_recurrence_advanced",
+                name=entry.get("deadline_name"),
+                recurrence=entry.get("recurrence"),
+                stale_due=str(due),
+                new_due=str(advanced),
+            )
+            sb.table("deadline_schedule").update({
+                "due_date": advanced.isoformat(),
+                "last_verified": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", entry["id"]).execute()
+            due = advanced
+            entry["due_date"] = advanced.isoformat()
 
         for alert_day in _ALERT_DAYS:
             if due - today == timedelta(days=alert_day):

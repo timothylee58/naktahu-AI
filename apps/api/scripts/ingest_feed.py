@@ -295,7 +295,15 @@ def _existing_hashes(supabase, hashes: list[str]) -> set[str]:
 
 
 async def main_async(args: argparse.Namespace) -> None:
-    supabase = None if args.dry_run else create_client(settings.supabase_url, settings.supabase_service_key)
+    # Real Supabase client regardless of dry_run — dry-run's contract is "no
+    # WRITES", not "no reads". Before this fix, dry-run hardcoded `already =
+    # set()` below, which meant the weekly scheduled dry-run cron
+    # (ingest-sources.yml) re-embedded every entry from every source on
+    # EVERY run forever, even entries it had already seen and embedded in
+    # every prior week's run — a real, recurring ILMU API cost for zero
+    # benefit, since dry-run's whole purpose is "check content looks right",
+    # not "burn tokens re-confirming unchanged content every week".
+    supabase = create_client(settings.supabase_url, settings.supabase_service_key)
 
     # getattr default keeps callers that predate --kind (and existing tests)
     # on the RSS path unchanged.
@@ -344,9 +352,15 @@ async def main_async(args: argparse.Namespace) -> None:
         print("Nothing to ingest.")
         return
 
-    already = set() if args.dry_run else _existing_hashes(supabase, [h for _, h in candidates])
+    # Read-only, runs in both modes now (see the comment on `supabase` above)
+    # — this is the actual fix: an entry already embedded in a prior run
+    # (dry or live) is skipped here, before the token-costing _embed() call
+    # below, instead of every entry being re-embedded on every scheduled
+    # dry-run regardless of whether anything changed.
+    already = _existing_hashes(supabase, [h for _, h in candidates])
     new_entries = [(e, h) for e, h in candidates if h not in already]
-    print(f"{len(new_entries)} new entr(ies) to embed and insert ({len(candidates) - len(new_entries)} already ingested)")
+    skipped_unchanged = len(candidates) - len(new_entries)
+    print(f"{len(new_entries)} new entr(ies) to embed and insert ({skipped_unchanged} already ingested — skipped, not re-embedded)")
 
     inserted = 0
     errors = 0

@@ -24,6 +24,21 @@ from scripts.ingest_feed import (  # noqa: E402
 )
 from scripts.sources import SOURCES, SOURCES_BY_NAME, get_source  # noqa: E402
 
+def _mock_supabase(existing_hashes: list[str] | None = None) -> MagicMock:
+    """A Supabase client whose document_chunks.select(...).in_(...) returns
+    `existing_hashes` as already-ingested — used for both dry-run and live
+    tests now that dry-run also does this read (see ingest_feed.py's
+    main_async: dry-run's contract is "no writes", not "no reads")."""
+    table_mock = MagicMock()
+    table_mock.select.return_value.in_.return_value.execute.return_value = MagicMock(
+        data=[{"content_hash": h} for h in (existing_hashes or [])]
+    )
+    table_mock.insert.return_value.execute.return_value = MagicMock(data=[{"id": "1"}])
+    sb = MagicMock()
+    sb.table.return_value = table_mock
+    return sb
+
+
 _RSS_SAMPLE = """<?xml version="1.0"?>
 <rss version="2.0">
   <channel>
@@ -133,6 +148,7 @@ async def test_main_async_dry_run_skips_poisoned_entry_and_embeds_clean_one(monk
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_RSS_SAMPLE))
     fake_embed = AsyncMock(return_value=[0.0] * 1536)
     monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
 
     args = MagicMock(
         feed_url="https://example.gov.my/rss",
@@ -148,6 +164,47 @@ async def test_main_async_dry_run_skips_poisoned_entry_and_embeds_clean_one(monk
     assert "1 entr(ies) — prompt-injection pattern suspected" in out
     assert "1 new entr(ies) to embed" in out
     assert fake_embed.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_main_async_dry_run_skips_reembedding_already_ingested_entry(monkeypatch, capsys):
+    """The actual fix: an entry whose content_hash already exists in
+    document_chunks must NOT be re-embedded on a dry-run — this is the
+    regression test for the token-waste bug (every scheduled weekly
+    dry-run was re-embedding every entry from every source, forever,
+    regardless of whether anything had changed since the last run)."""
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_RSS_SAMPLE))
+    fake_embed = AsyncMock(return_value=[0.0] * 1536)
+    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+
+    # Derived from the real parsed entry (via the actual parse_feed +
+    # FeedEntry.content the code under test uses) rather than hand-typed —
+    # hand-typing this once already produced text that didn't match
+    # _RSS_SAMPLE's real title/description after HTML-stripping, which
+    # would have made this test pass without actually exercising the skip
+    # path (a mismatched hash just means "nothing pre-existing", not "the
+    # skip logic works").
+    import hashlib
+    clean_entry = next(e for e in parse_feed(_RSS_SAMPLE) if "Dewan Rakyat" in e.title)
+    existing_hash = hashlib.sha256(clean_entry.content.encode()).hexdigest()
+
+    sb = _mock_supabase(existing_hashes=[existing_hash])
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
+
+    args = MagicMock(
+        feed_url="https://example.gov.my/rss",
+        domain="government",
+        ministry="Parliament of Malaysia",
+        language="bm",
+        limit=50,
+        dry_run=True,
+    )
+    await main_async(args)
+
+    out = capsys.readouterr().out
+    assert "already ingested — skipped, not re-embedded" in out
+    assert "0 new entr(ies) to embed" in out
+    fake_embed.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -285,6 +342,7 @@ async def test_main_async_html_dry_run_embeds_chunks(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_HTML_SAMPLE))
     fake_embed = AsyncMock(return_value=[0.0] * 1536)
     monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
 
     args = MagicMock(
         feed_url="https://www.investmalaysia.gov.my",
@@ -309,6 +367,11 @@ async def test_main_async_html_skips_injection_page(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_HTML_INJECTION))
     fake_embed = AsyncMock(return_value=[0.0] * 1536)
     monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    # create_client is now called unconditionally at the top of main_async
+    # (see the fix), before this test's early-return path (all entries
+    # filtered by the injection scan) is ever reached — needs the mock too,
+    # even though it never reaches the hash-check that mock exists for.
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
 
     args = MagicMock(
         feed_url="https://example.gov.my/poisoned",

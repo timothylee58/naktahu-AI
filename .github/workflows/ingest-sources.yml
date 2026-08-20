@@ -91,3 +91,25 @@ jobs:
             echo "::endgroup::"
           done
           exit $status
+
+      - name: Domain coverage report (sources x live chunks x eval coverage)
+        # Cross-checks 3 axes against each other every week: registered
+        # sources (scripts/sources.py), live document_chunks content, and
+        # eval-dataset coverage (evals/*.jsonl) — not 3 separate scheduled
+        # jobs re-deriving the same thing, one script reading all 3.
+        #
+        # continue-on-error, same as the health-check step above: this
+        # script now exits 1 when it finds a real gap (registered-but-never
+        # -ingested, or zero eval coverage), which is CORRECT and expected
+        # to fire today — most sources genuinely haven't been through a
+        # live ingest run yet. A hard-failing scheduled job that's red every
+        # single week trains everyone to ignore it; continue-on-error keeps
+        # it a loud, visible, non-blocking annotation instead — the same
+        # severity check_sources.py's health check already uses for the
+        # same reason.
+        if: always()
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -m scripts.check_domain_coverage

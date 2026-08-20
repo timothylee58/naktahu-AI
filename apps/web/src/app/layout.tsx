@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/lib/theme';
 import { PageTransition } from '@/components/PageTransition';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { SeasonalBanner } from '@/components/SeasonalBanner';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -112,6 +113,13 @@ export default function RootLayout({
         <I18nProvider>
           <ThemeProvider>
             <ErrorBoundary>
+              {/* Site-wide, above every page's own layout — a shrink-to-fit
+                  block sibling to PageTransition's flex-1, so it just pushes
+                  content down slightly rather than fighting any page's own
+                  full-height flex structure (e.g. /chat's header+sidebar
+                  layout). Self-gates on a date window; renders nothing
+                  outside it or once dismissed. */}
+              <SeasonalBanner />
               <PageTransition>{children}</PageTransition>
             </ErrorBoundary>
           </ThemeProvider>

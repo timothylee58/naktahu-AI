@@ -11,6 +11,7 @@ import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { AgentSpotlight } from './AgentSpotlight';
 import { ComparisonSection } from './ComparisonSection';
 import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
+import { SeasonalHeroVideo } from './SeasonalHeroVideo';
 import { useI18n } from '@/lib/i18n';
 import {
   LANDING_TAGLINE_KEYS,
@@ -116,6 +117,7 @@ export function LandingClient() {
       <AuthErrorBanner />
 
       <section className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full">
+        <SeasonalHeroVideo />
         <motion.div
           custom={0}
           variants={fadeUp}

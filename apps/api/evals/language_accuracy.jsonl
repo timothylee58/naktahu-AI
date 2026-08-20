@@ -76,3 +76,7 @@
 {"query": "如何将一座建筑物注册为国家文化遗产？", "expected_language": "zh", "domain": "culture"}
 {"query": "我要怎样查阅国会下议院的辩论记录？", "expected_language": "zh", "domain": "parliament"}
 {"query": "马来西亚国会的法案三读程序是怎样的？", "expected_language": "zh", "domain": "parliament"}
+{"query": "Bilakah jadual waktu peperiksaan SPM 2026 dan apakah subjek wajib yang baharu?", "expected_language": "bm", "domain": "education"}
+{"query": "SPM 2026考试时间表是什么时候公布的？", "expected_language": "zh", "domain": "education"}
+{"query": "Apakah skim bantuan sara hidup yang saya layak mohon sebagai isi rumah berpendapatan rendah?", "expected_language": "bm", "domain": "welfare"}
+{"query": "作为低收入家庭，我可以申请哪些政府生活成本援助计划？", "expected_language": "zh", "domain": "welfare"}

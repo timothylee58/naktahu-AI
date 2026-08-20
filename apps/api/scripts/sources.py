@@ -342,6 +342,232 @@ SOURCES: tuple[Source, ...] = (
         language="bm",
         notes="Official FAQ — eligibility/registration process questions (eKasih linkage, how to check status).",
     ),
+
+    # ── education domain — first-ever entries ──────────────────────────────
+    # Registered zero sources until now (confirmed by grep before adding
+    # these), despite study_agent/nodes.py's explain_node and
+    # generate_quiz_node both calling query_rag_findings(..., "education",
+    # ...) on every request — the agent has been architecturally live with
+    # no real content backing it, silently degrading to citation-less
+    # LLM-only answers. Found via WebSearch (this sandbox blocks direct
+    # fetch to moe.gov.my/lp.moe.gov.my, confirmed again when trying —
+    # EGRESS_BLOCKED via WebFetch, curl CONNECT tunnel 403), same
+    # not-content-verified caveat as the property/business/epf/legal
+    # entries above. All five are Lembaga Peperiksaan Malaysia (LPM) —
+    # the statutory exam board under KPM, not a third-party exam-prep site.
+    Source(
+        name="lpm-spm-overview",
+        url="https://lp.moe.gov.my/index.php/peperiksaan-pentaksiran/peringkat-menengah-atas/sijil-pelajaran-malaysia-spm",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="Official SPM overview — structure, subjects, assessment components.",
+    ),
+    Source(
+        name="lpm-makluman-spm",
+        url="https://lp.moe.gov.my/index.php/makluman-spm",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="Official SPM announcements index — the actual source of truth for exam-cycle changes, not a third-party recap.",
+    ),
+    Source(
+        name="lpm-takwim-pentaksiran-2026",
+        url="https://lp.moe.gov.my/index.php/makluman-spm/1405-takwim-pentaksiran-pusat-tingkatan-5-peperiksaan-sijil-pelajaran-malaysia-spm-tahun-2026-dan-tingkatan-4-peperiksaan-spm-tahun-2027",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="Central-assessment calendar for Form 5 SPM 2026 and Form 4 SPM 2027 candidates.",
+    ),
+    Source(
+        name="lpm-jadual-waktu-spmu-2026",
+        url="https://lp.moe.gov.my/index.php/jadual-waktu/1436-jadual-waktu-peperiksaan-sijil-pelajaran-malaysia-ulangan-spmu-2026ngan-2026",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="SPM Ulangan (repeat/resit) 2026 exam timetable page.",
+    ),
+    Source(
+        name="lpm-home",
+        url="https://lp.moe.gov.my/",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes="LPM portal home — general exam-board contact/structure info, catch-all for queries the more specific pages above don't cover.",
+    ),
+    # Registered from a user-supplied source (URL + the official PDF itself,
+    # "JWP_SPM_2026_18_OGOS_2026.pdf"), not found via WebSearch — this one IS
+    # content-verified: pdftotext was run directly against the PDF in this
+    # session and confirmed a real LPM/KPM "Jadual Waktu Peperiksaan SPM 2026"
+    # document (spoken/oral papers 26–29 Oct and 2–5 Nov 2026; written papers
+    # 23 Nov–17 Dec 2026). Distinct from lpm-jadual-waktu-spmu-2026 above,
+    # which is the SPM *Ulangan* (resit) 2026 timetable — a different exam
+    # cycle, different candidates, different page.
+    Source(
+        name="lpm-jadual-waktu-spm-2026",
+        url="https://lp.moe.gov.my/index.php/jw-spm/1447-jadual-waktu-peperiksaan-sijil-pelajaran-malaysia-2026",
+        kind="html",
+        domain="education",
+        ministry="Lembaga Peperiksaan Malaysia (LPM) / Kementerian Pendidikan Malaysia (KPM)",
+        language="bm",
+        notes=(
+            "SPM 2026 (regular, non-resit) exam timetable. Content-verified via "
+            "the official JWP SPM 2026 PDF: oral/speaking-listening tests 26-29 "
+            "Oct and 2-5 Nov 2026; written papers 23 Nov-17 Dec 2026."
+        ),
+    ),
+
+    # ── First registrations for 5 domains that had ZERO sources ─────────────
+    # government/finance/healthcare/immigration/culture — found via WebSearch,
+    # confirmed as real official ministry domains (.gov.my, verified against
+    # each ministry's own name, not a lookalike). Same not-content-verified
+    # caveat as every other WebSearch-found entry in this file: this sandbox
+    # blocks direct fetch to all of these (re-confirmed — WebFetch/curl both
+    # 403 on malaysia.gov.my, mof.gov.my, moh.gov.my, imi.gov.my, motac.gov.my).
+    # Two pages per domain: the general portal (broad coverage, catch-all) and
+    # one topic-specific page (the thing people actually search for).
+    Source(
+        name="mygovernment-portal-home",
+        url="https://www.malaysia.gov.my/en",
+        kind="html",
+        domain="government",
+        ministry="MyGovernment / National Digital Department (JDN)",
+        language="en",
+        notes="Central government-services directory — the single broadest 'which agency handles X' catch-all.",
+    ),
+    Source(
+        name="mygovernment-services-noncitizen",
+        url="https://rai.malaysia.gov.my/digital-services/apply---i-services-registration-service-provider--user",
+        kind="html",
+        domain="government",
+        ministry="MyGovernment / National Digital Department (JDN)",
+        language="en",
+        notes="Non-citizen-facing government services index (immigration/employment/education/healthcare cross-references).",
+    ),
+    Source(
+        name="mof-portal-home",
+        url="https://www.mof.gov.my/portal/en",
+        kind="html",
+        domain="finance",
+        ministry="Kementerian Kewangan Malaysia (MOF)",
+        language="en",
+        notes="MOF official portal — fiscal/tax policy, budget announcements, exemption guidelines.",
+    ),
+    Source(
+        name="mof-belanjawan-portal",
+        url="https://belanjawan.mof.gov.my/en",
+        kind="html",
+        domain="finance",
+        ministry="Kementerian Kewangan Malaysia (MOF)",
+        language="en",
+        notes="Federal Budget portal — Budget Speech text, fiscal outlook, revenue/expenditure estimates.",
+    ),
+    Source(
+        name="moh-portal-home",
+        url="https://www.moh.gov.my/en",
+        kind="html",
+        domain="healthcare",
+        ministry="Kementerian Kesihatan Malaysia (KKM)",
+        language="en",
+        notes="MOH official portal — public health programmes, facility directory.",
+    ),
+    Source(
+        name="moh-directory",
+        url="https://www.moh.gov.my/en/directory",
+        kind="html",
+        domain="healthcare",
+        ministry="Kementerian Kesihatan Malaysia (KKM)",
+        language="en",
+        notes="Government clinic/hospital directory — the actual 'where do I go' lookup, not just ministry-org info.",
+    ),
+    Source(
+        name="imi-portal-home",
+        url="https://www.imi.gov.my/index.php/en/home/",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Immigration Department official portal home.",
+    ),
+    Source(
+        name="imi-visa-services",
+        url="https://www.imi.gov.my/index.php/en/main-services/visa/",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Visa services page — pass/permit types, the highest-volume immigration query category.",
+    ),
+    Source(
+        name="motac-portal-home",
+        url="https://www.motac.gov.my/en/",
+        kind="html",
+        domain="culture",
+        ministry="Kementerian Pelancongan, Kesenian dan Kebudayaan (MOTAC)",
+        language="en",
+        notes="MOTAC official portal — tourism/arts/culture/heritage/museum/archives remit.",
+    ),
+    Source(
+        name="motac-policy",
+        url="https://www.motac.gov.my/en/profile/policy",
+        kind="html",
+        domain="culture",
+        ministry="Kementerian Pelancongan, Kesenian dan Kebudayaan (MOTAC)",
+        language="en",
+        notes="Ministry policy page — heritage-designation and cultural-preservation policy specifics.",
+    ),
+
+    # ── "Edisi Kemerdekaan" seasonal AI lens (Aug25-Sep20) — the two
+    # sub-topics that have a real, verifiable official source today: 1957
+    # Merdeka history and MA63 (Malaysia Day). Both found via WebSearch on
+    # confirmed .gov.my domains (Arkib Negara, JPM/BHESS, MyGOV) — same
+    # not-content-verified caveat as every other WebSearch-found entry here.
+    # Deliberately NOT registering parade-logistics or JPJ-discount
+    # sources for this lens: no real official source was found for either
+    # in this session, and inventing one would violate this file's own
+    # "URLs must be real, verified pages; never guess" rule — the frontend
+    # lens surfaces only the sub-topics that have sources.
+    Source(
+        name="arkib-pengisytiharan-kemerdekaan",
+        url="https://pustakailmu.arkib.gov.my/index.php/ms/pustaka-ilmu/imbasan-fakta/dokumen-perisytiharan-kemerdekaan",
+        kind="html",
+        domain="culture",
+        ministry="Arkib Negara Malaysia (National Archives)",
+        language="bm",
+        notes="Official 31 Aug 1957 Proclamation of Independence document and its historical context.",
+    ),
+    Source(
+        name="arkib-menjejaki-31-ogos-1957",
+        url="https://pustakailmu.arkib.gov.my/index.php/ms/pustaka-ilmu/jendela-sejarah/menjejaki-31-ogos-1957",
+        kind="html",
+        domain="culture",
+        ministry="Arkib Negara Malaysia (National Archives)",
+        language="bm",
+        notes="Narrative history of the 31 Aug 1957 independence ceremony at Stadium Merdeka.",
+    ),
+    Source(
+        name="bhess-perjanjian-ma63",
+        url="https://bhess.jpm.gov.my/index.php/perjanjian-ma63/",
+        kind="html",
+        domain="culture",
+        ministry="Bahagian Hal Ehwal Sabah & Sarawak (BHESS), Jabatan Perdana Menteri (JPM)",
+        language="bm",
+        notes="Official JPM page on the Malaysia Agreement 1963 (MA63) — the Hari Malaysia / 16 Sep source.",
+    ),
+    Source(
+        name="mygov-rukun-negara",
+        url="https://www.malaysia.gov.my/portal/content/30110?language=my",
+        kind="html",
+        domain="culture",
+        ministry="MyGovernment Portal (MAMPU)",
+        language="bm",
+        notes="Official Rukun Negara text — the 5 national principles and their formation context (est. 1970).",
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}

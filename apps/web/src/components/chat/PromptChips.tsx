@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, MotionConfig, useScroll, useTransform } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { matchAgentRules, type AgentSuggestion } from '@/lib/agent-suggestions';
+import { inSeasonalWindow } from '@/lib/seasonal-window';
 
 // framer-motion v12's replacement for the deprecated motion(Component)
 // factory — lets a Next.js <Link> take whileTap/variants like any other
@@ -112,6 +113,39 @@ const GROUPS: ChipGroup[] = [
   },
 ];
 
+// Seasonal 5th group (Aug25-Sep20 only) — only the two sub-topics that have
+// a real, registered official source today (scripts/sources.py: Arkib
+// Negara's 1957 proclamation record, JPM/BHESS's MA63 page, MyGOV's Rukun
+// Negara text). Deliberately does NOT include parade-logistics or
+// JPJ-discount queries from the original brief — no real official source
+// for either was found, and this file's own convention (every chip query
+// should route to something the RAG pipeline can actually answer from a
+// real source) means inventing one would just produce a confident-sounding
+// fabrication.
+const SEASONAL_GROUP: ChipGroup = {
+  titleKey: 'chat.groups.kemerdekaan',
+  chips: [
+    {
+      labelMs: 'Sejarah Merdeka 1957', labelEn: '1957 independence history', labelZh: '1957年独立历史',
+      queryMs: 'Bagaimana upacara Pengisytiharan Kemerdekaan pada 31 Ogos 1957 berlangsung?',
+      queryEn: 'How did the 31 August 1957 Proclamation of Independence ceremony unfold?',
+      queryZh: '1957年8月31日的独立宣言仪式是如何进行的？',
+    },
+    {
+      labelMs: 'MA63 ringkas', labelEn: 'MA63 explained', labelZh: 'MA63简介',
+      queryMs: 'Apakah Perjanjian Malaysia 1963 (MA63) dan mengapa ia penting untuk Hari Malaysia?',
+      queryEn: 'What is the Malaysia Agreement 1963 (MA63) and why does it matter for Malaysia Day?',
+      queryZh: '什么是1963年马来西亚协定（MA63）？它对马来西亚日为何重要？',
+    },
+    {
+      labelMs: '5 Prinsip Rukun Negara', labelEn: 'Rukun Negara’s 5 principles', labelZh: '国家原则五大原则',
+      queryMs: 'Apakah 5 prinsip Rukun Negara dan latar belakang pembentukannya?',
+      queryEn: 'What are the 5 principles of the Rukun Negara and how did it come about?',
+      queryZh: '国家原则（Rukun Negara）的五大原则是什么？它是如何形成的？',
+    },
+  ],
+};
+
 interface PromptChipsProps {
   onSelect: (query: string) => void;
   disabled?: boolean;
@@ -137,6 +171,17 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
   const isDark = variant === 'dark';
   const [active, setActive] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Client-only check (matching SeasonalBanner/SeasonalHeroVideo's own
+  // pattern) — inSeasonalWindow(new Date()) must not run during SSR, where
+  // "now" would differ from the client and risk a hydration mismatch on
+  // which tab set renders. Starts false so server and first client render
+  // agree, then flips true post-mount if in season.
+  const [seasonal, setSeasonal] = useState(false);
+  useEffect(() => {
+    setSeasonal(inSeasonalWindow(new Date()));
+  }, []);
+  const groups = seasonal ? [...GROUPS, SEASONAL_GROUP] : GROUPS;
 
   const activeTabClass = isDark ? 'text-nk-heritage' : 'text-nk-heritage-dim';
   const idleTabClass = isDark
@@ -178,26 +223,29 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
     matchAgentRules(chip.queryEn).find((s): s is AgentSuggestion => s.kind === 'agent') ?? null;
 
   const selectTab = useCallback((index: number) => {
-    const next = (index + GROUPS.length) % GROUPS.length;
+    const next = (index + groups.length) % groups.length;
     setActive(next);
     tabRefs.current[next]?.focus();
     // Keep the newly-active tab visible when the strip itself is scrolled
-    // (4 category names overflow a narrow viewport), so arrow-keying to an
-    // off-screen tab doesn't move focus somewhere the user can't see.
+    // (4-5 category names overflow a narrow viewport), so arrow-keying to
+    // an off-screen tab doesn't move focus somewhere the user can't see.
     tabRefs.current[next]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, []);
+  }, [groups.length]);
 
   const onTabKeyDown = useCallback(
     (e: React.KeyboardEvent, index: number) => {
       if (e.key === 'ArrowRight') { e.preventDefault(); selectTab(index + 1); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); selectTab(index - 1); }
       else if (e.key === 'Home') { e.preventDefault(); selectTab(0); }
-      else if (e.key === 'End') { e.preventDefault(); selectTab(GROUPS.length - 1); }
+      else if (e.key === 'End') { e.preventDefault(); selectTab(groups.length - 1); }
     },
-    [selectTab],
+    [selectTab, groups.length],
   );
 
-  const activeGroup = GROUPS[active];
+  // Guard against `active` pointing past the end if `groups` shrinks (the
+  // seasonal group disappearing) while a later index was selected — falls
+  // back to the first tab rather than rendering undefined.
+  const activeGroup = groups[active] ?? groups[0];
 
   return (
     // reducedMotion="user" is how motion reduction is honoured here, rather
@@ -222,7 +270,7 @@ export function PromptChips({ onSelect, disabled, variant = 'light' }: PromptChi
         aria-orientation="horizontal"
         className="flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0"
       >
-        {GROUPS.map((group, i) => {
+        {groups.map((group, i) => {
           const selected = i === active;
           return (
             <button
@@ -391,8 +439,13 @@ function ChipRow({
               disabled={disabled}
               variants={chipVariants}
               whileTap={disabled ? undefined : { scale: 0.96 }}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 border rounded-full text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${askChipClass}`}
             >
+              {/* Decorative "domain available" indicator — a status node,
+                  not a live-data feed: this breathes to read as active, but
+                  represents "this topic is ready to ask about", never a
+                  fabricated real-time count or server metric. */}
+              <span className={`chat-chip-dot flex-shrink-0 w-1.5 h-1.5 rounded-full ${isDark ? 'bg-nk-heritage' : 'bg-nk-heritage-dim'}`} aria-hidden />
               {getLabel(chip)}
             </motion.button>
           );
