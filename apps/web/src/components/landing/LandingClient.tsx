@@ -1,8 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
@@ -19,6 +27,12 @@ import {
   type LandingTaglineKey,
 } from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
+
+// How long the header-morph + content fade plays before the actual route
+// change fires — must match LandingHeader's spring feel closely enough
+// that the router.push doesn't cut the animation off mid-flight, but not
+// so long that the CTA feels laggy.
+const CHAT_MORPH_MS = 420;
 
 // Interactive hero chips — each is a real, functioning shortcut: domain
 // chips prefill /chat with a representative query for that domain (see
@@ -57,6 +71,7 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const { theme } = useTheme();
+  const router = useRouter();
   // Start from a stable key so SSR and the first client render match, then pick
   // a random tagline after mount. Calling Math.random() in the initial render
   // (server vs client) caused a hydration mismatch (React #418).
@@ -66,6 +81,75 @@ export function LandingClient() {
   }, []);
   const tagline = t(taglineKey);
   const isDark = theme === 'dark';
+
+  // framer's useReducedMotion() is false on the server and updates
+  // post-mount on the client — safe here because every value it gates
+  // below only ever changes a `style` transform amount or whether an
+  // event listener is attached, never which DOM nodes render, so there's
+  // nothing for a server/client markup diff to catch (same reasoning
+  // ChatInput/PromptChips/ChatAmbientMesh already document for their own
+  // client-only season/motion checks elsewhere in this codebase).
+  const reduceMotion = useReducedMotion();
+
+  // ── Scroll parallax: two ambient glow blobs drift at different speeds
+  // as the hero scrolls out of view. Scoped to the hero section itself
+  // (not the whole page's scroll range) via `target`, so the effect is
+  // "hero leaving the viewport", not "how far down the whole page you are".
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: heroScroll } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  });
+  // Background blob (larger, sits further back visually) drifts less;
+  // foreground blob (smaller, heritage accent) drifts more — the classic
+  // depth cue where the nearer layer appears to move faster.
+  const glowBgY = useTransform(heroScroll, [0, 1], reduceMotion ? [0, 0] : [0, 60]);
+  const glowFgY = useTransform(heroScroll, [0, 1], reduceMotion ? [0, 0] : [0, 160]);
+
+  // ── Mouse tilt: raw pointer offset from the hero's center (-0.5..0.5 on
+  // each axis), sprung for a natural settle instead of snapping 1:1 to the
+  // cursor — springs are interruptible and velocity-aware (apple-design
+  // guidance already applied elsewhere in this codebase), which matters
+  // here since the pointer can reverse direction at any instant.
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+  const springX = useSpring(pointerX, { stiffness: 150, damping: 20, mass: 0.5 });
+  const springY = useSpring(pointerY, { stiffness: 150, damping: 20, mass: 0.5 });
+  const tiltRotateX = useTransform(springY, [-0.5, 0.5], reduceMotion ? [0, 0] : [6, -6]);
+  const tiltRotateY = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [-6, 6]);
+  const glowBgX = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [-16, 16]);
+  const glowFgX = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [24, -24]);
+
+  const handleHeroMouseMove = (e: ReactMouseEvent<HTMLElement>) => {
+    if (reduceMotion) return; // never attach real work behind a no-op listener
+    const rect = e.currentTarget.getBoundingClientRect();
+    pointerX.set((e.clientX - rect.left) / rect.width - 0.5);
+    pointerY.set((e.clientY - rect.top) / rect.height - 0.5);
+  };
+  const handleHeroMouseLeave = () => {
+    pointerX.set(0);
+    pointerY.set(0);
+  };
+
+  // ── Header → sidebar chat-morph. reduceMotion skips straight to
+  // navigation — a shape-morphing header is exactly the kind of large
+  // moving-object transition apple-design's reduced-motion guidance
+  // (already applied elsewhere this session) says to replace, not tone
+  // down.
+  const [isEnteringChat, setIsEnteringChat] = useState(false);
+  const handleStartChat = (e: ReactMouseEvent<HTMLAnchorElement>) => {
+    // Modified clicks (open in new tab/window, middle-click) must keep
+    // working exactly like a plain <a href>/<Link> — only a plain left
+    // click gets the custom transition.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (reduceMotion) {
+      router.push('/chat');
+      return;
+    }
+    setIsEnteringChat(true);
+    window.setTimeout(() => router.push('/chat'), CHAT_MORPH_MS);
+  };
 
   const pageClass = isDark
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
@@ -91,8 +175,9 @@ export function LandingClient() {
           repaint, which would fight this product's restrained register),
           but it now carries both of NakTahu's identity accents instead of
           only the functional blue. */}
-      <div
+      <motion.div
         aria-hidden
+        style={{ y: glowBgY, x: glowBgX }}
         className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
           isDark ? 'opacity-100' : 'opacity-70'
         }`}
@@ -104,6 +189,17 @@ export function LandingClient() {
               : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
           }`}
         />
+      </motion.div>
+      {/* Foreground blob on its own transform, independent of the background
+          one above — a different scroll speed and a larger mouse nudge is
+          what reads as "in front of" the other blob. */}
+      <motion.div
+        aria-hidden
+        style={{ y: glowFgY, x: glowFgX }}
+        className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
+          isDark ? 'opacity-100' : 'opacity-70'
+        }`}
+      >
         <div
           className={`absolute left-[68%] top-[-60px] h-[360px] w-[520px] -translate-x-1/2 rounded-full blur-3xl ${
             isDark
@@ -111,13 +207,38 @@ export function LandingClient() {
               : 'bg-[radial-gradient(closest-side,rgba(156,74,42,0.07),transparent)]'
           }`}
         />
-      </div>
+      </motion.div>
 
-      <LandingHeader />
+      <LandingHeader collapsing={isEnteringChat} />
+
+      {/* Everything below the header fades+blurs+scales out while the
+          header morphs into the sidebar shape, then router.push fires —
+          the same "materialize/dematerialize a whole surface" treatment
+          apple-design's materials guidance describes for a big reposition,
+          not a plain instant navigation. */}
+      <motion.div
+        animate={
+          isEnteringChat
+            ? { opacity: 0, scale: 0.98, filter: 'blur(8px)' }
+            : { opacity: 1, scale: 1, filter: 'blur(0px)' }
+        }
+        transition={{ duration: CHAT_MORPH_MS / 1000, ease: 'easeOut' }}
+        style={{ pointerEvents: isEnteringChat ? 'none' : undefined }}
+      >
       <AuthErrorBanner />
 
-      <section className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full">
+      <section
+        ref={heroRef}
+        onMouseMove={handleHeroMouseMove}
+        onMouseLeave={handleHeroMouseLeave}
+        style={{ perspective: 800 }}
+        className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full"
+      >
         <SeasonalHeroVideo />
+        {/* Springed 3D tilt on the whole content group — `contents` keeps
+            each child's own fadeUp entrance untouched, this just adds the
+            tilt transform as an ancestor. */}
+        <motion.div style={{ rotateX: tiltRotateX, rotateY: tiltRotateY }} className="contents">
         <motion.div
           custom={0}
           variants={fadeUp}
@@ -229,6 +350,7 @@ export function LandingClient() {
         >
           <Link
             href="/chat"
+            onClick={handleStartChat}
             className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
           >
             {t('landing.hero.cta')}
@@ -255,6 +377,7 @@ export function LandingClient() {
           >
             {t('landing.hero.secondary_cta')}
           </Link>
+        </motion.div>
         </motion.div>
       </section>
 
@@ -405,6 +528,7 @@ export function LandingClient() {
           </span>
         </div>
       </footer>
+      </motion.div>
     </div>
   );
 }

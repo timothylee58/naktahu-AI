@@ -13,7 +13,17 @@ import { useTheme } from '@/lib/theme';
 
 const LANDING_NAV_OMIT = ['/agents'] as const;
 
-export function LandingHeader() {
+interface LandingHeaderProps {
+  /** True mid-transition into /chat — morphs the header's own box from a
+   * full top bar into the same left-sidebar rect AppSidebar occupies once
+   * /chat actually mounts (see LandingClient's "Mula Bertanya" handler).
+   * Defaults to false, which renders identically to before this prop
+   * existed — /about and /faq (the other two LandingHeader consumers)
+   * never pass it and are byte-for-byte unaffected. */
+  collapsing?: boolean;
+}
+
+export function LandingHeader({ collapsing = false }: LandingHeaderProps) {
   const { t } = useI18n();
   const { theme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,32 +37,69 @@ export function LandingHeader() {
     : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800';
 
   return (
-    <header className={`sticky top-0 z-30 border-b backdrop-blur-md ${shellClass}`}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        <Link href="/" className="inline-flex items-center text-lg flex-shrink-0">
+    <motion.header
+      // Boolean, not the `layout` shorthand (always-true): false for every
+      // /about and /faq render (they never pass `collapsing`) means no FLIP
+      // tracking at all there — identical behaviour to a plain <header>,
+      // preserving the "byte-for-byte unaffected" contract on those two
+      // consumers even though this file now always renders a motion.header.
+      layout={collapsing}
+      transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+      className={`z-30 backdrop-blur-md ${
+        collapsing
+          ? 'fixed inset-y-0 left-0 border-r w-72 h-full overflow-hidden'
+          : 'sticky top-0 border-b w-full'
+      } ${shellClass}`}
+    >
+      <motion.div
+        layout={collapsing}
+        className={`max-w-6xl mx-auto px-4 sm:px-6 gap-4 ${
+          collapsing ? 'flex flex-col items-start pt-5 h-full' : 'h-14 flex items-center justify-between'
+        }`}
+      >
+        <Link
+          href="/"
+          className="inline-flex items-center text-lg flex-shrink-0"
+          // Collapsing into a sidebar shape is a one-way trip to /chat —
+          // the logo link shouldn't compete with that mid-transition.
+          tabIndex={collapsing ? -1 : undefined}
+          aria-hidden={collapsing || undefined}
+        >
           <NakTahuWordmark markSize={26} />
         </Link>
 
-        <div className="hidden md:flex items-center gap-1">
-          <SiteNavLinks
-            variant={isDark ? 'dark' : 'light'}
-            layout="horizontal"
-            hideHome
-            excludeHrefs={LANDING_NAV_OMIT}
-          />
-        </div>
+        {/* Nav/toggles fade out during the morph rather than trying to
+            reflow horizontal nav into a vertical list mid-flight — this is
+            a shape transition to the sidebar's rect, not a full content
+            swap (AppSidebar itself mounts for real once /chat lands). */}
+        <motion.div
+          animate={collapsing ? { opacity: 0 } : { opacity: 1 }}
+          transition={{ duration: 0.15 }}
+          className={collapsing ? 'pointer-events-none' : 'contents'}
+        >
+          <div className="hidden md:flex items-center gap-1">
+            <SiteNavLinks
+              variant={isDark ? 'dark' : 'light'}
+              layout="horizontal"
+              hideHome
+              excludeHrefs={LANDING_NAV_OMIT}
+            />
+          </div>
 
-        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <ThemeToggle variant={isDark ? 'dark' : 'light'} />
-          <LangToggle variant={isDark ? 'dark' : 'light'} />
-          <AuthButton variant={isDark ? 'dark' : 'light'} layout="compact" />
-        </div>
+          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+            <ThemeToggle variant={isDark ? 'dark' : 'light'} />
+            <LangToggle variant={isDark ? 'dark' : 'light'} />
+            <AuthButton variant={isDark ? 'dark' : 'light'} layout="compact" />
+          </div>
+        </motion.div>
 
         <button
           type="button"
           onClick={() => setMenuOpen((o) => !o)}
           aria-label={t('header.menu')}
-          className={`md:hidden p-2 rounded-lg transition-colors ${menuBtnClass}`}
+          tabIndex={collapsing ? -1 : undefined}
+          aria-hidden={collapsing || undefined}
+          className={`md:hidden p-2 rounded-lg transition-colors ${collapsing ? 'opacity-0 pointer-events-none' : ''} ${menuBtnClass}`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
             {menuOpen ? (
@@ -62,10 +109,10 @@ export function LandingHeader() {
             )}
           </svg>
         </button>
-      </div>
+      </motion.div>
 
       <AnimatePresence>
-        {menuOpen && (
+        {menuOpen && !collapsing && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -91,6 +138,6 @@ export function LandingHeader() {
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+    </motion.header>
   );
 }
