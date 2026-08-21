@@ -10,14 +10,14 @@
  * the reference art.
  *
  * Aug25-Sep20 (Merdeka/Hari Malaysia window — lib/seasonal-window.ts):
- * swaps to a "Merdeka Bubble" variant — the same bubble and hibiscus, plus
- * a contained Jalur Gemilang badge (its own white-bordered rounded shape,
- * not clipped to the bubble outline) centred inside, per the reference art.
- * A self-contained flag badge — not a flag clipped edge-to-edge across the
- * whole bubble, this file's earlier approach — reads clearer at the
- * 20-26px this mark actually renders at (every NakTahuWordmark call site
- * is a header logo): a white border separates "flag" from "bubble" the way
- * clipping the two together didn't.
+ * swaps to a "Merdeka Bubble" variant — a white-edged, wave-cut Jalur
+ * Gemilang badge floating centred inside the bubble (blue bubble visibly
+ * showing around it, not clipped edge-to-edge to the bubble outline),
+ * plus the same hibiscus at the top-right corner. Matches the attached
+ * reference: one path (FLAG_PATH) drawn twice — once stroked white as the
+ * border, once as a clipPath for the striped/canton content — so the
+ * border follows the wavy silhouette exactly instead of a separate offset
+ * shape that could drift from it.
  *
  * Client component (useEffect-gated season check) rather than a server-side
  * date check, for the same reason as SeasonalBanner/ChatAmbientMesh/
@@ -69,6 +69,12 @@ function Hibiscus({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
+// Local coordinate frame (0,0 top-left), ~46 wide x 30 tall: straight,
+// rounded left edge (the "pole" side) and a wavy right edge — two gentle
+// S-bumps — reading as cloth flutter without needing runtime animation.
+const FLAG_PATH =
+  'M6,0 L36,0 Q44,0 42,6 Q40,12 46,15 Q40,18 42,24 Q44,30 36,30 L6,30 Q0,30 0,24 L0,6 Q0,0 6,0 Z';
+
 export function NakTahuMark({ size = 28, className, ...rest }: NakTahuMarkProps) {
   const decorative = rest['aria-hidden'];
   const [seasonal, setSeasonal] = useState(false);
@@ -99,34 +105,40 @@ export function NakTahuMark({ size = 28, className, ...rest }: NakTahuMarkProps)
 
   return (
     <svg {...sharedProps}>
+      <defs>
+        <clipPath id="ntm-flag-clip">
+          <path d={FLAG_PATH} />
+        </clipPath>
+      </defs>
+
       <rect x="14" y="14" width="92" height="74" rx="30" fill="var(--brand-blue, #3B5BFF)" />
       <path d="M32 88 L32 108 L52 88 Z" fill="var(--brand-blue, #3B5BFF)" />
 
-      {/* Contained flag badge — its own rounded, white-bordered shape
-          centred in the bubble, not clipped flush to the bubble outline.
-          Slight rotation + a translucent diagonal fold highlight stand in
-          for "waving cloth" at a scale too small for a real wave path. */}
-      <g transform="rotate(-6 51 51)">
-        <rect x="24" y="36" width="54" height="34" rx="7" fill="#ffffff" />
+      {/* Flag badge — centred in the bubble with visible blue margin all
+          round, not clipped flush to the bubble outline. Rotated slightly
+          for a dynamic, "just fluttered" angle. */}
+      <g transform="translate(37, 45) rotate(-8 23 15)">
+        {/* white border — the same path, stroked, so it traces the wave
+            exactly rather than a separately-drawn offset shape */}
+        <path d={FLAG_PATH} fill="#ffffff" stroke="#ffffff" strokeWidth="4" strokeLinejoin="round" />
         <g clipPath="url(#ntm-flag-clip)">
-          <rect x="26" y="38" width="50" height="30" fill="#CC0001" />
-          <rect x="26" y="44.3" width="50" height="6" fill="#ffffff" />
-          <rect x="26" y="56.9" width="50" height="6" fill="#ffffff" />
-          <rect x="26" y="38" width="24" height="15" fill="#010066" />
-          <circle cx="35" cy="45.5" r="4.6" fill="#FFCC00" />
-          <circle cx="37" cy="44" r="3.9" fill="#010066" />
+          <rect x="0" y="0" width="46" height="30" fill="#CC0001" />
+          <rect x="0" y="6.4" width="46" height="4.3" fill="#ffffff" />
+          <rect x="0" y="15" width="46" height="4.3" fill="#ffffff" />
+          <rect x="0" y="23.6" width="46" height="4.3" fill="#ffffff" />
+          {/* canton */}
+          <rect x="0" y="0" width="22" height="15" fill="#010066" />
+          {/* crescent */}
+          <circle cx="9" cy="7.5" r="4.6" fill="#FFCC00" />
+          <circle cx="10.6" cy="6" r="3.9" fill="#010066" />
+          {/* star */}
           <path
-            d="M44.5 39.2 L45.4 41.7 L48 41.7 L45.9 43.2 L46.7 45.7 L44.5 44.2 L42.3 45.7 L43.1 43.2 L41 41.7 L43.6 41.7 Z"
+            d="M18.5 1.4 L19.6 4.6 L23 4.6 L20.2 6.6 L21.3 9.8 L18.5 7.8 L15.7 9.8 L16.8 6.6 L14 4.6 L17.4 4.6 Z"
             fill="#FFCC00"
           />
-          {/* fold highlight — the "wave" cue */}
-          <path d="M26 38 L76 38 L60 68 L26 68 Z" fill="#ffffff" opacity="0.14" />
+          {/* fold highlight along the wave */}
+          <path d="M0,0 L36,0 L18,30 L0,30 Z" fill="#ffffff" opacity="0.12" />
         </g>
-        <defs>
-          <clipPath id="ntm-flag-clip">
-            <rect x="26" y="38" width="50" height="30" rx="5.5" />
-          </clipPath>
-        </defs>
       </g>
 
       <Hibiscus cx={98} cy={26} />
