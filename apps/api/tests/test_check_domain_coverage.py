@@ -117,14 +117,23 @@ def test_main_runs_without_credentials_reports_sources_and_evals_only(monkeypatc
 
 def test_main_exit_code_catches_no_sources_gap_without_credentials(monkeypatch, capsys):
     """Regression test for a real bug caught while building this: without
-    Supabase credentials, the table correctly showed parliament as 'NO
-    SOURCES REGISTERED' but the exit code stayed 0 — the gap-detection
+    Supabase credentials, the table correctly showed a real gap ('NO
+    SOURCES REGISTERED') but the exit code stayed 0 — the gap-detection
     logic only checked n_evals when chunks was None, silently ignoring the
-    axis-1-only gap that's visible without any DB access at all. parliament
-    is registered as an example of exactly this: it has zero sources.py
-    entries (its own separate, never-run ingest_parliament/ pipeline)."""
+    axis-1-only gap that's visible without any DB access at all.
+
+    Originally used `parliament` as the live example (it had zero
+    scripts/sources.py entries) — parliament has since been registered
+    (mymp-portal-home, parlimen-hansard-dewan-rakyat), which is the correct
+    outcome, not a fixture to preserve. Simulating a zero-source domain via
+    monkeypatch instead, so this test doesn't silently stop covering the
+    bug the moment every real domain gets a source (all 13 currently do)."""
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.setattr(
+        "scripts.check_domain_coverage._registered_source_counts",
+        lambda: {d: (0 if d == "parliament" else 2) for d in _VALID_DOMAINS},
+    )
     result = main()
     out = capsys.readouterr().out
     assert "parliament" in out and "NO SOURCES REGISTERED" in out

@@ -80,3 +80,6 @@
 {"query": "SPM 2026考试时间表是什么时候公布的？", "expected_language": "zh", "domain": "education"}
 {"query": "Apakah skim bantuan sara hidup yang saya layak mohon sebagai isi rumah berpendapatan rendah?", "expected_language": "bm", "domain": "welfare"}
 {"query": "作为低收入家庭，我可以申请哪些政府生活成本援助计划？", "expected_language": "zh", "domain": "welfare"}
+{"query": "Siapakah Ahli Parlimen bagi kawasan saya dan bagaimana saya boleh ketahui?", "expected_language": "bm", "domain": "parliament"}
+{"query": "Who is my Member of Parliament and how do I find out?", "expected_language": "en", "domain": "parliament"}
+{"query": "我的国会议员是谁？我该如何查询？", "expected_language": "zh", "domain": "parliament"}
