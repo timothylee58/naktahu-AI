@@ -568,6 +568,54 @@ SOURCES: tuple[Source, ...] = (
         language="bm",
         notes="Official Rukun Negara text — the 5 national principles and their formation context (est. 1970).",
     ),
+
+    # ── "Who's my MP" knowledge expansion — the `parliament` domain had ZERO
+    # registered sources despite already having a full Hansard
+    # speeches/votes pipeline (scripts/ingest_parliament/), a mp_profiles
+    # schema (migration 025), and read endpoints (routers/parliament.py) —
+    # what it never had was a source that actually answers "who is my MP",
+    # since nothing seeds mp_profiles with the 222-constituency roster in
+    # the first place. Two complementary sources, not duplicates: MyMP is
+    # the constituency-lookup/roster/bio source (who represents me); the
+    # Parliament portal is the speeches/bills/voting-history source the
+    # existing Hansard pipeline already scrapes from, registered here so
+    # it's finally visible to check_domain_coverage.py and
+    # ingest-sources.yml instead of living only inside a separate,
+    # never-run pipeline script.
+    Source(
+        name="mymp-portal-home",
+        url="https://mymp.org.my/",
+        kind="html",
+        domain="parliament",
+        ministry="MyMP (MCCHR — Malaysian Centre for Constitutionalism and Human Rights; civil-society, NOT a government body)",
+        language="en",
+        notes=(
+            "Constituency-to-MP lookup and MP biographies for all 222 Dewan Rakyat "
+            "seats — exactly the 'who is my MP' gap. Ministry field is deliberately "
+            "labelled non-governmental: this must never be cited or badged as an "
+            "official .gov.my source. Found via WebSearch, confirmed as the real "
+            "MyMP/MCCHR project (not a lookalike domain) but not content-verified "
+            "via direct fetch in this sandbox."
+        ),
+    ),
+    Source(
+        name="parlimen-hansard-dewan-rakyat",
+        url="https://www.parlimen.gov.my/hansard-dewan-rakyat.html",
+        kind="html",
+        domain="parliament",
+        ministry="Parlimen Malaysia",
+        language="bm",
+        notes=(
+            "The same official Hansard index scripts/ingest_parliament/"
+            "fetch_hansard.py already scrapes for speeches/bills/voting-history "
+            "(that pipeline's own HANSARD_LIST_URL) — registered here so this "
+            "domain's real content source is visible in this catalog and to "
+            "check_domain_coverage.py, not only inside that separate script. "
+            "Confirmed reachable per fetch_hansard.py's own Trap #11 note "
+            "(parlimen.gov.my is unreachable from THIS sandbox specifically, "
+            "proxy-blocked, not a dead URL)."
+        ),
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}

@@ -37,3 +37,4 @@
 {"query": "When is the SPM 2026 examination timetable and when does it start?", "expected_topic": "education", "min_confidence": 0.6}
 {"query": "Which subjects are compulsory for SPM under the Malaysia Education Blueprint 2026-2035?", "expected_topic": "education", "min_confidence": 0.6}
 {"query": "What government cost-of-living assistance schemes am I eligible for as a low-income household?", "expected_topic": "welfare", "min_confidence": 0.6}
+{"query": "Who is my Member of Parliament and how do I find out?", "expected_topic": "parliament", "min_confidence": 0.6}

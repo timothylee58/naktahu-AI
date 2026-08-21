@@ -10,14 +10,13 @@
  * the reference art.
  *
  * Aug25-Sep20 (Merdeka/Hari Malaysia window — lib/seasonal-window.ts):
- * swaps to a "Merdeka Bubble" variant — the same bubble and hibiscus, plus
- * a contained Jalur Gemilang badge (its own white-bordered rounded shape,
- * not clipped to the bubble outline) centred inside, per the reference art.
- * A self-contained flag badge — not a flag clipped edge-to-edge across the
- * whole bubble, this file's earlier approach — reads clearer at the
- * 20-26px this mark actually renders at (every NakTahuWordmark call site
- * is a header logo): a white border separates "flag" from "bubble" the way
- * clipping the two together didn't.
+ * swaps to a "Merdeka Bubble" variant — the Jalur Gemilang clipped flush to
+ * the bubble's own silhouette (edge to edge, tail excluded), no white
+ * inset frame and no wavy hem — both tried in earlier iterations of this
+ * file and removed on user feedback. The star (STAR_14_POINT_PATH) is the
+ * real Bintang Persekutuan: 14 points, not a generic 5-point star — the
+ * flag's single most identity-bearing detail, so it's the one place this
+ * mark doesn't simplify.
  *
  * Client component (useEffect-gated season check) rather than a server-side
  * date check, for the same reason as SeasonalBanner/ChatAmbientMesh/
@@ -69,6 +68,16 @@ function Hibiscus({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
+// Real 14-point federal star (Bintang Persekutuan) — one point per state +
+// federal territories, outer radius 11 / inner radius 4.5, centred at the
+// origin. Generated once (28 alternating outer/inner vertices) and pasted
+// as a literal so no trig runs at render time.
+const STAR_14_POINT_PATH =
+  'M0,-11 L1,-4.39 L4.77,-9.91 L2.81,-3.52 L8.6,-6.86 L4.05,-1.95 L10.72,-2.45 L4.5,0 ' +
+  'L10.72,2.45 L4.05,1.95 L8.6,6.86 L2.81,3.52 L4.77,9.91 L1,4.39 L0,11 L-1,4.39 ' +
+  'L-4.77,9.91 L-2.81,3.52 L-8.6,6.86 L-4.05,1.95 L-10.72,2.45 L-4.5,0 L-10.72,-2.45 ' +
+  'L-4.05,-1.95 L-8.6,-6.86 L-2.81,-3.52 L-4.77,-9.91 L-1,-4.39 Z';
+
 export function NakTahuMark({ size = 28, className, ...rest }: NakTahuMarkProps) {
   const decorative = rest['aria-hidden'];
   const [seasonal, setSeasonal] = useState(false);
@@ -99,34 +108,31 @@ export function NakTahuMark({ size = 28, className, ...rest }: NakTahuMarkProps)
 
   return (
     <svg {...sharedProps}>
-      <rect x="14" y="14" width="92" height="74" rx="30" fill="var(--brand-blue, #3B5BFF)" />
+      <defs>
+        <clipPath id="ntm-bubble-clip">
+          <rect x="14" y="14" width="92" height="74" rx="30" />
+        </clipPath>
+      </defs>
+
+      {/* tail — flat brand blue, unclipped, same shape as the default mark */}
       <path d="M32 88 L32 108 L52 88 Z" fill="var(--brand-blue, #3B5BFF)" />
 
-      {/* Contained flag badge — its own rounded, white-bordered shape
-          centred in the bubble, not clipped flush to the bubble outline.
-          Slight rotation + a translucent diagonal fold highlight stand in
-          for "waving cloth" at a scale too small for a real wave path. */}
-      <g transform="rotate(-6 51 51)">
-        <rect x="24" y="36" width="54" height="34" rx="7" fill="#ffffff" />
-        <g clipPath="url(#ntm-flag-clip)">
-          <rect x="26" y="38" width="50" height="30" fill="#CC0001" />
-          <rect x="26" y="44.3" width="50" height="6" fill="#ffffff" />
-          <rect x="26" y="56.9" width="50" height="6" fill="#ffffff" />
-          <rect x="26" y="38" width="24" height="15" fill="#010066" />
-          <circle cx="35" cy="45.5" r="4.6" fill="#FFCC00" />
-          <circle cx="37" cy="44" r="3.9" fill="#010066" />
-          <path
-            d="M44.5 39.2 L45.4 41.7 L48 41.7 L45.9 43.2 L46.7 45.7 L44.5 44.2 L42.3 45.7 L43.1 43.2 L41 41.7 L43.6 41.7 Z"
-            fill="#FFCC00"
-          />
-          {/* fold highlight — the "wave" cue */}
-          <path d="M26 38 L76 38 L60 68 L26 68 Z" fill="#ffffff" opacity="0.14" />
-        </g>
-        <defs>
-          <clipPath id="ntm-flag-clip">
-            <rect x="26" y="38" width="50" height="30" rx="5.5" />
-          </clipPath>
-        </defs>
+      {/* Jalur Gemilang, clipped flush to the bubble's own silhouette. 7
+          bands (not the real flag's 14 stripes, but more than this file's
+          earlier 3-band pass) — a closer match to the reference at a scale
+          this mark still reads at. */}
+      <g clipPath="url(#ntm-bubble-clip)">
+        <rect x="14" y="14" width="92" height="74" fill="#CC0001" />
+        <rect x="14" y="24.57" width="92" height="10.57" fill="#ffffff" />
+        <rect x="14" y="45.71" width="92" height="10.57" fill="#ffffff" />
+        <rect x="14" y="66.86" width="92" height="10.57" fill="#ffffff" />
+        {/* canton — enlarged to match the reference's proportions */}
+        <rect x="14" y="14" width="44" height="32" fill="#010066" />
+        {/* crescent — enlarged, opening left */}
+        <circle cx="26" cy="30" r="10" fill="#FFCC00" />
+        <circle cx="29.5" cy="28" r="8.5" fill="#010066" />
+        {/* star — the real 14-point Bintang Persekutuan, enlarged */}
+        <path d={STAR_14_POINT_PATH} fill="#FFCC00" transform="translate(45, 30)" />
       </g>
 
       <Hibiscus cx={98} cy={26} />
