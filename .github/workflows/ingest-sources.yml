@@ -92,6 +92,19 @@ jobs:
           done
           exit $status
 
+      - name: Fetch MP roster (dry-run — selectors unverified, see module docstring)
+        # Always --dry-run here, never gated by write_mode: fetch_mp_roster.py's
+        # CSS selectors were written without ever seeing mymp.org.my's real
+        # markup (proxy-blocked in the dev sandbox — Trap #11). This step's
+        # job is to surface "0 records parsed" loudly in CI logs on a real
+        # network run so a human notices and fixes the selectors, not to
+        # write real data un-reviewed. Once selectors are confirmed correct,
+        # promote to a real run of fetch_mp_roster.py (writes the roster
+        # file) followed by seed_mp_profiles.py (--dry-run first, then live)
+        # as a manual, deliberate step — not folded into this always-on job.
+        continue-on-error: true
+        run: python -m scripts.ingest_parliament.fetch_mp_roster --dry-run
+
       - name: Domain coverage report (sources x live chunks x eval coverage)
         # Cross-checks 3 axes against each other every week: registered
         # sources (scripts/sources.py), live document_chunks content, and
