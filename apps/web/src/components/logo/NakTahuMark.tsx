@@ -69,14 +69,14 @@ function Hibiscus({ cx, cy }: { cx: number; cy: number }) {
 }
 
 // Real 14-point federal star (Bintang Persekutuan) — one point per state +
-// federal territories, outer radius 8 / inner radius 3.3, centred at the
+// federal territories, outer radius 11 / inner radius 4.5, centred at the
 // origin. Generated once (28 alternating outer/inner vertices) and pasted
 // as a literal so no trig runs at render time.
 const STAR_14_POINT_PATH =
-  'M0,-8 L0.73,-3.22 L3.47,-7.21 L2.06,-2.58 L6.25,-4.99 L2.97,-1.43 L7.8,-1.78 L3.3,0 ' +
-  'L7.8,1.78 L2.97,1.43 L6.25,4.99 L2.06,2.58 L3.47,7.21 L0.73,3.22 L0,8 L-0.73,3.22 ' +
-  'L-3.47,7.21 L-2.06,2.58 L-6.25,4.99 L-2.97,1.43 L-7.8,1.78 L-3.3,0 L-7.8,-1.78 ' +
-  'L-2.97,-1.43 L-6.25,-4.99 L-2.06,-2.58 L-3.47,-7.21 L-0.73,-3.22 Z';
+  'M0,-11 L1,-4.39 L4.77,-9.91 L2.81,-3.52 L8.6,-6.86 L4.05,-1.95 L10.72,-2.45 L4.5,0 ' +
+  'L10.72,2.45 L4.05,1.95 L8.6,6.86 L2.81,3.52 L4.77,9.91 L1,4.39 L0,11 L-1,4.39 ' +
+  'L-4.77,9.91 L-2.81,3.52 L-8.6,6.86 L-4.05,1.95 L-10.72,2.45 L-4.5,0 L-10.72,-2.45 ' +
+  'L-4.05,-1.95 L-8.6,-6.86 L-2.81,-3.52 L-4.77,-9.91 L-1,-4.39 Z';
 
 export function NakTahuMark({ size = 28, className, ...rest }: NakTahuMarkProps) {
   const decorative = rest['aria-hidden'];
@@ -117,18 +117,22 @@ export function NakTahuMark({ size = 28, className, ...rest }: NakTahuMarkProps)
       {/* tail — flat brand blue, unclipped, same shape as the default mark */}
       <path d="M32 88 L32 108 L52 88 Z" fill="var(--brand-blue, #3B5BFF)" />
 
-      {/* Jalur Gemilang, clipped flush to the bubble's own silhouette. */}
+      {/* Jalur Gemilang, clipped flush to the bubble's own silhouette. 7
+          bands (not the real flag's 14 stripes, but more than this file's
+          earlier 3-band pass) — a closer match to the reference at a scale
+          this mark still reads at. */}
       <g clipPath="url(#ntm-bubble-clip)">
         <rect x="14" y="14" width="92" height="74" fill="#CC0001" />
-        <rect x="14" y="28.8" width="92" height="14.8" fill="#ffffff" />
-        <rect x="14" y="58.4" width="92" height="14.8" fill="#ffffff" />
-        {/* canton */}
-        <rect x="14" y="14" width="47" height="30" fill="#010066" />
-        {/* crescent */}
-        <circle cx="30" cy="27" r="8.5" fill="#FFCC00" />
-        <circle cx="33.5" cy="24.5" r="7.2" fill="#010066" />
-        {/* star — the real 14-point Bintang Persekutuan */}
-        <path d={STAR_14_POINT_PATH} fill="#FFCC00" transform="translate(46, 28)" />
+        <rect x="14" y="24.57" width="92" height="10.57" fill="#ffffff" />
+        <rect x="14" y="45.71" width="92" height="10.57" fill="#ffffff" />
+        <rect x="14" y="66.86" width="92" height="10.57" fill="#ffffff" />
+        {/* canton — enlarged to match the reference's proportions */}
+        <rect x="14" y="14" width="44" height="32" fill="#010066" />
+        {/* crescent — enlarged, opening left */}
+        <circle cx="26" cy="30" r="10" fill="#FFCC00" />
+        <circle cx="29.5" cy="28" r="8.5" fill="#010066" />
+        {/* star — the real 14-point Bintang Persekutuan, enlarged */}
+        <path d={STAR_14_POINT_PATH} fill="#FFCC00" transform="translate(45, 30)" />
       </g>
 
       <Hibiscus cx={98} cy={26} />
