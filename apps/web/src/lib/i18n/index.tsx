@@ -559,6 +559,8 @@ const MS: Translations = {
   'agents.research-synthesiser.run_button': 'Jalankan sintesis',
   'agents.research-synthesiser.synthesising': 'Mensintesis…',
   'agents.research-synthesiser.domains_label': 'Domain',
+  'agents.research-synthesiser.summary_heading': 'Sintesis',
+  'agents.research-synthesiser.sources_heading': 'Sumber',
   'agents.research-synthesiser.no_results': 'Tiada sumber relevan ditemui untuk soalan ini. Cuba jadikan soalan lebih spesifik.',
   'agents.study-agent.title': 'Ejen Pelajaran',
   'agents.study-agent.desc':
@@ -818,7 +820,7 @@ const MS: Translations = {
   'agents.grant-finder.deadline.closes': 'Tutup {date}',
   'agents.research-synthesiser.title': 'Penyelidik Sintesis',
   'agents.research-synthesiser.desc':
-    'Carian RAG selari merentas 3 domain dengan petikan tidak berulang. Peringkat Perniagaan.',
+    'Carian RAG selari merentas sehingga 13 domain, digabungkan menjadi satu sintesis bertulis dengan petikan tidak berulang. Peringkat Perniagaan.',
   'agents.retrenchment-navigator.title': 'Navigator Pemberhentian Kerja',
   'agents.retrenchment-navigator.desc':
     'Kelayakan tuntutan EIS, faedah penamatan statutori, dan senarai semak langkah seterusnya. Percuma.',
@@ -1509,6 +1511,8 @@ const EN: Translations = {
   'agents.research-synthesiser.run_button': 'Run synthesis',
   'agents.research-synthesiser.synthesising': 'Synthesising…',
   'agents.research-synthesiser.domains_label': 'Domains',
+  'agents.research-synthesiser.summary_heading': 'Synthesis',
+  'agents.research-synthesiser.sources_heading': 'Sources',
   'agents.research-synthesiser.no_results': 'No relevant sources found for this question. Try making it more specific.',
   'agents.study-agent.title': 'Study Agent',
   'agents.study-agent.desc':
@@ -1768,7 +1772,7 @@ const EN: Translations = {
   'agents.grant-finder.deadline.closes': 'Closes {date}',
   'agents.research-synthesiser.title': 'Research Synthesiser',
   'agents.research-synthesiser.desc':
-    'Parallel fan-out across 3 RAG domains with deduplicated citations. Business tier.',
+    'Parallel fan-out across up to 13 RAG domains, merged into one written synthesis with deduplicated citations. Business tier.',
   'agents.retrenchment-navigator.title': 'Retrenchment Navigator',
   'agents.retrenchment-navigator.desc':
     'EIS claim eligibility, statutory termination benefits, and a next-steps checklist. Free.',
@@ -2438,6 +2442,8 @@ const ZH: Translations = {
   'agents.research-synthesiser.run_button': '开始综合分析',
   'agents.research-synthesiser.synthesising': '综合分析中…',
   'agents.research-synthesiser.domains_label': '领域',
+  'agents.research-synthesiser.summary_heading': '综合分析',
+  'agents.research-synthesiser.sources_heading': '来源',
   'agents.research-synthesiser.no_results': '未找到与此问题相关的来源。请尝试提出更具体的问题。',
   'agents.study-agent.title': '学习 Agent',
   'agents.study-agent.desc': '上传您的 SPM 试卷 — 获取每道题目的讲解，并了解应重点复习的主题。',
@@ -2692,7 +2698,7 @@ const ZH: Translations = {
   'agents.grant-finder.deadline.rolling': '滚动申请',
   'agents.grant-finder.deadline.closes': '截止日期 {date}',
   'agents.research-synthesiser.title': '研究综合代理',
-  'agents.research-synthesiser.desc': '跨 3 个领域并行 RAG，去重引用。商业版。',
+  'agents.research-synthesiser.desc': '跨多达 13 个领域并行检索，合并为一篇书面综合分析，并附上去重引用。商业版。',
   'agents.retrenchment-navigator.title': '裁员导航代理',
   'agents.retrenchment-navigator.desc': 'EIS 索赔资格、法定终止福利，以及后续步骤清单。免费。',
   'agents.retrenchment-navigator.welcome': '欢迎。我可以帮助您了解被裁员后的权益和后续步骤。您在这位雇主工作了多久？',

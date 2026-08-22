@@ -109,6 +109,23 @@ const GROUPS: ChipGroup[] = [
         queryEn: 'Who is the Member of Parliament for my constituency and how do I contact them?',
         queryZh: '我的选区议员是谁？我该如何联系他们？',
       },
+      {
+        labelMs: 'Daftar mengundi', labelEn: 'Register to vote', labelZh: '登记选民',
+        queryMs: 'Bagaimana cara mendaftar sebagai pemilih dengan Suruhanjaya Pilihan Raya (SPR)?',
+        queryEn: 'How do I register as a voter with the Election Commission (SPR)?',
+        queryZh: '如何向选举委员会（SPR）登记成为选民？',
+      },
+      {
+        labelMs: 'Pinjaman PTPTN', labelEn: 'PTPTN education loan', labelZh: 'PTPTN助学贷款',
+        queryMs: 'Bagaimana cara memohon pinjaman pendidikan PTPTN dan apakah syarat kelayakannya?',
+        // Deliberately avoids the substring "study" (would false-match
+        // agent-suggestions.ts's Study Agent keyword — that agent is
+        // SPM/exam-focused, not PTPTN loans; matchAgentRules() below
+        // checks only this English string, so BM/ZH don't need the
+        // same care).
+        queryEn: 'How do I apply for a PTPTN education loan and what are the eligibility requirements?',
+        queryZh: '如何申请PTPTN助学贷款？申请资格是什么？',
+      },
     ],
   },
 ];
