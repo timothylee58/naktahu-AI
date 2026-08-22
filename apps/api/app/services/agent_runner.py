@@ -724,6 +724,7 @@ async def start_research_synthesiser(*, user_id: str, payload: dict[str, Any], s
         "output": _public_output(values),
         "citations": values.get("merged_citations") or values.get("citations") or [],
         "detected_domains": values.get("detected_domains") or [],
+        "summary": values.get("summary") or "",
     }
 
 

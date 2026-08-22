@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
@@ -24,22 +24,40 @@ function localeToApiLanguage(locale: string): 'bm' | 'en' | 'zh' {
   return 'en';
 }
 
+// Renders bare newlines from the LLM's plain-text synthesis as paragraphs —
+// the backend returns unstructured prose (no markdown contract for this
+// agent, unlike /chat's synthesiser_node), so this is the simplest correct
+// mapping rather than pulling in a markdown renderer for one field.
+function SynthesisText({ text }: { text: string }) {
+  const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  return (
+    <div className="flex flex-col gap-3">
+      {paragraphs.map((p, i) => (
+        <p key={i} className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300 locale-text-balance">
+          {p}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function ResearchSynthesiserPageInner() {
   const { t, locale } = useI18n();
   const { start, get } = useAgentApi();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
+  const [summary, setSummary] = useState('');
   const [citations, setCitations] = useState<Array<Record<string, unknown>>>([]);
   const [domains, setDomains] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [planRequired, setPlanRequired] = useState<string | null>(null);
-  // Distinguishes "never run yet" from "ran, found nothing" — the backend
-  // (graph.py) is pure parallel RAG citation aggregation with no LLM
-  // synthesis step, so a query that matches nothing in the corpus legitimately
-  // comes back with domains but zero citations. Previously that rendered as
-  // an empty page with no feedback, indistinguishable from the form having
-  // done nothing at all.
+  // Distinguishes "never run yet" from "ran, found nothing" — a query that
+  // matches nothing in the corpus legitimately comes back with domains but
+  // zero citations and no synthesis (synthesis_node deliberately skips the
+  // LLM call when there's nothing to ground it in — see graph.py). Previously
+  // that rendered as an empty page with no feedback, indistinguishable from
+  // the form having done nothing at all.
   const [hasRun, setHasRun] = useState(false);
 
   const run = async () => {
@@ -48,6 +66,7 @@ function ResearchSynthesiserPageInner() {
     setPlanRequired(null);
     try {
       const res = await start('research-synthesiser', { query, language: localeToApiLanguage(locale) });
+      setSummary((res.summary as string) ?? '');
       setCitations((res.citations as Array<Record<string, unknown>>) ?? []);
       setDomains((res.detected_domains as string[]) ?? []);
       setHasRun(true);
@@ -73,8 +92,8 @@ function ResearchSynthesiserPageInner() {
   // compiles its LangGraph with no checkpointer at all (single-shot,
   // confirmed in agent_runner.py) — there's no session_id/continue
   // concept to restore, only the stored output, so this just re-hydrates
-  // citations/domains/query directly from agent_runs.output. Silent
-  // fallback on any failure (bad/expired link) rather than an error.
+  // summary/citations/domains/query directly from agent_runs.output.
+  // Silent fallback on any failure (bad/expired link) rather than an error.
   useEffect(() => {
     const runId = searchParams.get('run');
     if (!runId) return;
@@ -83,6 +102,7 @@ function ResearchSynthesiserPageInner() {
         const stored = await get(`/api/v1/agent-runs/${runId}`);
         const out = (stored.output as Record<string, unknown>) ?? {};
         if (typeof out.query === 'string') setQuery(out.query);
+        if (typeof out.summary === 'string') setSummary(out.summary);
         const restoredCitations = (out.merged_citations ?? out.citations) as Array<Record<string, unknown>> | undefined;
         setCitations(restoredCitations ?? []);
         setDomains((out.detected_domains as string[]) ?? []);
@@ -129,6 +149,15 @@ function ResearchSynthesiserPageInner() {
             rows={3}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Cmd/Ctrl+Enter to run — a research query is often multi-line
+              // (plain Enter should keep inserting newlines), matching the
+              // same modifier-submit convention as /chat's ChatInput.
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && query.trim() && !loading) {
+                e.preventDefault();
+                void run();
+              }
+            }}
             placeholder={t('agents.research-synthesiser.query_placeholder')}
           />
           <button
@@ -143,19 +172,57 @@ function ResearchSynthesiserPageInner() {
 
         {loading && <AgentLoadingSkeleton message={t('agents.research-synthesiser.synthesising')} />}
 
-        {!loading && domains.length > 0 && (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            {t('agents.research-synthesiser.domains_label')}: {domains.map(domainLabel).join(', ')}
-          </p>
-        )}
-        {!loading && citations.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {citations.map((c, i) => (
-              <CitationChip key={i} citation={c as unknown as Citation} index={i + 1} />
-            ))}
-          </div>
-        )}
-        {!loading && hasRun && citations.length === 0 && !error && !planRequired && (
+        <AnimatePresence mode="wait">
+          {!loading && hasRun && (summary || citations.length > 0) && (
+            <motion.div
+              key={query}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="flex flex-col gap-5"
+            >
+              {domains.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mr-1">
+                    {t('agents.research-synthesiser.domains_label')}
+                  </span>
+                  {domains.map((d) => (
+                    <span
+                      key={d}
+                      className="inline-flex items-center rounded-full border border-nk-official/30 bg-nk-official/5 px-2.5 py-0.5 text-xs font-medium text-nk-official-dim dark:bg-nk-official/10 dark:text-nk-official"
+                    >
+                      {domainLabel(d)}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {summary && (
+                <section className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
+                  <h2 className="text-xs font-bold uppercase tracking-wide text-nk-official-dim dark:text-nk-official mb-3">
+                    {t('agents.research-synthesiser.summary_heading')}
+                  </h2>
+                  <SynthesisText text={summary} />
+                </section>
+              )}
+
+              {citations.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    {t('agents.research-synthesiser.sources_heading')}
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {citations.map((c, i) => (
+                      <CitationChip key={i} citation={c as unknown as Citation} index={i + 1} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!loading && hasRun && citations.length === 0 && !summary && !error && !planRequired && (
           <p className="text-sm text-center py-8 text-zinc-400 dark:text-zinc-500">
             {t('agents.research-synthesiser.no_results')}
           </p>
