@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useVoiceInput } from '@/lib/hooks/useVoiceInput';
-import { inSeasonalWindow } from '@/lib/seasonal-window';
+import { inSeasonalWindow, mentionsKemerdekaan } from '@/lib/seasonal-window';
 import {
   contextUsagePercent,
   formatContextUsage,
@@ -157,10 +157,23 @@ export function ChatInput({
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
   }, []);
 
+  // Send-button flag pulse — a small, self-clearing acknowledgement that
+  // fires alongside chat's own MerdekaConfetti burst (same keyword
+  // detector, same seasonal gate) without this component needing to know
+  // anything about the confetti trigger living in the parent page.
+  const [flagPulse, setFlagPulse] = useState(false);
+  const flagPulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (flagPulseTimer.current) clearTimeout(flagPulseTimer.current); }, []);
+
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || submittingRef.current) return;
     submittingRef.current = true;
+    if (seasonal && mentionsKemerdekaan(trimmed)) {
+      setFlagPulse(true);
+      if (flagPulseTimer.current) clearTimeout(flagPulseTimer.current);
+      flagPulseTimer.current = setTimeout(() => setFlagPulse(false), 1800);
+    }
     onSend(trimmed);
     setValue('');
     if (textareaRef.current) {
@@ -169,7 +182,7 @@ export function ChatInput({
     queueMicrotask(() => {
       submittingRef.current = false;
     });
-  }, [value, onSend]);
+  }, [value, onSend, seasonal]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -361,8 +374,21 @@ export function ChatInput({
           onClick={handleSubmit}
           disabled={!value.trim() || isStreaming}
           aria-label={t('chat.send')}
-          className="flex-shrink-0 p-2 rounded-full bg-nk-official text-white transition-colors hover:bg-nk-official-dim disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
+          className="relative flex-shrink-0 p-2 rounded-full bg-nk-official text-white transition-colors hover:bg-nk-official-dim disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
         >
+          {/* Flag-color pulse — a self-clearing acknowledgement that this
+              send just carried a Merdeka-keyword query (see handleSubmit).
+              A ring, not a fill, so the button's own color/legibility is
+              untouched — this decorates the button, it doesn't replace it. */}
+          {flagPulse && (
+            <span
+              aria-hidden
+              className="nk-send-flag-pulse absolute -inset-1 rounded-full pointer-events-none"
+              style={{
+                background: 'conic-gradient(from 0deg, #b3282d, #ffffff, #010066, #ffcc00, #b3282d)',
+              }}
+            />
+          )}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"

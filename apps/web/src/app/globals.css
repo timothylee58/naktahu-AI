@@ -274,6 +274,31 @@ html[lang='zh-Hans'] .locale-text-balance {
   100% { transform: translate(calc(-50% + var(--mc-drift, 0)), 70vh) rotate(calc(var(--mc-rotate, 0deg) + 340deg)); opacity: 0; }
 }
 
+/* ── Hero CTA Jalur Gemilang hover sweep (Merdeka/Malaysia Day window) ──── */
+.nk-flag-sweep {
+  animation: nk-flag-sweep-scroll 1.6s linear infinite;
+}
+@keyframes nk-flag-sweep-scroll {
+  from { background-position: 0% 0; }
+  to { background-position: 200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nk-flag-sweep { animation: none; }
+}
+
+/* ── Send-button Jalur Gemilang pulse (Merdeka-keyword send, chat) ──────── */
+.nk-send-flag-pulse {
+  animation: nk-send-flag-pulse-anim 0.9s ease-out 2;
+  z-index: -1;
+}
+@keyframes nk-send-flag-pulse-anim {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nk-send-flag-pulse { animation: none; opacity: 0.6; }
+}
+
 /* ── Prompt-chip status dot ────────────────────────────────────────────── */
 .chat-chip-dot {
   animation: chat-chip-pulse 2.4s ease-in-out infinite;
