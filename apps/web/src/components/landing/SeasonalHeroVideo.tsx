@@ -46,20 +46,22 @@ export function SeasonalHeroVideo() {
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-b-[2.5rem]">
       {reducedMotion ? (
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-30"
+          className="absolute inset-0 bg-cover bg-center opacity-25"
           style={{ backgroundImage: `url(${STATIC_FRAME_SRC})` }}
         />
       ) : (
         <iframe
-          className="absolute left-1/2 top-1/2 h-[130%] w-[130%] -translate-x-1/2 -translate-y-1/2 opacity-30"
+          className="absolute left-1/2 top-1/2 h-[130%] w-[130%] -translate-x-1/2 -translate-y-1/2 opacity-25"
           src={EMBED_SRC}
           title=""
           tabIndex={-1}
           allow="autoplay; encrypted-media"
         />
       )}
-      {/* Scrim so hero copy stays legible over the footage either way. */}
-      <div className="absolute inset-0 bg-gradient-to-b from-nk-bg-warm/70 via-nk-bg-warm/85 to-nk-bg-warm dark:from-[#12151C]/70 dark:via-[#12151C]/85 dark:to-[#12151C]" />
+      {/* Scrim so hero copy stays legible over the footage — dark mode needs
+          a heavier overlay since the video brightness competes with white/blue
+          text on the dark background. 90% top fading to full opaque bottom. */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#12151C]/80 via-[#12151C]/85 to-[#12151C] dark:from-[#12151C]/80 dark:via-[#12151C]/85 dark:to-[#12151C]" />
     </div>
   );
 }

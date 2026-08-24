@@ -183,16 +183,16 @@ export function LandingClient() {
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
     : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
-  const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
+  const mutedText = isDark ? 'text-zinc-200' : 'text-zinc-600';
+  const sectionTitle = isDark ? 'text-white' : 'text-zinc-800';
   const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-nk-official/50'
+    ? 'bg-white/10 border-white/20 shadow-[0_8px_30px_rgba(0,0,0,0.45)] focus-within:border-[#60A5FA]/60'
     : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-nk-official/40';
   const domainPillClass = isDark
-    ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
+    ? 'border-[#60A5FA]/50 text-[#93C5FD] bg-[#2563EB]/15'
     : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
-  const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
-  const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
+  const footerText = isDark ? 'text-zinc-400' : 'text-zinc-500';
+  const footerTitle = isDark ? 'text-white' : 'text-zinc-700';
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
@@ -279,7 +279,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-nk-official uppercase border border-nk-official/30 rounded-full px-4 py-1.5 locale-nowrap"
+          className={`inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase border rounded-full px-4 py-1.5 locale-nowrap ${isDark ? 'text-[#93C5FD] border-[#60A5FA]/50' : 'text-nk-official border-nk-official/30'}`}
         >
           🇲🇾 {t('landing.badge')}
         </motion.div>
@@ -289,7 +289,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance"
+          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
         >
           {(() => {
             const headline = t('landing.hero.headline');
@@ -299,7 +299,7 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-nk-official font-extrabold">{highlight}</span>
+                <span className="text-[#60A5FA] font-extrabold">{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
@@ -327,7 +327,7 @@ export function LandingClient() {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
-            className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
+            className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-300' : 'text-zinc-400'}`}
           >
             <path
               fillRule="evenodd"
