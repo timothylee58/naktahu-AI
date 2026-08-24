@@ -8,6 +8,7 @@ import { ChatBubbles, type ChatMessage } from '@/components/agents/ChatBubbles';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { CitationChip } from '@/components/chat/CitationChip';
+import { PropertyListingSubmitCard } from '@/components/agents/PropertyListingSubmitCard';
 import { useI18n } from '@/lib/i18n';
 import type { Citation } from '@/lib/types';
 
@@ -192,6 +193,8 @@ function PropertyConciergePageInner() {
             )}
           </section>
         )}
+
+        <PropertyListingSubmitCard />
 
         <ChatBubbles messages={messages} />
         {loading && <AgentLoadingSkeleton message={t('agents.property-concierge.thinking')} />}
