@@ -42,12 +42,23 @@ function ImmigrationNavigatorPageInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'welcome', role: 'bot', content: t('agents.immigration-navigator.welcome') },
   ]);
-  const [nextPrompt, setNextPrompt] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [checklist, setChecklist] = useState<string[]>([]);
   const [visaType, setVisaType] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [prefilledReference, setPrefilledReference] = useState<Array<{ field: string; value: string }>>([]);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [portalNote, setPortalNote] = useState<string | null>(null);
+  const [enquiryDraft, setEnquiryDraft] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const copyToClipboard = (text: string, key: string) => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(key);
+      setTimeout(() => setCopiedField((k) => (k === key ? null : k)), 1500);
+    });
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,6 +87,10 @@ function ImmigrationNavigatorPageInner() {
         if (out.visa_type) setVisaType(String(out.visa_type));
         if (Array.isArray(out.checklist)) setChecklist(out.checklist as string[]);
         if (Array.isArray(out.warnings)) setWarnings(out.warnings as string[]);
+        if (Array.isArray(out.prefilled_reference)) setPrefilledReference(out.prefilled_reference as Array<{ field: string; value: string }>);
+        if (typeof out.portal_url === 'string' && out.portal_url) setPortalUrl(out.portal_url);
+        if (typeof out.portal_note === 'string') setPortalNote(out.portal_note);
+        if (typeof out.enquiry_draft === 'string') setEnquiryDraft(out.enquiry_draft);
         const lastResponse = out.response ?? out.summary ?? out.output;
         if (lastResponse) {
           setMessages((prev) => [
@@ -131,7 +146,10 @@ function ImmigrationNavigatorPageInner() {
       if (out.visa_type) setVisaType(String(out.visa_type));
       if (Array.isArray(out.checklist)) setChecklist(out.checklist as string[]);
       if (Array.isArray(out.warnings)) setWarnings(out.warnings as string[]);
-      setNextPrompt((res.next_prompt as string) ?? (out.next_prompt as string) ?? null);
+      if (Array.isArray(out.prefilled_reference)) setPrefilledReference(out.prefilled_reference as Array<{ field: string; value: string }>);
+      if (typeof out.portal_url === 'string' && out.portal_url) setPortalUrl(out.portal_url);
+      if (typeof out.portal_note === 'string') setPortalNote(out.portal_note);
+      if (typeof out.enquiry_draft === 'string') setEnquiryDraft(out.enquiry_draft);
 
       // Generate contextual quick replies. QuickReplies sends the label text
       // itself as the next message (see onSelect below) — these were
@@ -210,6 +228,85 @@ function ImmigrationNavigatorPageInner() {
               </section>
             )}
 
+            {/* Named-e-service track (MDAC/ePLKS/MM2H/foreign-worker/
+                passport/PVIP): a copy-paste reference, never a submission —
+                see immigration_navigator/nodes.py's module docstring for
+                why. Each row has its own copy button since the whole point
+                is pasting these one at a time into the real government
+                form. */}
+            {prefilledReference.length > 0 && (
+              <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-semibold text-teal-800 dark:text-teal-300">{portalNote ?? t('agents.immigration-navigator.reference_title')}</h2>
+                  {portalUrl && (
+                    <a
+                      href={portalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      {t('agents.immigration-navigator.open_portal')}
+                    </a>
+                  )}
+                </div>
+                <div className="flex flex-col divide-y divide-zinc-100 dark:divide-white/10">
+                  {prefilledReference.map((row) => (
+                    <div key={row.field} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] text-zinc-400 dark:text-zinc-500">{row.field}</p>
+                        <p className="text-sm font-medium truncate">{row.value || '—'}</p>
+                      </div>
+                      {row.value && (
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(row.value, row.field)}
+                          className="flex-shrink-0 text-xs font-medium text-nk-official-dim hover:text-nk-official transition-colors"
+                        >
+                          {copiedField === row.field ? t('agents.immigration-navigator.copied') : t('agents.immigration-navigator.copy')}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {warnings.length > 0 && (
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 p-2 rounded-lg space-y-1 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
+                    {warnings.map((w) => <p key={w}>{w}</p>)}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* SPO enquiry-drafting track: draft text + the copy button —
+                same "user submits it themselves" pattern. */}
+            {enquiryDraft != null && (
+              <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-semibold text-teal-800 dark:text-teal-300">{t('agents.immigration-navigator.spo_draft_title')}</h2>
+                  <a
+                    href="https://eapp.imi.gov.my/spo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    {t('agents.immigration-navigator.open_portal')}
+                  </a>
+                </div>
+                <p className="text-sm whitespace-pre-wrap text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-white/5 rounded-lg p-3">{enquiryDraft}</p>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(enquiryDraft, 'spo_draft')}
+                  className="self-start text-xs font-medium text-nk-official-dim hover:text-nk-official transition-colors"
+                >
+                  {copiedField === 'spo_draft' ? t('agents.immigration-navigator.copied') : t('agents.immigration-navigator.copy')}
+                </button>
+                {warnings.length > 0 && (
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-100 p-2 rounded-lg space-y-1 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
+                    {warnings.map((w) => <p key={w}>{w}</p>)}
+                  </div>
+                )}
+              </section>
+            )}
+
             <ChatBubbles messages={messages} />
             {loading && <AgentLoadingSkeleton message={t('agents.immigration-navigator.thinking')} />}
             <div ref={bottomRef} />
@@ -220,10 +317,14 @@ function ImmigrationNavigatorPageInner() {
                   still a conversational multi-turn intake, not separately
                   named form fields, but labeling each turn as a step gives
                   the same sense of structured progress. */}
+              {/* The agent's next-prompt text itself is NOT repeated here —
+                  it already renders as the latest bot bubble in
+                  ChatBubbles right above this card, so showing it a
+                  second time read as a duplicated message rather than a
+                  "next step" cue. */}
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
                 {t('agents.immigration-navigator.turn_step').replace('{n}', String(turnsCount + 1))}
               </p>
-              {nextPrompt && <p className="text-sm text-nk-official-dim dark:text-nk-official">{nextPrompt}</p>}
               <QuickReplies options={quickReplies} onSelect={(opt) => void send(opt)} />
               <textarea
                 className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:border-teal-500/50 focus:outline-none focus:ring-1 focus:ring-teal-500/30 dark:border-white/10 dark:placeholder:text-zinc-500"

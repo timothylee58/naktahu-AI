@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthButton } from '@/components/auth/AuthButton';
@@ -21,9 +21,15 @@ interface LandingHeaderProps {
    * existed — /about and /faq (the other two LandingHeader consumers)
    * never pass it and are byte-for-byte unaffected. */
   collapsing?: boolean;
+  /** Gives every nav link the same loading-screen transition as the hero
+   * "Mula Bertanya" CTA instead of a bare route change — see
+   * LandingClient's handleNavClick. Undefined for /about and /faq (the
+   * other two consumers), which keeps their nav links as plain
+   * instant-navigation <Link>s, unaffected by this. */
+  onNavClick?: (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => void;
 }
 
-export function LandingHeader({ collapsing = false }: LandingHeaderProps) {
+export function LandingHeader({ collapsing = false, onNavClick }: LandingHeaderProps) {
   const { t } = useI18n();
   const { theme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -83,6 +89,7 @@ export function LandingHeader({ collapsing = false }: LandingHeaderProps) {
               layout="horizontal"
               hideHome
               excludeHrefs={LANDING_NAV_OMIT}
+              onLinkNavigate={onNavClick}
             />
           </div>
 
@@ -128,6 +135,7 @@ export function LandingHeader({ collapsing = false }: LandingHeaderProps) {
                 hideHome
                 excludeHrefs={LANDING_NAV_OMIT}
                 onNavigate={() => setMenuOpen(false)}
+                onLinkNavigate={onNavClick}
               />
               <div className="flex flex-col gap-2 pt-2 border-t border-inherit">
                 <ThemeToggle variant={isDark ? 'dark' : 'light'} layout="sidebar" />

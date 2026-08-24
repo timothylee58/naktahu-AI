@@ -35,6 +35,13 @@ import { useTheme } from '@/lib/theme';
 // so long that the CTA feels laggy.
 const CHAT_MORPH_MS = 420;
 
+// Lighter beat than CHAT_MORPH_MS: this path has no header→sidebar shape
+// morph to wait out (that treatment stays specific to the hero's own
+// "Mula Bertanya" CTA, since only /chat has a real sidebar shape to morph
+// into) — just enough time for the loading screen to read as intentional
+// before the route actually changes underneath it.
+const NAV_TRANSITION_MS = 380;
+
 // Interactive hero chips — each is a real, functioning shortcut: domain
 // chips prefill /chat with a representative query for that domain (see
 // app/chat/page.tsx's ?q= handling), and the Warung Watch chip links
@@ -154,6 +161,24 @@ export function LandingClient() {
     window.setTimeout(() => router.push('/chat'), CHAT_MORPH_MS);
   };
 
+  // Every OTHER real navigation this page offers (header nav links, domain
+  // chips, the Warung Watch chip, the "Explore Agents" secondary CTA) gets
+  // the same loading-screen treatment as the hero CTA, minus the
+  // /chat-specific header-morph — the opaque full-screen loader already
+  // covers the header entirely, so there's nothing to gain from also
+  // running that shape animation underneath it for a destination that
+  // isn't /chat.
+  const handleNavClick = (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (reduceMotion) {
+      router.push(href);
+      return;
+    }
+    setShowLoadingScreen(true);
+    window.setTimeout(() => router.push(href), NAV_TRANSITION_MS);
+  };
+
   const pageClass = isDark
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
     : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
@@ -219,7 +244,7 @@ export function LandingClient() {
         />
       </motion.div>
 
-      <LandingHeader collapsing={isEnteringChat} />
+      <LandingHeader collapsing={isEnteringChat} onNavClick={handleNavClick} />
 
       {/* Everything below the header fades+blurs+scales out while the
           header morphs into the sidebar shape, then router.push fires —
@@ -334,17 +359,22 @@ export function LandingClient() {
           animate="show"
           className="flex flex-wrap justify-center gap-2 max-w-xl"
         >
-          {DOMAIN_CHIPS.map((chip) => (
-            <Link
-              key={chip.key}
-              href={`/chat?q=${encodeURIComponent(t(chip.queryKey))}`}
-              className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
-            >
-              {t(`domain.${chip.key}`)}
-            </Link>
-          ))}
+          {DOMAIN_CHIPS.map((chip) => {
+            const href = `/chat?q=${encodeURIComponent(t(chip.queryKey))}`;
+            return (
+              <Link
+                key={chip.key}
+                href={href}
+                onClick={(e) => handleNavClick(href, e)}
+                className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+              >
+                {t(`domain.${chip.key}`)}
+              </Link>
+            );
+          })}
           <Link
             href="/warung-watch"
+            onClick={(e) => handleNavClick('/warung-watch', e)}
             className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
           >
             {t('nav.warung_watch')}
@@ -383,6 +413,7 @@ export function LandingClient() {
               itself; the hero doesn't need to restate it. */}
           <Link
             href="/agents"
+            onClick={(e) => handleNavClick('/agents', e)}
             className="text-sm hover:text-nk-official transition-colors locale-nowrap"
           >
             {t('landing.hero.secondary_cta')}
