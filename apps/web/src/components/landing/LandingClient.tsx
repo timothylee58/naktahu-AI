@@ -12,6 +12,7 @@ import {
   useTransform,
 } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatureShowcase } from './LandingFeatureShowcase';
@@ -137,6 +138,7 @@ export function LandingClient() {
   // (already applied elsewhere this session) says to replace, not tone
   // down.
   const [isEnteringChat, setIsEnteringChat] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const handleStartChat = (e: ReactMouseEvent<HTMLAnchorElement>) => {
     // Modified clicks (open in new tab/window, middle-click) must keep
     // working exactly like a plain <a href>/<Link> — only a plain left
@@ -148,6 +150,7 @@ export function LandingClient() {
       return;
     }
     setIsEnteringChat(true);
+    setShowLoadingScreen(true);
     window.setTimeout(() => router.push('/chat'), CHAT_MORPH_MS);
   };
 
@@ -168,6 +171,13 @@ export function LandingClient() {
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
+      {/* The one real navigation this page triggers (hero "Mula Bertanya" →
+          /chat) gets a full-screen transition treatment instead of a blank
+          frame while the route change lands — see PageLoadingScreen's own
+          docstring for why this isn't attached to every button on the
+          page (toggles/modals don't navigate anywhere). */}
+      <PageLoadingScreen show={showLoadingScreen} />
+
       {/* Two-tone ambient glow (official blue + heritage terracotta) instead
           of one flat blue blob — a small step toward the section-to-section
           "color storytelling" explored from the Fixa/V7 references: still a

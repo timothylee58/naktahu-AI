@@ -71,6 +71,10 @@ const MS: Translations = {
   /* ── header ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Soal tentang kerajaan',
+  'loading_screen.stage1': 'Menyambung ke agensi rasmi',
+  'loading_screen.stage2': 'Memuatkan indeks dokumen',
+  'loading_screen.stage3': 'Menyediakan ejen AI',
+  'loading_screen.stage4': 'Sedia',
   'header.lang_toggle': 'EN',
   'header.history': 'Sejarah',
   'header.menu': 'Menu',
@@ -1065,6 +1069,10 @@ const EN: Translations = {
   /* ── header ── */
   'header.title': 'NakTahu',
   'header.subtitle': 'Ask about government',
+  'loading_screen.stage1': 'Connecting to official agencies',
+  'loading_screen.stage2': 'Loading document index',
+  'loading_screen.stage3': 'Preparing AI agents',
+  'loading_screen.stage4': 'Ready',
   'header.lang_toggle': 'BM',
   'header.history': 'History',
   'header.menu': 'Menu',
@@ -2054,6 +2062,10 @@ const ZH: Translations = {
   /* ── header ── */
   'header.title': 'NakTahu',
   'header.subtitle': '询问政府事务',
+  'loading_screen.stage1': '正在连接官方机构',
+  'loading_screen.stage2': '正在加载文档索引',
+  'loading_screen.stage3': '正在准备 AI 代理',
+  'loading_screen.stage4': '准备就绪',
   'header.lang_toggle': 'BM',
   'header.history': '历史记录',
   'header.menu': '菜单',
