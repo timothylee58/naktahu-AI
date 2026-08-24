@@ -16,10 +16,17 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from supabase import Client
 
+from app.agents.tools import ocr_extract_listing_fields
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables
 from services.billing import add_credits
 
 SUBMISSION_CREDIT_REWARD = 1
+
+# Base64 image size guard — mirrors app/routers/transcribe.py's
+# _MAX_AUDIO_B64_CHARS reasoning: ~9M base64 chars ≈ ~6.7MB decoded, a
+# generous ceiling for a phone photo/screenshot without letting an
+# oversized payload through to the vision call.
+MAX_LISTING_IMAGE_B64_CHARS = 9_000_000
 
 
 def _check_injection(text: Optional[str]) -> None:
@@ -90,6 +97,26 @@ async def submit_listing(
         await asyncio.to_thread(_mark_awarded)
 
     return {"submitted": inserted, "credits_awarded": credits_awarded}
+
+
+async def extract_listing_from_image(
+    image_base64: str,
+    *,
+    mime_type: str = "image/jpeg",
+    language: str = "bm",
+) -> dict[str, Any]:
+    """OCR a photo/screenshot of a listing into prefill fields for the
+    submission form. Nothing is stored or submitted here — the image is
+    never persisted (not uploaded to Supabase Storage, not written to any
+    table); it only ever reaches the vision model as a one-shot base64
+    payload. The extracted fields still pass through the same
+    injection-scan/submit_listing path as manually-typed fields once the
+    user reviews and confirms them via POST /api/v1/property/listings, so
+    this function never bypasses the "unverified, user-confirmed" model."""
+    fields = await ocr_extract_listing_fields(image_base64, mime_type=mime_type, language=language)
+    _check_injection(fields.get("title"))
+    _check_injection(fields.get("location"))
+    return fields
 
 
 async def list_my_listings(supabase_client: Client, user_id: str) -> list[dict[str, Any]]:

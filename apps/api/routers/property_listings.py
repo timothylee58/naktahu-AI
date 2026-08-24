@@ -5,11 +5,17 @@ from pydantic import BaseModel, Field
 
 from middleware.rate_limit import apply_query_rate_limit
 from services.auth import UserContext, get_current_user
-from services.property_submissions import list_my_listings, submit_listing
+from services.property_submissions import (
+    MAX_LISTING_IMAGE_B64_CHARS,
+    extract_listing_from_image,
+    list_my_listings,
+    submit_listing,
+)
 
 router = APIRouter(prefix="/api/v1/property/listings", tags=["property-listings"])
 
 _PROPERTY_TYPES = {"condo", "apartment", "landed", "other"}
+_ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 class ListingSubmitRequest(BaseModel):
@@ -48,6 +54,36 @@ async def post_listing_submission(
         bedrooms=body.bedrooms,
         notes=body.notes,
     )
+
+
+class ListingOcrRequest(BaseModel):
+    image_base64: str = Field(..., min_length=16, max_length=MAX_LISTING_IMAGE_B64_CHARS)
+    mime_type: str = Field("image/jpeg", max_length=20)
+    language: str = Field("bm", max_length=2)
+
+
+@router.post("/ocr")
+@apply_query_rate_limit()
+async def post_listing_ocr(
+    request: Request,
+    response: Response,
+    body: ListingOcrRequest,
+    user: Annotated[UserContext, Depends(get_current_user)],
+):
+    """Extracts prefill fields from a photographed/screenshotted listing.
+    Does not write anything — the caller still POSTs to / to actually
+    submit, after reviewing/editing whatever came back here."""
+    if body.mime_type not in _ALLOWED_IMAGE_MIME_TYPES:
+        raise HTTPException(status_code=422, detail=f"mime_type must be one of {sorted(_ALLOWED_IMAGE_MIME_TYPES)}")
+    if body.language not in {"bm", "en", "zh"}:
+        raise HTTPException(status_code=422, detail="language must be one of ['bm', 'en', 'zh']")
+
+    fields = await extract_listing_from_image(
+        body.image_base64,
+        mime_type=body.mime_type,
+        language=body.language,
+    )
+    return {"fields": fields}
 
 
 @router.get("/mine")

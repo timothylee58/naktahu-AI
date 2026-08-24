@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import binascii
 import io
+import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -204,6 +205,120 @@ async def ocr_extract_text(
     except Exception as exc:
         log.warning("ocr_anthropic_fallback_failed", error=str(exc))
         return ""
+
+
+async def ocr_extract_listing_fields(
+    image_base64: str,
+    *,
+    mime_type: str = "image/jpeg",
+    language: str = "bm",
+) -> dict[str, Any]:
+    """Extract structured property-listing fields from a photographed or
+    screenshotted listing (e.g. a PropertyGuru/iProperty/Mudah screenshot,
+    or a photo of a physical "For Sale" signboard) via a vision-capable
+    chat completion. Same ILMU-primary/Anthropic-fallback shape as
+    ocr_extract_text above — this is a second, structured-output sibling
+    of it, not a replacement.
+
+    Returns a dict with only the keys ListingSubmitRequest accepts
+    (title/price_myr/location/property_type/bedrooms), any subset of which
+    may be missing/None if the model couldn't read them. Returns {} on
+    total failure — callers must treat this as "nothing extracted, user
+    fills the form manually" (Trap #4-style: never crash on a failed
+    provider), never as a submitted listing: this only prefills the
+    existing submission form (services.property_submissions.submit_listing)
+    for the user to review and confirm, exactly like the URL-paste path —
+    OCR does not submit anything on its own."""
+    data_url = f"data:{mime_type};base64,{image_base64}"
+    lang_note = "Respond in Bahasa Malaysia values where the source text is Malay, otherwise English." if language == "bm" else "Respond in English."
+    system = (
+        "You read a photographed or screenshotted Malaysian property listing "
+        "(from a listing site, a signboard, or a printed flyer) and extract "
+        "structured fields. Return ONLY a JSON object with these keys: "
+        'title (string or null), price_myr (number or null, MYR only — '
+        "convert if another currency is shown, or null if unclear), "
+        "location (string or null — area/town, not a full address), "
+        'property_type (one of "condo", "apartment", "landed", "other", or null), '
+        "bedrooms (integer or null). "
+        "Do not invent a value that is not visibly present in the image — use "
+        f"null for anything you cannot actually read. {lang_note}"
+    )
+    raw = ""
+    try:
+        resp = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract the listing fields from this image."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+            max_tokens=300,
+            temperature=0.0,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+    except Exception as exc:
+        log.warning("listing_ocr_ilmu_failed", error=str(exc))
+
+    if not raw:
+        try:
+            from app.services.llm_client import FALLBACK_MODEL, anthropic_client
+
+            resp = await anthropic_client.messages.create(
+                model=FALLBACK_MODEL,
+                max_tokens=300,
+                system=system,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {"type": "base64", "media_type": mime_type, "data": image_base64},
+                            },
+                            {"type": "text", "text": "Extract the listing fields from this image."},
+                        ],
+                    }
+                ],
+            )
+            parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+            raw = "".join(parts).strip()
+        except Exception as exc:
+            log.warning("listing_ocr_anthropic_fallback_failed", error=str(exc))
+            return {}
+
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except (ValueError, IndexError):
+        log.warning("listing_ocr_unparseable_response")
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+
+    _VALID_TYPES = {"condo", "apartment", "landed", "other"}
+    out: dict[str, Any] = {}
+    title = parsed.get("title")
+    if isinstance(title, str) and title.strip():
+        out["title"] = title.strip()[:200]
+    price = parsed.get("price_myr")
+    if isinstance(price, (int, float)) and price >= 0:
+        out["price_myr"] = float(price)
+    location = parsed.get("location")
+    if isinstance(location, str) and location.strip():
+        out["location"] = location.strip()[:120]
+    ptype = parsed.get("property_type")
+    if isinstance(ptype, str) and ptype in _VALID_TYPES:
+        out["property_type"] = ptype
+    bedrooms = parsed.get("bedrooms")
+    if isinstance(bedrooms, int) and 0 <= bedrooms <= 50:
+        out["bedrooms"] = bedrooms
+    return out
 
 
 async def generate_pdf(
