@@ -200,6 +200,7 @@ async def agent_continue(
     if agent_name in (
         "immigration-navigator",
         "retrenchment-navigator",
+        "property-concierge",
         "study-agent",
         "eligibility-agent",
         "compliance-drafter",

@@ -113,6 +113,13 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=0,
         ),
+        "property-concierge": AgentDefinition(
+            name="property-concierge",
+            description="Guided buyer/renter intake: lead-tier qualification, property RAG citations (tenancy/strata/land title), and a shareable brief.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
     }
 
 

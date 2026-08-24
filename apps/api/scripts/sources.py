@@ -616,6 +616,119 @@ SOURCES: tuple[Source, ...] = (
             "proxy-blocked, not a dead URL)."
         ),
     ),
+
+    # ── DOSM (Department of Statistics Malaysia) + KPDN (Ministry of
+    # Domestic Trade and Cost of Living) + one more SSM page — multi-domain
+    # knowledge-base expansion. URLs confirmed real via WebSearch (dosm.gov.my,
+    # open.dosm.gov.my, kpdn.gov.my, ssm.com.my all resolved to the actual
+    # official portals, not lookalikes) but NOT content-verified via direct
+    # fetch — same sandbox-egress restriction as every other WebSearch-found
+    # entry in this file (see module docstring). DOSM's own statistics span
+    # population, economic, and social data with no single narrower domain
+    # fitting all of it, so — like mygovernment-portal-home — it's tagged
+    # "government" rather than "finance". KPDN's own portal is tagged
+    # "business" (trade-licensing/consumer-protection remit); its
+    # cost-of-living assistance programme is already covered separately by
+    # the "welfare"-tagged Ihsan MADANI entries above, which KPDN also runs.
+    Source(
+        name="dosm-portal-home",
+        url="https://www.dosm.gov.my/",
+        kind="html",
+        domain="government",
+        ministry="Jabatan Perangkaan Malaysia (DOSM)",
+        language="en",
+        notes="National statistics department's official portal — population, economic, and social statistics catalogue.",
+    ),
+    Source(
+        name="opendosm-home",
+        url="https://open.dosm.gov.my/",
+        kind="html",
+        domain="government",
+        ministry="Jabatan Perangkaan Malaysia (DOSM)",
+        language="en",
+        notes="OpenDOSM — DOSM's open-data catalogue/dashboard platform (CPI, GDP, population, labour force series).",
+    ),
+    Source(
+        name="kpdn-portal-home",
+        url="https://www.kpdn.gov.my/en/home",
+        kind="html",
+        domain="business",
+        ministry="Kementerian Perdagangan Dalam Negeri dan Kos Sara Hidup (KPDN)",
+        language="en",
+        notes="Ministry of Domestic Trade and Cost of Living official portal — trade licensing, consumer protection, price-control enforcement.",
+    ),
+    Source(
+        name="ssm-ezbiz-online",
+        url="https://www.ssm.com.my/Pages/Services/Registration-of-Business-(ROB)/EzBiz-Online.aspx",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes="Official explainer page for EzBiz, SSM's online sole-proprietorship/partnership registration, renewal, and termination service.",
+    ),
+
+    # ── property domain — open transacted-price data sources (NAPIC/JPPH,
+    # OpenDOSM, data.gov.my). Registered on user request as a follow-up to
+    # the "where's the open MY property listing data" question. Important
+    # honesty note, not a caveat to silently drop: NONE of these are a
+    # listings feed (active for-sale/for-rent ads) — no such open dataset
+    # exists for Malaysia (PropertyGuru/iProperty/Mudah are proprietary,
+    # no open API, ToS forbids scraping — exactly why property_concierge
+    # doesn't attempt live listing sourcing, see its module docstring).
+    # These three are TRANSACTED-PRICE / statistical sources instead:
+    #   - napic-open-sales-data: NAPIC/JPPH's actual open-data offering.
+    #     Confirmed via WebSearch that only aggregate/summary sales data is
+    #     free here — individual-transaction records are paid and
+    #     restricted to registered valuers/agents (per JPPH's own site).
+    #   - opendosm-data-catalogue / datagovmy-dashboards: general dataset
+    #     catalogue/dashboard index pages, registered here rather than a
+    #     dedicated "house price index" sub-page — WebSearch did not turn
+    #     up a confirmed URL for one on either platform, and per this
+    #     file's own rule, a plausible-looking guessed URL is not
+    #     registered. If DOSM/data.gov.my publish a dedicated housing
+    #     dataset later, replace these with that specific page.
+    # Same not-content-verified-via-direct-fetch caveat as every other
+    # WebSearch-found entry in this file (sandbox egress restriction).
+    Source(
+        name="napic-open-sales-data",
+        url="https://napic.jpph.gov.my/en/open-sales-data",
+        kind="html",
+        domain="property",
+        ministry="Jabatan Penilaian dan Perkhidmatan Harta (JPPH) — National Property Information Centre (NAPIC)",
+        language="en",
+        notes=(
+            "NAPIC's open sales-transaction data offering — median price, price-per-sqft, "
+            "and yearly trends by state/area. Aggregate/summary level is free; individual "
+            "transaction records are paid and restricted to registered valuers/agents."
+        ),
+    ),
+    Source(
+        name="opendosm-data-catalogue",
+        url="https://open.dosm.gov.my/data-catalogue",
+        kind="html",
+        domain="property",
+        ministry="Jabatan Perangkaan Malaysia (DOSM)",
+        language="en",
+        notes=(
+            "OpenDOSM's full dataset catalogue index — registered here (rather than a "
+            "dedicated house-price-index page, which WebSearch could not confirm a URL "
+            "for) so RAG can at least point to where DOSM's housing/property-adjacent "
+            "series, if any, would be listed."
+        ),
+    ),
+    Source(
+        name="datagovmy-dashboards",
+        url="https://data.gov.my/dashboard",
+        kind="html",
+        domain="property",
+        ministry="Malaysia Government Open Data Portal (data.gov.my)",
+        language="en",
+        notes=(
+            "data.gov.my's dashboard index — the general open-data catalogue entry "
+            "point; no dedicated property/housing dataset URL was confirmed via "
+            "WebSearch, so the catalogue itself is registered rather than a guessed page."
+        ),
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}

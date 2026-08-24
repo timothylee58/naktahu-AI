@@ -37,17 +37,12 @@ function fmt(template: string, vars: Record<string, string | number>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), template);
 }
 
-type RedeemStatus =
-  | { kind: 'idle' }
-  | { kind: 'success'; message: string }
-  | { kind: 'error'; message: string };
-
 export default function ProfilePage() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { supabase, user, accessToken, ready } = useSupabaseSession();
-  const { get, post } = useAgentApi();
+  const { get } = useAgentApi();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
@@ -57,9 +52,6 @@ export default function ProfilePage() {
   const [copyLabel, setCopyLabel] = useState<'copy' | 'copied' | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const [redeemInput, setRedeemInput] = useState('');
-  const [redeemLoading, setRedeemLoading] = useState(false);
-  const [redeemStatus, setRedeemStatus] = useState<RedeemStatus>({ kind: 'idle' });
   const [activeGrant, setActiveGrant] = useState<{ plan_tier: string; expires_at: string } | null>(null);
 
   useEffect(() => {
@@ -126,36 +118,6 @@ export default function ProfilePage() {
     if (!referralCode) return;
     const message = fmt(t('profile.referral.whatsapp_message'), { code: referralCode, link: referralLink });
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
-  };
-
-  const submitRedeemCode = async () => {
-    const code = redeemInput.trim();
-    if (!code) return;
-    setRedeemLoading(true);
-    setRedeemStatus({ kind: 'idle' });
-    try {
-      const res = await post('/api/v1/billing/redeem', { code });
-      if (res.status === 'credits_granted') {
-        setRedeemStatus({ kind: 'success', message: fmt(t('profile.redeem.status.credits_granted'), { n: Number(res.credits_amount) }) });
-        void fetchUserCredits(supabase, user!.id).then(setCredits);
-      } else if (res.status === 'plan_granted') {
-        setRedeemStatus({
-          kind: 'success',
-          message: fmt(t('profile.redeem.status.plan_granted'), { plan: String(res.plan_tier), days: Number(res.duration_days) }),
-        });
-        void get('/api/v1/billing/plan-status').then((r) => setActiveGrant((r.active_grant as { plan_tier: string; expires_at: string } | null) ?? null));
-      } else {
-        setRedeemStatus({ kind: 'error', message: t('profile.redeem.status.error') });
-      }
-      setRedeemInput('');
-    } catch (e) {
-      const detail = e instanceof Error ? e.message : '';
-      const key = `profile.redeem.status.${detail.replace(/\s+/g, '_')}`;
-      const resolved = t(key);
-      setRedeemStatus({ kind: 'error', message: resolved === key ? t('profile.redeem.status.error') : resolved });
-    } finally {
-      setRedeemLoading(false);
-    }
   };
 
   const plan = effectivePlan(user);
@@ -334,42 +296,20 @@ export default function ProfilePage() {
 
                 <div className="border-t border-zinc-100 dark:border-white/10" />
 
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 text-nk-official-dim dark:text-nk-official">
-                      <path d="M8 1a.75.75 0 0 1 .75.75v6.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 1 1 1.06-1.06l2.22 2.22V1.75A.75.75 0 0 1 8 1ZM1.75 11a.75.75 0 0 1 .75.75v.5c0 .414.336.75.75.75h9.5a.75.75 0 0 0 .75-.75v-.5a.75.75 0 0 1 1.5 0v.5A2.25 2.25 0 0 1 12.75 14h-9.5A2.25 2.25 0 0 1 1 11.75v-.5a.75.75 0 0 1 .75-.75Z" />
-                    </svg>
+                {/* Full redeem flow now lives on /billing alongside the
+                    rest of the account's money-related actions (credits,
+                    plan grant, checkout); this stays as a quick shortcut
+                    into it rather than a second copy of the form. */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                     {t('profile.codes.redeem_label')}
-                  </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-2">{t('profile.redeem.desc')}</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={redeemInput}
-                      onChange={(e) => setRedeemInput(e.target.value.toUpperCase())}
-                      placeholder={t('profile.redeem.placeholder')}
-                      className="flex-1 border border-zinc-200 rounded-xl p-2.5 text-sm font-mono tracking-wide bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-500"
-                    />
-                    <button
-                      type="button"
-                      disabled={redeemLoading || !redeemInput.trim()}
-                      onClick={() => void submitRedeemCode()}
-                      className="px-4 py-2 bg-nk-official hover:bg-nk-official-dim text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
-                    >
-                      {t('profile.redeem.button')}
-                    </button>
-                  </div>
-                  {redeemStatus.kind !== 'idle' && (
-                    <p
-                      className={`text-xs font-medium ${
-                        redeemStatus.kind === 'success'
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-red-600 dark:text-red-400'
-                      }`}
-                    >
-                      {redeemStatus.message}
-                    </p>
-                  )}
+                  </span>
+                  <Link
+                    href="/billing"
+                    className="text-xs font-medium text-nk-official-dim hover:text-nk-official transition-colors"
+                  >
+                    {t('nav.billing')} →
+                  </Link>
                 </div>
               </section>
 
