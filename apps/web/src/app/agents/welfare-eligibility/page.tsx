@@ -121,7 +121,14 @@ function WelfareEligibilityPage() {
   );
 
   const single = (arr: string[]) => (arr.length ? arr[0] : undefined);
-  const toggleSingle = (setter: (v: string[]) => void) => (id: string) => setter([id]);
+  // Re-clicking an already-selected chip clears it, rather than being a
+  // no-op — every one of these fields except state is optional, and the
+  // previous behaviour meant an accidental tap on a single-select field
+  // could never be undone except by picking a *different* answer instead
+  // of "no answer". Reads the field's own current value at click time
+  // (fresh closure per render), not a shared/generic toggler.
+  const singleToggle = (selected: string[], setter: (v: string[]) => void) => (id: string) =>
+    setter(selected.includes(id) ? [] : [id]);
   const canSubmit = state.length > 0; // state is the only field the backend's scope-matching genuinely needs to run at all; everything else narrows the match, nothing else blocks it
 
   const run = async () => {
@@ -192,28 +199,29 @@ function WelfareEligibilityPage() {
                 type="number"
                 min={1900}
                 max={2020}
+                placeholder={t('agents.welfare-eligibility.field.birth_year_placeholder')}
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value)}
-                className="w-32 border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10"
+                className="w-32 border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.gender')}</label>
-              <ChipSelector options={genderOptions} selected={gender} onToggle={toggleSingle(setGender)} multiple={false} size="sm" />
+              <ChipSelector options={genderOptions} selected={gender} onToggle={singleToggle(gender, setGender)} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
                 {t('agents.welfare-eligibility.field.state')} <span className="text-red-500">*</span>
               </label>
-              <ChipSelector options={stateOptions} selected={state} onToggle={toggleSingle(setState)} multiple={false} size="sm" />
+              <ChipSelector options={stateOptions} selected={state} onToggle={singleToggle(state, setState)} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.ethnic_group')}</label>
-              <ChipSelector options={ethnicOptions} selected={ethnicGroup} onToggle={toggleSingle(setEthnicGroup)} multiple={false} size="sm" />
+              <ChipSelector options={ethnicOptions} selected={ethnicGroup} onToggle={singleToggle(ethnicGroup, setEthnicGroup)} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.marital_status')}</label>
-              <ChipSelector options={maritalOptions} selected={maritalStatus} onToggle={toggleSingle(setMaritalStatus)} multiple={false} size="sm" />
+              <ChipSelector options={maritalOptions} selected={maritalStatus} onToggle={singleToggle(maritalStatus, setMaritalStatus)} multiple={false} size="sm" />
             </div>
           </div>
 
@@ -226,27 +234,33 @@ function WelfareEligibilityPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.individual_income')}</label>
-                <input type="number" min={0} value={individualIncome} onChange={(e) => setIndividualIncome(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10" />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 dark:text-zinc-500">RM</span>
+                  <input type="number" min={0} placeholder="0" value={individualIncome} onChange={(e) => setIndividualIncome(e.target.value)} className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600" />
+                </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.household_income')}</label>
-                <input type="number" min={0} value={householdIncome} onChange={(e) => setHouseholdIncome(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10" />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 dark:text-zinc-500">RM</span>
+                  <input type="number" min={0} placeholder="0" value={householdIncome} onChange={(e) => setHouseholdIncome(e.target.value)} className="w-full border border-zinc-200 rounded-lg pl-9 pr-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600" />
+                </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.dependents_children')}</label>
-                <input type="number" min={0} max={30} value={depChildren} onChange={(e) => setDepChildren(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10" />
+                <input type="number" min={0} max={30} placeholder="0" value={depChildren} onChange={(e) => setDepChildren(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.dependents_elderly')}</label>
-                <input type="number" min={0} max={30} value={depElderly} onChange={(e) => setDepElderly(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10" />
+                <input type="number" min={0} max={30} placeholder="0" value={depElderly} onChange={(e) => setDepElderly(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.dependents_oku')}</label>
-                <input type="number" min={0} max={30} value={depOku} onChange={(e) => setDepOku(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10" />
+                <input type="number" min={0} max={30} placeholder="0" value={depOku} onChange={(e) => setDepOku(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.dependents_chronic_ill')}</label>
-                <input type="number" min={0} max={30} value={depChronic} onChange={(e) => setDepChronic(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10" />
+                <input type="number" min={0} max={30} placeholder="0" value={depChronic} onChange={(e) => setDepChronic(e.target.value)} className="border border-zinc-200 rounded-lg px-3 py-2 text-sm bg-transparent focus:outline-none focus:border-nk-official/40 dark:border-white/10 dark:placeholder:text-zinc-600" />
               </div>
             </div>
           </div>
@@ -259,19 +273,19 @@ function WelfareEligibilityPage() {
             </h2>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.employment_status')}</label>
-              <ChipSelector options={employmentOptions} selected={employmentStatus} onToggle={toggleSingle(setEmploymentStatus)} multiple={false} size="sm" />
+              <ChipSelector options={employmentOptions} selected={employmentStatus} onToggle={singleToggle(employmentStatus, setEmploymentStatus)} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.education_level')}</label>
-              <ChipSelector options={educationOptions} selected={educationLevel} onToggle={toggleSingle(setEducationLevel)} multiple={false} size="sm" />
+              <ChipSelector options={educationOptions} selected={educationLevel} onToggle={singleToggle(educationLevel, setEducationLevel)} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.is_oku')}</label>
-              <ChipSelector options={yesNoOptions} selected={isOku} onToggle={toggleSingle(setIsOku)} multiple={false} size="sm" />
+              <ChipSelector options={yesNoOptions} selected={isOku} onToggle={singleToggle(isOku, setIsOku)} multiple={false} size="sm" />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{t('agents.welfare-eligibility.field.housing_ownership')}</label>
-              <ChipSelector options={housingOptions} selected={housingOwnership} onToggle={toggleSingle(setHousingOwnership)} multiple={false} size="sm" />
+              <ChipSelector options={housingOptions} selected={housingOwnership} onToggle={singleToggle(housingOwnership, setHousingOwnership)} multiple={false} size="sm" />
             </div>
           </div>
 
