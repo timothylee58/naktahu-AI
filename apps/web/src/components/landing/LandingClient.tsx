@@ -21,6 +21,7 @@ import { AgentSpotlight } from './AgentSpotlight';
 import { ComparisonSection } from './ComparisonSection';
 import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
 import { SeasonalHeroVideo } from './SeasonalHeroVideo';
+import { useSeasonalHeroVideo } from '@/lib/hooks/useSeasonalHeroVideo';
 import { useI18n } from '@/lib/i18n';
 import {
   LANDING_TAGLINE_KEYS,
@@ -98,6 +99,13 @@ export function LandingClient() {
   // ChatInput/PromptChips/ChatAmbientMesh already document for their own
   // client-only season/motion checks elsewhere in this codebase).
   const reduceMotion = useReducedMotion();
+
+  // Drives the hero's layout branch, not just SeasonalHeroVideo's own
+  // render — outside the Merdeka/Malaysia Day window the hero stays the
+  // single-column centered layout it always was; only when there's
+  // actually a framed video to show does it switch to the two-panel
+  // layout (text left, media right) described below.
+  const { active: seasonalVideoActive } = useSeasonalHeroVideo();
 
   // ── Scroll parallax: two ambient glow blobs drift at different speeds
   // as the hero scrolls out of view. Scoped to the hero section itself
@@ -194,6 +202,26 @@ export function LandingClient() {
   const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
 
+  // High-contrast surfaces for the video-hero layout only — the framed
+  // media panel next to the copy is meaningfully brighter/busier
+  // (opacity-50/contrast-125/saturate-125, see SeasonalHeroVideo) than the
+  // near-invisible opacity-15 wash it replaces, so each content block gets
+  // its own opaque-ish card instead of relying on theme-dependent page
+  // contrast. Bright whites + a lighter blue accent regardless of the
+  // light/dark toggle, same reasoning: this card sits next to real video
+  // footage, not the page background, so it keeps its own fixed palette.
+  const heroSurface = seasonalVideoActive
+    ? 'bg-[#12151C]/90 backdrop-blur-sm ring-1 ring-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)]'
+    : '';
+  const heroMutedText = seasonalVideoActive ? 'text-zinc-300' : mutedText;
+  const heroHighlightColor = seasonalVideoActive ? '#93C5FD' : '#60A5FA';
+  const heroSearchBoxClass = seasonalVideoActive
+    ? `${heroSurface} focus-within:ring-nk-official/50`
+    : searchBoxClass;
+  const heroDomainPillClass = seasonalVideoActive
+    ? 'border-nk-official/40 text-nk-official bg-nk-official/15'
+    : domainPillClass;
+
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
       {/* The one real navigation this page triggers (hero "Mula Bertanya" →
@@ -267,13 +295,19 @@ export function LandingClient() {
         onMouseMove={handleHeroMouseMove}
         onMouseLeave={handleHeroMouseLeave}
         style={{ perspective: 800 }}
-        className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full"
+        className={
+          seasonalVideoActive
+            ? 'relative grid lg:grid-cols-2 items-center flex-1 px-4 sm:px-6 py-16 sm:py-24 gap-10 lg:gap-14 max-w-6xl mx-auto w-full'
+            : 'relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full'
+        }
       >
-        <SeasonalHeroVideo />
         {/* Springed 3D tilt on the whole content group — `contents` keeps
             each child's own fadeUp entrance untouched, this just adds the
             tilt transform as an ancestor. */}
-        <motion.div style={{ rotateX: tiltRotateX, rotateY: tiltRotateY }} className="contents">
+        <motion.div
+          style={{ rotateX: tiltRotateX, rotateY: tiltRotateY }}
+          className={seasonalVideoActive ? 'flex flex-col items-start text-left gap-6 sm:gap-8' : 'contents'}
+        >
         <motion.div
           custom={0}
           variants={fadeUp}
@@ -284,13 +318,14 @@ export function LandingClient() {
           🇲🇾 {t('landing.badge')}
         </motion.div>
 
-        <motion.h1
+        <motion.div
           custom={1}
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+          className={seasonalVideoActive ? `flex flex-col gap-4 rounded-2xl px-5 py-5 sm:px-6 sm:py-6 ${heroSurface}` : 'contents'}
         >
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
           {(() => {
             const headline = t('landing.hero.headline');
             const highlight = t('landing.hero.headline.highlight');
@@ -299,35 +334,30 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-[#60A5FA] font-extrabold">{highlight}</span>
+                <span style={{ color: heroHighlightColor }} className="font-extrabold">{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
           })()}
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          custom={2}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className={`text-base sm:text-lg max-w-xl leading-relaxed locale-text-balance ${mutedText}`}
-        >
+        <p className={`text-base sm:text-lg max-w-xl leading-relaxed locale-text-balance ${heroMutedText}`}>
           {tagline}
-        </motion.p>
+        </p>
+        </motion.div>
 
         <motion.div
           custom={3}
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className={`w-full max-w-xl border rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
+          className={`w-full max-w-xl border rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 transition-colors duration-200 ${heroSearchBoxClass}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
-            className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
+            className={`w-5 h-5 flex-shrink-0 ${seasonalVideoActive ? 'text-zinc-400' : isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
           >
             <path
               fillRule="evenodd"
@@ -335,7 +365,7 @@ export function LandingClient() {
               clipRule="evenodd"
             />
           </svg>
-          <TypewriterQueryWrapper isDark={isDark} />
+          <TypewriterQueryWrapper isDark={seasonalVideoActive ? true : isDark} />
         </motion.div>
 
         {/* Trust disclaimer — moved from above the headline (where it
@@ -347,7 +377,11 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className={`text-xs max-w-md -mt-2 locale-text-balance ${mutedText}`}
+          className={
+            seasonalVideoActive
+              ? `text-xs max-w-md -mt-2 locale-text-balance rounded-full px-3.5 py-1.5 ${heroSurface} ${heroMutedText}`
+              : `text-xs max-w-md -mt-2 locale-text-balance ${mutedText}`
+          }
         >
           {t('landing.hero.disclaimer_note')}
         </motion.p>
@@ -357,7 +391,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="flex flex-wrap justify-center gap-2 max-w-xl"
+          className={seasonalVideoActive ? 'flex flex-wrap gap-2 max-w-xl' : 'flex flex-wrap justify-center gap-2 max-w-xl'}
         >
           {DOMAIN_CHIPS.map((chip) => {
             const href = `/chat?q=${encodeURIComponent(t(chip.queryKey))}`;
@@ -366,7 +400,7 @@ export function LandingClient() {
                 key={chip.key}
                 href={href}
                 onClick={(e) => handleNavClick(href, e)}
-                className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+                className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${heroDomainPillClass}`}
               >
                 {t(`domain.${chip.key}`)}
               </Link>
@@ -375,7 +409,7 @@ export function LandingClient() {
           <Link
             href="/warung-watch"
             onClick={(e) => handleNavClick('/warung-watch', e)}
-            className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+            className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${heroDomainPillClass}`}
           >
             {t('nav.warung_watch')}
           </Link>
@@ -386,7 +420,11 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="flex flex-col items-center gap-3"
+          className={
+            seasonalVideoActive
+              ? `flex flex-col items-start gap-3 rounded-2xl px-5 py-5 sm:px-6 sm:py-6 ${heroSurface}`
+              : 'flex flex-col items-center gap-3'
+          }
         >
           <Link
             href="/chat"
@@ -414,12 +452,28 @@ export function LandingClient() {
           <Link
             href="/agents"
             onClick={(e) => handleNavClick('/agents', e)}
-            className="text-sm hover:text-nk-official transition-colors locale-nowrap"
+            className={`text-sm transition-colors locale-nowrap ${seasonalVideoActive ? 'text-zinc-300 hover:text-white' : 'hover:text-nk-official'}`}
           >
             {t('landing.hero.secondary_cta')}
           </Link>
         </motion.div>
         </motion.div>
+
+        {/* Framed media panel — right column, wide viewports only (the
+            grid collapses to one column on small screens via
+            lg:grid-cols-2 above, so this simply stacks below the copy on
+            mobile rather than needing a separate mobile treatment). */}
+        {seasonalVideoActive && (
+          <motion.div
+            custom={2}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+            className="w-full"
+          >
+            <SeasonalHeroVideo />
+          </motion.div>
+        )}
       </section>
 
       <motion.section
