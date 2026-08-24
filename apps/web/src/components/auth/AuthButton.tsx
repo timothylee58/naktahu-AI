@@ -254,6 +254,15 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   >
                     {t('profile.view_full')}
                   </Link>
+                  <Link
+                    href="/billing"
+                    onClick={() => setProfileOpen(false)}
+                    className={`text-xs font-medium text-center rounded-lg px-3 py-2 transition-colors border ${
+                      isDark ? 'text-zinc-300 hover:bg-white/10 border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border-zinc-200'
+                    }`}
+                  >
+                    {t('nav.billing')}
+                  </Link>
                   {/* Sign out lives in this popover instead of as a
                       persistent full-width row below the avatar card — the
                       footer was eating too much vertical space that query
