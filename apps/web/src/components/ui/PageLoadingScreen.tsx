@@ -167,15 +167,30 @@ export function PageLoadingScreen({ show, loadSeconds = 1.1, accentColor = '#3B5
               >
                 <div
                   className="absolute inset-0 rounded-full"
-                  style={{
-                    background: 'radial-gradient(circle at 32% 28%, #FF7A6E 0%, #F0403A 55%, #B21C1C 100%)',
-                    boxShadow: '0 0 22px -2px rgba(240,64,58,0.85), inset -3px -4px 8px rgba(0,0,0,0.35)',
-                  }}
+                  style={{ border: '2px solid rgba(237,28,36,0.55)', animation: 'nk-loader-ring-pulse 1.9s ease-out infinite' }}
                 />
-                <div
-                  className="absolute inset-0 rounded-full"
-                  style={{ border: '2px solid rgba(240,64,58,0.7)', animation: 'nk-loader-ring-pulse 1.9s ease-out infinite' }}
-                />
+                {/* Bunga raya (hibiscus), not a plain dot — same 5-petal +
+                    stamen construction as NakTahuMark's Hibiscus, so the
+                    orbiting badge reads as the brand's own flower rather
+                    than a generic notification dot. */}
+                <svg
+                  viewBox="0 0 34 34"
+                  width={34}
+                  height={34}
+                  className="absolute inset-0 drop-shadow-[0_0_10px_rgba(237,28,36,0.65)]"
+                  aria-hidden
+                >
+                  <g fill="#ED1C24">
+                    <ellipse cx="17" cy="8.5" rx="6.1" ry="8.5" transform="rotate(0 17 17)" />
+                    <ellipse cx="17" cy="8.5" rx="6.1" ry="8.5" transform="rotate(72 17 17)" />
+                    <ellipse cx="17" cy="8.5" rx="6.1" ry="8.5" transform="rotate(144 17 17)" />
+                    <ellipse cx="17" cy="8.5" rx="6.1" ry="8.5" transform="rotate(216 17 17)" />
+                    <ellipse cx="17" cy="8.5" rx="6.1" ry="8.5" transform="rotate(288 17 17)" />
+                  </g>
+                  <circle cx="17" cy="17" r="2.8" fill="#C4141A" />
+                  <line x1="17" y1="17" x2="25.5" y2="4.5" stroke="#C4141A" strokeWidth="1.3" strokeLinecap="round" />
+                  <circle cx="25.5" cy="4.5" r="1.6" fill="#FFCC00" />
+                </svg>
               </div>
             </div>
           </div>
