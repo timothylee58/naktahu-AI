@@ -29,6 +29,14 @@ const INTENTS: { id: string; icon: string; titleKey: string; descKey: string; me
   { id: 'visit', icon: '✈️', titleKey: 'agents.immigration-navigator.intent.visit.title', descKey: 'agents.immigration-navigator.intent.visit.desc', message: 'Visit family for 3 months' },
   { id: 'business', icon: '🏢', titleKey: 'agents.immigration-navigator.intent.business.title', descKey: 'agents.immigration-navigator.intent.business.desc', message: 'Start a business in Kuala Lumpur' },
   { id: 'extend', icon: '🔄', titleKey: 'agents.immigration-navigator.intent.extend.title', descKey: 'agents.immigration-navigator.intent.extend.desc', message: 'Extend my current visa' },
+  // These three route straight into the named e-service reference track
+  // (service_router_node's keyword detection — "mdac"/"plks"/"pvip" — see
+  // app/agents/immigration_navigator/nodes.py) rather than the general
+  // visa-intake flow above, so their message text is chosen to match those
+  // keywords exactly.
+  { id: 'mdac', icon: '🛂', titleKey: 'agents.immigration-navigator.intent.mdac.title', descKey: 'agents.immigration-navigator.intent.mdac.desc', message: 'I need to submit my MDAC before arrival' },
+  { id: 'eplks', icon: '🪪', titleKey: 'agents.immigration-navigator.intent.eplks.title', descKey: 'agents.immigration-navigator.intent.eplks.desc', message: 'I need to renew my PLKS' },
+  { id: 'pvip', icon: '💎', titleKey: 'agents.immigration-navigator.intent.pvip.title', descKey: 'agents.immigration-navigator.intent.pvip.desc', message: "I'm interested in the PVIP" },
 ];
 
 function ImmigrationNavigatorPageInner() {
