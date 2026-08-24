@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { inSeasonalWindow } from '@/lib/seasonal-window';
+import { getSeasonalMilestone, inSeasonalWindow, type SeasonalMilestone } from '@/lib/seasonal-window';
 
 /** Shared seasonal/reduced-motion state for the Merdeka hero video —
  * split out of SeasonalHeroVideo so LandingClient can branch its hero
@@ -11,12 +11,15 @@ import { inSeasonalWindow } from '@/lib/seasonal-window';
 export function useSeasonalHeroVideo() {
   const [active, setActive] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [milestone, setMilestone] = useState<SeasonalMilestone>({ kind: 'after' });
 
   useEffect(() => {
     // Client-only check — avoids an SSR/client hydration mismatch on both
     // the date window and the media query (documented failure mode
     // elsewhere in this codebase for the same pattern).
-    setActive(inSeasonalWindow(new Date()));
+    const now = new Date();
+    setActive(inSeasonalWindow(now));
+    setMilestone(getSeasonalMilestone(now));
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReducedMotion(mq.matches);
     const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
@@ -24,5 +27,5 @@ export function useSeasonalHeroVideo() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  return { active, reducedMotion };
+  return { active, reducedMotion, milestone };
 }

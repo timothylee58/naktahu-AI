@@ -68,6 +68,18 @@ const ALL_DOMAINS = [
   { key: 'immigration' },
 ] as const;
 
+// Reuses welfare-eligibility's own state id list + i18n label keys
+// (agents.welfare-eligibility.state.*) rather than duplicating a second
+// trilingual state-name list — same ids, same labels, just a different
+// consumer. Seasonal-only (see the state picker chip below): lets a
+// visitor jump straight into a state-specific Merdeka Day query during
+// the Aug 25-Sep 20 window, instead of a generic domain chip.
+const MERDEKA_STATE_IDS = [
+  'johor', 'kedah', 'kelantan', 'melaka', 'negeri_sembilan', 'pahang',
+  'penang', 'perak', 'perlis', 'sabah', 'sarawak', 'selangor', 'terengganu',
+  'kl', 'labuan', 'putrajaya',
+] as const;
+
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
   show: (i: number) => ({
@@ -415,6 +427,45 @@ export function LandingClient() {
           </Link>
         </motion.div>
 
+        {/* State picker — seasonal-only. Builds a state-specific Merdeka
+            Day query (still in the active UI language, via the
+            state_query_template) and sends it through the same
+            loading-screen transition every other nav link on this page
+            uses, just triggered by a <select> change instead of an
+            anchor click (handleNavClick expects a click event it can
+            preventDefault on, which a <select> doesn't have). */}
+        {seasonalVideoActive && (
+          <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="w-full max-w-xl">
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const stateId = e.target.value;
+                if (!stateId) return;
+                const stateLabel = t(`agents.welfare-eligibility.state.${stateId}`);
+                const query = t('landing.hero.state_query_template').replace('{state}', stateLabel);
+                const href = `/chat?q=${encodeURIComponent(query)}`;
+                if (reduceMotion) {
+                  router.push(href);
+                } else {
+                  setShowLoadingScreen(true);
+                  window.setTimeout(() => router.push(href), NAV_TRANSITION_MS);
+                }
+                e.target.value = ''; // reset so picking the same state again still fires onChange
+              }}
+              className={`w-full max-w-xs border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors cursor-pointer ${heroDomainPillClass}`}
+            >
+              <option value="" disabled>
+                🇲🇾 {t('landing.hero.state_picker_placeholder')}
+              </option>
+              {MERDEKA_STATE_IDS.map((id) => (
+                <option key={id} value={id} className="text-zinc-900">
+                  {t(`agents.welfare-eligibility.state.${id}`)}
+                </option>
+              ))}
+            </select>
+          </motion.div>
+        )}
+
         <motion.div
           custom={6}
           variants={fadeUp}
@@ -429,8 +480,27 @@ export function LandingClient() {
           <Link
             href="/chat"
             onClick={handleStartChat}
-            className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+            className="relative inline-flex items-center gap-2 overflow-hidden bg-nk-official hover:bg-nk-official-dim hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap group"
           >
+            {/* Jalur Gemilang color sweep — a seasonal-only hover accent
+                under the label, echoing the same "recolor an existing
+                element to the flag's palette" treatment ChatInput.tsx's
+                mic waveform already uses during this window. Static
+                (no animation) under prefers-reduced-motion — the sweep
+                itself, not just its speed, is motion this component must
+                respect turning off. */}
+            {seasonalVideoActive && (
+              <span
+                aria-hidden
+                className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
+                  reduceMotion ? '' : 'nk-flag-sweep'
+                }`}
+                style={{
+                  background: 'linear-gradient(90deg, #b3282d, #ffffff, #010066, #ffcc00, #b3282d)',
+                  backgroundSize: reduceMotion ? '100% 100%' : '200% 100%',
+                }}
+              />
+            )}
             {t('landing.hero.cta')}
             <svg
               xmlns="http://www.w3.org/2000/svg"
