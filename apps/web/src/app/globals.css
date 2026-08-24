@@ -312,3 +312,35 @@ html[lang='zh-Hans'] .locale-text-balance {
 @media (prefers-reduced-motion: reduce) {
   .chat-waveform span { animation: none; height: 60% !important; }
 }
+
+/* ── Landing header nav dot indicator (CSS anchor positioning) ─────────
+   Each nav link in SiteNavLinks' horizontal layout gets a unique
+   `anchor-name` (set inline per-link, since the name is dynamic per
+   href); this single dot's `position-anchor` is repointed to the active
+   link's anchor-name on every selection change. `left`/`top` are ordinary
+   animatable length properties whose computed value comes from anchor() —
+   changing which anchor is referenced just changes those two numbers, so
+   the plain `transition` below is enough for a smooth glide between
+   labels; no JS-driven position math needed.
+   Progressive enhancement only: browsers without anchor-positioning
+   support (anything pre-Chrome/Edge 125) simply never show the dot,
+   rather than rendering an absolutely-positioned element glued to a
+   meaningless spot. */
+.site-nav-dot {
+  position: fixed;
+  left: anchor(center);
+  top: anchor(bottom);
+  translate: -50% 6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-nk-official);
+  pointer-events: none;
+  transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1), top 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@supports not (anchor-name: --x) {
+  .site-nav-dot { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-nav-dot { transition: none; }
+}

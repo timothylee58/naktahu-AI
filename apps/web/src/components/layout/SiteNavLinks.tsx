@@ -30,6 +30,14 @@ const LINKS: { href: string; key: string; Icon: LucideIcon; group: 'ai' | 'commu
   { href: '/warung-watch', key: 'nav.warung_watch', Icon: Soup, group: 'community' },
 ];
 
+// CSS anchor-name is a dashed-ident, so hrefs are slugified into one
+// ("/" -> "--nav-anchor-home", "/pricing" -> "--nav-anchor-pricing"). Only
+// the horizontal (landing header) layout uses this — see the
+// .site-nav-dot rule in globals.css for what actually consumes it.
+function navAnchorName(href: string): string {
+  return `--nav-anchor-${href === '/' ? 'home' : href.replace(/[^a-z0-9]+/gi, '-')}`;
+}
+
 export function SiteNavLinks({
   variant,
   onNavigate,
@@ -179,8 +187,14 @@ export function SiteNavLinks({
       : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100';
   };
 
+  // The dot only tracks plain category labels (Home + visibleLinks), not
+  // the "Mula Bertanya" CTA — that's a bordered button with its own
+  // emphasis treatment, not one of the interchangeable category tabs.
+  const trackableHrefs = [...(hideHome ? [] : ['/']), ...visibleLinks.map((l) => l.href)];
+  const activeTrackableHref = trackableHrefs.find((href) => isActive(href));
+
   return (
-    <nav className="flex flex-wrap items-center gap-1">
+    <nav className="relative flex flex-wrap items-center gap-1">
       {showChatCta && (
         <Link
           href="/chat"
@@ -191,7 +205,12 @@ export function SiteNavLinks({
         </Link>
       )}
       {!hideHome && (
-        <Link href="/" onClick={onNavigate} className={`px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap ${linkClass('/')}`}>
+        <Link
+          href="/"
+          onClick={onNavigate}
+          style={{ anchorName: navAnchorName('/') } as React.CSSProperties}
+          className={`px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap ${linkClass('/')}`}
+        >
           {t('nav.home')}
         </Link>
       )}
@@ -200,11 +219,19 @@ export function SiteNavLinks({
           key={link.href}
           href={link.href}
           onClick={onNavigate}
+          style={{ anchorName: navAnchorName(link.href) } as React.CSSProperties}
           className={`px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap ${linkClass(link.href)}`}
         >
           {t(link.key)}
         </Link>
       ))}
+      {activeTrackableHref && (
+        <span
+          aria-hidden
+          className="site-nav-dot"
+          style={{ positionAnchor: navAnchorName(activeTrackableHref) } as React.CSSProperties}
+        />
+      )}
     </nav>
   );
 }
