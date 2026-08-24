@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Home, Info, HelpCircle, CreditCard, Plug, Bot, Soup, type LucideIcon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
@@ -13,6 +14,11 @@ interface SiteNavLinksProps {
   /** Omit links from the nav (e.g. landing header defers pricing/agents to hero). */
   excludeHrefs?: readonly string[];
   hideHome?: boolean;
+  /** When provided, every Link's click routes through this instead of a
+   * bare navigation — LandingHeader passes its loading-screen transition
+   * handler here; AppSidebar's in-app usage never passes it, so ordinary
+   * app navigation is untouched. */
+  onLinkNavigate?: (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => void;
 }
 
 // "group" separates two different interaction models that shouldn't read as
@@ -45,6 +51,7 @@ export function SiteNavLinks({
   showChatCta = false,
   excludeHrefs = [],
   hideHome = false,
+  onLinkNavigate,
 }: SiteNavLinksProps) {
   const { t } = useI18n();
   const pathname = usePathname();
@@ -52,6 +59,10 @@ export function SiteNavLinks({
   const excluded = new Set(excludeHrefs);
   const visibleLinks = LINKS.filter((link) => !excluded.has(link.href));
   const isActive = (href: string) => pathname === href || (href !== '/' && pathname.startsWith(href));
+  const handleClick = (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => {
+    onLinkNavigate?.(href, e);
+    onNavigate?.();
+  };
 
   // Vertical layout (app sidebar) gets the full Cloudflare-style treatment:
   // icon + label row, a full-row background tint plus a colored left-edge
@@ -89,7 +100,7 @@ export function SiteNavLinks({
         <Link
           key={link.href}
           href={link.href}
-          onClick={onNavigate}
+          onClick={(e) => handleClick(link.href, e)}
           className={rowClass(link.href, isCommunity)}
         >
           {active && (
@@ -119,7 +130,7 @@ export function SiteNavLinks({
         {showChatCta && (
           <Link
             href="/chat"
-            onClick={onNavigate}
+            onClick={(e) => handleClick('/chat', e)}
             className={`flex items-center gap-2.5 pl-3.5 pr-3 py-2 rounded-lg text-sm font-medium border transition-colors locale-nowrap ${
               isDark
                 ? 'border-nk-official/40 bg-nk-official/10 text-nk-official hover:bg-nk-official/20'
@@ -130,7 +141,7 @@ export function SiteNavLinks({
           </Link>
         )}
         {!hideHome && (
-          <Link href="/" onClick={onNavigate} className={rowClass('/')}>
+          <Link href="/" onClick={(e) => handleClick('/', e)} className={rowClass('/')}>
             {isActive('/') && (
               <span aria-hidden className={`absolute left-0 top-1 bottom-1 w-[2.5px] rounded-full bg-nk-official`} />
             )}
@@ -198,8 +209,8 @@ export function SiteNavLinks({
       {showChatCta && (
         <Link
           href="/chat"
-          onClick={onNavigate}
-          className={`px-3 py-1.5 rounded-lg text-lg font-bold border transition-colors locale-nowrap ${linkClass('/chat', true)}`}
+          onClick={(e) => handleClick('/chat', e)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors locale-nowrap ${linkClass('/chat', true)}`}
         >
           {t('nav.try_question')}
         </Link>
@@ -207,9 +218,9 @@ export function SiteNavLinks({
       {!hideHome && (
         <Link
           href="/"
-          onClick={onNavigate}
+          onClick={(e) => handleClick('/', e)}
           style={{ anchorName: navAnchorName('/') } as React.CSSProperties}
-          className={`px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap ${linkClass('/')}`}
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors locale-nowrap ${linkClass('/')}`}
         >
           {t('nav.home')}
         </Link>
@@ -218,9 +229,9 @@ export function SiteNavLinks({
         <Link
           key={link.href}
           href={link.href}
-          onClick={onNavigate}
+          onClick={(e) => handleClick(link.href, e)}
           style={{ anchorName: navAnchorName(link.href) } as React.CSSProperties}
-          className={`px-3 py-1.5 rounded-lg text-lg font-bold transition-colors locale-nowrap ${linkClass(link.href)}`}
+          className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors locale-nowrap ${linkClass(link.href)}`}
         >
           {t(link.key)}
         </Link>
