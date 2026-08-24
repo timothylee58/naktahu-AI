@@ -359,6 +359,7 @@ const MS: Translations = {
 
   /* ── landing ── */
   'landing.badge': 'Dibuat untuk Malaysia',
+  'landing.hero.video_caption': 'Hari Merdeka & Hari Malaysia',
   'landing.hero.headline': 'Tanya apa sahaja tentang kerajaan Malaysia.',
   'landing.hero.headline.highlight': 'Malaysia',
   'landing.hero.disclaimer_note': 'NakTahu AI bukan nasihat rasmi kerajaan — sentiasa sahkan maklumat penting dengan agensi berkaitan.',
@@ -1385,6 +1386,7 @@ const EN: Translations = {
 
   /* ── landing ── */
   'landing.badge': 'Built for Malaysia',
+  'landing.hero.video_caption': 'Merdeka & Malaysia Day',
   'landing.hero.headline': 'Ask anything about the Malaysian government.',
   'landing.hero.headline.highlight': 'Malaysian government',
   'landing.hero.disclaimer_note': "NakTahu AI isn't official government advice — always verify anything important with the relevant agency.",
@@ -2409,6 +2411,7 @@ const ZH: Translations = {
 
   /* ── landing ── */
   'landing.badge': '专为马来西亚打造',
+  'landing.hero.video_caption': '独立日与马来西亚日',
   'landing.hero.headline': '为您解答关于马来西亚政策问题',
   'landing.hero.headline.highlight': '马来西亚',
   'landing.hero.disclaimer_note': 'NakTahu AI 并非官方政府建议——重要事项请务必向相关机构核实。',

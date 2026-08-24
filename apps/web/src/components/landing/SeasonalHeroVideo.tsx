@@ -1,6 +1,7 @@
 'use client';
 
 import { useSeasonalHeroVideo } from '@/lib/hooks/useSeasonalHeroVideo';
+import { useI18n } from '@/lib/i18n';
 
 // Hari Merdeka / Hari Malaysia hero media — a muted YouTube embed looping
 // the 12:00 mark of the referenced parade footage, seasonal-gated to the
@@ -38,34 +39,44 @@ const STATIC_FRAME_SRC = `https://img.youtube.com/vi/${VIDEO_ID}/hqdefault.jpg`;
 
 export function SeasonalHeroVideo() {
   const { active, reducedMotion } = useSeasonalHeroVideo();
+  const { t } = useI18n();
 
   if (!active) return null;
 
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none relative aspect-[4/3] lg:aspect-square w-full overflow-hidden rounded-[2rem] bg-[#12151C] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10"
-    >
-      {reducedMotion ? (
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-50 contrast-125 saturate-125"
-          style={{ backgroundImage: `url(${STATIC_FRAME_SRC})` }}
-        />
-      ) : (
-        <iframe
-          className="absolute left-1/2 top-1/2 h-[140%] w-[140%] -translate-x-1/2 -translate-y-1/2 opacity-50 contrast-125 saturate-125"
-          src={EMBED_SRC}
-          title=""
-          tabIndex={-1}
-          allow="autoplay; encrypted-media"
-        />
-      )}
-      {/* Localized scrim — confined to this framed panel, not the whole
-          hero: a soft bottom-anchored gradient for depth/grounding, since
-          the copy no longer sits on top of the footage and doesn't need
-          protecting from it. */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#12151C]/70 via-transparent to-[#12151C]/20" />
-      <div className="absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-white/5" />
+    <div className="relative aspect-[4/3] lg:aspect-square w-full overflow-hidden rounded-[2rem] bg-[#12151C] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        {reducedMotion ? (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-50 contrast-125 saturate-125"
+            style={{ backgroundImage: `url(${STATIC_FRAME_SRC})` }}
+          />
+        ) : (
+          <iframe
+            className="absolute left-1/2 top-1/2 h-[140%] w-[140%] -translate-x-1/2 -translate-y-1/2 opacity-50 contrast-125 saturate-125"
+            src={EMBED_SRC}
+            title=""
+            tabIndex={-1}
+            allow="autoplay; encrypted-media"
+          />
+        )}
+        {/* Localized scrim — confined to this framed panel, not the whole
+            hero: a soft bottom-anchored gradient for depth/grounding, since
+            the copy no longer sits on top of the footage and doesn't need
+            protecting from it. Also what keeps the caption chip below
+            legible against the footage. */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#12151C]/70 via-transparent to-[#12151C]/20" />
+        <div className="absolute inset-0 rounded-[2rem] ring-1 ring-inset ring-white/5" />
+      </div>
+
+      {/* Caption chip — ties the footage to the occasion it's actually
+          celebrating instead of playing as an unexplained ambient clip;
+          the flag emoji mirrors the one already in the hero badge
+          (🇲🇾 {t('landing.badge')}) above the headline. */}
+      <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-[#12151C]/80 backdrop-blur-sm ring-1 ring-white/10 px-3 py-1.5 text-xs font-semibold text-white locale-nowrap">
+        <span aria-hidden>🇲🇾</span>
+        {t('landing.hero.video_caption')}
+      </div>
     </div>
   );
 }
