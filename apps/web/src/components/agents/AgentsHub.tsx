@@ -12,6 +12,7 @@ import {
   FlaskConical,
   GraduationCap,
   HeartPulse,
+  Home,
   Landmark,
   LifeBuoy,
   Lock,
@@ -68,6 +69,10 @@ const AGENT_VISUALS: Record<string, { icon: LucideIcon; tile: string }> = {
   'retrenchment-navigator': {
     icon: LifeBuoy,
     tile: 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300',
+  },
+  'property-concierge': {
+    icon: Home,
+    tile: 'bg-lime-50 text-lime-600 dark:bg-lime-500/15 dark:text-lime-300',
   },
   'sme-compliance-navigator': {
     icon: ClipboardCheck,

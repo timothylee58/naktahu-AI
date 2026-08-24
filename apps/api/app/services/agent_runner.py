@@ -18,6 +18,7 @@ from app.agents.grant_draft_generator.nodes import compile_node as _grant_draft_
 from app.agents.grant_draft_generator.state import GrantDraftState
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
+from app.agents.property_concierge.graph import get_property_concierge_graph
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
 from app.agents.retrenchment_navigator.graph import get_retrenchment_navigator_graph
 from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
@@ -493,6 +494,58 @@ async def get_retrenchment_status(session_id: str, checkpointer: Any) -> dict[st
     return {"session_id": session_id, "status": values.get("status", "completed"), "output": _public_output(values)}
 
 
+# ── Property Concierge ────────────────────────────────────────────────────────
+
+
+async def start_property_concierge(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_property_concierge_graph(checkpointer=checkpointer)
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "message": payload.get("message", ""),
+        "language": payload.get("language", "bm"),
+        "turns_count": 0,
+        "tool_calls": [],
+    }
+    values, _ = await _run_graph(graph, session_id, inputs)
+    status = values.get("status", "completed")
+    _log_run(supabase_client, user_id, "property-concierge", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def continue_property_concierge(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    graph = get_property_concierge_graph(checkpointer=checkpointer)
+    t0 = time.monotonic()
+    # Same fix as continue_immigration_navigator/continue_retrenchment_navigator
+    # — this graph has no interrupt(), so the new message must be passed as
+    # real input to actually restart the graph from START against the
+    # existing checkpointed state, not a no-op ainvoke(None, ...).
+    await graph.ainvoke({"message": payload.get("message", "")}, config=_thread_config(session_id))
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    values = dict(snapshot.values) if snapshot else {}
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    status = values.get("status", "completed")
+    user_id = values.get("user_id") or ""
+    _log_run(supabase_client, user_id, "property-concierge", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def get_property_concierge_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
+    graph = get_property_concierge_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        return {"session_id": session_id, "status": "not_found"}
+    values = dict(snapshot.values)
+    return {"session_id": session_id, "status": values.get("status", "completed"), "output": _public_output(values)}
+
+
 # ── Health Triage ─────────────────────────────────────────────────────────────
 
 
@@ -819,6 +872,7 @@ AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "grant-draft-generator": start_grant_draft_generator,
     "retrenchment-navigator": start_retrenchment_navigator,
     "welfare-eligibility-agent": start_welfare_eligibility_agent,
+    "property-concierge": start_property_concierge,
 }
 
 AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -827,6 +881,7 @@ AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
     "immigration-navigator": continue_immigration_navigator,
     "eligibility-agent": continue_eligibility_agent,
     "retrenchment-navigator": continue_retrenchment_navigator,
+    "property-concierge": continue_property_concierge,
 }
 
 AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -836,6 +891,7 @@ AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
     "health-triage": get_health_status,
     "grant-draft-generator": get_grant_draft_status,
     "retrenchment-navigator": get_retrenchment_status,
+    "property-concierge": get_property_concierge_status,
 }
 
 # agent_name -> confirm handler. Every entry here is dispatched generically

@@ -60,6 +60,12 @@ export const WIRED_AGENTS: WiredAgent[] = [
     badgeKey: 'new',
   },
   {
+    slug: 'property-concierge',
+    href: '/agents/property-concierge',
+    planKey: 'free',
+    badgeKey: 'new',
+  },
+  {
     slug: 'sme-compliance-navigator',
     href: '/agents/sme-compliance-navigator',
     planKey: 'free',
