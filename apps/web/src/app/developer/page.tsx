@@ -39,6 +39,7 @@ interface ApiKeyRow {
   active: boolean;
   last_used_at: string | null;
   created_at: string | null;
+  name: string | null;
 }
 
 interface UsageStats {
@@ -49,7 +50,7 @@ interface UsageStats {
 }
 
 const PLANS: { id: ApiPlan; price: string; desc: string; paid: boolean }[] = [
-  { id: 'free', price: 'RM 0/mo', desc: '500 calls · 5 req/min · JSON + citations', paid: false },
+  { id: 'free', price: 'RM 0/mo', desc: '150 calls · 5 req/min · JSON + citations', paid: false },
   { id: 'starter', price: 'RM 49/mo', desc: '5,500 calls · 10 req/min · JSON + citations', paid: true },
   { id: 'growth', price: 'RM 149/mo', desc: '50,000 calls · SSE + multi-domain · 60 req/min', paid: true },
   { id: 'widget', price: 'RM 99/mo', desc: 'Embeddable widget · domain-locked key', paid: true },
@@ -137,10 +138,14 @@ export default function DeveloperPage() {
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [plan, setPlan] = useState<ApiPlan>('free');
   const [domains, setDomains] = useState('');
+  const [keyName, setKeyName] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -191,11 +196,12 @@ export default function DeveloperPage() {
           : [];
       const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/developer/keys`, {
         method: 'POST',
-        body: JSON.stringify({ plan, domain_whitelist: whitelist }),
+        body: JSON.stringify({ plan, domain_whitelist: whitelist, name: keyName.trim() || undefined }),
       });
       if (!res.ok) throw new Error('create_failed');
       const data = (await res.json()) as { raw_key: string; key: ApiKeyRow };
       setNewRawKey(data.raw_key);
+      setKeyName('');
       await load();
     } catch {
       setError(t('developer.error.create'));
@@ -213,6 +219,48 @@ export default function DeveloperPage() {
       await load();
     } catch {
       setError(t('developer.error.revoke'));
+    }
+  };
+
+  // Replaces the secret in place — same id/plan/limits/usage, only the
+  // credential itself changes (see the backend's rotate_api_key docstring
+  // for why this beats revoke-then-recreate for a leaked-key recovery).
+  const rotateKey = async (id: string) => {
+    setRotatingId(id);
+    setError(null);
+    setNewRawKey(null);
+    try {
+      const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/developer/keys/${id}/rotate`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('rotate_failed');
+      const data = (await res.json()) as { raw_key: string };
+      setNewRawKey(data.raw_key);
+      await load();
+    } catch {
+      setError(t('developer.error.rotate'));
+    } finally {
+      setRotatingId(null);
+    }
+  };
+
+  const startRename = (row: ApiKeyRow) => {
+    setRenamingId(row.id);
+    setRenameDraft(row.name ?? '');
+  };
+
+  const saveRename = async (id: string) => {
+    const trimmed = renameDraft.trim();
+    try {
+      const res = await fetchWithAuth(supabase, `${API_BASE}/api/v1/developer/keys/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: trimmed || null }),
+      });
+      if (!res.ok) throw new Error('rename_failed');
+      setRenamingId(null);
+      await load();
+    } catch {
+      setError(t('developer.error.rename'));
     }
   };
 
@@ -357,6 +405,13 @@ export default function DeveloperPage() {
                     );
                   })}
                 </div>
+                <Input
+                  type="text"
+                  value={keyName}
+                  onChange={(e) => setKeyName(e.target.value)}
+                  placeholder={t('developer.name_placeholder')}
+                  maxLength={60}
+                />
                 {(plan === 'widget' || plan === 'white_label') && (
                   <Input
                     type="text"
@@ -387,7 +442,47 @@ export default function DeveloperPage() {
                       key={k.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-4 py-3 transition-colors hover:border-zinc-200 hover:bg-zinc-50/60 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/5"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
+                        {renamingId === k.id ? (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Input
+                              type="text"
+                              autoFocus
+                              value={renameDraft}
+                              onChange={(e) => setRenameDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') void saveRename(k.id);
+                                if (e.key === 'Escape') setRenamingId(null);
+                              }}
+                              maxLength={60}
+                              className="h-7 text-xs py-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void saveRename(k.id)}
+                              className="text-xs font-semibold text-nk-official-dim dark:text-nk-official flex-shrink-0"
+                            >
+                              {t('developer.save')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRenamingId(null)}
+                              className="text-xs text-zinc-400 flex-shrink-0"
+                            >
+                              {t('developer.cancel')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => k.active && startRename(k)}
+                            className="text-sm font-medium text-zinc-800 dark:text-zinc-200 hover:underline decoration-dotted underline-offset-2 disabled:no-underline text-left"
+                            disabled={!k.active}
+                            title={k.active ? t('developer.rename') : undefined}
+                          >
+                            {k.name || t('developer.unnamed_key')}
+                          </button>
+                        )}
                         <p className="text-sm font-mono font-medium text-zinc-800 dark:text-zinc-200">
                           {k.key_prefix}…
                         </p>
@@ -397,15 +492,27 @@ export default function DeveloperPage() {
                         </p>
                       </div>
                       {k.active && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void revokeKey(k.id)}
-                          className="text-red-600 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
-                        >
-                          {t('developer.revoke')}
-                        </Button>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void rotateKey(k.id)}
+                            disabled={rotatingId === k.id}
+                            title={t('developer.rotate_hint')}
+                          >
+                            {rotatingId === k.id ? '…' : t('developer.rotate')}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void revokeKey(k.id)}
+                            className="text-red-600 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                          >
+                            {t('developer.revoke')}
+                          </Button>
+                        </div>
                       )}
                     </li>
                   ))}
