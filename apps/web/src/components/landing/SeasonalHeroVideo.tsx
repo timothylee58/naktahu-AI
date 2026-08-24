@@ -18,9 +18,8 @@ import { inSeasonalWindow } from '@/lib/seasonal-window';
 // from the same video, not necessarily that exact second.
 const VIDEO_ID = 'XmjCOYNtUo8';
 const START_SECONDS = 720; // 12:00
-const END_SECONDS = 730; // 12:10
 const EMBED_SRC =
-  `https://www.youtube.com/embed/${VIDEO_ID}?start=${START_SECONDS}&end=${END_SECONDS}` +
+  `https://www.youtube.com/embed/${VIDEO_ID}?start=${START_SECONDS}` +
   `&autoplay=1&mute=1&loop=1&playlist=${VIDEO_ID}&controls=0&modestbranding=1&playsinline=1&rel=0`;
 const STATIC_FRAME_SRC = `https://img.youtube.com/vi/${VIDEO_ID}/hqdefault.jpg`;
 
