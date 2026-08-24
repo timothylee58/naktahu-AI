@@ -12,6 +12,21 @@ node's empty-table behavior is deliberate and honest: return zero matches
 with no_schemes_loaded=True, not a fabricated result. Once real rows exist
 (via a verified ingestion pass), this same filter logic starts actually
 matching them — no code change needed here for that transition.
+
+needs_review (migration 043): the query below only ever selects
+needs_review=false rows. A freshly-scraped row's eligibility_rules may be
+`{}` either because the scheme genuinely has no constraints, or because
+LLM extraction (app/services/madani_eligibility_extraction.py) simply
+failed to find anything in the description — and _rules_satisfied() below
+treats an absent key as "no constraint", so an unreviewed {} would match
+EVERY profile that asks. Surfacing that as "you qualify" before a human
+(or a confident automated extraction — see that module's docstring for
+when it flips needs_review itself) has confirmed which of those two cases
+it is would be worse than showing nothing. This is a deliberate, stated
+product decision (see the PR that added migration 043), not an accident:
+an unreviewed scheme is treated exactly like a not-yet-ingested one from
+the requester's point of view — absent from results, not shown with a
+caveat — until it's confirmed.
 """
 from __future__ import annotations
 
@@ -88,6 +103,7 @@ async def match_node(state: WelfareState, supabase: Any) -> dict[str, Any]:
             supabase.table("madani_scheme")
             .select("scheme_name,category,scope,description,implementing_agency,eligibility_rules,source_url,aggregator_url")
             .eq("is_active", True)
+            .eq("needs_review", False)
             .execute()
         )
         rows = res.data or []
