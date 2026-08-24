@@ -183,7 +183,7 @@ export function LandingClient() {
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
     : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
+  const mutedText = isDark ? 'text-zinc-300' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const searchBoxClass = isDark
     ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-nk-official/50'
@@ -289,7 +289,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance"
+          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
         >
           {(() => {
             const headline = t('landing.hero.headline');
@@ -299,7 +299,7 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-nk-official font-extrabold">{highlight}</span>
+                <span className="text-[#60A5FA] font-extrabold">{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
