@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.middleware.sanitise import sanitise_query
 from app.routers.query import _run_pipeline, _sse
+from core.config import settings
 from middleware.api_key_auth import get_api_key_context
 from middleware.api_key_rate_limit import enforce_api_key_rate_limit, enforce_multi_rate_limit, enforce_sse_rate_limit
 from services.api_key_service import ApiKeyContext, increment_usage, log_api_key_event
@@ -363,15 +364,100 @@ async def public_openapi(request: Request) -> JSONResponse:
 
 @router.get("/docs", include_in_schema=False, response_class=HTMLResponse)
 async def public_docs() -> HTMLResponse:
-    """Swagger UI for the public Knowledge API."""
+    """Branded Swagger UI for the public Knowledge API.
+
+    Stock Swagger UI (the previous version of this page) has no NakTahu
+    identity, no link back to where a key actually comes from
+    (/developer), and its default green/blue "Try it out" chrome clashes
+    with the brand blue used everywhere else in the app. This wraps the
+    same SwaggerUIBundle in a branded header + CSS override — same spec
+    (/api/v1/public/openapi.json), same Swagger UI version pinned from
+    the same CDN, purely presentational.
+
+    This page is served from the API's own origin (Railway), not the web
+    app's (Netlify) — "/developer" and "/" would 404 here if left as
+    relative links, so the brand-header nav uses settings.frontend_url
+    explicitly."""
+    frontend = settings.frontend_url.rstrip("/")
+    # Plain string + placeholder .replace(), not an f-string — the CSS
+    # block below is full of literal { } which an f-string would try to
+    # parse as interpolations.
     html = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>NakTahu Knowledge API</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NakTahu Knowledge API — Docs</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%233b5bff'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css" />
+  <style>
+    :root {
+      --nk-blue: #3b5bff;
+      --nk-blue-dark: #2540c9;
+      --nk-ink: #12151c;
+    }
+    html, body { margin: 0; background: #f8f9fc; }
+    /* Brand header — replaces Swagger UI's own topbar entirely (hidden below) */
+    .nk-docs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 16px 32px;
+      background: linear-gradient(150deg, var(--nk-blue), var(--nk-blue-dark));
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .nk-docs-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; }
+    .nk-docs-mark { width: 24px; height: 20px; border-radius: 46% 46% 46% 4px / 50% 50% 50% 4px; background: rgba(255,255,255,0.95); flex-shrink: 0; }
+    .nk-docs-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .nk-docs-subtitle { font-size: 12px; color: rgba(255,255,255,0.75); font-weight: 500; }
+    .nk-docs-links { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+    .nk-docs-links a {
+      color: #fff;
+      text-decoration: none;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.35);
+      transition: background 0.15s ease, border-color 0.15s ease;
+      white-space: nowrap;
+    }
+    .nk-docs-links a:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.6); }
+    .nk-docs-links a.nk-docs-cta { background: #fff; color: var(--nk-blue-dark); border-color: #fff; }
+    .nk-docs-links a.nk-docs-cta:hover { background: rgba(255,255,255,0.9); }
+
+    /* Swagger UI's own topbar is redundant with the header above */
+    .swagger-ui .topbar { display: none; }
+    /* Rebrand Swagger UI's default green/blue accents to the site's brand blue */
+    .swagger-ui .btn.authorize,
+    .swagger-ui .btn.authorize svg { color: var(--nk-blue); border-color: var(--nk-blue); }
+    .swagger-ui .btn.execute { background: var(--nk-blue); border-color: var(--nk-blue); }
+    .swagger-ui .btn.execute:hover { background: var(--nk-blue-dark); border-color: var(--nk-blue-dark); }
+    .swagger-ui .opblock.opblock-post { border-color: var(--nk-blue); background: rgba(59,91,255,0.04); }
+    .swagger-ui .opblock.opblock-post .opblock-summary-method { background: var(--nk-blue); }
+    .swagger-ui .opblock-tag { border-bottom-color: #e4e4e7; }
+    .swagger-ui a.nostyle, .swagger-ui .info a { color: var(--nk-blue); }
+    .swagger-ui .scheme-container { background: transparent; box-shadow: none; }
+    .swagger-ui .info { margin: 24px 0; }
+    #swagger-ui { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  </style>
 </head>
 <body>
+  <header class="nk-docs-header">
+    <a href="__FRONTEND__/" class="nk-docs-brand">
+      <span class="nk-docs-mark" aria-hidden="true"></span>
+      <span>
+        <div class="nk-docs-title">NakTahu Knowledge API</div>
+        <div class="nk-docs-subtitle">Malaysian bilingual answers, with citations</div>
+      </span>
+    </a>
+    <nav class="nk-docs-links">
+      <a href="__FRONTEND__/developer">Get an API key</a>
+      <a href="/api/v1/public/openapi.json">OpenAPI JSON</a>
+      <a href="__FRONTEND__/developer" class="nk-docs-cta">Dashboard →</a>
+    </nav>
+  </header>
   <div id="swagger-ui"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js"></script>
   <script>
@@ -379,9 +465,14 @@ async def public_docs() -> HTMLResponse:
       url: '/api/v1/public/openapi.json',
       dom_id: '#swagger-ui',
       presets: [SwaggerUIBundle.presets.apis],
-      layout: 'BaseLayout'
+      layout: 'BaseLayout',
+      docExpansion: 'list',
+      filter: true,
+      deepLinking: true,
+      persistAuthorization: true,
+      tryItOutEnabled: true
     });
   </script>
 </body>
 </html>"""
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html.replace("__FRONTEND__", frontend))

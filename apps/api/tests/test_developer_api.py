@@ -151,7 +151,7 @@ def test_create_key_default_plan_is_free(client) -> None:
     c, sb = client
     sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
     sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(
-        data=[_key_row(plan="free", calls_limit=500, rate_limit_per_min=5)]
+        data=[_key_row(plan="free", calls_limit=150, rate_limit_per_min=5)]
     )
 
     res = c.post("/api/v1/developer/keys", json={}, headers=_auth_header())
@@ -235,3 +235,94 @@ def test_revoke_unknown_key_returns_404(client) -> None:
     res = c.delete("/api/v1/developer/keys/does-not-exist", headers=_auth_header())
 
     assert res.status_code == 404
+
+
+# ── Rename ───────────────────────────────────────────────────────────────────
+
+
+def test_rename_key_requires_authentication(client) -> None:
+    c, _ = client
+    res = c.patch("/api/v1/developer/keys/key-uuid-1", json={"name": "prod"})
+    assert res.status_code == 401
+
+
+def test_rename_key_succeeds(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=[{"id": "key-uuid-1"}]
+    )
+
+    res = c.patch("/api/v1/developer/keys/key-uuid-1", json={"name": "prod widget"}, headers=_auth_header())
+
+    assert res.status_code == 204
+
+
+def test_rename_key_not_owned_returns_404(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+
+    res = c.patch("/api/v1/developer/keys/someone-elses-key", json={"name": "x"}, headers=_auth_header())
+
+    assert res.status_code == 404
+
+
+def test_rename_key_clears_name_with_null(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=[{"id": "key-uuid-1"}]
+    )
+
+    res = c.patch("/api/v1/developer/keys/key-uuid-1", json={"name": None}, headers=_auth_header())
+
+    assert res.status_code == 204
+    sb.table.return_value.update.assert_called_with({"name": None})
+
+
+# ── Rotate ───────────────────────────────────────────────────────────────────
+
+
+def test_rotate_key_requires_authentication(client) -> None:
+    c, _ = client
+    res = c.post("/api/v1/developer/keys/key-uuid-1/rotate")
+    assert res.status_code == 401
+
+
+def test_rotate_key_returns_new_raw_key_once(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=[{"id": "key-uuid-1"}]
+    )
+
+    res = c.post("/api/v1/developer/keys/key-uuid-1/rotate", headers=_auth_header())
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["raw_key"].startswith(API_KEY_RAW_PREFIX)
+    assert set(data.keys()) == {"raw_key"}  # never leaks anything else about the row
+
+
+def test_rotate_key_not_owned_or_inactive_returns_404(client) -> None:
+    c, sb = client
+    sb.table.return_value.update.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+        data=[]
+    )
+
+    res = c.post("/api/v1/developer/keys/someone-elses-key/rotate", headers=_auth_header())
+
+    assert res.status_code == 404
+
+
+# ── Create with name ─────────────────────────────────────────────────────────
+
+
+def test_create_key_accepts_optional_name(client) -> None:
+    c, sb = client
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(count=0)
+    sb.table.return_value.insert.return_value.select.return_value.execute.return_value = MagicMock(
+        data=[_key_row(name="my staging key")]
+    )
+
+    res = c.post("/api/v1/developer/keys", json={"plan": "free", "name": "my staging key"}, headers=_auth_header())
+
+    assert res.status_code == 201
+    assert res.json()["key"]["name"] == "my staging key"

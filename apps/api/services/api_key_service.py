@@ -19,7 +19,7 @@ API_KEY_RAW_PREFIX = "nkt_live_"
 
 API_PLAN_DEFAULTS: dict[str, dict[str, Any]] = {
     "free": {
-        "calls_limit": 500,
+        "calls_limit": 150,
         "rate_limit_per_min": 5,
         "sse": False,
         "multi": False,
@@ -258,6 +258,7 @@ async def create_api_key_record(
     user_id: str,
     plan: str,
     domain_whitelist: Optional[list[str]] = None,
+    name: Optional[str] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Insert key row; return (raw_key, public_row without hash)."""
     if plan not in VALID_API_PLANS:
@@ -288,6 +289,7 @@ async def create_api_key_record(
         "rate_limit_per_min": features["rate_limit_per_min"],
         "domain_whitelist": domain_whitelist or [],
         "active": True,
+        "name": name,
     }
 
     def _insert() -> dict[str, Any]:
@@ -305,7 +307,7 @@ async def list_api_keys(supabase: Client, user_id: str) -> list[dict[str, Any]]:
             supabase.table("api_keys")
             .select(
                 "id, key_prefix, plan, calls_used, calls_limit, rate_limit_per_min, "
-                "domain_whitelist, active, last_used_at, created_at"
+                "domain_whitelist, active, last_used_at, created_at, name"
             )
             .eq("user_id", user_id)
             .order("created_at", desc=True)
@@ -328,6 +330,46 @@ async def revoke_api_key(supabase: Client, user_id: str, key_id: str) -> bool:
         return bool(res.data)
 
     return await asyncio.to_thread(_revoke)
+
+
+async def rename_api_key(supabase: Client, user_id: str, key_id: str, name: Optional[str]) -> bool:
+    def _rename() -> bool:
+        res = (
+            supabase.table("api_keys")
+            .update({"name": name})
+            .eq("id", key_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return bool(res.data)
+
+    return await asyncio.to_thread(_rename)
+
+
+async def rotate_api_key(supabase: Client, user_id: str, key_id: str) -> Optional[str]:
+    """Replaces the secret (key_hash/key_prefix) on an existing key row in
+    place — same id, plan, limits, domain_whitelist, calls_used, and name,
+    only the credential itself changes. Lets a developer recover from a
+    leaked key without losing their configured plan/whitelist or resetting
+    their monthly usage counter (unlike revoke-then-recreate, which loses
+    all of that and also costs one of MAX_KEYS_PER_USER=3 slots).
+    Returns the new raw key, or None if no active key with that id/user
+    was found (caller turns that into a 404)."""
+    raw_key, key_hash, key_prefix = generate_api_key()
+
+    def _rotate() -> bool:
+        res = (
+            supabase.table("api_keys")
+            .update({"key_hash": key_hash, "key_prefix": key_prefix})
+            .eq("id", key_id)
+            .eq("user_id", user_id)
+            .eq("active", True)
+            .execute()
+        )
+        return bool(res.data)
+
+    updated = await asyncio.to_thread(_rotate)
+    return raw_key if updated else None
 
 
 async def fetch_usage_stats(

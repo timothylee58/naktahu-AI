@@ -148,3 +148,18 @@ def test_public_docs_html(client):
     res = c.get("/api/v1/public/docs")
     assert res.status_code == 200
     assert "swagger-ui" in res.text.lower()
+
+
+def test_public_docs_is_branded_and_links_to_frontend_not_relative(client):
+    """The docs page is served from the API's own origin (Railway), not
+    the web app's (Netlify) — a relative /developer link would 404 here,
+    so the branded header must resolve against settings.frontend_url and
+    never leak the __FRONTEND__ template placeholder into the response."""
+    from core.config import settings
+
+    c, _, _ = client
+    res = c.get("/api/v1/public/docs")
+
+    assert "NakTahu Knowledge API" in res.text
+    assert "__FRONTEND__" not in res.text
+    assert f'{settings.frontend_url.rstrip("/")}/developer' in res.text

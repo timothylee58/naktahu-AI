@@ -89,7 +89,7 @@ async def test_match_node_no_supabase_returns_no_schemes_loaded() -> None:
 @pytest.mark.asyncio
 async def test_match_node_empty_table_returns_no_schemes_loaded() -> None:
     sb = MagicMock()
-    sb.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
     result = await match_node({"profile": {}}, sb)
     assert result == {"matched_schemes": [], "no_schemes_loaded": True}
 
@@ -97,15 +97,27 @@ async def test_match_node_empty_table_returns_no_schemes_loaded() -> None:
 @pytest.mark.asyncio
 async def test_match_node_fetch_exception_fails_open_to_no_schemes_loaded() -> None:
     sb = MagicMock()
-    sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = Exception("boom")
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.side_effect = Exception("boom")
     result = await match_node({"profile": {}}, sb)
     assert result == {"matched_schemes": [], "no_schemes_loaded": True}
 
 
 @pytest.mark.asyncio
+async def test_match_node_only_queries_reviewed_active_rows() -> None:
+    """needs_review=false must be part of the query itself (migration 043)
+    — an unreviewed row must never even reach _rules_satisfied()."""
+    sb = MagicMock()
+    select_mock = sb.table.return_value.select.return_value
+    select_mock.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+    await match_node({"profile": {}}, sb)
+    select_mock.eq.assert_called_with("is_active", True)
+    select_mock.eq.return_value.eq.assert_called_with("needs_review", False)
+
+
+@pytest.mark.asyncio
 async def test_match_node_matches_real_row_against_profile() -> None:
     sb = MagicMock()
-    sb.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[
         {
             "scheme_name": "Test Scheme",
             "category": "pendapatan",
@@ -126,7 +138,7 @@ async def test_match_node_matches_real_row_against_profile() -> None:
 @pytest.mark.asyncio
 async def test_match_node_state_scoped_scheme_excludes_other_states() -> None:
     sb = MagicMock()
-    sb.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=[
         {
             "scheme_name": "Selangor Scheme", "category": "kesihatan", "scope": "state:selangor",
             "description": "desc", "implementing_agency": "Agency", "eligibility_rules": {},

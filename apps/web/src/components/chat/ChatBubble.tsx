@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,6 +12,9 @@ import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ResponseActions } from './ResponseActions';
 import { SuggestionChips } from './SuggestionChips';
+import { TranslateControl } from './TranslateControl';
+
+type TranslateLang = 'bm' | 'en' | 'zh';
 
 interface UserBubbleProps {
   role: 'user';
@@ -44,6 +48,10 @@ const spring = { duration: 0.28, ease: [0.16, 1, 0.3, 1] } as const;
 
 export function ChatBubble(props: ChatBubbleProps) {
   const { t } = useI18n();
+  // Declared before the early return below (Rules of Hooks) even though
+  // it's only meaningful for the assistant-role branch — harmless unused
+  // state on the user-bubble render path.
+  const [translated, setTranslated] = useState<{ text: string; lang: TranslateLang } | null>(null);
 
   if (props.role === 'user') {
     return (
@@ -62,6 +70,12 @@ export function ChatBubble(props: ChatBubbleProps) {
 
   const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact, isError = false } = props;
   const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
+
+  // Translation is a display-only swap on top of the already-finished
+  // answer — never re-runs retrieval/synthesis, never mutates `content`
+  // itself (so copy/share/feedback/regenerate below keep acting on the
+  // original, source-of-truth text; only the rendered bubble changes).
+  const displayContent = translated?.text ?? content;
 
   return (
     <div className="flex justify-start gap-2.5">
@@ -94,10 +108,16 @@ export function ChatBubble(props: ChatBubbleProps) {
             <StreamingText tokens={tokens ?? []} isStreaming={isStreaming} />
           ) : (
             <span className="chat-content text-sm leading-relaxed">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
             </span>
           )}
         </motion.div>
+
+        {translated && (
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 -mt-1">
+            {t('chat.translated_notice')}
+          </p>
+        )}
 
         {isError && onRegenerate && (
           <button
@@ -118,17 +138,25 @@ export function ChatBubble(props: ChatBubbleProps) {
 
         {/* Action buttons — only after streaming completes */}
         {!isStreaming && !isThinking && !isError && content && (
-          <ResponseActions
-            content={content}
-            onRegenerate={onRegenerate}
-            isStreaming={isStreaming}
-            query={query}
-            domain={domain}
-            language={language}
-            citations={citations}
-            confidence={confidence}
-            accessToken={accessToken}
-          />
+          <div className="flex items-center gap-1">
+            <ResponseActions
+              content={content}
+              onRegenerate={onRegenerate}
+              isStreaming={isStreaming}
+              query={query}
+              domain={domain}
+              language={language}
+              citations={citations}
+              confidence={confidence}
+              accessToken={accessToken}
+            />
+            <TranslateControl
+              content={content}
+              activeLanguage={translated?.lang ?? null}
+              accessToken={accessToken}
+              onTranslated={(text, lang) => setTranslated(text && lang ? { text, lang } : null)}
+            />
+          </div>
         )}
 
         {!isError && hasLowConfidence && (

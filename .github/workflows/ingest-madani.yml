@@ -1,0 +1,92 @@
+name: Ingest Ihsan MADANI Schemes
+
+# Runs scripts/ingest_madani.py — the third ingestion pipeline (scrape
+# ihsanmadani.gov.my -> injection scan -> eligibility_rules extraction ->
+# embed -> upsert into madani_scheme), distinct from ingest-sources.yml
+# (-> document_chunks) and scripts/ingest.py (-> dosm_documents, no
+# scheduled job of its own). See scripts/ingest_madani.py's module
+# docstring for the full pipeline shape.
+#
+# NOT a Railway cron job: deadline-monitor.yml already established the
+# precedent for this repo — a Railway cron would need a new service
+# landed on the live API's Root Directory with its own service-ID/token
+# scoping, none of which exists today, versus a GitHub Actions scheduled
+# workflow needing nothing new to create. This mirrors that decision, not
+# a Railway-based one some earlier task description assumed.
+#
+# Weekly, not daily: welfare-scheme data is slow-moving (MADANI's listing
+# changes on the order of policy announcements, not daily news), matching
+# ingest-sources.yml's own weekly cadence and reasoning.
+#
+# Isolated from CI/test paths on purpose (per CLAUDE.md's sandbox-noise
+# guidance) — this workflow is the ONLY place scrape_via_subprocess()
+# actually reaches the live site; every test in test_ingest_madani.py and
+# test_scraper.py mocks the network entirely and never runs in this job.
+#
+# Defaults to --dry-run for the same reason ingest-sources.yml does: the
+# scraper's selectors are still unverified against real markup (see
+# ingestion/sources/ihsan_madani/scraper.py's module docstring — this
+# repo's dev sandbox has no egress to ihsanmadani.gov.my to check them
+# against). A human should read a --dry-run run's log output, confirm
+# scraped records look real (not empty, not a login wall, selectors
+# actually matching), and only then dispatch with write_mode=live.
+
+on:
+  schedule:
+    - cron: "0 21 * * 0"  # weekly, Sunday 21:00 UTC (05:00 MYT Monday) — 1h after ingest-sources.yml
+  workflow_dispatch:
+    inputs:
+      write_mode:
+        description: "dry-run (scrape + extract + embed, no Supabase write) or live (actually write)"
+        type: choice
+        options:
+          - dry-run
+          - live
+        default: dry-run
+      category:
+        description: "Space-separated category subset (blank = all: umum kesihatan makanan pendapatan pendidikan pengangkutan perumahan utiliti)"
+        type: string
+        required: false
+
+jobs:
+  ingest-madani:
+    name: Scrape and ingest Ihsan MADANI schemes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Run ingest_madani
+        working-directory: apps/api
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Eligibility extraction + embedding both call ILMU even in
+          # --dry-run (ingest_madani.py builds the row, including the
+          # embed/extract calls, before deciding whether to write) —
+          # same reasoning ingest-sources.yml documents for its own
+          # dry-run/ILMU_API_KEY requirement.
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+        run: |
+          WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
+          CATEGORY="${{ github.event.inputs.category }}"
+          DRY_RUN_FLAG="--dry-run"
+          if [ "$WRITE_MODE" = "live" ]; then
+            DRY_RUN_FLAG=""
+          fi
+
+          CATEGORY_FLAG=""
+          if [ -n "$CATEGORY" ]; then
+            CATEGORY_FLAG="--category $CATEGORY"
+          fi
+
+          python -m scripts.ingest_madani $DRY_RUN_FLAG $CATEGORY_FLAG

@@ -325,6 +325,11 @@ function SidebarPanel({
   const { t } = useI18n();
   const isDark = variant === 'dark';
   const supabase = useMemo(() => createClient(), []);
+  const pathname = usePathname();
+  // The CTA's whole point is "jump into a chat" — pointless (and one extra
+  // no-op click) on the page that already IS the chat. Every other app
+  // page (agents, history, billing, etc.) still gets it.
+  const onChatPage = pathname === '/chat';
 
   const historyEnabled = Boolean(showHistory && user && canAccessHistory(user));
 
@@ -395,6 +400,7 @@ function SidebarPanel({
           variant={variant}
           layout="vertical"
           onNavigate={onClose}
+          showChatCta={!onChatPage}
         />
       </div>
 

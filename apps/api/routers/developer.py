@@ -14,7 +14,9 @@ from services.api_key_service import (
     create_api_key_record,
     fetch_usage_stats,
     list_api_keys,
+    rename_api_key,
     revoke_api_key,
+    rotate_api_key,
 )
 from services.auth import UserContext, get_current_user
 
@@ -35,11 +37,20 @@ MIN_APP_PLAN_FOR_PAID_API_PLANS = "pro"
 class CreateKeyRequest(BaseModel):
     plan: Literal["free", "starter", "growth", "enterprise", "widget", "white_label"] = "free"
     domain_whitelist: list[str] = Field(default_factory=list, max_length=10)
+    name: Optional[str] = Field(default=None, max_length=60)
 
 
 class CreateKeyResponse(BaseModel):
     raw_key: str
     key: dict[str, Any]
+
+
+class RenameKeyRequest(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=60)
+
+
+class RotateKeyResponse(BaseModel):
+    raw_key: str
 
 
 class KeyListItem(BaseModel):
@@ -53,6 +64,7 @@ class KeyListItem(BaseModel):
     active: bool
     last_used_at: Optional[str] = None
     created_at: Optional[str] = None
+    name: Optional[str] = None
 
 
 class KeyListResponse(BaseModel):
@@ -94,6 +106,7 @@ async def create_key(
             user_id=user.user_id,
             plan=body.plan,
             domain_whitelist=body.domain_whitelist,
+            name=body.name,
         )
     except ValueError as exc:
         if str(exc) == "max_keys_reached":
@@ -125,6 +138,7 @@ async def get_keys(
             active=bool(r.get("active", True)),
             last_used_at=r.get("last_used_at"),
             created_at=r.get("created_at"),
+            name=r.get("name"),
         )
         for r in rows
     ]
@@ -144,6 +158,41 @@ async def delete_key(
     revoked = await revoke_api_key(supabase, user.user_id, key_id)
     if not revoked:
         raise HTTPException(status_code=404, detail="API key not found")
+
+
+@router.patch("/keys/{key_id}", status_code=204, response_model=None)
+async def rename_key(
+    key_id: str,
+    body: RenameKeyRequest,
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> None:
+    supabase = getattr(request.app.state, "supabase", None)
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Key service temporarily unavailable")
+
+    renamed = await rename_api_key(supabase, user.user_id, key_id, body.name)
+    if not renamed:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+
+@router.post("/keys/{key_id}/rotate", response_model=RotateKeyResponse)
+async def rotate_key(
+    key_id: str,
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> RotateKeyResponse:
+    """Replaces the secret in place — same id/plan/limits/usage, only the
+    credential changes (see rotate_api_key's own docstring for why this is
+    preferable to revoke-then-recreate for a leaked-key recovery flow)."""
+    supabase = getattr(request.app.state, "supabase", None)
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Key service temporarily unavailable")
+
+    raw_key = await rotate_api_key(supabase, user.user_id, key_id)
+    if raw_key is None:
+        raise HTTPException(status_code=404, detail="API key not found or already revoked")
+    return RotateKeyResponse(raw_key=raw_key)
 
 
 @router.get("/usage", response_model=UsageResponse)
