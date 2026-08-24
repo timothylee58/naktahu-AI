@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { AgencyContact, Citation } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
+import { inSeasonalWindow, mentionsKemerdekaan } from '@/lib/seasonal-window';
+import { MALAYSIA_STATE_IDS } from '@/lib/malaysia-states';
 import { AgencyContactCard } from './AgencyContactCard';
 import { CitationChip } from './CitationChip';
 import { StreamingText } from './StreamingText';
@@ -52,6 +54,13 @@ export function ChatBubble(props: ChatBubbleProps) {
   // it's only meaningful for the assistant-role branch — harmless unused
   // state on the user-bubble render path.
   const [translated, setTranslated] = useState<{ text: string; lang: TranslateLang } | null>(null);
+  // Client-only check (same pattern as PromptChips/ChatInput's own
+  // seasonal flags) — starts false so server/first-client render agree,
+  // then flips true post-mount if in the Merdeka/Malaysia Day window.
+  const [seasonal, setSeasonal] = useState(false);
+  useEffect(() => {
+    setSeasonal(inSeasonalWindow(new Date()));
+  }, []);
 
   if (props.role === 'user') {
     return (
@@ -202,6 +211,35 @@ export function ChatBubble(props: ChatBubbleProps) {
             onSelect={onSuggestionSelect}
             disabled={false}
           />
+        )}
+
+        {/* State-narrowing follow-up — only after a Merdeka-themed answer
+            (same keyword detector chat's confetti/send-pulse use), during
+            the season, once streaming has actually finished. Re-asks the
+            same query with a state appended, rather than inventing a new
+            question — the user already asked the thing they care about,
+            this just localizes it. */}
+        {!isStreaming && !isThinking && !isError && seasonal && query && mentionsKemerdekaan(query) && onSuggestionSelect && (
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              const stateId = e.target.value;
+              if (!stateId) return;
+              const stateLabel = t(`agents.welfare-eligibility.state.${stateId}`);
+              onSuggestionSelect(`${query} ${t('chat.state_narrow_suffix').replace('{state}', stateLabel)}`);
+              e.target.value = '';
+            }}
+            className="self-start max-w-[220px] border border-nk-official/30 bg-nk-official/10 text-nk-official-dim dark:text-nk-official rounded-full px-3 py-1 text-xs font-medium cursor-pointer"
+          >
+            <option value="" disabled>
+              🇲🇾 {t('chat.state_narrow_placeholder')}
+            </option>
+            {MALAYSIA_STATE_IDS.map((id) => (
+              <option key={id} value={id} className="text-zinc-900">
+                {t(`agents.welfare-eligibility.state.${id}`)}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </div>

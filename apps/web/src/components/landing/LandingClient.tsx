@@ -23,6 +23,7 @@ import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
 import { SeasonalHeroVideo } from './SeasonalHeroVideo';
 import { useSeasonalHeroVideo } from '@/lib/hooks/useSeasonalHeroVideo';
 import { useI18n } from '@/lib/i18n';
+import { MALAYSIA_STATE_IDS } from '@/lib/malaysia-states';
 import {
   LANDING_TAGLINE_KEYS,
   pickRandomTaglineKey,
@@ -66,18 +67,6 @@ const ALL_DOMAINS = [
   { key: 'education' },
   { key: 'health' },
   { key: 'immigration' },
-] as const;
-
-// Reuses welfare-eligibility's own state id list + i18n label keys
-// (agents.welfare-eligibility.state.*) rather than duplicating a second
-// trilingual state-name list — same ids, same labels, just a different
-// consumer. Seasonal-only (see the state picker chip below): lets a
-// visitor jump straight into a state-specific Merdeka Day query during
-// the Aug 25-Sep 20 window, instead of a generic domain chip.
-const MERDEKA_STATE_IDS = [
-  'johor', 'kedah', 'kelantan', 'melaka', 'negeri_sembilan', 'pahang',
-  'penang', 'perak', 'perlis', 'sabah', 'sarawak', 'selangor', 'terengganu',
-  'kl', 'labuan', 'putrajaya',
 ] as const;
 
 const fadeUp = {
@@ -457,7 +446,7 @@ export function LandingClient() {
               <option value="" disabled>
                 🇲🇾 {t('landing.hero.state_picker_placeholder')}
               </option>
-              {MERDEKA_STATE_IDS.map((id) => (
+              {MALAYSIA_STATE_IDS.map((id) => (
                 <option key={id} value={id} className="text-zinc-900">
                   {t(`agents.welfare-eligibility.state.${id}`)}
                 </option>

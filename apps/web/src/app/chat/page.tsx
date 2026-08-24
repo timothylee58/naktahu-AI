@@ -16,7 +16,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { MerdekaConfetti } from '@/components/chat/MerdekaConfetti';
 import { PromptChips } from '@/components/chat/PromptChips';
-import { inSeasonalWindow } from '@/lib/seasonal-window';
+import { inSeasonalWindow, mentionsKemerdekaan } from '@/lib/seasonal-window';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
@@ -26,15 +26,6 @@ import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } fro
 let msgCounter = 0;
 function makeId() {
   return `msg-${++msgCounter}-${Date.now()}`;
-}
-
-// Merdeka/Hari Malaysia confetti trigger — a small, deliberately narrow
-// keyword set (not a general "excited" detector) so the burst reads as a
-// direct response to the user's own words, not a random surprise.
-const KEMERDEKAAN_KEYWORDS = ['merdeka', 'perarakan', 'hari malaysia', 'negaraku'];
-function mentionsKemerdekaan(query: string): boolean {
-  const lower = query.toLowerCase();
-  return KEMERDEKAAN_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 function ChatPageInner() {

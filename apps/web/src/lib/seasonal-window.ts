@@ -40,6 +40,20 @@ function daysUntil(now: Date, month: number, day: number): number {
   return Math.round((target.getTime() - startOfNow.getTime()) / 86_400_000);
 }
 
+// Shared keyword detector — a small, deliberately narrow set (not a
+// general "excited" detector) so any Merdeka-themed UI reaction (chat's
+// confetti, the send-button flag pulse, the post-answer state-narrowing
+// chip) reads as a direct response to the user's own words, not a random
+// surprise. Extracted from app/chat/page.tsx so its two new consumers
+// (ChatInput's send-button pulse, ChatBubble's state-narrowing chip)
+// don't each duplicate the list.
+const KEMERDEKAAN_KEYWORDS = ['merdeka', 'perarakan', 'hari malaysia', 'negaraku'];
+
+export function mentionsKemerdekaan(query: string): boolean {
+  const lower = query.toLowerCase();
+  return KEMERDEKAAN_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 export function getSeasonalMilestone(now: Date): SeasonalMilestone {
   const month = now.getMonth() + 1;
   const day = now.getDate();
