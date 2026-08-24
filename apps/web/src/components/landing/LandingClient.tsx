@@ -49,17 +49,17 @@ export function LandingClient() {
   const pageClass = isDark
     ? 'min-h-screen bg-[#0A0F1E] text-white'
     : 'min-h-screen bg-zinc-50 text-zinc-900';
-  const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
-  const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
+  const borderClass = isDark ? 'border-white/15' : 'border-zinc-200';
+  const mutedText = isDark ? 'text-zinc-300' : 'text-zinc-600';
+  const sectionTitle = isDark ? 'text-white' : 'text-zinc-800';
   const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-[#2563EB]/50'
+    ? 'bg-white/10 border-white/20 shadow-[0_8px_30px_rgba(0,0,0,0.45)] focus-within:border-[#60A5FA]/60'
     : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-[#2563EB]/40';
   const domainPillClass = isDark
-    ? 'border-[#2563EB]/40 text-[#2563EB] bg-[#2563EB]/10'
+    ? 'border-[#60A5FA]/50 text-[#93C5FD] bg-[#2563EB]/15'
     : 'border-blue-200 text-blue-700 bg-blue-50';
-  const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
-  const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
+  const footerText = isDark ? 'text-zinc-400' : 'text-zinc-500';
+  const footerTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
@@ -72,7 +72,7 @@ export function LandingClient() {
         <div
           className={`absolute left-1/2 top-[-180px] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-3xl ${
             isDark
-              ? 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.22),transparent)]'
+              ? 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.30),transparent)]'
               : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
           }`}
         />
@@ -87,7 +87,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#2563EB] uppercase border border-[#2563EB]/30 rounded-full px-4 py-1.5 locale-nowrap"
+          className={`inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase border rounded-full px-4 py-1.5 locale-nowrap ${isDark ? 'text-[#93C5FD] border-[#60A5FA]/50' : 'text-[#2563EB] border-[#2563EB]/30'}`}
         >
           🇲🇾 {t('landing.badge')}
         </motion.div>
@@ -97,7 +97,7 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance"
+          className={`text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance ${isDark ? 'drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]' : ''}`}
         >
           {(() => {
             const headline = t('landing.hero.headline');
@@ -107,7 +107,7 @@ export function LandingClient() {
             return (
               <>
                 {headline.slice(0, idx)}
-                <span className="text-[#2563EB]">{highlight}</span>
+                <span className={isDark ? 'text-[#60A5FA]' : 'text-[#2563EB]'}>{highlight}</span>
                 {headline.slice(idx + highlight.length)}
               </>
             );
@@ -135,7 +135,7 @@ export function LandingClient() {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
-            className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
+            className="w-5 h-5 flex-shrink-0 text-zinc-400"
           >
             <path
               fillRule="evenodd"
@@ -155,7 +155,7 @@ export function LandingClient() {
         >
           <Link
             href="/chat"
-            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+            className={`inline-flex items-center gap-2 font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base transition-all duration-200 locale-nowrap hover:-translate-y-0.5 active:translate-y-0 ${isDark ? 'bg-[#3B82F6] hover:bg-[#60A5FA] text-white shadow-lg shadow-blue-500/25 hover:shadow-xl' : 'bg-[#2563EB] hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30 hover:shadow-xl'}`}
           >
             {t('landing.hero.cta')}
             <svg
@@ -173,7 +173,7 @@ export function LandingClient() {
           </Link>
           <Link
             href="/agents"
-            className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
+            className={`text-sm transition-colors locale-nowrap ${isDark ? 'text-zinc-300 hover:text-[#60A5FA]' : 'hover:text-[#2563EB]'}`}
           >
             {t('landing.hero.secondary_cta')}
           </Link>

@@ -81,9 +81,9 @@ export function TypewriterQuery({ locale = 'ms', isDark = true }: TypewriterQuer
   }, [queryIdx, queries]);
 
   return (
-    <span className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+    <span className={`text-sm ${isDark ? 'text-zinc-300' : 'text-zinc-500'}`}>
       {displayText}
-      <span className={`inline-block w-0.5 h-[1em] align-text-bottom ml-px animate-blink ${isDark ? 'bg-zinc-500' : 'bg-zinc-400'}`} />
+      <span className={`inline-block w-0.5 h-[1em] align-text-bottom ml-px animate-blink ${isDark ? 'bg-zinc-400' : 'bg-zinc-400'}`} />
     </span>
   );
 }
