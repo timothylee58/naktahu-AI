@@ -616,6 +616,56 @@ SOURCES: tuple[Source, ...] = (
             "proxy-blocked, not a dead URL)."
         ),
     ),
+
+    # ── DOSM (Department of Statistics Malaysia) + KPDN (Ministry of
+    # Domestic Trade and Cost of Living) + one more SSM page — multi-domain
+    # knowledge-base expansion. URLs confirmed real via WebSearch (dosm.gov.my,
+    # open.dosm.gov.my, kpdn.gov.my, ssm.com.my all resolved to the actual
+    # official portals, not lookalikes) but NOT content-verified via direct
+    # fetch — same sandbox-egress restriction as every other WebSearch-found
+    # entry in this file (see module docstring). DOSM's own statistics span
+    # population, economic, and social data with no single narrower domain
+    # fitting all of it, so — like mygovernment-portal-home — it's tagged
+    # "government" rather than "finance". KPDN's own portal is tagged
+    # "business" (trade-licensing/consumer-protection remit); its
+    # cost-of-living assistance programme is already covered separately by
+    # the "welfare"-tagged Ihsan MADANI entries above, which KPDN also runs.
+    Source(
+        name="dosm-portal-home",
+        url="https://www.dosm.gov.my/",
+        kind="html",
+        domain="government",
+        ministry="Jabatan Perangkaan Malaysia (DOSM)",
+        language="en",
+        notes="National statistics department's official portal — population, economic, and social statistics catalogue.",
+    ),
+    Source(
+        name="opendosm-home",
+        url="https://open.dosm.gov.my/",
+        kind="html",
+        domain="government",
+        ministry="Jabatan Perangkaan Malaysia (DOSM)",
+        language="en",
+        notes="OpenDOSM — DOSM's open-data catalogue/dashboard platform (CPI, GDP, population, labour force series).",
+    ),
+    Source(
+        name="kpdn-portal-home",
+        url="https://www.kpdn.gov.my/en/home",
+        kind="html",
+        domain="business",
+        ministry="Kementerian Perdagangan Dalam Negeri dan Kos Sara Hidup (KPDN)",
+        language="en",
+        notes="Ministry of Domestic Trade and Cost of Living official portal — trade licensing, consumer protection, price-control enforcement.",
+    ),
+    Source(
+        name="ssm-ezbiz-online",
+        url="https://www.ssm.com.my/Pages/Services/Registration-of-Business-(ROB)/EzBiz-Online.aspx",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes="Official explainer page for EzBiz, SSM's online sole-proprietorship/partnership registration, renewal, and termination service.",
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
