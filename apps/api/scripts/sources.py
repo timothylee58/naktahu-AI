@@ -503,6 +503,43 @@ SOURCES: tuple[Source, ...] = (
         language="en",
         notes="Visa services page — pass/permit types, the highest-volume immigration query category.",
     ),
+
+    # ── Named e-service + SPO sources — back the immigration_navigator
+    # agent's new reference-generation and enquiry-drafting tracks (see
+    # that agent's module docstring). URLs confirmed real via WebSearch
+    # against the actual imigresen-online.imi.gov.my/eapp.imi.gov.my
+    # domains, not content-verified via direct fetch (same sandbox
+    # restriction as imi-portal-home above). Deliberately excludes
+    # "eservices.imi.gov.my.esarvice.online", which surfaced in one search
+    # result — the real eservices.imi.gov.my domain suffixed onto an
+    # unrelated host, a lookalike-domain pattern; never register or link it.
+    Source(
+        name="jim-eservices-hub",
+        url="https://imigresen-online.imi.gov.my/eservices/main",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Main e-Services hub — entry point for MM2H, PVIP, and other login-gated JIM online applications.",
+    ),
+    Source(
+        name="jim-pvip-faq",
+        url="https://imigresen-online.imi.gov.my/eservices/doc/FAQ_PVIP.pdf",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Official Malaysia Premium Visa Programme (PVIP) FAQ — requirements, fees, and the authorised-agency application model.",
+    ),
+    Source(
+        name="jim-spo-portal",
+        url="https://eapp.imi.gov.my/spo",
+        kind="html",
+        domain="immigration",
+        ministry="Jabatan Imigresen Malaysia (JIM)",
+        language="en",
+        notes="Sistem Pertanyaan Online (SPO) — the official enquiry portal immigration_navigator's SPO track drafts an enquiry for (never submits to).",
+    ),
     Source(
         name="motac-portal-home",
         url="https://www.motac.gov.my/en/",
