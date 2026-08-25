@@ -129,6 +129,62 @@ def test_public_query_valid_key_returns_json(client):
     assert "X-RateLimit-Limit" in res.headers
 
 
+def test_public_query_stream_returns_sse_events(client):
+    """Public Knowledge API's own SSE endpoint (/query/stream) — no
+    existing coverage before this. Mocks _stream_pipeline (not
+    _run_pipeline) since that's what actually feeds this endpoint's token
+    events post-fix — see app/routers/query.py's module for why
+    /query/stream now streams tokens as they arrive instead of buffering
+    the whole answer first."""
+    c, sb, redis = client
+    raw, key_hash, _ = generate_api_key()
+    sb.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[
+            {
+                "id": "key-uuid-2",
+                "user_id": "user-1",
+                "key_hash": key_hash,
+                "key_prefix": raw[:16],
+                "plan": "growth",  # SSE requires the sse feature flag — see API_PLAN_DEFAULTS
+                "calls_used": 0,
+                "calls_limit": 50000,
+                "rate_limit_per_min": 60,
+                "domain_whitelist": [],
+                "active": True,
+            }
+        ]
+    )
+    sb.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[{}])
+    sb.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[{}])
+
+    async def _fake_stream(query, session_id, user_id, domain=None):
+        yield "token", "Jawapan"
+        yield "token", " ringkas."
+        yield "result", {
+            "tokens": ["Jawapan", " ringkas."],
+            "final_state": {
+                "citations": [{"title": "EPF", "ministry": "KWSP", "url": "https://www.kwsp.gov.my", "confidence": 0.9}],
+                "confidence_score": 0.88,
+                "domain": "epf",
+                "language": "bm",
+            },
+            "metrics": {"latency_ms": 900},
+        }
+
+    with patch("routers.api_v1_public._stream_pipeline", new=_fake_stream):
+        res = c.post(
+            "/api/v1/public/query/stream",
+            json={"query": "Cara keluarkan EPF?", "language": "bm"},
+            headers={"X-NakTahu-Key": raw},
+        )
+
+    assert res.status_code == 200
+    assert "text/event-stream" in res.headers["content-type"]
+    assert "event: token" in res.text
+    assert "event: citation" in res.text
+    assert "event: done" in res.text
+
+
 def test_developer_create_key_requires_auth(client):
     c, _, _ = client
     res = c.post("/api/v1/developer/keys", json={"plan": "starter"})

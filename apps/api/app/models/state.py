@@ -71,3 +71,13 @@ class AgentState(TypedDict, total=False):
     # confidence-gated document citations model applies to.
     is_live_status_query: bool
     place_name: Optional[str]
+    # Speculative query-embedding task, started by router_node in parallel
+    # with its own classification LLM call (see cache.has_query_been_seen's
+    # docstring for why this is only ever fired when it's guaranteed not to
+    # be wasted work) and consumed by rag_node instead of computing its own
+    # embedding from scratch on a cache miss. An asyncio.Task, not
+    # JSON-serializable — safe ONLY because this pipeline runs stateless
+    # (checkpointer=None, app/agents/graph.py's `pipeline`) and never
+    # persists AgentState anywhere; a checkpointed graph must never carry
+    # this field.
+    _speculative_embedding_task: NotRequired[Any]

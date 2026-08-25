@@ -1,6 +1,7 @@
 """Tests for the POST /api/v1/query SSE endpoint."""
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from unittest.mock import patch
@@ -10,7 +11,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.routers.query import _extract_user_id
+from app.routers.query import _extract_user_id, _stream_pipeline
 from core.config import settings
 
 
@@ -82,6 +83,49 @@ async def test_query_endpoint_returns_sse_events() -> None:
 
     assert "token" in event_types
     assert "done" in event_types
+
+
+@pytest.mark.asyncio
+async def test_stream_pipeline_yields_tokens_as_they_arrive_not_buffered() -> None:
+    """Regression guard for the buffering bug this was fixed from: tokens
+    must reach the consumer as soon as astream produces them, not only
+    after the whole pipeline coroutine has finished and been collected
+    into a list. Proven by recording the ORDER of events across both the
+    fake astream's own progress and what the consumer observed — a
+    buffer-then-replay implementation would only ever show
+    'consumer:got:*' entries after 'astream:end', never interleaved with
+    'astream:mid'."""
+    order: list[str] = []
+
+    async def _fake_astream_delayed(inputs, stream_mode):  # type: ignore[no-untyped-def]
+        yield ("custom", "first")
+        await asyncio.sleep(0)  # yield control back to the event loop
+        order.append("astream:mid")
+        yield ("custom", "second")
+        yield (
+            "updates",
+            {"analyst": {"citations": [], "confidence_score": 0.5, "domain": "tax", "language": "en"}},
+        )
+        order.append("astream:end")
+
+    with patch("app.routers.query.pipeline") as mock_pipeline:
+        mock_pipeline.astream = _fake_astream_delayed
+
+        received: list[str] = []
+        async for kind, payload in _stream_pipeline("query", "sess-stream", None):
+            if kind == "token":
+                received.append(payload)
+                order.append(f"consumer:got:{payload}")
+            else:
+                assert kind == "result"
+                assert payload["final_state"]["domain"] == "tax"
+
+    assert received == ["first", "second"]
+    # The consumer saw the first token before the fake pipeline even
+    # produced its second one — real interleaving, not a post-hoc replay
+    # (a buffer-then-replay implementation would only ever record
+    # 'consumer:got:*' entries after 'astream:end').
+    assert order.index("consumer:got:first") < order.index("astream:mid")
 
 
 @pytest.mark.asyncio

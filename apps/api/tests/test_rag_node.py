@@ -1,6 +1,7 @@
 """Tests for app.agents.rag_node."""
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -310,3 +311,68 @@ async def test_rag_node_rerank_enabled_widens_pool_and_calls_reranker(monkeypatc
     assert mock_search.await_args.kwargs.get("limit") == 12
     mock_rerank.assert_awaited_once()
     assert result["retrieved_chunks"] == _FAKE_CHUNKS
+
+
+# ── Speculative embedding task (router_node hand-off) ──────────────────────
+
+@pytest.mark.asyncio
+async def test_rag_node_reuses_speculative_embedding_task_on_cache_miss() -> None:
+    """A speculative task from router_node must be awaited instead of
+    rag_node calling _embed() itself — that's the whole point of the
+    hand-off (see AgentState._speculative_embedding_task's docstring)."""
+    task = asyncio.ensure_future(asyncio.sleep(0, result=_FAKE_EMBEDDING))
+    state = {**_STATE, "_speculative_embedding_task": task}
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
+    ):
+        mock_client.embeddings.create = AsyncMock()  # must never be called
+        result = await rag_node(state)
+
+    mock_client.embeddings.create.assert_not_awaited()
+    assert mock_search.await_args.args[1] == _FAKE_EMBEDDING
+    assert len(result["retrieved_chunks"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_rag_node_cache_hit_cancels_pending_speculative_task() -> None:
+    """A same-query race (see router_node's own comment on this) can land
+    a speculative task in flight even though this run turns out to be a
+    cache hit — it must be cancelled, not left to run to completion for a
+    result nothing will use."""
+    async def _never_resolves():
+        await asyncio.sleep(10)
+        return _FAKE_EMBEDDING
+
+    task = asyncio.ensure_future(_never_resolves())
+    state = {**_STATE, "_speculative_embedding_task": task}
+
+    with patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=_serialize_chunks(_FAKE_CHUNKS))):
+        result = await rag_node(state)
+
+    assert task.cancelled() or task.cancelling() > 0
+    assert len(result["retrieved_chunks"]) == 1
+    task.cancel()  # ensure cleanup regardless of which branch fired above
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+@pytest.mark.asyncio
+async def test_rag_node_marks_query_seen_after_successful_cache_write() -> None:
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()) as mock_mark,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        await rag_node(_STATE)
+
+    mock_mark.assert_awaited_once_with(_STATE["query"], ttl=3600)

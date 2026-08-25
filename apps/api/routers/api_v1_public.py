@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, Field, field_validator
 
 from app.middleware.sanitise import sanitise_query
-from app.routers.query import _run_pipeline, _sse
+from app.routers.query import _run_pipeline, _sse, _stream_pipeline
 from core.config import settings
 from middleware.api_key_auth import get_api_key_context
 from middleware.api_key_rate_limit import enforce_api_key_rate_limit, enforce_multi_rate_limit, enforce_sse_rate_limit
@@ -208,11 +208,13 @@ async def public_query_stream(
 
     async def _gen() -> AsyncGenerator[str, None]:
         t0 = time.monotonic()
+        final_state: dict = {}
         try:
-            result = await _run_pipeline(clean, session_id, ctx.user_id)
-            for token in result["tokens"]:
-                yield _sse("token", {"text": token})
-            final_state = result["final_state"]
+            async for kind, payload in _stream_pipeline(clean, session_id, ctx.user_id):
+                if kind == "token":
+                    yield _sse("token", {"text": payload})
+                else:  # kind == "result"
+                    final_state = payload["final_state"]
             for citation in final_state.get("citations", []):
                 yield _sse("citation", dict(citation))
             yield _sse(
@@ -237,7 +239,7 @@ async def public_query_stream(
             supabase,
             key_id=ctx.key_id,
             endpoint="/api/v1/public/query/stream",
-            domain=str(result.get("final_state", {}).get("domain") or "general"),
+            domain=str(final_state.get("domain") or "general"),
             response_ms=latency_ms,
         )
 

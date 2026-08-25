@@ -16,6 +16,17 @@ def _mock_completion(content: str) -> MagicMock:
     return resp
 
 
+@pytest.fixture(autouse=True)
+def _default_query_already_seen():
+    """Every test in this file except the speculative-embed tests below
+    (which override this explicitly) shouldn't fire a real background
+    embedding task — has_query_been_seen defaults to True here so
+    router_node's speculative-embed branch is a no-op unless a test
+    deliberately asks for it."""
+    with patch("app.agents.router_node.cache_svc.has_query_been_seen", new=AsyncMock(return_value=True)):
+        yield
+
+
 @pytest.mark.asyncio
 async def test_router_node_bm_finance() -> None:
     """BM query about tax should be classified as bm + finance."""
@@ -40,6 +51,59 @@ async def test_router_node_en_government() -> None:
 
     assert result["language"] == "en"
     assert result["domain"] == "government"
+
+
+@pytest.mark.asyncio
+async def test_router_node_fires_speculative_embed_when_query_never_seen() -> None:
+    """cache.has_query_been_seen()==False guarantees rag_node's real cache
+    lookup will also miss (see cache.mark_query_seen's docstring) — so
+    router_node must fire the speculative embed and hand it to rag_node
+    via state, in parallel with its own classify call."""
+    completion = _mock_completion('{"language": "en", "domain": "tax", "intent": "test"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client, \
+         patch("app.agents.router_node.cache_svc.has_query_been_seen", new=AsyncMock(return_value=False)), \
+         patch("app.agents.rag_node._embed", new=AsyncMock(return_value=[0.1, 0.2])) as mock_embed:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "How do I pay income tax?"})
+
+    task = result["_speculative_embedding_task"]
+    assert task is not None
+    embedding = await task
+    assert embedding == [0.1, 0.2]
+    mock_embed.assert_awaited_once_with("How do I pay income tax?")
+
+
+@pytest.mark.asyncio
+async def test_router_node_skips_speculative_embed_when_query_already_seen() -> None:
+    """A query text that's already cached under some domain/language must
+    never trigger a speculative embed — it would either be wasted (real
+    lookup also hits) or, in the rare reclassification case, no worse than
+    today's behaviour. Either way, firing it here has no guaranteed payoff,
+    unlike the never-seen case."""
+    completion = _mock_completion('{"language": "en", "domain": "tax", "intent": "test"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client, \
+         patch("app.agents.router_node.cache_svc.has_query_been_seen", new=AsyncMock(return_value=True)), \
+         patch("app.agents.rag_node._embed", new=AsyncMock()) as mock_embed:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "How do I pay income tax?"})
+
+    assert result["_speculative_embedding_task"] is None
+    mock_embed.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_router_node_skips_speculative_embed_for_empty_query() -> None:
+    completion = _mock_completion('{"language": "en", "domain": null, "intent": "test"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client, \
+         patch("app.agents.router_node.cache_svc.has_query_been_seen", new=AsyncMock()) as mock_seen:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": ""})
+
+    assert result["_speculative_embedding_task"] is None
+    mock_seen.assert_not_awaited()  # no point checking the marker for an empty query
 
 
 @pytest.mark.asyncio
