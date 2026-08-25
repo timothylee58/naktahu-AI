@@ -97,6 +97,7 @@ async def rag_node(state: AgentState) -> dict:
     # None (not "government") when unclassified — see app/models/state.py's
     # domain field docstring for why a specific-domain default is a trap.
     domain = state.get("domain")
+    speculative_task = state.get("_speculative_embedding_task")
 
     key = _cache_key(query, language, domain)
 
@@ -104,14 +105,25 @@ async def rag_node(state: AgentState) -> dict:
     cached = await cache_svc.get_cached_result(key)
     if cached is not None:
         log.info("rag_cache_hit", key=key[:16])
+        # router_node only ever starts this task when has_query_been_seen()
+        # was False, which should make a same-query cache hit here
+        # impossible in the common case — but a same-query race (two
+        # concurrent requests for a brand-new query) or a domain/language
+        # reclassification on a repeat query can still land here with a
+        # task in flight. Cancel it rather than let it run to completion
+        # unused.
+        if speculative_task is not None and not speculative_task.done():
+            speculative_task.cancel()
         return {"retrieved_chunks": _deserialize_chunks(cached)}
 
-    # Cache miss — generate embedding and search
+    # Cache miss — generate embedding (reusing router_node's speculative
+    # task if one is in flight — see AgentState._speculative_embedding_task
+    # and cache.has_query_been_seen's docstring) and search
     log.info("rag_cache_miss", key=key[:16])
     do_rerank = rerank_enabled()
     search_limit = _RERANK_CANDIDATE_POOL if do_rerank else _FINAL_CHUNK_COUNT
     try:
-        embedding = await _embed(query)
+        embedding = await speculative_task if speculative_task is not None else await _embed(query)
         chunks = await hybrid_search(query, embedding, domain=domain, limit=search_limit)
         # Recall fallback: hybrid_search hard-filters on dc.domain = domain_filter,
         # so a single misclassified domain from router_node (e.g. a tax question
@@ -145,7 +157,11 @@ async def rag_node(state: AgentState) -> dict:
         log.warning("rag_retrieval_failed", error=str(exc))
         return {"retrieved_chunks": []}
 
-    # Persist to cache
+    # Persist to cache, and record that this query text has now been
+    # cached (domain/language-agnostic marker — see cache.mark_query_seen's
+    # docstring) so a future router_node run knows it's safe to fire a
+    # speculative embed for a repeat of this exact query text.
     await cache_svc.set_cached_result(key, _serialize_chunks(chunks), ttl=_CACHE_TTL)
+    await cache_svc.mark_query_seen(query, ttl=_CACHE_TTL)
 
     return {"retrieved_chunks": chunks}

@@ -1,6 +1,7 @@
 """router_node — fast intent/language/domain classifier using ILMU chat model."""
 from __future__ import annotations
 
+import asyncio
 import re
 
 import structlog
@@ -8,6 +9,7 @@ import weave
 
 from app.models.state import AgentState
 from app.orchestration.circuit_breaker import CircuitOpenError, ilmu_breaker
+from app.services import cache as cache_svc
 from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
 
 log = structlog.get_logger(__name__)
@@ -71,6 +73,23 @@ async def router_node(state: AgentState) -> dict:
 
     # Deterministic script check before calling the LLM — CJK is unambiguous
     script_lang = _script_detect(query)
+
+    # Speculative query embedding — started here so it runs concurrently
+    # with this node's own classification call below, instead of rag_node
+    # only starting it after router_node has fully finished. Only fired
+    # when cache.has_query_been_seen() is False, which guarantees the real,
+    # domain-scoped cache lookup in rag_node will also miss (the "seen"
+    # marker is only ever set alongside a real cache write — see its
+    # docstring) — so this embedding is never wasted work on what would
+    # have been a cache hit. Imported lazily (not at module level) so
+    # nothing here depends on rag_node's own import graph beyond this one
+    # function call, matching guard_node's existing lazy-import-for-
+    # patchability convention.
+    speculative_embedding_task = None
+    if query and not await cache_svc.has_query_been_seen(query):
+        from app.agents.rag_node import _embed
+
+        speculative_embedding_task = asyncio.create_task(_embed(query))
 
     try:
         # Routed through ilmu_breaker so a degraded/hanging ILMU provider
@@ -154,10 +173,17 @@ async def router_node(state: AgentState) -> dict:
         is_live_status_query=is_live_status_query,
         place_name=place_name,
     )
+    # Handed to rag_node via state; if this query instead gets blocked by
+    # guard_node or routed to warung_watch_node (neither of which reads
+    # this field — see graph.py), the task simply finishes in the
+    # background and is garbage-collected. A harmless, rare exception to
+    # "never wasted" (those paths skip rag_node entirely by design), not
+    # worth adding cancellation plumbing for.
     return {
         "language": language,
         "domain": domain,
         "intent": intent,
         "is_live_status_query": is_live_status_query,
         "place_name": place_name,
+        "_speculative_embedding_task": speculative_embedding_task,
     }
