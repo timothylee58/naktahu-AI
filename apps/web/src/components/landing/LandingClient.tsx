@@ -613,6 +613,9 @@ export function LandingClient() {
           <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.spotlight.desc')}</p>
         </div>
         <AgentSpotlight isDark={isDark} />
+        <p className={`mt-6 text-center text-xs max-w-2xl mx-auto locale-text-balance ${mutedText}`}>
+          {t('landing.spotlight.disclaimer')}
+        </p>
       </motion.section>
 
       <motion.section

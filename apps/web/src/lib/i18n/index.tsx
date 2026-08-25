@@ -442,7 +442,9 @@ const MS: Translations = {
   'landing.trust.jpn.tag2': 'Kewarganegaraan & sijil',
   'landing.spotlight.title': 'Ejen AI Khusus',
   'landing.spotlight.desc':
-    'Setiap ejen dilatih untuk satu tugas — bukan jack-of-all-trades yang cetek.',
+    'Setiap ejen fokus pada satu tugas khusus, disokong sumber rasmi — bukan jack-of-all-trades yang cetek.',
+  'landing.spotlight.disclaimer':
+    'Jawapan ejen adalah panduan am berdasarkan sumber rasmi, bukan nasihat profesional (perubatan, kewangan atau undang-undang). Untuk keputusan penting, rujuk pengamal bertauliah.',
   'landing.spotlight.warung_watch.desc':
     'Semak status sesak warung berhampiran, disumbang orang ramai secara langsung.',
   'landing.compare.title': 'NakTahu AI vs Chatbot Generik',
@@ -450,7 +452,7 @@ const MS: Translations = {
   'landing.compare.them': 'Chatbot Generik',
   'landing.compare.row.sources': 'Sumber rasmi kerajaan Malaysia',
   'landing.compare.row.sources.us': 'Setiap jawapan disertakan pautan',
-  'landing.compare.row.sources.them': 'Sering tiada sumber / direka',
+  'landing.compare.row.sources.them': 'Sering tiada sumber disertakan',
   'landing.compare.row.languages': 'Nuansa Bahasa Malaysia',
   'landing.compare.row.languages.us': 'BM, Inggeris, Mandarin — termasuk Manglish',
   'landing.compare.row.languages.them': 'Fokus Inggeris umum',
@@ -459,7 +461,7 @@ const MS: Translations = {
   'landing.compare.row.domains.them': 'Pengetahuan am sejagat',
   'landing.compare.row.confidence': 'Semakan keyakinan',
   'landing.compare.row.confidence.us': 'Jawapan tidak pasti ditandakan, bukan diteka',
-  'landing.compare.row.confidence.them': 'Sentiasa jawab dengan yakin, walau salah',
+  'landing.compare.row.confidence.them': 'Tahap keyakinan jarang ditunjukkan',
   'landing.preview.title': 'Lihat Bagaimana NakTahu Menjawab',
   'landing.preview.desc':
     'Simulasi strim jawapan sebenar — dipautkan terus ke sumber rasmi.',
@@ -1489,7 +1491,9 @@ const EN: Translations = {
   'landing.trust.jpn.tag2': 'Citizenship & certificates',
   'landing.spotlight.title': 'Specialised AI Agents',
   'landing.spotlight.desc':
-    'Each agent is trained for one job — not a shallow jack-of-all-trades.',
+    'Each agent focuses on one task, backed by official sources — not a shallow jack-of-all-trades.',
+  'landing.spotlight.disclaimer':
+    'Agent answers are general guidance from official sources, not professional advice (medical, financial, or legal). For important decisions, consult a licensed practitioner.',
   'landing.spotlight.warung_watch.desc':
     'Check nearby warung crowd status, live from real people.',
   'landing.compare.title': 'NakTahu AI vs Generic Chatbots',
@@ -1497,7 +1501,7 @@ const EN: Translations = {
   'landing.compare.them': 'Generic Chatbot',
   'landing.compare.row.sources': 'Official Malaysian government sources',
   'landing.compare.row.sources.us': 'Every answer comes with a citation link',
-  'landing.compare.row.sources.them': 'Often no sources / fabricated',
+  'landing.compare.row.sources.them': 'Sources often not included',
   'landing.compare.row.languages': 'Malaysian language nuance',
   'landing.compare.row.languages.us': 'BM, English, Mandarin — including Manglish',
   'landing.compare.row.languages.them': 'General English-first',
@@ -1506,7 +1510,7 @@ const EN: Translations = {
   'landing.compare.row.domains.them': 'Generic worldwide knowledge',
   'landing.compare.row.confidence': 'Confidence checking',
   'landing.compare.row.confidence.us': 'Uncertain answers are flagged, not guessed',
-  'landing.compare.row.confidence.them': 'Always answers confidently, even when wrong',
+  'landing.compare.row.confidence.them': 'Confidence level usually not shown',
   'landing.preview.title': 'See How NakTahu Answers',
   'landing.preview.desc':
     'A simulated preview of a real streamed answer — linked straight to official sources.',
@@ -2526,14 +2530,16 @@ const ZH: Translations = {
   'landing.trust.jpn.desc': '移民、MyKad 与护照',
   'landing.trust.jpn.tag2': '公民权与证件',
   'landing.spotlight.title': '专项 AI 代理',
-  'landing.spotlight.desc': '每个代理专注一项任务 — 而非泛泛而谈的全能助手。',
+  'landing.spotlight.desc': '每个代理专注一项任务，并以官方来源为依据 — 而非泛泛而谈的全能助手。',
+  'landing.spotlight.disclaimer':
+    '代理的回答是基于官方来源的一般性指引，并非专业意见（医疗、财务或法律）。重要决定请咨询持牌专业人士。',
   'landing.spotlight.warung_watch.desc': '查看附近小吃摊的实时拥挤状态，由真实用户上报。',
   'landing.compare.title': 'NakTahu AI 对比通用聊天机器人',
   'landing.compare.us': 'NakTahu AI',
   'landing.compare.them': '通用聊天机器人',
   'landing.compare.row.sources': '马来西亚政府官方来源',
   'landing.compare.row.sources.us': '每个答案都附带引用链接',
-  'landing.compare.row.sources.them': '常无来源 / 凭空捏造',
+  'landing.compare.row.sources.them': '通常不附来源',
   'landing.compare.row.languages': '本地语言细节',
   'landing.compare.row.languages.us': '马来文、英文、中文 — 包括 Manglish',
   'landing.compare.row.languages.them': '以英文为主的通用回答',
@@ -2542,7 +2548,7 @@ const ZH: Translations = {
   'landing.compare.row.domains.them': '泛泛的全球知识',
   'landing.compare.row.confidence': '置信度检查',
   'landing.compare.row.confidence.us': '不确定的答案会被标记，而非乱猜',
-  'landing.compare.row.confidence.them': '即使错误也总是自信作答',
+  'landing.compare.row.confidence.them': '通常不显示置信程度',
   'landing.preview.title': '看看 NakTahu 如何作答',
   'landing.preview.desc': '真实流式答案的模拟预览 — 直接链接官方来源。',
   'landing.preview.demo_query': '如何申请子女税务减免？',
