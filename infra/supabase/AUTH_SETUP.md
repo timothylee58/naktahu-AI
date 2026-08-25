@@ -33,13 +33,14 @@ Add **Redirect URLs** (exact paths depend on your client; include both dev and p
 | Environment | Example redirect URL |
 |-------------|----------------------|
 | Local Next.js | `http://localhost:3000/**` (or your app route that handles the auth callback, e.g. `http://localhost:3000/auth/callback`) |
-| Production (Netlify) | `https://naktahu.netlify.app/**` and `https://naktahu.netlify.app/auth/callback` |
+| Production (naktahu.my) | `https://naktahu.my/**` and `https://naktahu.my/auth/callback` |
+| Production (Netlify, kept as a working fallback) | `https://naktahu.netlify.app/**` and `https://naktahu.netlify.app/auth/callback` |
 | Production (Vercel) | `https://<your-project>.vercel.app/**` or your custom domain callback route |
 
 Also set **Site URL**:
 
 - Local: `http://localhost:3000`
-- Production: `https://naktahu.netlify.app` (or your custom domain)
+- Production: `https://naktahu.my` (primary — this is what OAuth providers/email templates link back to; naktahu.netlify.app stays in Redirect URLs above so a bookmarked/old link still completes sign-in, it just isn't the Site URL any more)
 
 If **Site URL** is still `http://localhost:3000` in production, OAuth failures redirect to localhost and show browser security errors.
 

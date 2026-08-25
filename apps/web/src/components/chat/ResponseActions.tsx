@@ -6,6 +6,7 @@ import type { Citation } from '@/lib/types';
 import { getAnonSessionId } from '@/lib/anon-session';
 import { useI18n } from '@/lib/i18n';
 import { API_BASE } from '@/lib/api-base';
+import { ShareMenu } from './ShareMenu';
 
 interface ResponseActionsProps {
   content: string;
@@ -34,7 +35,6 @@ export function ResponseActions({
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [shareState, setShareState] = useState<'idle' | 'sharing' | 'copied' | 'error'>('idle');
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
@@ -76,35 +76,6 @@ export function ResponseActions({
     [feedback, submitting, query, content, citations, domain, language, accessToken],
   );
 
-  const handleShare = useCallback(async () => {
-    if (!query || shareState === 'sharing') return;
-    setShareState('sharing');
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-      const res = await fetch(`${API_BASE}/api/v1/share`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          query,
-          response_text: content,
-          citations: citations ?? [],
-          domain: domain ?? 'general',
-          language: language ?? 'en',
-          confidence: confidence ?? null,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to create share link');
-      const data = (await res.json()) as { id: string };
-      await navigator.clipboard.writeText(`${window.location.origin}/a/${data.id}`);
-      setShareState('copied');
-      setTimeout(() => setShareState('idle'), 2000);
-    } catch {
-      setShareState('error');
-      setTimeout(() => setShareState('idle'), 2000);
-    }
-  }, [query, content, citations, domain, language, confidence, shareState, accessToken]);
-
   if (isStreaming) return null;
 
   return (
@@ -131,36 +102,20 @@ export function ResponseActions({
         )}
       </button>
 
-      {/* Share */}
+      {/* Share — real WhatsApp/Telegram/Facebook targets + an AI-drafted
+          caption, not just a copy-link button (see ShareMenu's own
+          docstring on why this is still purely client-side navigation to
+          each platform's own share composer, never an automated post). */}
       {query && (
-        <button
-          onClick={handleShare}
-          disabled={shareState === 'sharing'}
-          title={
-            shareState === 'copied'
-              ? t('chat.actions.share_copied')
-              : shareState === 'error'
-                ? t('chat.actions.share_error')
-                : t('chat.actions.share')
-          }
-          className={`p-1.5 rounded-lg transition-colors disabled:cursor-default ${
-            shareState === 'error'
-              ? 'text-red-500'
-              : shareState === 'copied'
-                ? 'text-green-500'
-                : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-white/10'
-          }`}
-        >
-          {shareState === 'copied' ? (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-              <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-              <path d="M11.5 2a2.5 2.5 0 1 0-2.457 2.964l-3.5 2.121a2.5 2.5 0 1 0 0 3.83l3.5 2.121a2.5 2.5 0 1 0 .757-1.279l-3.5-2.121a2.51 2.51 0 0 0 0-1.272l3.5-2.121A2.5 2.5 0 0 0 11.5 2Z" />
-            </svg>
-          )}
-        </button>
+        <ShareMenu
+          content={content}
+          query={query}
+          domain={domain}
+          language={language}
+          citations={citations}
+          confidence={confidence}
+          accessToken={accessToken}
+        />
       )}
 
       {/* Regenerate */}

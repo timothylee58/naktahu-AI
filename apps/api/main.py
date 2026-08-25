@@ -72,9 +72,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Naktahu API", lifespan=lifespan)
 
+# naktahu.my is the primary domain; naktahu.netlify.app stays in the
+# default so the old URL keeps working (nothing redirects it away, and
+# some users/bookmarks/backlinks will still point at it) until it's
+# deliberately retired. Railway's real CORS_ORIGINS env var is the actual
+# source of truth in production — this default only matters when that
+# var is unset (local dev, or a fresh deploy before it's configured).
 _raw_origins = os.environ.get(
     "CORS_ORIGINS",
-    "http://localhost:3000,https://naktahu.netlify.app",
+    "http://localhost:3000,https://naktahu.my,https://www.naktahu.my,https://naktahu.netlify.app",
 )
 _allow_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 

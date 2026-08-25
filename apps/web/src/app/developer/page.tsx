@@ -547,7 +547,7 @@ export default function DeveloperPage() {
 
             <Card className="p-6 shadow-[0_2px_16px_rgba(15,23,42,0.06)]">
               <h2 className="text-sm font-semibold mb-2">{t('developer.widget')}</h2>
-              <pre className="text-xs bg-zinc-950 text-zinc-100 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap ring-1 ring-white/5">{`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://naktahu.netlify.app'}/widget.js"
+              <pre className="text-xs bg-zinc-950 text-zinc-100 rounded-xl p-4 overflow-x-auto whitespace-pre-wrap ring-1 ring-white/5">{`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://naktahu.my'}/widget.js"
   data-api-key="nkt_live_YOUR_KEY"
   data-domain="tax"
   data-lang="bm"
