@@ -101,9 +101,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# naktahu.my is the primary domain; naktahu.netlify.app stays in the
+# default so the old URL keeps working until it's deliberately retired —
+# see main.py's matching comment (Trap #1: this default must stay
+# identical in both mains).
 _cors_origins_raw = os.environ.get(
     "CORS_ORIGINS",
-    "http://localhost:3000,https://naktahu.netlify.app",
+    "http://localhost:3000,https://naktahu.my,https://www.naktahu.my,https://naktahu.netlify.app",
 )
 _cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
 

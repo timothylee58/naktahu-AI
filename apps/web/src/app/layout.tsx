@@ -43,11 +43,13 @@ const plexMono = IBM_Plex_Mono({
  * fallback is only auto-populated on Vercel; this project deploys to
  * Netlify, so it has to be set explicitly.
  *
- * Falls back to the current Netlify URL, matching the existing hardcoded
- * fallback in developer/page.tsx. Point NEXT_PUBLIC_SITE_URL at
- * https://naktahu.my once that domain is live.
+ * Falls back to naktahu.my (the primary domain, matching the existing
+ * hardcoded fallback in developer/page.tsx) — set NEXT_PUBLIC_SITE_URL
+ * explicitly on Netlify regardless, since a code fallback can't know
+ * which of naktahu.my / naktahu.netlify.app a given deploy is actually
+ * served from.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://naktahu.netlify.app';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://naktahu.my';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

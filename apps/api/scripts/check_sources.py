@@ -24,7 +24,7 @@ import httpx
 from scripts.sources import SOURCES, SOURCES_BY_NAME, Source
 
 _TIMEOUT_SECONDS = 15.0
-_USER_AGENT = "NakTahu-AI-SourceHealthCheck/1.0 (+https://naktahu.netlify.app)"
+_USER_AGENT = "NakTahu-AI-SourceHealthCheck/1.0 (+https://naktahu.my)"
 
 
 async def _check_one(client: httpx.AsyncClient, source: Source) -> tuple[Source, int | None, str | None]:
