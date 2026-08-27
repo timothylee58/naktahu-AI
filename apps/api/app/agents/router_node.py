@@ -18,8 +18,18 @@ _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
     "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
     "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property, welfare), intent (string summary max 10 words), "
-    "is_live_status_query (boolean), place_name (string or null). "
+    "is_live_status_query (boolean), place_name (string or null), "
+    "is_structured_parliament_query (boolean), parliament_bill_number (string or null), parliament_mp_query (string or null). "
     "Use 'parliament' for questions about Members of Parliament, constituencies, voting records, bills, or Hansard. "
+    "Set is_structured_parliament_query=true ONLY when the query asks for a specific, "
+    "lookupable fact: how a named bill's vote broke down (set parliament_bill_number to the "
+    "bill number/name as written, e.g. 'RUU 355' or 'D.R. 15/2026'), or who a specific MP or "
+    "constituency is (set parliament_mp_query to the MP's name or constituency name as written, "
+    "e.g. 'Bangi' or 'YB Anwar Ibrahim'). Set it to false, even for domain='parliament', for "
+    "general questions about parliamentary debates, Hansard content, or what was discussed "
+    "(e.g. 'what did parliament debate about tax reform'), since those need document search, "
+    "not a structured lookup. Never set both parliament_bill_number and parliament_mp_query at "
+    "once; pick whichever the query is actually asking for. "
     "Use 'property' for land titles, strata management, tenancy, or e-Tanah matters. "
     "Use 'welfare' for cost-of-living assistance, social welfare aid, or government relief schemes "
     "(electricity/utility rebates, food aid, housing assistance, income-support initiatives) — "
@@ -165,6 +175,18 @@ async def router_node(state: AgentState) -> dict:
         # than sending warung_watch_node a query it can't search on.
         is_live_status_query = False
 
+    is_structured_parliament_query = bool(parsed.get("is_structured_parliament_query") is True)
+    parliament_bill_number = parsed.get("parliament_bill_number")
+    if not isinstance(parliament_bill_number, str) or not parliament_bill_number.strip():
+        parliament_bill_number = None
+    parliament_mp_query = parsed.get("parliament_mp_query")
+    if not isinstance(parliament_mp_query, str) or not parliament_mp_query.strip():
+        parliament_mp_query = None
+    if not parliament_bill_number and not parliament_mp_query:
+        # Same "flag true, no usable entity" guard as is_live_status_query
+        # above — parliament_query_node has nothing to look up otherwise.
+        is_structured_parliament_query = False
+
     log.info(
         "router_classified",
         language=language,
@@ -172,6 +194,9 @@ async def router_node(state: AgentState) -> dict:
         intent=intent,
         is_live_status_query=is_live_status_query,
         place_name=place_name,
+        is_structured_parliament_query=is_structured_parliament_query,
+        parliament_bill_number=parliament_bill_number,
+        parliament_mp_query=parliament_mp_query,
     )
     # Handed to rag_node via state; if this query instead gets blocked by
     # guard_node or routed to warung_watch_node (neither of which reads
@@ -185,5 +210,8 @@ async def router_node(state: AgentState) -> dict:
         "intent": intent,
         "is_live_status_query": is_live_status_query,
         "place_name": place_name,
+        "is_structured_parliament_query": is_structured_parliament_query,
+        "parliament_bill_number": parliament_bill_number,
+        "parliament_mp_query": parliament_mp_query,
         "_speculative_embedding_task": speculative_embedding_task,
     }

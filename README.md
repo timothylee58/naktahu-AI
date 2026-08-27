@@ -3,7 +3,7 @@
 > **Ilmu tempatan, jawapan seketika.**
 ----
 
-NakTahu AI is a Malaysian-focused, trilingual AI answer engine (Bahasa Malaysia, English, Mandarin) that delivers cited, government-sourced answers to questions about Malaysian public services, law, education, finance, and healthcare. Beyond chat, it's an agentic platform: a set of vertical AI agents for grant matching, compliance drafting, retrenchment guidance, immigration, health triage, exam prep, investor due diligence, and parliamentary transparency; a crowdsourced live-status tool for local eateries (Warung Watch); and a metered Developer/Knowledge API for external integrators.
+NakTahu AI is a Malaysian-focused, trilingual AI answer engine (Bahasa Malaysia, English, Mandarin) that delivers cited, government-sourced answers across 13 canonical domains — government, education, legal, finance, healthcare, EPF, tax, business, immigration, culture, parliament, property, and welfare. Beyond chat, it's an agentic platform: a set of vertical AI agents for grant matching, compliance drafting, retrenchment guidance, immigration, welfare eligibility, property, health triage, exam prep, investor due diligence, and parliamentary transparency; a crowdsourced live-status tool for local eateries (Warung Watch); and a metered Developer/Knowledge API for external integrators.
 
 ---
 
@@ -30,6 +30,8 @@ A shared LangGraph-based agent framework backs several purpose-built assistants,
 | **SME Compliance Navigator (PatuhiKu)** | Cross-references a business profile against tax (LHDN), employment (EPF/SOCSO/EIS), and company (SSM) obligations in parallel. |
 | **Immigration Navigator** | Conversational visa/permit intake grounded in immigration-domain retrieval. |
 | **Retrenchment Navigator** | Guided retrenchment options — EIS unemployment-claim eligibility, statutory termination-benefit calculation (deterministic Employment Act arithmetic, never LLM-guessed), and a next-steps checklist. Free tier, 0 credits. |
+| **Welfare Eligibility Agent** | Matches a household profile (income, state, dependents, OKU status, employment/housing) against cost-of-living and social-assistance schemes — deterministic, filter-first eligibility matching, same architecture as Grant Finder's scoring. Sourced from Ihsan MADANI's own listings via a dedicated scrape→verify→embed ingestion pipeline (`scripts/ingest_madani.py`, weekly), with an eligibility-rules review gate (`needs_review`) so an unverified scheme is never surfaced as "you qualify." Free tier, 0 credits. |
+| **Property Concierge** | Guided property buyer/renter intake — lead-tier qualification, property-domain RAG citations (tenancy, strata, land title, NAPIC/OpenDOSM open sales data), and a shareable brief. Lets users paste in a listing URL themselves (with an OCR-from-photo option) rather than the agent sourcing live listings — see the agent's own module docstring for why it doesn't scrape licensed-valuer-gated listing sites. Free tier, 0 credits. |
 | **Health Triage** | Bahasa Malaysia symptom intake with severity assessment, public healthcare facility recommendations, and an on-demand PDF export of the triage summary. |
 | **Study Agent** | Upload an SPM past paper and get retrieval-grounded explanations per question. |
 | **Research Synthesiser** | Parallel multi-domain retrieval and synthesis for broader research-style questions. |
@@ -43,7 +45,9 @@ A rule-based query→agent matcher (no LLM call) surfaces a relevant agent inlin
 A standalone crowdsourced "how busy is it right now" tool for Malaysian warungs/kopitiams/food stalls — deliberately outside the RAG pipeline, since live crowd status has no citable government source and has its own freshness window instead. Users check a place's current status (search-and-match against reported names), submit their own status report, and optionally attach a price report for a specific menu item; price reports render as a real trend chart (recharts) once a warung has enough data points — never a fabricated sample series. A "nearby places" search assist calls the real Google Places API (New) Nearby Search endpoint when `GOOGLE_PLACES_API_KEY` is configured (degrades to a Maps-link-only view otherwise); Google's Popular Times data is explicitly *not* used, since it isn't exposed via any official, ToS-compliant API.
 
 ### Platform
-- **Developer / Knowledge API** — a separate, API-key-authenticated surface (`/api/v1/public`, `/api/v1/developer`) for external integrators: single- and multi-domain query endpoints, streaming, self-hosted OpenAPI docs, and per-key usage tracking.
+- **Developer / Knowledge API** — a separate, API-key-authenticated surface (`/api/v1/public`, `/api/v1/developer`) for external integrators: single- and multi-domain query endpoints, streaming, a branded self-hosted Swagger UI at `/api/v1/public/docs`, key naming and one-click rotation (replace a leaked key's secret without losing its plan/limits/usage), and per-key usage tracking. Free tier available to any signed-in user, no Pro subscription required.
+- **In-chat answer translation** — translate any answer between BM/EN/ZH on demand, independent of the query's own detected language, without re-running retrieval/synthesis.
+- **Real social sharing** — WhatsApp/Telegram/Facebook share targets (each platform's own share composer, never automated posting) plus an optional AI-drafted caption, on top of the permalink system below.
 - **Shareable answers** — generate a permalink for any answer.
 - **Session history** — authenticated users get persistent query history (pro plan), plus a separate, non-plan-gated agent-run history (drafts, checklists, eligibility results) for any signed-in user.
 - **Interactive citation cards** — hover or tap a citation chip for the full source title, a colour-coded confidence rating, staleness flag, and the direct source link, instead of only a truncated inline chip.
@@ -119,11 +123,16 @@ naktahu-AI/
 │       │                          parliament, investor, transcribe, session)
 │       ├── services/           — auth, billing, api key/credit management
 │       ├── middleware/         — rate limiting, plan gating, sanitisation
-│       └── scripts/            — document + Hansard ingestion pipelines
+│       └── scripts/            — 3 distinct ingestion pipelines: ingest.py
+│                                  (→ dosm_documents, CSV), ingest_feed.py
+│                                  (→ document_chunks, what RAG retrieval
+│                                  actually reads — RSS/HTML + Hansard),
+│                                  ingest_madani.py (→ madani_scheme, welfare
+│                                  eligibility data)
 ├── packages/
 │   └── shared-types/           — TypeScript types shared across the web workspace
 ├── infra/
-│   ├── supabase/migrations/    — versioned SQL schema (30+ files)
+│   ├── supabase/migrations/    — versioned SQL schema (45+ files)
 │   └── docker-compose.yml
 └── .github/workflows/
     ├── ci.yml                 — typecheck, pytest, and an eval-quality gate on PRs
@@ -238,6 +247,7 @@ Most are validated via `apps/api/core/config.py`'s `Settings` object — but not
 | `deploy.yml` | Push to `main` | Deploys `apps/web` to Netlify. `apps/api` deploys via Railway's own build hook. |
 | `deadline-monitor.yml` | Daily 18:00 UTC (02:00 MYT), manual dispatch | Runs the Deadline Monitor agent directly on a GitHub runner |
 | `ingest-sources.yml` | Weekly, Sunday 20:00 UTC, manual dispatch | Runs `scripts/ingest_feed.py` against every registered source in `scripts/sources.py` |
+| `ingest-madani.yml` | Weekly, Sunday 21:00 UTC, manual dispatch | Runs `scripts/ingest_madani.py` — scrapes Ihsan MADANI's welfare-scheme listings into `madani_scheme` (defaults to `--dry-run`; selectors need live-site verification before a real run is trusted — see the script's own docstring) |
 | `lighthouse.yml` | Push to `main`, manual dispatch | Lighthouse CI audit, gated on a minimum PWA score |
 | `ping-supabase.yml` | Mon + Thu 9am UTC | Keeps the Supabase free-tier project from auto-pausing |
 

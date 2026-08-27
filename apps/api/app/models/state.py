@@ -71,6 +71,20 @@ class AgentState(TypedDict, total=False):
     # confidence-gated document citations model applies to.
     is_live_status_query: bool
     place_name: Optional[str]
+    # Parliament structured-lookup short-circuit — set by router_node when
+    # a domain='parliament' query is asking about a specific bill's vote
+    # record or a specific MP/constituency, rather than general Hansard
+    # debate content ("what did parliament debate about tax reform" stays
+    # on the normal RAG path, since that's chunk-retrieval-shaped, not a
+    # structured lookup). When true, graph.py routes straight to
+    # parliament_query_node instead of rag/analyst/synthesiser — this is a
+    # direct read from mp_profiles/mp_votes/parliament_bills (already a
+    # Postgres property graph — FK edges mp_votes.mp_id/bill_id — per
+    # migration 025), not something the confidence-gated citation model
+    # applies to.
+    is_structured_parliament_query: bool
+    parliament_bill_number: Optional[str]
+    parliament_mp_query: Optional[str]
     # Speculative query-embedding task, started by router_node in parallel
     # with its own classification LLM call (see cache.has_query_been_seen's
     # docstring for why this is only ever fired when it's guaranteed not to

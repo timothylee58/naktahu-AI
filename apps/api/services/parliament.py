@@ -47,7 +47,7 @@ async def search_mps(supabase_client: Client, query: str, limit: int = 20) -> li
         res = (
             supabase_client.table("mp_profiles")
             .select(
-                "id,full_name,constituency_code,constituency_name,party,state,is_active"
+                "id,full_name,constituency_code,constituency_name,party,state,is_active,parlimen_url"
             )
             .or_(
                 f"full_name.ilike.{pattern},constituency_name.ilike.{pattern},"

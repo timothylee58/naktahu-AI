@@ -316,3 +316,77 @@ async def test_router_node_ignores_flag_true_without_usable_place_name() -> None
 
     assert result["is_live_status_query"] is False
     assert result["place_name"] is None
+
+
+# ── structured parliament lookup classification ─────────────────────────────
+
+@pytest.mark.asyncio
+async def test_router_node_classifies_bill_vote_query_as_structured() -> None:
+    completion = _mock_completion(
+        '{"language": "en", "domain": "parliament", "intent": "bill vote record", '
+        '"is_structured_parliament_query": true, "parliament_bill_number": "RUU 355", '
+        '"parliament_mp_query": null}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "How did MPs vote on RUU 355?"})
+
+    assert result["is_structured_parliament_query"] is True
+    assert result["parliament_bill_number"] == "RUU 355"
+    assert result["parliament_mp_query"] is None
+
+
+@pytest.mark.asyncio
+async def test_router_node_classifies_mp_lookup_query_as_structured() -> None:
+    completion = _mock_completion(
+        '{"language": "en", "domain": "parliament", "intent": "who is the mp", '
+        '"is_structured_parliament_query": true, "parliament_bill_number": null, '
+        '"parliament_mp_query": "Bangi"}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "Who is the MP for Bangi?"})
+
+    assert result["is_structured_parliament_query"] is True
+    assert result["parliament_mp_query"] == "Bangi"
+    assert result["parliament_bill_number"] is None
+
+
+@pytest.mark.asyncio
+async def test_router_node_leaves_general_hansard_question_unstructured() -> None:
+    """General debate-content questions stay on the normal RAG path — only
+    a specific bill/MP lookup should short-circuit to parliament_query_node."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "parliament", "intent": "tax reform debate", '
+        '"is_structured_parliament_query": false, "parliament_bill_number": null, '
+        '"parliament_mp_query": null}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "What did parliament debate about tax reform?"})
+
+    assert result["is_structured_parliament_query"] is False
+    assert result["parliament_bill_number"] is None
+    assert result["parliament_mp_query"] is None
+
+
+@pytest.mark.asyncio
+async def test_router_node_ignores_structured_flag_true_without_usable_entity() -> None:
+    """A malformed classification (flag true, both entities null/blank)
+    can't be routed to parliament_query_node — falls back to RAG."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "parliament", "intent": "vague", '
+        '"is_structured_parliament_query": true, "parliament_bill_number": "  ", '
+        '"parliament_mp_query": null}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "tell me about parliament"})
+
+    assert result["is_structured_parliament_query"] is False
+    assert result["parliament_bill_number"] is None
+    assert result["parliament_mp_query"] is None
