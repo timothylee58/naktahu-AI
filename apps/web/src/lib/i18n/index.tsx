@@ -1063,6 +1063,24 @@ const MS: Translations = {
 
   /* ── footer ── */
   'footer.privacy': 'Dasar Privasi',
+
+  /* ── perniagaan-terurus (managed service lead form) ── */
+  'perniagaan.form.name_label': 'Nama',
+  'perniagaan.form.name_placeholder': 'Nama penuh anda',
+  'perniagaan.form.company_label': 'Syarikat',
+  'perniagaan.form.company_placeholder': 'Nama syarikat (jika ada)',
+  'perniagaan.form.email_label': 'E-mel',
+  'perniagaan.form.email_placeholder': 'nama@syarikat.com',
+  'perniagaan.form.phone_label': 'No. Telefon',
+  'perniagaan.form.phone_placeholder': '+60 12-345 6789',
+  'perniagaan.form.contact_hint': 'Berikan sekurang-kurangnya satu — e-mel atau telefon.',
+  'perniagaan.form.message_label': 'Mesej (pilihan)',
+  'perniagaan.form.message_placeholder': 'Ceritakan sedikit tentang keperluan pematuhan atau geran syarikat anda.',
+  'perniagaan.form.submit': 'Tempah Panggilan',
+  'perniagaan.form.submitting': 'Menghantar…',
+  'perniagaan.form.success': 'Terima kasih! Kami akan hubungi anda dalam masa 1 hari bekerja.',
+  'perniagaan.form.error': 'Gagal menghantar. Sila cuba lagi atau e-mel kami terus.',
+  'perniagaan.form.contact_required': 'Sila berikan e-mel atau nombor telefon.',
 };
 
 const EN: Translations = {
@@ -2112,6 +2130,24 @@ const EN: Translations = {
 
   /* ── footer ── */
   'footer.privacy': 'Privacy Policy',
+
+  /* ── perniagaan-terurus (managed service lead form) ── */
+  'perniagaan.form.name_label': 'Name',
+  'perniagaan.form.name_placeholder': 'Your full name',
+  'perniagaan.form.company_label': 'Company',
+  'perniagaan.form.company_placeholder': 'Company name (if any)',
+  'perniagaan.form.email_label': 'Email',
+  'perniagaan.form.email_placeholder': 'name@company.com',
+  'perniagaan.form.phone_label': 'Phone',
+  'perniagaan.form.phone_placeholder': '+60 12-345 6789',
+  'perniagaan.form.contact_hint': 'Provide at least one — email or phone.',
+  'perniagaan.form.message_label': 'Message (optional)',
+  'perniagaan.form.message_placeholder': "Tell us a bit about your company's compliance or grant needs.",
+  'perniagaan.form.submit': 'Book a Call',
+  'perniagaan.form.submitting': 'Sending…',
+  'perniagaan.form.success': "Thanks! We'll be in touch within 1 business day.",
+  'perniagaan.form.error': 'Failed to send. Please try again or email us directly.',
+  'perniagaan.form.contact_required': 'Please provide an email or phone number.',
 };
 
 const ZH: Translations = {
@@ -3130,6 +3166,24 @@ const ZH: Translations = {
 
   /* ── footer ── */
   'footer.privacy': '隐私政策',
+
+  /* ── perniagaan-terurus (managed service lead form) ── */
+  'perniagaan.form.name_label': '姓名',
+  'perniagaan.form.name_placeholder': '您的全名',
+  'perniagaan.form.company_label': '公司',
+  'perniagaan.form.company_placeholder': '公司名称（如有）',
+  'perniagaan.form.email_label': '电邮',
+  'perniagaan.form.email_placeholder': 'name@company.com',
+  'perniagaan.form.phone_label': '电话',
+  'perniagaan.form.phone_placeholder': '+60 12-345 6789',
+  'perniagaan.form.contact_hint': '请至少提供电邮或电话其中一项。',
+  'perniagaan.form.message_label': '留言（选填）',
+  'perniagaan.form.message_placeholder': '简单说明贵公司的合规或申请拨款需求。',
+  'perniagaan.form.submit': '预约通话',
+  'perniagaan.form.submitting': '发送中…',
+  'perniagaan.form.success': '谢谢！我们将在 1 个工作天内与您联系。',
+  'perniagaan.form.error': '发送失败，请重试或直接电邮联系我们。',
+  'perniagaan.form.contact_required': '请提供电邮或电话号码。',
 };
 
 const DICTS: Record<UILocale, Translations> = { ms: MS, en: EN, zh: ZH };
