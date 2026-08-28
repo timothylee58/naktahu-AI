@@ -1,12 +1,9 @@
-import time
 from unittest.mock import AsyncMock, MagicMock
 
-import jwt
 import pytest
 from fastapi.testclient import TestClient
 
 import main as api_main
-from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
 
 
