@@ -58,6 +58,7 @@ class AgentCapability(str, Enum):
     symptom_triage = "symptom_triage"
     study_assistance = "study_assistance"
     compliance_analysis = "compliance_analysis"
+    scam_detection = "scam_detection"
 
     # Interaction patterns
     streaming = "streaming"

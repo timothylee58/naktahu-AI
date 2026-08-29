@@ -29,7 +29,7 @@ from middleware.prometheus_middleware import PrometheusMiddleware
 from middleware.rate_limit import anonymous_limiter
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
-from routers import billing, calendar as calendar_router, feedback, history, parliament, property_listings, referrals, share, translate as translate_router, warung_watch
+from routers import billing, calendar as calendar_router, feedback, history, leads, parliament, property_listings, referrals, share, translate as translate_router, warung_watch
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
 from app.routers.metrics import router as metrics_router
@@ -141,6 +141,7 @@ app.include_router(calendar_router.router)
 app.include_router(referrals.router)
 app.include_router(share.router)
 app.include_router(parliament.router)
+app.include_router(leads.router)
 app.include_router(property_listings.router)
 app.include_router(warung_watch.router)
 app.include_router(eligibility_router)

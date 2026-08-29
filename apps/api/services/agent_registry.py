@@ -120,6 +120,13 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=0,
         ),
+        "scam-check-agent": AgentDefinition(
+            name="scam-check-agent",
+            description="ScamShield — checks a pasted SMS/link/phone number claiming to be from a government agency or bank against a curated list of verified official domains. Free civic tool.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
     }
 
 

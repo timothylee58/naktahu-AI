@@ -83,3 +83,6 @@
 {"query": "Siapakah Ahli Parlimen bagi kawasan saya dan bagaimana saya boleh ketahui?", "expected_language": "bm", "domain": "parliament"}
 {"query": "Who is my Member of Parliament and how do I find out?", "expected_language": "en", "domain": "parliament"}
 {"query": "我的国会议员是谁？我该如何查询？", "expected_language": "zh", "domain": "parliament"}
+{"query": "Saya terima SMS kata akaun KWSP saya dikunci, ini betul ke scam?", "expected_language": "bm", "domain": "scam_check"}
+{"query": "Is this LHDN tax refund SMS link real or a scam?", "expected_language": "en", "domain": "scam_check"}
+{"query": "这个说我公积金账户被锁的短信是真的还是骗局？", "expected_language": "zh", "domain": "scam_check"}

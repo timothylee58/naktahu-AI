@@ -71,6 +71,10 @@ class AgentStartRequest(BaseModel):
     education_level: Optional[Literal["none", "primary", "secondary", "spm", "diploma", "degree", "postgrad"]] = None
     is_oku: Optional[bool] = None
     housing_ownership: Optional[Literal["own", "rented", "family_owned", "no_fixed_housing"]] = None
+    # scam-check-agent — raw pasted SMS/message/URL, bounded generously
+    # since scam SMS are usually short but the surrounding forwarded
+    # context (a WhatsApp thread, an email) can be longer.
+    input_text: str = Field(default="", max_length=5000)
 
 
 class AgentContinueRequest(BaseModel):

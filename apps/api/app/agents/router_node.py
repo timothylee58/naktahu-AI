@@ -43,6 +43,17 @@ _SYSTEM_PROMPT = (
     "Detect language from the query text itself, not from any metadata."
 )
 
+# scam_check is deliberately EXCLUDED here, unlike ingest_feed.py's/
+# check_domain_coverage.py's/evals' copies of this list. Those cover content/
+# schema validity (document_chunks.domain, eval-dataset tagging); this set
+# is specifically "domains the general chat classifier may route into". A
+# general chat query must never be classified into scam_check — that path
+# skips check_node.py's deterministic official-domain check entirely, and
+# the general RAG synthesiser must never be the thing that decides whether
+# a link is safe. scam_check is reachable only via its own dedicated
+# endpoint (POST /api/v1/agents/scam-check-agent/start). Confirmed
+# high-severity finding from an automated review; test_router_node.py
+# asserts scam_check never appears in _SYSTEM_PROMPT as the guard for this.
 _VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property", "welfare"}
 # Map common LLM outputs to stored domain values
 _DOMAIN_ALIASES = {

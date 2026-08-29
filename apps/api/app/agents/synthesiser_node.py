@@ -254,6 +254,20 @@ async def _generate_suggestions(query: str, domain: str, language: str) -> list[
             "zh": ["如何查询我的土地所有权状态？", "分层地契维护费的责任是什么？", "房地产纠纷应联系哪个机构？"],
             "en": ["How do I check my land title status?", "What are the strata maintenance fee obligations?", "Who should I contact for a property dispute?"],
         },
+        # Pre-existing gap found while adding scam_check below — welfare was
+        # never added here despite being a canonical domain since migration
+        # 037, so it silently fell back to "government"'s suggestions. Fixed
+        # in the same change since it's the identical root cause.
+        "welfare": {
+            "bm": ["Apakah skim bantuan lain yang mungkin saya layak?", "Bagaimana cara memohon bantuan ini?", "Bilakah bantuan ini akan dibayar?"],
+            "zh": ["我可能还符合哪些其他援助计划？", "如何申请这项援助？", "这项援助何时发放？"],
+            "en": ["What other assistance schemes might I qualify for?", "How do I apply for this assistance?", "When will this assistance be paid out?"],
+        },
+        "scam_check": {
+            "bm": ["Bagaimana cara laporkan SMS/pautan penipuan ini?", "Apakah tanda lain yang menunjukkan ini adalah penipuan?", "Ke mana saya patut hubungi jika saya sudah terkena penipuan?"],
+            "zh": ["我该如何举报这条诈骗短信/链接？", "还有哪些迹象显示这是诈骗？", "如果我已经受骗，应该联系哪个机构？"],
+            "en": ["How do I report this scam SMS or link?", "What other signs indicate this is a scam?", "Who should I contact if I've already been scammed?"],
+        },
     }
 
     lang_key = language if language in ["bm", "zh", "en"] else "en"
