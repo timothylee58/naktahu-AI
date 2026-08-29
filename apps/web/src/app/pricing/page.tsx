@@ -545,13 +545,6 @@ export default function PricingPage() {
                       >
                         {isPending(item, 'stripe') ? '…' : t('pricing.credits.card')}
                       </button>
-                      <button
-                        onClick={() => startCheckout(item, 'hitpay')}
-                        disabled={isPending(item, 'hitpay')}
-                        className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-500/10 dark:hover:bg-teal-500/20 dark:text-teal-300 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isPending(item, 'hitpay') ? '…' : t('pricing.credits.fpx')}
-                      </button>
                     </div>
                   </div>
                 ))}
