@@ -55,6 +55,7 @@ _DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
     "property": ("tanah", "hartanah", "property", "strata", "sewa", "tenancy"),
     "welfare": ("bantuan", "welfare", "kebajikan", "subsidi", "rebate", "rahmah"),
     "finance": ("kewangan", "finance", "bank", "pinjaman", "loan"),
+    "scam_check": ("scam", "penipuan", "phishing", "tipu", "fraud", "escam"),
 }
 
 

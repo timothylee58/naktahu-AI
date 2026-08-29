@@ -45,7 +45,7 @@ from pathlib import Path
 _VALID_DOMAINS = (
     "government", "education", "legal", "finance", "healthcare", "epf",
     "tax", "business", "immigration", "culture", "parliament", "property",
-    "welfare",
+    "welfare", "scam_check",
 )
 
 _EVALS_DIR = Path(__file__).parent.parent / "evals"

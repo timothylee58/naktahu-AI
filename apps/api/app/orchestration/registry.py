@@ -268,6 +268,21 @@ def _fallback_registry() -> dict[str, EnhancedAgentDefinition]:
             supports_streaming=False,
             max_timeout_seconds=30.0,
         ),
+        "scam-check-agent": EnhancedAgentDefinition(
+            name="scam-check-agent",
+            version="1.0.0",
+            description="Checks a pasted SMS/link/phone number claiming to be from a government agency or bank against a curated list of verified official domains.",
+            capabilities=[
+                AgentCapability.scam_detection,
+                AgentCapability.single_shot,
+            ],
+            supported_domains=["scam_check"],
+            plan_required="free",
+            credit_cost=0,
+            supports_multi_turn=False,
+            supports_streaming=False,
+            max_timeout_seconds=30.0,
+        ),
     }
 
 

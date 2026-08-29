@@ -246,8 +246,8 @@ def test_language_accuracy_dataset_shape() -> None:
     assert by_lang.get("zh", 0) >= 20
 
 
-# The 13 canonical domains — must stay byte-identical to router_node's
-# _VALID_DOMAINS and migration 016/030/037's valid_domain CHECK constraint
+# The 14 canonical domains — must stay byte-identical to router_node's
+# _VALID_DOMAINS and migration 016/030/037/046's valid_domain CHECK constraint
 # (Trap #6: this list has drifted across its copies before — it was found
 # missing "welfare" here, silently, since the subset check below only
 # rejects an eval case tagged with an domain NOT in this set; it never
@@ -256,7 +256,7 @@ def test_language_accuracy_dataset_shape() -> None:
 _CANONICAL_DOMAINS = {
     "government", "education", "legal", "finance", "healthcare", "epf",
     "tax", "business", "immigration", "culture", "parliament", "property",
-    "welfare",
+    "welfare", "scam_check",
 }
 
 

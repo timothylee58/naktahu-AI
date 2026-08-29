@@ -23,6 +23,7 @@ from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
 from app.agents.retrenchment_navigator.graph import get_retrenchment_navigator_graph
 from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
 from app.agents.runtime import thread_config as _thread_config
+from app.agents.scam_check_agent.graph import get_scam_check_agent_graph
 from app.agents.study_agent.graph import get_study_agent_graph
 from app.agents.welfare_eligibility_agent.graph import get_welfare_eligibility_agent_graph
 
@@ -859,6 +860,43 @@ async def start_welfare_eligibility_agent(*, user_id: str, payload: dict[str, An
     }
 
 
+async def start_scam_check_agent(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    """Single-shot: one pasted SMS/link/phone number in, a deterministic
+    verified/impersonation-risk/unverified check node result explained by
+    the LLM out. No checkpointer needed — same single-shot shape as
+    welfare_eligibility_agent. check_node needs supabase (queries
+    official_gov_domains), so this threads a config the same way.
+
+    Deliberately does NOT call _log_run(). The pasted input can contain
+    phone numbers or account-adjacent details a user is asking about
+    precisely because they're worried it's sensitive — same privacy
+    reasoning as welfare_eligibility_agent not persisting its profile
+    payload (see that function's docstring). No agent_runs row means no
+    History entry for this agent, matching that same intentional tradeoff.
+    """
+    session_id = str(uuid.uuid4())
+    graph = get_scam_check_agent_graph()
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "language": payload.get("language", "bm"),
+        "input_text": payload.get("input_text", ""),
+    }
+    config = _thread_config(session_id, supabase=supabase_client)
+    t0 = time.monotonic()
+    values = await graph.ainvoke(inputs, config=config)
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "output": _public_output(values),
+        "checks": values.get("checks") or [],
+        "overall_verdict": values.get("overall_verdict", "no_url_found"),
+        "text_red_flags": values.get("text_red_flags") or [],
+        "summary": values.get("summary", ""),
+    }
+
+
 # ── Dispatch table ────────────────────────────────────────────────────────────
 
 AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -873,6 +911,7 @@ AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "retrenchment-navigator": start_retrenchment_navigator,
     "welfare-eligibility-agent": start_welfare_eligibility_agent,
     "property-concierge": start_property_concierge,
+    "scam-check-agent": start_scam_check_agent,
 }
 
 AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
