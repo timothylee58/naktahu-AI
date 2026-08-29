@@ -17,7 +17,7 @@ log = structlog.get_logger(__name__)
 _SYSTEM_PROMPT = (
     "You are a query classifier for a Malaysian knowledge base. "
     "Return JSON with: language (bm, en, or zh for Mandarin Chinese), domain (one of: government, education, "
-    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property, welfare, scam_check), intent (string summary max 10 words), "
+    "legal, finance, healthcare, epf, tax, business, immigration, culture, parliament, property, welfare), intent (string summary max 10 words), "
     "is_live_status_query (boolean), place_name (string or null), "
     "is_structured_parliament_query (boolean), parliament_bill_number (string or null), parliament_mp_query (string or null). "
     "Use 'parliament' for questions about Members of Parliament, constituencies, voting records, bills, or Hansard. "
@@ -34,9 +34,6 @@ _SYSTEM_PROMPT = (
     "Use 'welfare' for cost-of-living assistance, social welfare aid, or government relief schemes "
     "(electricity/utility rebates, food aid, housing assistance, income-support initiatives) — "
     "distinct from 'finance' (personal financial products/advice) and 'government' (general civic services). "
-    "Use 'scam_check' when the query pastes or describes a suspicious SMS, link, phone number, or asks "
-    "whether something claiming to be from a government agency or bank is real (e.g. 'is this LHDN link "
-    "real?', 'I got a text saying my EPF account is locked'). "
     "Set is_live_status_query=true ONLY for questions asking whether a specific named "
     "restaurant/warung/kopitiam/food stall is currently busy, packed, crowded, or has a "
     "queue right now (e.g. 'Is Pelita packed right now?', 'Ada line tak kat Village Park sekarang?'). "
@@ -46,7 +43,18 @@ _SYSTEM_PROMPT = (
     "Detect language from the query text itself, not from any metadata."
 )
 
-_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property", "welfare", "scam_check"}
+# scam_check is deliberately EXCLUDED here, unlike ingest_feed.py's/
+# check_domain_coverage.py's/evals' copies of this list. Those cover content/
+# schema validity (document_chunks.domain, eval-dataset tagging); this set
+# is specifically "domains the general chat classifier may route into". A
+# general chat query must never be classified into scam_check — that path
+# skips check_node.py's deterministic official-domain check entirely, and
+# the general RAG synthesiser must never be the thing that decides whether
+# a link is safe. scam_check is reachable only via its own dedicated
+# endpoint (POST /api/v1/agents/scam-check-agent/start). Confirmed
+# high-severity finding from an automated review; test_router_node.py
+# asserts scam_check never appears in _SYSTEM_PROMPT as the guard for this.
+_VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property", "welfare"}
 # Map common LLM outputs to stored domain values
 _DOMAIN_ALIASES = {
     "health": "healthcare",

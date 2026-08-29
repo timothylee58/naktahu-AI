@@ -53,6 +53,22 @@ ALTER TABLE official_gov_domains ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "official_gov_domains_public_read"
   ON official_gov_domains FOR SELECT TO anon, authenticated USING (true);
 
+-- Confirmed bug (automated review): load_agent_registry reads the live
+-- `agents` table in production (services/agent_registry.py) — the flat
+-- fallback dict in that same file only covers dev/tests when Supabase is
+-- unreachable. Without this row, POST /api/v1/agents/scam-check-agent/start
+-- 404s in production even though the handler and fallback registry exist.
+-- Same pattern as migration 041's property-concierge insert.
+INSERT INTO agents (name, description, input_schema, plan_required, credit_cost)
+VALUES (
+    'scam-check-agent',
+    'Checks a pasted SMS/link/phone number claiming to be from a government agency or bank against a curated list of verified official domains.',
+    '{}',
+    'free',
+    0
+)
+ON CONFLICT (name) DO NOTHING;
+
 INSERT INTO official_gov_domains (institution_name, institution_name_bm, domain, agency_type, category, common_scam_patterns, official_contact) VALUES
   ('Inland Revenue Board (LHDN)', 'Lembaga Hasil Dalam Negeri', 'hasil.gov.my', 'government', 'tax',
     '{fake tax refund SMS, fake e-Filing login link, fake "outstanding tax" WhatsApp message}', 'https://www.hasil.gov.my'),

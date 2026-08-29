@@ -56,8 +56,15 @@ class ScamCheckAgentAdapter(AgentProtocol):
     async def start(self, context: OrchestratorContext) -> AgentResult:
         from app.services.agent_runner import start_scam_check_agent
 
+        # The pasted SMS/message text is the orchestrator's query, not an
+        # extra field — same convention health_triage/immigration_navigator
+        # adapters use for their free-text input (context.query). Reading
+        # context.extra.get("input_text") here was a confirmed bug: the
+        # executor always populates extra with only supabase_client/
+        # checkpointer, so every orchestrator-routed run would silently
+        # check empty text (no_url_found) and never load official_gov_domains.
         payload = {
-            "input_text": context.extra.get("input_text", ""),
+            "input_text": context.query,
             "language": context.language,
         }
 

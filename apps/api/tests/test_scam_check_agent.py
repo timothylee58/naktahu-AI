@@ -44,6 +44,22 @@ def test_extract_urls_deduplicates() -> None:
     assert urls.count("hasil.gov.my") == 1
 
 
+def test_extract_urls_resolves_userinfo_bait_to_real_host() -> None:
+    """Regression test for a confirmed high-severity finding: a URL shaped
+    like "https://hasil.gov.my@evil.com/verify" must resolve to the host a
+    browser would actually connect to (evil.com), not the fake
+    "username" (hasil.gov.my) an attacker put before the @ specifically to
+    bait a naive domain check into reporting verified_official."""
+    urls = _extract_urls("Sila sahkan: https://hasil.gov.my@evil.com/verify")
+    assert urls == ["evil.com"]
+    assert "hasil.gov.my" not in urls
+
+
+def test_extract_urls_resolves_userinfo_bait_without_scheme() -> None:
+    urls = _extract_urls("Sahkan di sini: hasil.gov.my@evil.com/verify segera")
+    assert urls == ["evil.com"]
+
+
 # ── Levenshtein (typosquat distance) ────────────────────────────────────────
 
 
@@ -88,6 +104,33 @@ async def test_check_node_typosquat_domain_is_impersonation_risk() -> None:
     result = await check_node({"input_text": "Klik hasil-refund.gov.my.claim-now.cc untuk tuntut bayaran balik"}, sb)
     assert result["overall_verdict"] == "impersonation_risk"
     assert result["checks"][0]["matched_institution"] == "Inland Revenue Board (LHDN)"
+
+
+@pytest.mark.asyncio
+async def test_check_node_real_subdomain_of_official_is_verified_not_flagged() -> None:
+    """Regression test for a confirmed high-severity finding: a real
+    subdomain of an official institution's own domain (mytax.hasil.gov.my)
+    must be verified_official, never impersonation_risk. The first version's
+    substring check ("hasil" in domain) flagged exactly this."""
+    sb = MagicMock()
+    sb.table.return_value.select.return_value.execute.return_value = MagicMock(data=_OFFICIAL_ROWS)
+    result = await check_node({"input_text": "Layari mytax.hasil.gov.my untuk e-Filing"}, sb)
+    assert result["overall_verdict"] == "verified_official"
+    assert result["checks"][0]["matched_institution"] == "Inland Revenue Board (LHDN)"
+
+
+@pytest.mark.asyncio
+async def test_check_node_unrelated_short_label_domain_not_falsely_flagged() -> None:
+    """Regression test for a confirmed high-severity finding: a bare
+    substring match falsely flagged unrelated domains that happen to
+    contain a short official label — e.g. "pos" (pos.com.my's label) is a
+    substring of "compose.com". The exact-component check must not match."""
+    official_with_short_label = [{"institution_name": "Pos Malaysia", "domain": "pos.com.my"}]
+    sb = MagicMock()
+    sb.table.return_value.select.return_value.execute.return_value = MagicMock(data=official_with_short_label)
+    result = await check_node({"input_text": "Check out compose.com for a deal"}, sb)
+    assert result["overall_verdict"] == "unverified"
+    assert result["checks"][0]["verdict"] != "impersonation_risk"
 
 
 @pytest.mark.asyncio
@@ -230,8 +273,8 @@ def test_registered_in_enhanced_registry() -> None:
 async def test_adapter_start_happy_path() -> None:
     adapter = ScamCheckAgentAdapter()
     context = OrchestratorContext(
-        query="", language="en", domain="scam_check",
-        extra={"input_text": "is hasil.gov.my real", "supabase_client": None},
+        query="is hasil.gov.my real", language="en", domain="scam_check",
+        extra={"supabase_client": None},
     )
     with patch(
         "app.services.agent_runner.start_scam_check_agent",
@@ -239,10 +282,13 @@ async def test_adapter_start_happy_path() -> None:
             "session_id": "s1", "status": "completed",
             "summary": "verified", "checks": [], "overall_verdict": "verified_official", "text_red_flags": [],
         }),
-    ):
+    ) as mock_start:
         result = await adapter.start(context)
     assert result.status == AgentStatusEnum.completed
     assert result.structured_output["overall_verdict"] == "verified_official"
+    # Regression guard: the pasted text must come from context.query, not
+    # context.extra — confirmed bug where extra never carried input_text.
+    assert mock_start.call_args.kwargs["payload"]["input_text"] == "is hasil.gov.my real"
 
 
 @pytest.mark.asyncio

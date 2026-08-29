@@ -24,14 +24,14 @@ from app.agents.scam_check_agent.state import ExtractedDomainCheck, ScamCheckSta
 
 log = structlog.get_logger(__name__)
 
-# Matches bare domains too (no scheme), since scam SMS rarely include
-# "https://" — e.g. "hasil-refund.gov.my.claim-now.cc/verify".
-_URL_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?"
-    r"([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)"
-    r"(?:/[^\s]*)?",
-    re.IGNORECASE,
-)
+# Whitespace-delimited tokens containing a dot — deliberately loose. The
+# *real* parsing (including correctly resolving userinfo like
+# "hasil.gov.my@evil.com" to host "evil.com", which a hand-rolled domain
+# regex gets wrong — see _hostname_from_url) is delegated entirely to
+# urlsplit, not done here. This just finds candidate tokens worth parsing.
+_TOKEN_RE = re.compile(r"\S+\.\S+")
+
+_TLD_RE = re.compile(r"^[a-z]{2,}$", re.IGNORECASE)
 
 # Deterministic, given-not-invented red flags for the LLM to explain —
 # covers the actual scam-copy vocabulary seen in real LHDN/JPJ/EPF
@@ -48,18 +48,46 @@ def _normalise_domain(raw: str) -> str:
     return raw.strip().lower().removeprefix("www.")
 
 
+def _hostname_from_url(token: str) -> str | None:
+    """Resolve the token's real, browser-would-connect-to host — the only
+    correct source of truth for this is urlsplit's `.hostname`, which
+    (per RFC 3986) parses `user:pass@host` netloc syntax and returns just
+    `host`. A hand-rolled domain-charset regex applied directly to the raw
+    token gets this wrong: for "https://hasil.gov.my@evil.com/verify" it
+    would greedily capture "hasil.gov.my" (stopping at '@') and report
+    that as the domain, when the browser actually connects to "evil.com" —
+    inverting the safety check entirely (a bait host wrapped in a real
+    institution's name as fake "credentials" reads as verified_official).
+    Confirmed bug from an automated review of this file's first version;
+    fixed by handing the *whole* token to urlsplit instead of pre-parsing
+    it with a regex.
+
+    `urlsplit` needs a scheme to parse netloc correctly; token has none
+    reliably (scam SMS rarely include "https://"), so one is added only
+    for parsing.
+    """
+    candidate = token if "://" in token else f"//{token}"
+    parsed = urlsplit(candidate)
+    hostname = parsed.hostname
+    if not hostname:
+        return None
+    return _normalise_domain(hostname)
+
+
 def _extract_urls(text: str) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
-    for m in _URL_RE.finditer(text):
-        domain = _normalise_domain(m.group(1))
-        # Require at least one dot and a plausible TLD-length tail to avoid
-        # matching ordinary sentence fragments ("e.g." etc.) as domains.
-        if "." not in domain or len(domain.rsplit(".", 1)[-1]) < 2:
+    for m in _TOKEN_RE.finditer(text):
+        hostname = _hostname_from_url(m.group(0))
+        if not hostname or "." not in hostname:
             continue
-        if domain not in seen:
-            seen.add(domain)
-            out.append(domain)
+        # Require a plausible alphabetic TLD to avoid matching ordinary
+        # sentence fragments ("e.g.", "no.5") as domains.
+        if not _TLD_RE.match(hostname.rsplit(".", 1)[-1]):
+            continue
+        if hostname not in seen:
+            seen.add(hostname)
+            out.append(hostname)
     return out
 
 
@@ -83,16 +111,59 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
-def _hostname_from_url(url: str) -> str:
-    """urlsplit needs a scheme to parse netloc correctly — _extract_urls
-    already stripped scheme/www, so re-add one just for parsing."""
-    parsed = urlsplit(url if "://" in url else f"//{url}")
-    return _normalise_domain(parsed.hostname or url)
+def _is_official_or_subdomain(domain: str, official: str) -> bool:
+    """A real subdomain of an official domain (mytax.hasil.gov.my,
+    i-akaun.kwsp.gov.my) is legitimately part of that institution's own
+    namespace — must be verified_official, never flagged. Confirmed bug
+    fix: the first version's substring check ("hasil" in domain) flagged
+    exactly these as impersonation_risk."""
+    return domain == official or domain.endswith("." + official)
+
+
+def _looks_like_impersonation(domain: str, official: str) -> bool:
+    """Two narrow, deliberately conservative impersonation signals —
+    replacing the first version's `official_label in domain` substring
+    check, which also matched real government subdomains (bug above) AND
+    unrelated hosts sharing a short label by coincidence (confirmed: "pos"
+    — the label for pos.com.my — is a substring of "compose.com"; "imi" —
+    imi.gov.my — is a substring of dozens of unrelated words). Both
+    signals below require a component/prefix boundary, not a bare
+    substring:
+
+    1. `official` appears as a leading, dot-bounded prefix of a LONGER
+       domain (the classic "hasil.gov.my.claim-now.cc" bait — official
+       domain first, so a skimming reader sees the real name, then more
+       attacker-controlled labels after it). Exact-domain and real
+       subdomains are already handled by _is_official_or_subdomain above
+       and never reach this check.
+    2. The official domain's first label (e.g. "hasil") appears as an
+       EXACT dot/hyphen-delimited component of `domain`, not merely a
+       substring — "compose.com" splits to {"compose", "com"}, so "pos"
+       (a substring of "compose", not a component) no longer matches;
+       "hasil-refund.gov.my.claim-now.cc" splits to a set containing
+       "hasil" exactly, so it still matches. Gated to labels of at least
+       4 characters — official labels shorter than that (imi, pos, rmp,
+       bnm, jpn, ssm, moh — half the seed list) are deliberately EXCLUDED
+       from this embedding check, since a 3-character exact-component
+       match is still too likely to hit an unrelated real word by chance.
+       Those institutions are still covered by the exact/subdomain and
+       Levenshtein checks on the full domain string, just not this
+       "embedded as a prefix label" pattern specifically — an intentional
+       under-detection tradeoff, not an oversight.
+    """
+    if domain != official and domain.startswith(official + "."):
+        return True
+    label = official.split(".")[0]
+    if len(label) >= 4:
+        components = set(re.split(r"[.-]", domain))
+        if label in components:
+            return True
+    return False
 
 
 def _check_domain(domain: str, official_domains: list[dict[str, Any]]) -> ExtractedDomainCheck:
     for row in official_domains:
-        if domain == row["domain"]:
+        if _is_official_or_subdomain(domain, row["domain"]):
             return {
                 "url": domain,
                 "domain": domain,
@@ -101,13 +172,9 @@ def _check_domain(domain: str, official_domains: list[dict[str, Any]]) -> Extrac
                 "matched_domain": row["domain"],
             }
 
-    # Typosquat / impersonation check: close edit-distance to a real
-    # official domain, or the real domain's core label present with a
-    # wrong TLD (e.g. "hasil.gov.my.claim-now.cc" or "hasil-gov.my").
     for row in official_domains:
         official = row["domain"]
-        label = official.split(".")[0]  # e.g. "hasil" from "hasil.gov.my"
-        if len(label) >= 3 and label in domain and domain != official:
+        if _looks_like_impersonation(domain, official):
             return {
                 "url": domain,
                 "domain": domain,
@@ -115,7 +182,14 @@ def _check_domain(domain: str, official_domains: list[dict[str, Any]]) -> Extrac
                 "matched_institution": row["institution_name"],
                 "matched_domain": official,
             }
-        if _levenshtein(domain, official) <= 2 and domain != official:
+        # Typo distance, guarded by a length gate so two short-but-unrelated
+        # domains can't coincidentally land within edit-distance 2 of each
+        # other (e.g. "pos.com.my" vs some unrelated 9-char domain).
+        if (
+            domain != official
+            and abs(len(domain) - len(official)) <= 2
+            and _levenshtein(domain, official) <= 2
+        ):
             return {
                 "url": domain,
                 "domain": domain,
@@ -163,7 +237,7 @@ async def check_node(state: ScamCheckState, supabase: Any) -> dict[str, Any]:
         except Exception as exc:
             log.warning("official_gov_domains_fetch_failed", error=str(exc))
 
-    checks = [_check_domain(_hostname_from_url(url), official_domains) for url in urls]
+    checks = [_check_domain(url, official_domains) for url in urls]
     overall = max((c["verdict"] for c in checks), key=lambda v: _VERDICT_SEVERITY[v]) if checks else "no_url_found"
 
     return {"checks": checks, "overall_verdict": overall, "text_red_flags": red_flags}

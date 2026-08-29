@@ -390,3 +390,33 @@ async def test_router_node_ignores_structured_flag_true_without_usable_entity() 
     assert result["is_structured_parliament_query"] is False
     assert result["parliament_bill_number"] is None
     assert result["parliament_mp_query"] is None
+
+
+# ── scam_check is never offered to the general chat classifier ─────────────
+# Regression test for a confirmed high-severity finding: scam_check is a
+# valid domain for scam-check-agent (its own dedicated single-shot
+# endpoint), but must NEVER be something general /chat queries get
+# classified into — that path skips check_node.py's deterministic
+# verification entirely and would let the general RAG synthesiser imply a
+# link is safe/fake without ever checking official_gov_domains.
+
+
+def test_router_node_never_offers_scam_check_to_the_llm_classifier() -> None:
+    assert "scam_check" not in _SYSTEM_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_router_node_rejects_scam_check_even_if_llm_outputs_it_anyway() -> None:
+    """Defense in depth: even if a model somehow outputs domain="scam_check"
+    despite never being told it's an option, it's not in _VALID_DOMAINS for
+    router_node's purposes — falls back to None (search-everything) like any
+    other unrecognised domain, never leaks through as a real classification."""
+    completion = _mock_completion(
+        '{"language": "en", "domain": "scam_check", "intent": "is this link real"}'
+    )
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "is this LHDN link real?"})
+
+    assert result["domain"] is None
