@@ -126,9 +126,20 @@ body {
   scrollbar-color: #d4d4d8 transparent;
 }
 
-/* Chinese typography — avoid orphaned characters per line */
+/* Chinese typography line-breaking rules (e.g. don't break before closing
+   punctuation). Orphan avoidance is handled by text-wrap: pretty on
+   .locale-text-balance below, not word-break — word-break: keep-all was
+   here previously and was a confirmed bug: it treats an entire unspaced
+   run of Han characters as a single unbreakable "word" (the same rule
+   Western text uses to avoid breaking mid-word), so any zh heading/
+   paragraph with no natural break point (spaces, punctuation) couldn't
+   wrap at all and silently overflowed its container — reproduced on the
+   landing hero headline, which rendered past its card and behind the
+   seasonal video panel. Root-caused and verified fixed with a headless
+   browser (scrollWidth === clientWidth after removing word-break: keep-all,
+   confirmed unfixed by every other candidate: text-wrap, the headline
+   card's own width). */
 html[lang='zh-Hans'] {
-  word-break: keep-all;
   line-break: strict;
 }
 
