@@ -2512,7 +2512,7 @@ const ZH: Translations = {
   'landing.hero.video_play': '播放',
   'landing.hero.state_picker_placeholder': '查找您所在州属的独立日活动…',
   'landing.hero.state_query_template': '{state}有哪些独立日庆祝活动？',
-  'landing.hero.headline': '为您解答关于\n"马来西亚"政策问题',
+  'landing.hero.headline': '为您解答关于\n马来西亚 政策疑问',
   'landing.hero.headline.highlight': '马来西亚',
   'landing.hero.disclaimer_note': 'NakTahu AI 并非官方政府建议——重要事项请务必向相关机构核实。',
   'landing.hero.pricing_note': '免费——每日25个问题。Pro 每月RM19起 · 代理点数RM5起 →',
