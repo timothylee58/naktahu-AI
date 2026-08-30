@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -324,21 +324,38 @@ export function LandingClient() {
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className={seasonalVideoActive ? `flex flex-col gap-4 rounded-2xl px-5 py-5 sm:px-6 sm:py-6 ${heroSurface}` : 'contents'}
+          className={
+            seasonalVideoActive
+              ? `w-full min-w-0 flex flex-col gap-4 rounded-2xl px-5 py-5 sm:px-6 sm:py-6 ${heroSurface}`
+              : 'contents'
+          }
         >
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
           {(() => {
             const headline = t('landing.hero.headline');
             const highlight = t('landing.hero.headline.highlight');
-            const idx = headline.indexOf(highlight);
-            if (idx === -1) return headline;
-            return (
-              <>
-                {headline.slice(0, idx)}
-                <span style={{ color: heroHighlightColor }} className="font-extrabold">{highlight}</span>
-                {headline.slice(idx + highlight.length)}
-              </>
-            );
+            // A literal \n in the headline string forces a line break at that
+            // point (only the zh copy uses this, for "为您解答关于 / “马来西亚”
+            // 政策问题" — an explicit two-line format, not just natural wrap).
+            // BM/EN headlines have no \n, so this is a no-op single-line render
+            // for them, identical to before.
+            return headline.split('\n').map((line, i) => {
+              const idx = line.indexOf(highlight);
+              return (
+                <Fragment key={i}>
+                  {i > 0 && <br />}
+                  {idx === -1 ? (
+                    line
+                  ) : (
+                    <>
+                      {line.slice(0, idx)}
+                      <span style={{ color: heroHighlightColor }} className="font-extrabold">{highlight}</span>
+                      {line.slice(idx + highlight.length)}
+                    </>
+                  )}
+                </Fragment>
+              );
+            });
           })()}
         </h1>
 
