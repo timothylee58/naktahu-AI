@@ -11,19 +11,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { effectivePlan, planBadgeLabel, userRole, ADMIN_ROLES } from '@/lib/auth-plan';
 import { fetchUserCredits } from '@/lib/credits';
-
-const FEEDBACK_EMAIL = 'feedback@naktahu.my';
-
-// mailto: prefilled subject/body — a placeholder until general product
-// feedback gets its own backend endpoint. The existing /api/v1/feedback
-// table (migration 006) is purpose-built for per-answer thumbs ratings —
-// query/response_summary/rating are all NOT NULL and negative-rated rows
-// feed the eval-harness mining pipeline (apps/api/scripts/mine_feedback_gaps.py).
-// Posting general text through it would inject non-answer rows into that
-// pipeline, so this stays a mailto: until a dedicated table/endpoint exists.
-function feedbackMailtoHref(subjectPrefix: string): string {
-  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subjectPrefix)}`;
-}
+import { ProductFeedbackCard } from '@/components/profile/ProductFeedbackCard';
 
 function formatMemberSince(iso: string | undefined, locale: string): string | null {
   if (!iso) return null;
@@ -219,23 +207,7 @@ export default function ProfilePage() {
                 </div>
               </section>
 
-              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                  {t('profile.feedback.title')}
-                </span>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('profile.feedback.desc')}</p>
-                {/* Scoped explicitly against the per-answer 👍/👎 in chat
-                    (ResponseActions.tsx) — that channel already captures the
-                    query, citations, and domain automatically; this one is
-                    for everything that isn't about one specific answer. */}
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">{t('profile.feedback.scope_note')}</p>
-                <a
-                  href={feedbackMailtoHref(t('profile.feedback.title'))}
-                  className="self-start px-4 py-2 bg-nk-official/10 hover:bg-nk-official/20 text-nk-official-dim dark:text-nk-official rounded-full text-sm font-semibold transition-colors"
-                >
-                  {t('profile.feedback.button')}
-                </a>
-              </section>
+              <ProductFeedbackCard />
 
               {/* Referral (outbound: share your own code) and redeem
                   (inbound: use someone else's/a promo code) used to be two
