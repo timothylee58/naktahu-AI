@@ -75,6 +75,9 @@ def test_metrics_response_shape(client: TestClient, monkeypatch: pytest.MonkeyPa
     assert "naktahu_http_requests_total" in body
     assert "naktahu_agent_calls_total" in body
     assert "naktahu_circuit_breaker_state" in body
+    assert "naktahu_rag_queries_total" in body
+    assert "naktahu_retrieval_score" in body
+    assert "naktahu_provider_fallback_total" in body
 
 
 def test_metrics_reflects_recorded_agent_call(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

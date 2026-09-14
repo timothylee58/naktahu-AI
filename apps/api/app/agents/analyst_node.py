@@ -8,6 +8,7 @@ import structlog
 import weave
 
 from app.agents.personal_data import detect_personal_data_agency
+from app.core.prometheus_metrics import retrieval_score
 from app.models.state import AgentState, Citation
 from app.services.vector_store import ChunkResult
 
@@ -176,6 +177,7 @@ async def analyst_node(state: AgentState) -> dict:
     if not chunks:
         # Either nothing was retrieved, or everything retrieved was superseded.
         log.warning("analyst_no_usable_chunks", superseded_count=superseded_count)
+        retrieval_score.observe(0.0)
         return {
             "retrieved_chunks": chunks,
             "citations": [],
@@ -200,6 +202,7 @@ async def analyst_node(state: AgentState) -> dict:
 
     top3 = scored[:3]
     confidence = sum(s for s, _, _ in top3) / len(top3)
+    retrieval_score.observe(confidence)
 
     citations: list[Citation] = [
         Citation(

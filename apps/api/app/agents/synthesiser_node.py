@@ -13,6 +13,7 @@ import structlog
 import weave
 from langgraph.config import get_stream_writer
 
+from app.core.prometheus_metrics import provider_fallback_total, rag_queries_total
 from app.middleware.sanitise import INJECTION_PATTERNS
 from app.models.state import AgentState
 from app.services.llm_client import (
@@ -308,11 +309,13 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
         log.warning("ilmu_stream_error", error=str(exc), emitted_any=emitted_any)
 
     if emitted_any:
+        rag_queries_total.labels(language=language, provider="ilmu").inc()
         return
 
     # ILMU produced nothing usable — safe to try Anthropic since nothing has
     # been streamed to the client yet.
     log.warning("ilmu_no_output_falling_back_to_anthropic")
+    provider_fallback_total.inc()
     anthropic_any = False
     try:
         async for token in _stream_anthropic(context, system_prompt):
@@ -322,12 +325,16 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     except Exception:
         log.error("anthropic_fallback_failed", exc_info=True)
 
-    if not anthropic_any:
-        fallback = {
-            "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
-            "zh": "抱歉，我现在无法回答。请稍后再试。",
-        }.get(language, "I'm sorry, I'm unable to answer right now. Please try again later.")
-        yield fallback
+    if anthropic_any:
+        rag_queries_total.labels(language=language, provider="claude").inc()
+        return
+
+    rag_queries_total.labels(language=language, provider="none").inc()
+    fallback = {
+        "bm": "Maaf, saya tidak dapat menjawab sekarang. Sila cuba sebentar lagi.",
+        "zh": "抱歉，我现在无法回答。请稍后再试。",
+    }.get(language, "I'm sorry, I'm unable to answer right now. Please try again later.")
+    yield fallback
 
 
 @weave.op()

@@ -89,6 +89,40 @@ async def test_analyst_citation_retrieved_at_none_when_absent() -> None:
     assert result["citations"][0]["retrieved_at"] is None
 
 
+def _retrieval_score_count() -> float:
+    """The Histogram's _count sample, found by name suffix rather than a
+    fixed samples[] index — bucket-sample ordering/count is an
+    implementation detail of prometheus_client's Histogram.collect()."""
+    from app.core.prometheus_metrics import retrieval_score
+
+    for sample in retrieval_score.collect()[0].samples:
+        if sample.name.endswith("_count"):
+            return sample.value
+    raise AssertionError("no _count sample found on naktahu_retrieval_score")
+
+
+@pytest.mark.asyncio
+async def test_analyst_observes_retrieval_score_on_scored_path() -> None:
+    chunk = _make_chunk()
+    before = _retrieval_score_count()
+
+    await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    assert _retrieval_score_count() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_analyst_observes_zero_retrieval_score_when_no_usable_chunks() -> None:
+    """A query where every chunk is superseded/missing must still observe a
+    (zero) retrieval score — a silent gap here would make the metric miss
+    exactly the failure mode it exists to surface."""
+    before = _retrieval_score_count()
+
+    await analyst_node({"query": "q", "retrieved_chunks": []})
+
+    assert _retrieval_score_count() == before + 1
+
+
 @pytest.mark.asyncio
 async def test_analyst_needs_clarification_when_low_confidence() -> None:
     """needs_clarification=True when all chunks score < 0.6."""
