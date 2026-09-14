@@ -105,6 +105,40 @@ agent_safety_flags_total = Counter(
     registry=REGISTRY,
 )
 
+# ── Business metrics: RAG pipeline provider/quality (populated by ───────────
+#    synthesiser_node.py and analyst_node.py) ───────────────────────────────
+
+rag_queries_total = Counter(
+    "naktahu_rag_queries_total",
+    "Total RAG queries by language and answering provider",
+    # provider: "ilmu" (primary served it), "claude" (Anthropic fallback
+    # served it), or "none" (both providers failed — the static apology
+    # went out). Never "anthropic" — kept as "claude" to match the
+    # CLAUDE_MODEL/FALLBACK_MODEL naming already used in llm_client.py.
+    ["language", "provider"],
+    registry=REGISTRY,
+)
+
+retrieval_score = Histogram(
+    "naktahu_retrieval_score",
+    # NOT a RAGAS-library score — this repo has no ragas dependency. This is
+    # analyst_node's existing per-query confidence_score (chunk relevance +
+    # gov-domain authority + recency-penalized staleness, averaged over the
+    # top 3 cited chunks — see analyst_node.py's docstring), which is the
+    # closest real per-query retrieval-quality signal this pipeline
+    # computes. Named naktahu_retrieval_score, not naktahu_ragas_score, so
+    # the metric doesn't claim a library this repo doesn't use.
+    "Per-query retrieval confidence score (analyst_node's chunk-relevance confidence, 0-1)",
+    buckets=(0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 1.0),
+    registry=REGISTRY,
+)
+
+provider_fallback_total = Counter(
+    "naktahu_provider_fallback_total",
+    "Times Claude was invoked as fallback because ILMU produced no usable output",
+    registry=REGISTRY,
+)
+
 # ── Circuit breaker state (read lazily at scrape time) ─────────────────────
 
 _BREAKER_STATE_VALUE = {"closed": 0, "open": 1, "half_open": 2}
@@ -179,4 +213,7 @@ __all__ = [
     "agent_tokens_total",
     "agent_cache_hits_total",
     "agent_safety_flags_total",
+    "rag_queries_total",
+    "retrieval_score",
+    "provider_fallback_total",
 ]

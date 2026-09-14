@@ -121,6 +121,69 @@ async def test_stream_synthesis_static_fallback_only_when_both_providers_yield_n
     assert text == _FALLBACK_EN
 
 
+@pytest.mark.asyncio
+async def test_stream_synthesis_records_ilmu_provider_metric() -> None:
+    from app.core.prometheus_metrics import rag_queries_total
+
+    def fake_ilmu(_context, _system):
+        return _fake_stream(["An answer."])
+
+    def fake_anthropic(_context, _system):
+        return _fake_stream(["SHOULD NOT BE CALLED"])
+
+    before = rag_queries_total.labels(language="bm", provider="ilmu")._value.get()
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        await _collect_synthesis({"language": "bm", "query": "q", "retrieved_chunks": []})
+
+    assert rag_queries_total.labels(language="bm", provider="ilmu")._value.get() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesis_records_claude_fallback_metrics() -> None:
+    """Both provider_fallback_total (fallback was attempted) and
+    rag_queries_total{provider="claude"} (fallback actually served the
+    answer) must increment when ILMU yields nothing but Anthropic does."""
+    from app.core.prometheus_metrics import provider_fallback_total, rag_queries_total
+
+    def fake_ilmu(_context, _system):
+        return _fake_stream([])
+
+    def fake_anthropic(_context, _system):
+        return _fake_stream(["Anthropic answer."])
+
+    fallback_before = provider_fallback_total._value.get()
+    claude_before = rag_queries_total.labels(language="en", provider="claude")._value.get()
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        await _collect_synthesis({"language": "en", "query": "q", "retrieved_chunks": []})
+
+    assert provider_fallback_total._value.get() == fallback_before + 1
+    assert rag_queries_total.labels(language="en", provider="claude")._value.get() == claude_before + 1
+
+
+@pytest.mark.asyncio
+async def test_stream_synthesis_records_none_provider_when_both_fail() -> None:
+    from app.core.prometheus_metrics import provider_fallback_total, rag_queries_total
+
+    def fake_ilmu(_context, _system):
+        return _fake_stream([])
+
+    async def fake_anthropic(_context, _system):
+        raise RuntimeError("anthropic unavailable")
+        yield ""  # pragma: no cover - marks this as an async generator
+
+    fallback_before = provider_fallback_total._value.get()
+    none_before = rag_queries_total.labels(language="en", provider="none")._value.get()
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu), \
+         patch.object(synthesiser_module, "_stream_anthropic", fake_anthropic):
+        await _collect_synthesis({"language": "en", "query": "q", "retrieved_chunks": []})
+
+    # Fallback was still attempted (ILMU produced nothing), it just also failed.
+    assert provider_fallback_total._value.get() == fallback_before + 1
+    assert rag_queries_total.labels(language="en", provider="none")._value.get() == none_before + 1
+
+
 @pytest.fixture(autouse=True)
 def _mock_stream_writer():
     """synthesiser_node calls get_stream_writer(), which requires a live
