@@ -120,8 +120,15 @@ export function HeroBrandReveal() {
         const depth = Math.sin(theta);
         const near = (depth + 1) / 2;
 
-        // Converge inward: chips start 1.45x out and settle onto the ring.
-        const radius = rx * (1.45 - 0.45 * intro);
+        // Expand outward: chips emerge from behind the mark and settle onto
+        // the ring. Deliberately outward rather than converging in from a
+        // wider radius — an inward entrance peaks ABOVE the settled radius,
+        // and orbitRadius()'s inset only guarantees the settled ring fits.
+        // Measured at 1.45x inward it pushed ~5px past the viewport edge at
+        // 390px width for ~2s on every load (Cursor Bugbot flagged the
+        // mechanism on PR #206). Scaling 0.55 -> 1.0 can never exceed the
+        // settled radius, so the ring fits by construction at any width.
+        const radius = rx * (0.55 + 0.45 * intro);
         const x = Math.cos(theta) * radius;
         const y = depth * ORBIT_RY * (0.6 + 0.4 * intro);
 
