@@ -32,10 +32,7 @@ interface PostcodePersonalizerProps {
   inputClassName?: string;
 }
 
-/** Year-round postcode → state personalization, separate from the
- * seasonal Merdeka-only state picker in LandingClient.tsx (that one fires a
- * fixed "Merdeka celebrations in {state}" query and only renders during the
- * seasonal window). This one just resolves a postcode to a state and
+/** Postcode → state personalization. Resolves a postcode to a state and
  * remembers it locally so a returning visitor sees a state-aware welcome
  * line without re-entering it — no backend call, no account required. */
 export function PostcodePersonalizer({ className, inputClassName }: PostcodePersonalizerProps) {
