@@ -82,7 +82,7 @@ NakTahu AI is a Malaysian-focused AI answer engine that returns cited answers fr
 - PRs to `main`: TypeScript typecheck, Next.js build, Python tests.
 - Push to `main`: deploy web, then deploy API.
 
-## Interview-ready talking points
+## Discussion points
 - **Agentic RAG design**: clear separation between routing, retrieval, trust scoring, and synthesis.
 - **Streaming UX**: SSE token streaming for low perceived latency.
 - **Production controls**: auth, rate limiting, retries/fallback provider path.
