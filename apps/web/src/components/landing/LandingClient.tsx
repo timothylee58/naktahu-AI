@@ -18,6 +18,7 @@ import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatureShowcase } from './LandingFeatureShowcase';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { PostcodePersonalizer } from './PostcodePersonalizer';
+import { HeroBrandReveal } from './HeroBrandReveal';
 import { AgentSpotlight } from './AgentSpotlight';
 import { ComparisonSection } from './ComparisonSection';
 import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
@@ -277,6 +278,11 @@ export function LandingClient() {
           style={{ rotateX: tiltRotateX, rotateY: tiltRotateY }}
           className="contents"
         >
+        {/* Hero opener — the brand mark assembling once on load, then three
+            citation-chip motifs. Plays immediately on mount (own internal
+            stagger), ahead of the fadeUp-staggered content below. */}
+        <HeroBrandReveal />
+
         <motion.div
           custom={0}
           variants={fadeUp}
