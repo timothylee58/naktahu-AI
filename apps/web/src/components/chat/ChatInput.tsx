@@ -11,7 +11,6 @@ import {
 } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useVoiceInput } from '@/lib/hooks/useVoiceInput';
-import { inSeasonalWindow, mentionsKemerdekaan } from '@/lib/seasonal-window';
 import {
   contextUsagePercent,
   formatContextUsage,
@@ -77,10 +76,6 @@ export function ChatInput({
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [seasonal, setSeasonal] = useState(false);
-  useEffect(() => {
-    setSeasonal(inSeasonalWindow(new Date()));
-  }, []);
   // Guards against a same-tick double-submit (e.g. a duplicate/repeated
   // Enter keydown before `value` state has cleared) — released on the next
   // microtask rather than tied to isStreaming, since sending while a
@@ -157,23 +152,10 @@ export function ChatInput({
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
   }, []);
 
-  // Send-button flag pulse — a small, self-clearing acknowledgement that
-  // fires alongside chat's own MerdekaConfetti burst (same keyword
-  // detector, same seasonal gate) without this component needing to know
-  // anything about the confetti trigger living in the parent page.
-  const [flagPulse, setFlagPulse] = useState(false);
-  const flagPulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (flagPulseTimer.current) clearTimeout(flagPulseTimer.current); }, []);
-
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || submittingRef.current) return;
     submittingRef.current = true;
-    if (seasonal && mentionsKemerdekaan(trimmed)) {
-      setFlagPulse(true);
-      if (flagPulseTimer.current) clearTimeout(flagPulseTimer.current);
-      flagPulseTimer.current = setTimeout(() => setFlagPulse(false), 1800);
-    }
     onSend(trimmed);
     setValue('');
     if (textareaRef.current) {
@@ -182,7 +164,7 @@ export function ChatInput({
     queueMicrotask(() => {
       submittingRef.current = false;
     });
-  }, [value, onSend, seasonal]);
+  }, [value, onSend]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -316,23 +298,8 @@ export function ChatInput({
           }`}
         >
           {isListening ? (
-            // "Suara Merdeka" mode: during the seasonal window, recolor the
-            // waveform bars to the four Jalur Gemilang colours instead of
-            // the default currentColor — a real, honest visual (this IS
-            // the live mic waveform, just recoloured), not a fabricated
-            // audio-analysis feature.
             <span className="chat-waveform" aria-hidden>
-              {seasonal ? (
-                <>
-                  <span style={{ backgroundColor: '#b3282d' }} />
-                  <span style={{ backgroundColor: '#ffffff', outline: '1px solid currentColor' }} />
-                  <span style={{ backgroundColor: '#ffcc00' }} />
-                  <span style={{ backgroundColor: '#010066' }} />
-                  <span style={{ backgroundColor: '#b3282d' }} />
-                </>
-              ) : (
-                <><span /><span /><span /><span /><span /></>
-              )}
+              <span /><span /><span /><span /><span />
             </span>
           ) : (
             <svg
@@ -376,19 +343,6 @@ export function ChatInput({
           aria-label={t('chat.send')}
           className="relative flex-shrink-0 p-2 rounded-full bg-nk-official text-white transition-colors hover:bg-nk-official-dim disabled:opacity-40 disabled:cursor-not-allowed mb-0.5"
         >
-          {/* Flag-color pulse — a self-clearing acknowledgement that this
-              send just carried a Merdeka-keyword query (see handleSubmit).
-              A ring, not a fill, so the button's own color/legibility is
-              untouched — this decorates the button, it doesn't replace it. */}
-          {flagPulse && (
-            <span
-              aria-hidden
-              className="nk-send-flag-pulse absolute -inset-1 rounded-full pointer-events-none"
-              style={{
-                background: 'conic-gradient(from 0deg, #b3282d, #ffffff, #010066, #ffcc00, #b3282d)',
-              }}
-            />
-          )}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"

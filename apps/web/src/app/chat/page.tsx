@@ -14,9 +14,7 @@ import type { Message } from '@/lib/types';
 import { ChatAmbientMesh } from '@/components/chat/ChatAmbientMesh';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { MerdekaConfetti } from '@/components/chat/MerdekaConfetti';
 import { PromptChips } from '@/components/chat/PromptChips';
-import { inSeasonalWindow, mentionsKemerdekaan } from '@/lib/seasonal-window';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
@@ -45,10 +43,6 @@ function ChatPageInner() {
   // and auto-fired once isStreaming flips false, instead of blocking input
   // entirely until the in-flight answer completes.
   const [queuedQuery, setQueuedQuery] = useState<string | null>(null);
-  // Confetti burst key — incremented (not just a boolean) so submitting a
-  // second Merdeka-keyword query while a prior burst is still finishing
-  // remounts MerdekaConfetti with a fresh particle set instead of no-op-ing.
-  const [confettiBurst, setConfettiBurst] = useState(0);
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -237,10 +231,6 @@ function ChatPageInner() {
       bubbleCreated.current = false;
       isAtBottomRef.current = true;
 
-      if (inSeasonalWindow(new Date()) && mentionsKemerdekaan(query)) {
-        setConfettiBurst((n) => n + 1);
-      }
-
       const userMsg: Message = {
         id: makeId(),
         role: 'user',
@@ -379,9 +369,6 @@ function ChatPageInner() {
 
   return (
     <div className={`flex h-full ${pageBg}`}>
-      {confettiBurst > 0 && (
-        <MerdekaConfetti key={confettiBurst} onDone={() => setConfettiBurst(0)} />
-      )}
       <AppSidebar
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
