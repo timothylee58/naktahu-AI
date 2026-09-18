@@ -82,23 +82,40 @@ export function HeroBrandReveal() {
     // simply fade in — a gentler, non-vestibular equivalent rather than no
     // feedback, per apple-design's reduced-motion guidance.
     if (reduceMotion) {
-      chipRefs.current.forEach((el, i) => {
-        if (!el) return;
-        const theta = (i / AGENCIES.length) * TAU;
+      const layoutStatic = () => {
         const rx = orbitRadius(boxRef.current);
-        el.style.transform = `translate(-50%, -50%) translate(${Math.cos(theta) * rx}px, ${Math.sin(theta) * ORBIT_RY}px)`;
-        el.style.opacity = '1';
-      });
-      if (markRef.current) markRef.current.style.opacity = '1';
-      return;
+        chipRefs.current.forEach((el, i) => {
+          if (!el) return;
+          const theta = (i / AGENCIES.length) * TAU;
+          el.style.transform = `translate(-50%, -50%) translate(${Math.cos(theta) * rx}px, ${Math.sin(theta) * ORBIT_RY}px)`;
+          el.style.opacity = '1';
+        });
+        if (markRef.current) markRef.current.style.opacity = '1';
+      };
+      layoutStatic();
+      // The animated path recomputes the radius every frame, so it tracks a
+      // resize for free; this path laid out once on mount and went stale on
+      // rotate/resize. Same responsiveness for both paths.
+      window.addEventListener('resize', layoutStatic);
+      return () => window.removeEventListener('resize', layoutStatic);
     }
 
     let raf = 0;
-    let startTs: number | null = null;
+    let lastTs: number | null = null;
+    let running = false;
+    // Accumulated *visible* time, not wall-clock time. The orbit must freeze
+    // while off-screen rather than keep advancing, so the clock sums per-frame
+    // deltas only while the loop is actually running.
+    let elapsedMs = 0;
 
     const tick = (ts: number) => {
-      if (startTs === null) startTs = ts;
-      const frame = ((ts - startTs) / 1000) * FPS;
+      // Clamped delta: a resumed rAF (tab was hidden, or the main thread
+      // stalled) hands back a timestamp far in the future. Without the clamp
+      // that single frame would advance the orbit by the whole gap and read as
+      // a jump. 100ms caps any one frame at ~6 frames of motion.
+      elapsedMs += lastTs === null ? 0 : Math.min(ts - lastTs, 100);
+      lastTs = ts;
+      const frame = (elapsedMs / 1000) * FPS;
       const rx = orbitRadius(boxRef.current);
 
       // Mark: materializes first, then breathes on the orbit's own period so
@@ -146,8 +163,45 @@ export function HeroBrandReveal() {
       raf = requestAnimationFrame(tick);
     };
 
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const start = () => {
+      if (running) return;
+      running = true;
+      // Drop the stale timestamp so the first frame after a resume contributes
+      // a zero delta — the orbit picks up exactly where it was left.
+      lastTs = null;
+      raf = requestAnimationFrame(tick);
+    };
+    const stop = () => {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+
+    // Only animate while the element is actually on screen. The hero sits at
+    // the top of a long page, so without this the loop would keep running for
+    // the entire visit no matter how far the reader scrolled past it.
+    // IntersectionObserver fires once on observe(), which is what starts the
+    // loop — including the case where the element is already out of view on
+    // load, where the entrance correctly waits until it is scrolled to.
+    const box = boxRef.current;
+    if (!box || typeof IntersectionObserver === 'undefined') {
+      start();
+      return () => stop();
+    }
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) start();
+        else stop();
+      },
+      { threshold: 0 },
+    );
+    io.observe(box);
+
+    return () => {
+      io.disconnect();
+      stop();
+    };
   }, [reduceMotion]);
 
   return (
