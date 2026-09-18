@@ -376,3 +376,57 @@ async def test_rag_node_marks_query_seen_after_successful_cache_write() -> None:
         await rag_node(_STATE)
 
     mock_mark.assert_awaited_once_with(_STATE["query"], ttl=3600)
+
+
+# ── Embedding provider safety ───────────────────────────────────────────────
+# The embedding model is a property of the corpus, not a per-request choice.
+# document_chunks.embedding is vector(1536) written by ILMU; text-embedding-3-small
+# is also 1536-dimensional, so a cross-provider substitution does NOT raise — it
+# returns a vector from a different space and every cosine score against the stored
+# chunks becomes noise, which analyst_node then scores and cites. These tests pin
+# the fallback as removed.
+
+
+@pytest.mark.asyncio
+async def test_embed_does_not_fall_back_to_another_provider() -> None:
+    """A failing ILMU embed must raise, never silently return a vector from a
+    different embedding space."""
+    from app.agents.rag_node import _embed
+
+    with patch("app.agents.rag_node.ilmu_client") as mock_client:
+        mock_client.embeddings.create = AsyncMock(side_effect=RuntimeError("ilmu down"))
+        with pytest.raises(RuntimeError):
+            await _embed("cukai pendapatan")
+
+
+@pytest.mark.asyncio
+async def test_rag_node_returns_no_chunks_when_embedding_fails() -> None:
+    """The safe degradation: no chunks, so analyst_node produces zero citations
+    and asks for clarification, rather than ranking noise-scored chunks."""
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
+    ):
+        mock_client.embeddings.create = AsyncMock(side_effect=RuntimeError("ilmu down"))
+        result = await rag_node(_STATE)
+
+    assert result["retrieved_chunks"] == []
+    # Never search with a vector we could not legitimately produce.
+    mock_search.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_no_module_imports_a_second_embedding_provider() -> None:
+    """Guards the invariant across all three query paths at once — rag_node,
+    tools and grant_rag_node each had their own copy of the same fallback."""
+    import app.agents.eligibility_agent.grant_rag_node as grant_rag_node
+    import app.agents.rag_node as rag_module
+    import app.agents.tools as tools_module
+
+    for module in (rag_module, tools_module, grant_rag_node):
+        assert not hasattr(module, "openai_client"), (
+            f"{module.__name__} imported openai_client — a second embedding provider "
+            "must not be reachable from a path that queries the ILMU-embedded corpus"
+        )

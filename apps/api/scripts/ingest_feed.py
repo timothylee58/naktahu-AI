@@ -55,7 +55,12 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from app.agents.rag_node import _embed  # noqa: E402 — reuse the live ILMU→OpenAI embedding fallback
+# Reuses the query path's embedder on purpose: rows written here are searched
+# by rag_node, so both sides must use the same model or the stored vectors and
+# the query vector end up in different spaces. It raises rather than falling
+# back to another provider — a failed embed must skip the row, never write an
+# incompatible vector into document_chunks. See llm_client.OPENAI_EMBEDDING_MODEL.
+from app.agents.rag_node import _embed  # noqa: E402
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 from scripts.sources import SOURCES_BY_NAME, get_source  # noqa: E402
