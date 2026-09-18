@@ -13,6 +13,7 @@ import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import type { Message } from '@/lib/types';
 import { ChatAmbientMesh } from '@/components/chat/ChatAmbientMesh';
 import { ChatBubble } from '@/components/chat/ChatBubble';
+import { ChatEmptyOrbit } from '@/components/chat/ChatEmptyOrbit';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -447,53 +448,15 @@ function ChatPageInner() {
             transition={{ duration: 0.45, ease: 'easeOut' }}
             className="flex flex-col items-center justify-center text-center gap-5 select-none px-6 py-14"
           >
-            {/* Identity mark — abstract batik/kawung roundel (overlapping
-                circles) ringed by a stripe-rhythm tick pattern, in the two
-                functional accents (nk-official blue, nk-heritage terracotta).
-                Deliberately not a literal crest or flag: geometry evoking
-                Malaysian textile pattern-making, not government letterhead. */}
-            <div
-              className={`relative w-[72px] h-[72px] rounded-full flex items-center justify-center ${
-                isDark ? 'bg-white/5' : 'bg-white'
-              }`}
-              style={{ boxShadow: isDark ? '0 8px 24px -8px rgba(59,91,255,0.35)' : '0 8px 24px -8px rgba(59,91,255,0.25)' }}
-            >
-              <svg viewBox="0 0 64 64" className="w-full h-full" aria-hidden>
-                {/* stripe-rhythm ring: 12 short radial ticks, alternating accents */}
-                {Array.from({ length: 12 }).map((_, i) => {
-                  const angle = (i / 12) * Math.PI * 2;
-                  // .toFixed(3) — not just cosmetic. Server (Node) and
-                  // client (V8-in-Chrome/etc) can serialize the same
-                  // Math.cos/sin float to a different number of decimal
-                  // digits (e.g. "9.483339501604604" vs "9.4833395016046"),
-                  // which React's hydration diff treats as a real mismatch
-                  // and logs on every single page load. Fixing the string
-                  // representation to a set precision makes server and
-                  // client emit byte-identical attribute values.
-                  const x1 = (32 + Math.cos(angle) * 26).toFixed(3);
-                  const y1 = (32 + Math.sin(angle) * 26).toFixed(3);
-                  const x2 = (32 + Math.cos(angle) * 30).toFixed(3);
-                  const y2 = (32 + Math.sin(angle) * 30).toFixed(3);
-                  return (
-                    <line
-                      key={i}
-                      x1={x1}
-                      y1={y1}
-                      x2={x2}
-                      y2={y2}
-                      stroke={i % 3 === 0 ? 'var(--nk-heritage)' : 'var(--nk-official)'}
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      opacity={0.85}
-                    />
-                  );
-                })}
-                {/* kawung roundel: three overlapping circles */}
-                <circle cx="26" cy="28" r="12" fill="var(--nk-official)" fillOpacity={isDark ? 0.35 : 0.18} />
-                <circle cx="38" cy="28" r="12" fill="var(--nk-heritage)" fillOpacity={isDark ? 0.35 : 0.18} />
-                <circle cx="32" cy="38" r="12" fill="var(--nk-official)" fillOpacity={isDark ? 0.25 : 0.12} />
-              </svg>
-            </div>
+            {/* Identity mark — the loading screen's extruded speech-bubble
+                logo, orbited by the six real agencies the landing hero
+                names. Replaces the static kawung roundel that sat here: the
+                user has just come through PageLoadingScreen on "Mula
+                Bertanya", so carrying that same mark into /chat makes this
+                screen read as the destination of that transition, and the
+                orbit states the sourcing promise structurally instead of
+                only in the trust chips below. */}
+            <ChatEmptyOrbit />
 
             {/* Greeting only — the separate muted subtitle line (chat.empty:
                 "Ask me anything about Malaysian government services") was
