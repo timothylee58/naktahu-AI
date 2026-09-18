@@ -262,7 +262,7 @@ export function HeroBrandReveal() {
           className="absolute left-1/2 top-1/2"
           style={{ opacity: 0, transform: 'translate(-50%, -50%)', willChange: 'transform, opacity' }}
         >
-          <span className="inline-flex items-center whitespace-nowrap rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 px-2 py-0.5 text-[10px] md:px-2.5 md:py-1 md:text-xs font-mono font-semibold uppercase tracking-tight text-nk-official-dim backdrop-blur-sm dark:border-nk-official/40 dark:bg-nk-official/10 dark:text-nk-official">
+          <span className="inline-flex items-center whitespace-nowrap rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 px-2.5 py-1 text-xs md:px-3 md:py-1.5 md:text-sm font-mono font-semibold uppercase tracking-tight text-nk-official-dim backdrop-blur-sm dark:border-nk-official/40 dark:bg-nk-official/10 dark:text-nk-official">
             {agency}
           </span>
         </div>
