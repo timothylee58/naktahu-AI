@@ -1,107 +1,294 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef } from 'react';
+import { useReducedMotion } from 'framer-motion';
 
-// Live CSS/SVG hero-opener moment — the mark assembling once on page load,
-// followed by three citation-chip motifs. Built as a real, interactive
-// React/Framer-Motion component (no rendered video asset): same visual
-// concept originally scoped for a Remotion-rendered hero clip, but that
-// path was blocked (this sandbox's network policy rejects the Chromium
-// download Remotion needs to render), so this delivers the same "hero is a
-// thesis" opening moment live instead.
+// Hero opener — "orbit of sources": six real Malaysian agencies circling the
+// brand mark on a tilted elliptical path, passing in front of and behind it.
 //
-// Deliberately NOT a second full-bleed media panel / two-column layout —
-// this is a compact addition sitting *above* the existing hero content in
-// the single-column hero LandingClient already reverted to, not a
-// reintroduction of the seasonal two-panel video-hero layout this repo
-// just moved away from.
+// Why an orbit and not a static row: the previous version stacked a 72px flat
+// mark over a plain row of three chips. Two problems that version had, both
+// visible on the live page — the mark duplicated the header logo sitting a few
+// hundred pixels directly above it in the same viewport, and the chips made
+// the "verified official sources" claim in words without ever *showing* it.
+// Putting the agencies in continuous orbit around the mark states the
+// product's actual thesis structurally: many official sources, one answer at
+// the centre. The mark here is the subject of a diagram, not a second logo,
+// which is what earns the repeat.
 //
-// Mark geometry/colors are byte-identical to NakTahuMark.tsx's default
-// (non-seasonal) SVG — this is the same permanent brand mark, just played
-// as a one-time assembly instead of rendered static. Citation-chip motifs
-// use the exact double-border "stamp" language CitationChip.tsx uses for
-// real citations, holding three agency abbreviations already cited
-// elsewhere in the product (AgencyTrustGrid.tsx) — never fabricated.
+// Motion vocabulary, per the three references this was designed against:
+//   - Mobbin (Notion's web hero): tiles travelling curved paths around the
+//     centre content, rather than parked in a grid.
+//   - three.js: perspective depth — orbiting objects scale up and brighten
+//     toward the camera, shrink and dim behind the subject, and actually
+//     occlude (z-index flips at the half-orbit). Done with 2D scale rather
+//     than real translateZ on purpose: a perspective transform on 11px
+//     monospace text renders it visibly soft, and legibility of the agency
+//     names is the whole point of the element.
+//   - Remotion: ONE master clock. Every value below is derived from a single
+//     frame counter via interpolate(), the way a Remotion composition derives
+//     everything from useCurrentFrame() — so the entrance, the orbit and the
+//     mark's breathing are phase-locked into one choreographed sequence
+//     instead of N independent CSS animations drifting apart.
+//
+// The rAF loop writes transform/opacity straight to the DOM through refs and
+// never calls setState, so this animates on the compositor and triggers zero
+// React re-renders after mount.
+//
+// Agency names are the six real agencies AgencyTrustGrid.tsx already names as
+// this product's sources — never invented ones. Chip styling is the same
+// double-border "stamp" language CitationChip.tsx uses for real citations.
 
-const PETAL_ROTATIONS = [0, 72, 144, 216, 288] as const;
-const CHIP_AGENCIES = ['LHDN', 'KWSP', 'JPN'] as const;
+const AGENCIES = ['LHDN', 'KWSP', 'SSM', 'PERKESO', 'KKM', 'JPN'] as const;
 
-// apple-design defaults: critically damped (no overshoot) for a
-// materializing UI element, since nothing here carries gesture momentum.
-const materialize = { type: 'spring' as const, damping: 22, stiffness: 260, mass: 0.6 };
+const FPS = 60;
+const TAU = Math.PI * 2;
+/** Seconds for one full revolution. Slow enough to read as ambient rather
+ *  than busy; 24s ≈ 0.04Hz, far below the ~0.2Hz band that reads as
+ *  vestibularly unpleasant for large sustained motion. */
+const ORBIT_SECONDS = 24;
+/** Entrance: chips converge inward from a wider radius into the orbit. */
+const INTRO_FRAMES = 1.15 * FPS;
+const INTRO_STAGGER = 0.07 * FPS;
+
+/** Ellipse tilt: vertical radius as a fraction of the horizontal one. Kept at
+ *  ~1/3 rather than flatter — below about this ratio the ellipse stops reading
+ *  as a path at all and the chips just look scattered at random heights. */
+const ORBIT_RY_RATIO = 0.363;
+/** Base mark size, scaled up with the ring on wider viewports. */
+const MARK_SIZE = 78;
+
+/** Remotion's interpolate(), clamped: map a frame onto an output range. */
+function interpolate(frame: number, [inMin, inMax]: [number, number], [outMin, outMax]: [number, number]) {
+  if (inMax === inMin) return outMin;
+  const p = Math.min(1, Math.max(0, (frame - inMin) / (inMax - inMin)));
+  return outMin + (outMax - outMin) * p;
+}
+
+/** Critically-damped settle — apple-design's default for a materializing
+ *  element that carries no gesture momentum, so no overshoot. */
+function easeOutCubic(p: number) {
+  return 1 - Math.pow(1 - p, 3);
+}
 
 export function HeroBrandReveal() {
   const reduceMotion = useReducedMotion();
+  const boxRef = useRef<HTMLDivElement>(null);
+  const markRef = useRef<HTMLDivElement>(null);
+  const chipRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Reduced motion: a single quick cross-fade to the fully-settled state,
-  // no stagger/scale drama — apple-design's guidance for replacing
-  // spring/parallax with a gentler, non-vestibular equivalent rather than
-  // just turning feedback off entirely.
-  const petalTransition = (i: number) =>
-    reduceMotion ? { duration: 0.2 } : { ...materialize, delay: 0.15 + i * 0.06 };
-  const chipTransition = (i: number) =>
-    reduceMotion ? { duration: 0.2, delay: 0.1 } : { ...materialize, delay: 0.55 + i * 0.08 };
+  useEffect(() => {
+    // Reduced motion: no clock at all. Chips settle at their rest angles and
+    // simply fade in — a gentler, non-vestibular equivalent rather than no
+    // feedback, per apple-design's reduced-motion guidance.
+    if (reduceMotion) {
+      const layoutStatic = () => {
+        const { rx, ry, markScale } = orbitGeometry(boxRef.current);
+        chipRefs.current.forEach((el, i) => {
+          if (!el) return;
+          const theta = (i / AGENCIES.length) * TAU;
+          el.style.transform = `translate(-50%, -50%) translate(${Math.cos(theta) * rx}px, ${Math.sin(theta) * ry}px)`;
+          el.style.opacity = '1';
+        });
+        if (markRef.current) {
+          markRef.current.style.opacity = '1';
+          markRef.current.style.transform = `translate(-50%, -50%) scale(${markScale})`;
+        }
+      };
+      layoutStatic();
+      // The animated path recomputes the radius every frame, so it tracks a
+      // resize for free; this path laid out once on mount and went stale on
+      // rotate/resize. Same responsiveness for both paths.
+      window.addEventListener('resize', layoutStatic);
+      return () => window.removeEventListener('resize', layoutStatic);
+    }
+
+    let raf = 0;
+    let lastTs: number | null = null;
+    let running = false;
+    // Accumulated *visible* time, not wall-clock time. The orbit must freeze
+    // while off-screen rather than keep advancing, so the clock sums per-frame
+    // deltas only while the loop is actually running.
+    let elapsedMs = 0;
+
+    const tick = (ts: number) => {
+      // Clamped delta: a resumed rAF (tab was hidden, or the main thread
+      // stalled) hands back a timestamp far in the future. Without the clamp
+      // that single frame would advance the orbit by the whole gap and read as
+      // a jump. 100ms caps any one frame at ~6 frames of motion.
+      elapsedMs += lastTs === null ? 0 : Math.min(ts - lastTs, 100);
+      lastTs = ts;
+      const frame = (elapsedMs / 1000) * FPS;
+      const { rx, ry, markScale } = orbitGeometry(boxRef.current);
+
+      // Mark: materializes first, then breathes on the orbit's own period so
+      // the two stay phase-locked (the Remotion single-clock point).
+      if (markRef.current) {
+        const intro = easeOutCubic(interpolate(frame, [0, INTRO_FRAMES], [0, 1]));
+        const breathe = 1 + Math.sin((frame / (ORBIT_SECONDS * FPS)) * TAU) * 0.02;
+        markRef.current.style.opacity = String(intro);
+        markRef.current.style.transform =
+          `translate(-50%, -50%) scale(${(0.82 + 0.18 * intro) * breathe * markScale})`;
+      }
+
+      chipRefs.current.forEach((el, i) => {
+        if (!el) return;
+        const introStart = INTRO_FRAMES * 0.35 + i * INTRO_STAGGER;
+        const intro = easeOutCubic(interpolate(frame, [introStart, introStart + INTRO_FRAMES], [0, 1]));
+
+        const theta = (i / AGENCIES.length) * TAU + (frame / (ORBIT_SECONDS * FPS)) * TAU;
+        // depth: -1 fully behind the mark, +1 fully in front of it.
+        const depth = Math.sin(theta);
+        const near = (depth + 1) / 2;
+
+        // Expand outward: chips emerge from behind the mark and settle onto
+        // the ring. Deliberately outward rather than converging in from a
+        // wider radius — an inward entrance peaks ABOVE the settled radius,
+        // and orbitGeometry()'s inset only guarantees the settled ring fits.
+        // Measured at 1.45x inward it pushed ~5px past the viewport edge at
+        // 390px width for ~2s on every load (Cursor Bugbot flagged the
+        // mechanism on PR #206). Scaling 0.55 -> 1.0 can never exceed the
+        // settled radius, so the ring fits by construction at any width.
+        const radius = rx * (0.55 + 0.45 * intro);
+        const x = Math.cos(theta) * radius;
+        const y = depth * ry * (0.6 + 0.4 * intro);
+
+        // Depth floors are deliberately shallow: enough contrast between the
+        // near and far halves to read as 3D, but the far side still has to be
+        // legible — these are the agency names the element exists to show, so
+        // fading them to near-invisible would trade the point for the effect.
+        el.style.transform =
+          `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${(0.82 + 0.2 * near) * (0.9 + 0.1 * intro)})`;
+        el.style.opacity = String((0.56 + 0.44 * near) * intro);
+        // Real occlusion: the far half of the orbit passes behind the mark.
+        el.style.zIndex = depth >= 0 ? '20' : '0';
+      });
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    const start = () => {
+      if (running) return;
+      running = true;
+      // Drop the stale timestamp so the first frame after a resume contributes
+      // a zero delta — the orbit picks up exactly where it was left.
+      lastTs = null;
+      raf = requestAnimationFrame(tick);
+    };
+    const stop = () => {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+
+    // Only animate while the element is actually on screen. The hero sits at
+    // the top of a long page, so without this the loop would keep running for
+    // the entire visit no matter how far the reader scrolled past it.
+    // IntersectionObserver fires once on observe(), which is what starts the
+    // loop — including the case where the element is already out of view on
+    // load, where the entrance correctly waits until it is scrolled to.
+    const box = boxRef.current;
+    if (!box || typeof IntersectionObserver === 'undefined') {
+      start();
+      return () => stop();
+    }
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) start();
+        else stop();
+      },
+      { threshold: 0 },
+    );
+    io.observe(box);
+
+    return () => {
+      io.disconnect();
+      stop();
+    };
+  }, [reduceMotion]);
 
   return (
-    <div aria-hidden className="flex flex-col items-center gap-4">
-      <motion.svg
-        viewBox="0 0 120 120"
-        width={72}
-        height={72}
-        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={reduceMotion ? { duration: 0.2 } : materialize}
+    // Width and height grow together so the ring keeps its proportions:
+    // orbitGeometry() reads this element's measured width every frame, so the
+    // whole composition follows from these two classes.
+    <div
+      ref={boxRef}
+      aria-hidden
+      className="relative w-full max-w-md select-none h-[150px] md:max-w-2xl md:h-[250px]"
+    >
+      {/* Depth glow under the mark — the one light source in the composition,
+          so the orbiting chips read as circling something with presence. */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 md:h-72 md:w-72 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl"
+        style={{ background: 'radial-gradient(closest-side, rgba(59,91,255,0.55), rgba(59,91,255,0.12) 55%, transparent)' }}
+      />
+
+      {/* The mark — same geometry as NakTahuMark.tsx's permanent bunga-raya
+          mark, at z-10 so half the orbit passes in front and half behind. */}
+      <div
+        ref={markRef}
+        className="absolute left-1/2 top-1/2 z-10"
+        style={{ opacity: 0, transform: 'translate(-50%, -50%)', willChange: 'transform, opacity' }}
       >
-        <rect x="14" y="14" width="92" height="74" rx="30" fill="var(--brand-blue, #3B5BFF)" />
-        <motion.path
-          d="M32 88 L32 108 L52 88 Z"
-          fill="var(--brand-blue, #3B5BFF)"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={reduceMotion ? { duration: 0.2 } : { ...materialize, delay: 0.08 }}
-        />
-        <g>
-          {PETAL_ROTATIONS.map((rot, i) => (
-            <motion.ellipse
-              key={rot}
-              cx={98}
-              cy={17}
-              rx="6.5"
-              ry="9"
-              fill="#ED1C24"
-              transform={`rotate(${rot} 98 26)`}
-              style={{ transformOrigin: '98px 26px' }}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={petalTransition(i)}
-            />
-          ))}
-          <motion.g
-            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={petalTransition(5)}
-            style={{ transformOrigin: '98px 26px' }}
-          >
+        <svg viewBox="0 0 120 120" width={MARK_SIZE} height={MARK_SIZE}>
+          <rect x="14" y="14" width="92" height="74" rx="30" fill="var(--brand-blue, #3B5BFF)" />
+          <path d="M32 88 L32 108 L52 88 Z" fill="var(--brand-blue, #3B5BFF)" />
+          <g>
+            {[0, 72, 144, 216, 288].map((rot) => (
+              <ellipse
+                key={rot}
+                cx={98}
+                cy={17}
+                rx="6.5"
+                ry="9"
+                fill="#ED1C24"
+                transform={`rotate(${rot} 98 26)`}
+              />
+            ))}
             <circle cx={98} cy={26} r="3" fill="#C4141A" />
             <line x1={98} y1={26} x2={108} y2={13} stroke="#C4141A" strokeWidth="1.4" strokeLinecap="round" />
             <circle cx={108} cy={13} r="1.8" fill="#FFCC00" />
-          </motion.g>
-        </g>
-      </motion.svg>
-
-      <div className="flex flex-wrap justify-center gap-2">
-        {CHIP_AGENCIES.map((agency, i) => (
-          <motion.span
-            key={agency}
-            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={chipTransition(i)}
-            className="inline-flex items-center rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 text-nk-official-dim px-2.5 py-0.5 text-[11px] font-mono font-semibold uppercase tracking-tight dark:bg-nk-official/10 dark:border-nk-official/40 dark:text-nk-official"
-          >
-            {agency}
-          </motion.span>
-        ))}
+          </g>
+        </svg>
       </div>
+
+      {AGENCIES.map((agency, i) => (
+        <div
+          key={agency}
+          ref={(el) => {
+            chipRefs.current[i] = el;
+          }}
+          className="absolute left-1/2 top-1/2"
+          style={{ opacity: 0, transform: 'translate(-50%, -50%)', willChange: 'transform, opacity' }}
+        >
+          <span className="inline-flex items-center whitespace-nowrap rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 px-2 py-0.5 text-[10px] md:px-2.5 md:py-1 md:text-xs font-mono font-semibold uppercase tracking-tight text-nk-official-dim backdrop-blur-sm dark:border-nk-official/40 dark:bg-nk-official/10 dark:text-nk-official">
+            {agency}
+          </span>
+        </div>
+      ))}
     </div>
   );
+}
+
+/** Ring geometry, derived continuously from the element's measured width so
+ *  the composition scales with the viewport rather than stepping at
+ *  breakpoints. The 58px inset keeps the widest chip (PERKESO) inside the box
+ *  at the settled radius, and the entrance only ever scales inward from there.
+ *
+ *  The upper bound was previously a flat 128px, picked for phone safety, and
+ *  never grew: at 1440px that left a ~316px ring under a ~715px headline,
+ *  reading as a stray cluster rather than the hero's opening statement. Phone
+ *  values are deliberately unchanged — a 358px box still yields rx 121,
+ *  ry 44, markScale 1, matching what was measured and verified at 390px. */
+function orbitGeometry(box: HTMLDivElement | null) {
+  const width = box?.clientWidth ?? 320;
+  const rx = Math.max(92, Math.min(230, width / 2 - 58));
+  return {
+    rx,
+    ry: rx * ORBIT_RY_RATIO,
+    // The mark has to grow with the ring, or the centre stops anchoring it.
+    // Capped so it stays a mark rather than a billboard.
+    markScale: Math.max(1, Math.min(1.55, rx / 121)),
+  };
 }
