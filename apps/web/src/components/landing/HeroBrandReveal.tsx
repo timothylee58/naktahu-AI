@@ -51,12 +51,12 @@ const ORBIT_SECONDS = 24;
 const INTRO_FRAMES = 1.15 * FPS;
 const INTRO_STAGGER = 0.07 * FPS;
 
-/** Vertical radius. Kept at ~1/3 of the horizontal radius rather than flatter:
- *  below about that ratio the ellipse stops reading as a path at all and the
- *  chips just look scattered at random heights. */
-const ORBIT_RY = 44;
+/** Ellipse tilt: vertical radius as a fraction of the horizontal one. Kept at
+ *  ~1/3 rather than flatter — below about this ratio the ellipse stops reading
+ *  as a path at all and the chips just look scattered at random heights. */
+const ORBIT_RY_RATIO = 0.363;
+/** Base mark size, scaled up with the ring on wider viewports. */
 const MARK_SIZE = 78;
-const BOX_HEIGHT = 150;
 
 /** Remotion's interpolate(), clamped: map a frame onto an output range. */
 function interpolate(frame: number, [inMin, inMax]: [number, number], [outMin, outMax]: [number, number]) {
@@ -83,14 +83,17 @@ export function HeroBrandReveal() {
     // feedback, per apple-design's reduced-motion guidance.
     if (reduceMotion) {
       const layoutStatic = () => {
-        const rx = orbitRadius(boxRef.current);
+        const { rx, ry, markScale } = orbitGeometry(boxRef.current);
         chipRefs.current.forEach((el, i) => {
           if (!el) return;
           const theta = (i / AGENCIES.length) * TAU;
-          el.style.transform = `translate(-50%, -50%) translate(${Math.cos(theta) * rx}px, ${Math.sin(theta) * ORBIT_RY}px)`;
+          el.style.transform = `translate(-50%, -50%) translate(${Math.cos(theta) * rx}px, ${Math.sin(theta) * ry}px)`;
           el.style.opacity = '1';
         });
-        if (markRef.current) markRef.current.style.opacity = '1';
+        if (markRef.current) {
+          markRef.current.style.opacity = '1';
+          markRef.current.style.transform = `translate(-50%, -50%) scale(${markScale})`;
+        }
       };
       layoutStatic();
       // The animated path recomputes the radius every frame, so it tracks a
@@ -116,7 +119,7 @@ export function HeroBrandReveal() {
       elapsedMs += lastTs === null ? 0 : Math.min(ts - lastTs, 100);
       lastTs = ts;
       const frame = (elapsedMs / 1000) * FPS;
-      const rx = orbitRadius(boxRef.current);
+      const { rx, ry, markScale } = orbitGeometry(boxRef.current);
 
       // Mark: materializes first, then breathes on the orbit's own period so
       // the two stay phase-locked (the Remotion single-clock point).
@@ -124,7 +127,8 @@ export function HeroBrandReveal() {
         const intro = easeOutCubic(interpolate(frame, [0, INTRO_FRAMES], [0, 1]));
         const breathe = 1 + Math.sin((frame / (ORBIT_SECONDS * FPS)) * TAU) * 0.02;
         markRef.current.style.opacity = String(intro);
-        markRef.current.style.transform = `translate(-50%, -50%) scale(${(0.82 + 0.18 * intro) * breathe})`;
+        markRef.current.style.transform =
+          `translate(-50%, -50%) scale(${(0.82 + 0.18 * intro) * breathe * markScale})`;
       }
 
       chipRefs.current.forEach((el, i) => {
@@ -140,14 +144,14 @@ export function HeroBrandReveal() {
         // Expand outward: chips emerge from behind the mark and settle onto
         // the ring. Deliberately outward rather than converging in from a
         // wider radius — an inward entrance peaks ABOVE the settled radius,
-        // and orbitRadius()'s inset only guarantees the settled ring fits.
+        // and orbitGeometry()'s inset only guarantees the settled ring fits.
         // Measured at 1.45x inward it pushed ~5px past the viewport edge at
         // 390px width for ~2s on every load (Cursor Bugbot flagged the
         // mechanism on PR #206). Scaling 0.55 -> 1.0 can never exceed the
         // settled radius, so the ring fits by construction at any width.
         const radius = rx * (0.55 + 0.45 * intro);
         const x = Math.cos(theta) * radius;
-        const y = depth * ORBIT_RY * (0.6 + 0.4 * intro);
+        const y = depth * ry * (0.6 + 0.4 * intro);
 
         // Depth floors are deliberately shallow: enough contrast between the
         // near and far halves to read as 3D, but the far side still has to be
@@ -205,16 +209,18 @@ export function HeroBrandReveal() {
   }, [reduceMotion]);
 
   return (
+    // Width and height grow together so the ring keeps its proportions:
+    // orbitGeometry() reads this element's measured width every frame, so the
+    // whole composition follows from these two classes.
     <div
       ref={boxRef}
       aria-hidden
-      className="relative w-full max-w-md select-none"
-      style={{ height: BOX_HEIGHT }}
+      className="relative w-full max-w-md select-none h-[150px] md:max-w-2xl md:h-[250px]"
     >
       {/* Depth glow under the mark — the one light source in the composition,
           so the orbiting chips read as circling something with presence. */}
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 md:h-72 md:w-72 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl"
         style={{ background: 'radial-gradient(closest-side, rgba(59,91,255,0.55), rgba(59,91,255,0.12) 55%, transparent)' }}
       />
 
@@ -256,7 +262,7 @@ export function HeroBrandReveal() {
           className="absolute left-1/2 top-1/2"
           style={{ opacity: 0, transform: 'translate(-50%, -50%)', willChange: 'transform, opacity' }}
         >
-          <span className="inline-flex items-center whitespace-nowrap rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-tight text-nk-official-dim backdrop-blur-sm dark:border-nk-official/40 dark:bg-nk-official/10 dark:text-nk-official">
+          <span className="inline-flex items-center whitespace-nowrap rounded-md border-2 border-double border-nk-official/50 bg-nk-official/5 px-2 py-0.5 text-[10px] md:px-2.5 md:py-1 md:text-xs font-mono font-semibold uppercase tracking-tight text-nk-official-dim backdrop-blur-sm dark:border-nk-official/40 dark:bg-nk-official/10 dark:text-nk-official">
             {agency}
           </span>
         </div>
@@ -265,12 +271,24 @@ export function HeroBrandReveal() {
   );
 }
 
-/** Horizontal orbit radius, derived from the element's real width so the ring
- *  never overflows a narrow phone viewport. Falls back to a safe default
- *  before first measurement. */
-function orbitRadius(box: HTMLDivElement | null) {
+/** Ring geometry, derived continuously from the element's measured width so
+ *  the composition scales with the viewport rather than stepping at
+ *  breakpoints. The 58px inset keeps the widest chip (PERKESO) inside the box
+ *  at the settled radius, and the entrance only ever scales inward from there.
+ *
+ *  The upper bound was previously a flat 128px, picked for phone safety, and
+ *  never grew: at 1440px that left a ~316px ring under a ~715px headline,
+ *  reading as a stray cluster rather than the hero's opening statement. Phone
+ *  values are deliberately unchanged — a 358px box still yields rx 121,
+ *  ry 44, markScale 1, matching what was measured and verified at 390px. */
+function orbitGeometry(box: HTMLDivElement | null) {
   const width = box?.clientWidth ?? 320;
-  // Capped well inside the hero's text column: a ring wider than the headline
-  // below it stops reading as part of the same composition.
-  return Math.max(92, Math.min(128, width / 2 - 58));
+  const rx = Math.max(92, Math.min(230, width / 2 - 58));
+  return {
+    rx,
+    ry: rx * ORBIT_RY_RATIO,
+    // The mark has to grow with the ring, or the centre stops anchoring it.
+    // Capped so it stays a mark rather than a billboard.
+    markScale: Math.max(1, Math.min(1.55, rx / 121)),
+  };
 }
