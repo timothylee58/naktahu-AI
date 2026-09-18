@@ -22,12 +22,35 @@ anthropic_client = anthropic.AsyncAnthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY", "placeholder"),
 )
 
-# OpenAI client — fallback for embeddings when ILMU embeddings unavailable
+# OpenAI client. NOT an embedding fallback for the live RAG corpus — see the
+# warning on OPENAI_EMBEDDING_MODEL below before wiring this into any query or
+# ingestion path.
 _openai_key = os.environ.get("OPENAI_API_KEY", "")
 openai_client: AsyncOpenAI | None = AsyncOpenAI(api_key=_openai_key) if _openai_key else None
 
 ILMU_CHAT_MODEL: str = os.environ.get("ILMU_CHAT_MODEL", "ilmu-chat")
 ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "ilmu-embedding")
+
+# The embedding model is a property of the CORPUS, never a per-request choice.
+#
+# document_chunks.embedding is vector(1536), written by ILMU_EMBEDDING_MODEL.
+# text-embedding-3-small is *also* 1536-dimensional, so substituting it does not
+# raise — pgvector happily computes a cosine distance between two vectors from
+# completely different embedding spaces and returns a number that means nothing.
+# hybrid_search weights cosine 0.7 / BM25 0.3, so the BM25 half keeps producing
+# plausible-looking results while the semantic half is noise, and analyst_node
+# then scores, ranks and cites those chunks with a confidence derived partly
+# from that noise. Nothing anywhere logs an error.
+#
+# Worse on the write side: scripts/ingest_feed.py embeds straight into
+# document_chunks, so a provider swap mid-ingest writes OpenAI-space rows
+# permanently alongside ILMU-space ones, with no way to tell them apart
+# afterwards.
+#
+# Switching embedding providers is therefore a corpus migration — re-embed
+# every row — not a runtime fallback. This constant exists only for
+# scripts/ingest.py, which builds the separate dosm_documents table (not read
+# by live RAG; see CLAUDE.md Trap #14).
 OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 FALLBACK_MODEL: str = "claude-sonnet-4-20250514"
 
