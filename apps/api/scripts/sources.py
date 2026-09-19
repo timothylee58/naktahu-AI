@@ -766,6 +766,130 @@ SOURCES: tuple[Source, ...] = (
             "WebSearch, so the catalogue itself is registered rather than a guessed page."
         ),
     ),
+
+    # ── Startup funding/tax-incentive landscape (business + tax domains) —
+    # user-requested update. grant_database (migration 020, refreshed by 050)
+    # already carries the structured fixed-amount programmes; these seven
+    # cover the pieces RAG needs and grant_database's schema doesn't fit:
+    # the national funding directory (many programmes, no single amount),
+    # Cradle Fund's own site (referenced as agency/source_url by SEVEN
+    # existing grant_database rows — CIP Spark/Sprint, Angel Tax Incentive —
+    # yet never registered here, so chat could never answer a general
+    # "tell me about Cradle Fund" question with a real citation), and the
+    # two statutory tax-exemption mechanisms (Malaysia Digital Tax Incentive,
+    # Angel Tax Incentive) — percentage/exemption-based, not fixed-MYR-band
+    # grants, same reasoning migration 020's own comment gives for routing
+    # Pioneer Status/ITA to RAG instead of grant_database.
+    # All six domains (mystartup.gov.my, cradle.com.my, mdec.my, mranti.my,
+    # mban.com.my, mosti.gov.my) reconfirmed blocked by this session's own
+    # network egress proxy via direct curl (000/connection-never-completes on
+    # every one) — same not-content-verified-via-direct-fetch caveat as
+    # every other WebSearch-found entry in this file. Each URL below is
+    # corroborated by at least one independent WebSearch result (a named
+    # news outlet, an official press-release PDF snippet, or the programme's
+    # own page surfacing in search), not guessed from a plausible pattern.
+    Source(
+        name="mystartup-national-fundings",
+        url="https://www.mystartup.gov.my/investor/national-fundings",
+        kind="html",
+        domain="business",
+        ministry="MYStartup — national project by the Ministry of Science, Technology and Innovation (MOSTI), developed by Cradle Fund",
+        language="en",
+        notes=(
+            "Official national startup-funding directory — the single "
+            "broadest 'what funding exists' catch-all, spanning government "
+            "and private programmes grant_database's per-row schema can't "
+            "list exhaustively."
+        ),
+    ),
+    Source(
+        name="cradle-fund-home",
+        url="https://www.cradle.com.my/",
+        kind="html",
+        domain="business",
+        ministry="Cradle Fund Sdn Bhd (MOSTI-established, focal agency for Malaysia's startup ecosystem)",
+        language="en",
+        notes=(
+            "Cradle Fund's own portal — agency behind CIP Spark, CIP Sprint, "
+            "Cradle Elevate and the Angel Tax Incentive (four grant_database/"
+            "tax-domain entries), never itself registered as a RAG source "
+            "until now."
+        ),
+    ),
+    Source(
+        name="cradle-elevate",
+        url="https://cradle.com.my/elevate.html",
+        kind="html",
+        domain="business",
+        ministry="Cradle Fund Sdn Bhd",
+        language="en",
+        notes=(
+            "Cradle Elevate programme detail page — the bridging equity "
+            "programme added to grant_database by migration 050. RAG source "
+            "backs the same programme_name/source_url that row cites."
+        ),
+    ),
+    Source(
+        name="mranti-home",
+        url="https://mranti.my/",
+        kind="html",
+        domain="business",
+        ministry="Malaysian Research Accelerator for Technology & Innovation (MRANTI) — merger of Technology Park Malaysia and MaGIC",
+        language="en",
+        notes=(
+            "MRANTI's own portal — incubation, co-working, the National "
+            "Technology & Innovation Sandbox, and other free/subsidised "
+            "founder resources. The 'free recommended resources' gap: "
+            "nothing pointed chat at Malaysia's own central incubator "
+            "before this entry."
+        ),
+    ),
+    Source(
+        name="mdec-malaysia-digital-tax-incentive",
+        url="https://www.mdec.my/malaysiadigital/tax-incentive",
+        kind="html",
+        domain="tax",
+        ministry="Malaysia Digital Economy Corporation (MDEC)",
+        language="en",
+        notes=(
+            "Malaysia Digital (MD) Tax Incentive — the outcome-based tiered "
+            "scheme (Investment Tax Allowance track) that replaced the "
+            "MSC-era Pioneer Status route for digital-economy companies "
+            "from 31 May 2024. Statutory exemption, not a grant-amount "
+            "programme — routed to tax RAG for the same reason migration "
+            "020 keeps Pioneer Status/ITA/RA out of grant_database."
+        ),
+    ),
+    Source(
+        name="cradle-angel-tax-incentive",
+        url="https://www.cradle.com.my/angel-tax-incentive/",
+        kind="html",
+        domain="tax",
+        ministry="Angel Tax Incentive Office (ATIO), a unit under Cradle Fund Sdn Bhd, under the Ministry of Finance",
+        language="en",
+        notes=(
+            "Official Angel Tax Incentive page — accredited angel investors "
+            "get an income tax exemption equal to their investment (RM5,000-"
+            "RM500,000 range per WebSearch corroboration). Exemption "
+            "mechanism, not a startup-facing grant amount, hence tax domain "
+            "not business/grant_database."
+        ),
+    ),
+    Source(
+        name="mban-angel-tax-incentive",
+        url="https://mban.com.my/angel-tax-incentive/",
+        kind="html",
+        domain="tax",
+        ministry="Malaysian Business Angel Network (MBAN) — private-sector accreditation body for angel investors under the Angel Tax Incentive framework, NOT a government body",
+        language="en",
+        notes=(
+            "MBAN accredits the individual angel investors and clubs the "
+            "Angel Tax Incentive applies to. Ministry field is deliberately "
+            "labelled non-governmental, same pattern as mymp-portal-home "
+            "above — this must never be cited or badged as an official "
+            ".gov.my source, only as the accreditation body's own page."
+        ),
+    ),
 )
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
