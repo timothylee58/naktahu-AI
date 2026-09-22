@@ -32,7 +32,7 @@ groups:
           - refId: C
             datasourceUid: __expr__
             model:
-              type: threshold
+              type: classic_conditions
               expr: ""
               refId: C
               conditions:
@@ -64,7 +64,7 @@ groups:
           - refId: C
             datasourceUid: __expr__
             model:
-              type: threshold
+              type: classic_conditions
               expr: ""
               refId: C
               conditions:
@@ -98,7 +98,7 @@ groups:
           - refId: C
             datasourceUid: __expr__
             model:
-              type: threshold
+              type: classic_conditions
               expr: ""
               refId: C
               conditions:

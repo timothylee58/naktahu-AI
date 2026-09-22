@@ -8,8 +8,9 @@ was live but nothing scraped it.
 ```
 infra/observability/
 ├── prometheus/
-│   ├── Dockerfile          FROM prom/prometheus, bakes in prometheus.yml
-│   └── prometheus.yml      scrapes @naktahu-ai over Railway private networking
+│   ├── Dockerfile               FROM prom/prometheus, overrides ENTRYPOINT
+│   ├── docker-entrypoint.sh     substitutes METRICS_AUTH_TOKEN at container start
+│   └── prometheus.yml.template  scrapes @naktahu-ai over Railway private networking
 └── grafana/
     ├── Dockerfile          FROM grafana/grafana, bakes in provisioning/ + dashboards/
     ├── dashboards/
@@ -40,6 +41,17 @@ Both services talk to each other over Railway's private network
 - Grafana's datasource points at `http://prometheus.railway.internal:9090`.
 - Only Grafana gets a public Railway domain, so dashboards are reachable but
   Prometheus's raw (unauthenticated) query API is not exposed publicly.
+- `/metrics` on the API fails closed to 401 without a matching bearer token
+  (`apps/api/app/routers/metrics.py`) — Prometheus's scrape job sends one via
+  the `authorization` block in `prometheus.yml.template`, substituted from
+  the `METRICS_AUTH_TOKEN` Railway variable at container start (see below).
+  Without it, every scrape 401s and the dashboard stays empty even though
+  the alert rules' `noDataState: OK` would otherwise look quietly fine.
+- Grafana's own public domain: **must** be generated with `targetPort: 3000`.
+  Grafana listens on 3000 by default and does not read Railway's injected
+  `$PORT` the way `apps/api`'s `start.sh` does — generating the domain
+  without an explicit target port routes it to the wrong port and the
+  dashboard URL won't reach Grafana.
 
 ## Alert rules — provisioned but not yet wired to notify anyone
 
@@ -65,10 +77,17 @@ left; everything else here is live.
 
 ## Manual steps for whoever deploys this
 
-1. The Grafana admin password is set once as the Railway variable
+1. **`METRICS_AUTH_TOKEN`** — generate one value, set it as a Railway
+   variable on BOTH the `@naktahu-ai` API service (it was previously unset
+   there too — `/metrics` 401ed unconditionally before this change, with or
+   without a scraper) and the `prometheus` service. Same value both places;
+   never committed.
+2. The Grafana admin password is set once as the Railway variable
    `GF_SECURITY_ADMIN_PASSWORD` at service-creation time (never hardcoded
    here, never committed) — rotate it after first login.
-2. Configure a Grafana contact point (see above) to make the three alert
-   rules actually notify someone.
-3. `RAILWAY_ENVIRONMENT`/`RAILWAY_PROJECT_ID`/etc. are unused by these two
+3. Generate Grafana's public domain with `targetPort: 3000` explicitly (see
+   Networking above) — not the default `generate-domain` call.
+4. Configure a Grafana contact point (see Alert rules above) to make the
+   three alert rules actually notify someone.
+5. `RAILWAY_ENVIRONMENT`/`RAILWAY_PROJECT_ID`/etc. are unused by these two
    services — they need no secrets from the API service's own variable set.
