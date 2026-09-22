@@ -1,14 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <!-- Browser-tab favicon: the bare Hibiscus-Notch mark (bubble + tail + amber
-       dots), no background plate — matches NakTahuMark.tsx exactly so the tab
-       icon and the in-app header logo read as the same mark. The maskable
+  <!-- Browser-tab favicon: the bare Hibiscus-Notch mark (bubble + tail + one
+       bunga raya), no background plate — matches NakTahuMark.tsx exactly so
+       the tab icon and the in-app header logo read as the same mark. This
+       file previously still had the pre-hibiscus five-amber-dot pentagon
+       after NakTahuMark.tsx moved to the single-flower design; regenerated
+       here from that component so the two can't drift again. The maskable
        platform icons (apple-touch-icon.png, manifest.json's PNG set) keep
        their own background plate separately, since those need one. -->
   <rect x="14" y="14" width="92" height="74" rx="30" fill="#3B5BFF"/>
   <path d="M32 88 L32 108 L52 88 Z" fill="#3B5BFF"/>
-  <circle cx="96.0" cy="17.0" r="4" fill="#FFB238"/>
-  <circle cx="104.6" cy="23.2" r="4" fill="#FFB238"/>
-  <circle cx="101.3" cy="33.3" r="4" fill="#FFB238"/>
-  <circle cx="90.7" cy="33.3" r="4" fill="#FFB238"/>
-  <circle cx="87.4" cy="23.2" r="4" fill="#FFB238"/>
+  <g fill="#ED1C24">
+    <ellipse cx="98" cy="17" rx="6.5" ry="9" transform="rotate(0 98 26)"/>
+    <ellipse cx="98" cy="17" rx="6.5" ry="9" transform="rotate(72 98 26)"/>
+    <ellipse cx="98" cy="17" rx="6.5" ry="9" transform="rotate(144 98 26)"/>
+    <ellipse cx="98" cy="17" rx="6.5" ry="9" transform="rotate(216 98 26)"/>
+    <ellipse cx="98" cy="17" rx="6.5" ry="9" transform="rotate(288 98 26)"/>
+  </g>
+  <circle cx="98" cy="26" r="3" fill="#C4141A"/>
+  <line x1="98" y1="26" x2="108" y2="13" stroke="#C4141A" stroke-width="1.4" stroke-linecap="round"/>
+  <circle cx="108" cy="13" r="1.8" fill="#FFCC00"/>
 </svg>
