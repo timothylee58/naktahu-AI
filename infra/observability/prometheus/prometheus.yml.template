@@ -1,0 +1,35 @@
+# Template, not the live config — docker-entrypoint.sh substitutes
+# __METRICS_AUTH_TOKEN__ from the runtime env var at container start and
+# writes the real prometheus.yml to a path outside the image layers. The
+# token itself is never baked into the image or committed to this repo
+# (CLAUDE.md hard rule): apps/api/app/routers/metrics.py fails closed to
+# 401 without a bearer token matching METRICS_AUTH_TOKEN — Cursor Bugbot
+# caught that this scrape config originally sent no Authorization header
+# at all, which would have meant every scrape silently 401ing forever
+# while noDataState: OK kept the alert rules looking green.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  # @naktahu-ai's actual private-networking endpoint and port, read from its
+  # live Railway service config (privateNetworkEndpoint: "naktahu-ai",
+  # port 8080 — the same port its public domain routes to) — not guessed.
+  - job_name: naktahu-api
+    metrics_path: /metrics
+    scheme: http
+    authorization:
+      type: Bearer
+      credentials: __METRICS_AUTH_TOKEN__
+    static_configs:
+      - targets: ["naktahu-ai.railway.internal:8080"]
+        labels:
+          service: naktahu-api
+          environment: production
+
+  # Prometheus's own health/ingestion metrics — standard self-scrape, useful
+  # once this stack itself needs debugging (e.g. scrape failures, WAL size).
+  # No auth needed: this is Prometheus's own unauthenticated /metrics.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
