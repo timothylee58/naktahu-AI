@@ -1,0 +1,28 @@
+# Scrape config for the naktahu-ai Railway project.
+#
+# 30s, not the 15s default: at this project's traffic (tens of requests/day
+# as of the last check), a tighter interval buys nothing and just burns
+# scrape cycles on an idle target.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  # @naktahu-ai's actual private-networking endpoint and port, read from its
+  # live Railway service config (privateNetworkEndpoint: "naktahu-ai",
+  # port 8080 — the same port its public domain routes to) — not guessed.
+  # Private networking only: this target is never reachable from outside
+  # the Railway project, so /metrics needs no separate auth in front of it.
+  - job_name: naktahu-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["naktahu-ai.railway.internal:8080"]
+        labels:
+          service: naktahu-api
+          environment: production
+
+  # Prometheus's own health/ingestion metrics — standard self-scrape, useful
+  # once this stack itself needs debugging (e.g. scrape failures, WAL size).
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

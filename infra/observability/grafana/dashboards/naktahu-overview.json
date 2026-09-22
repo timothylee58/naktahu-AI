@@ -1,0 +1,147 @@
+{
+  "title": "NakTahu — API overview",
+  "uid": "naktahu-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "1m",
+  "tags": ["naktahu"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "HTTP requests by status code",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(naktahu_http_requests_total[5m])) by (status_code)",
+          "legendFormat": "{{status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP p50 / p95 / p99 latency by route",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(naktahu_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p50 {{route}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(naktahu_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p95 {{route}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(naktahu_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p99 {{route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "RAG queries by answering provider",
+      "description": "provider=ilmu (primary served it), claude (Anthropic fallback served it), none (both failed, static apology went out)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(naktahu_rag_queries_total[5m])) by (provider)",
+          "legendFormat": "{{provider}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Claude fallback rate",
+      "description": "Times Claude was invoked because ILMU produced no usable output. A sustained rise here means ILMU is degraded, not that Claude usage is normal.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "rate(naktahu_provider_fallback_total[5m])",
+          "legendFormat": "fallback/s"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Retrieval confidence (analyst_node score, p50 / p95)",
+      "description": "0.6 is analyst_node's own needs_clarification threshold — falling below it means real users are seeing the degraded-confidence path.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "max": 1, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(naktahu_retrieval_score_bucket[15m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(naktahu_retrieval_score_bucket[15m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Circuit breaker state",
+      "description": "0=closed 1=open 2=half_open, by provider",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "closed", "color": "green" } } },
+            { "type": "value", "options": { "1": { "text": "open", "color": "red" } } },
+            { "type": "value", "options": { "2": { "text": "half_open", "color": "yellow" } } }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "naktahu_circuit_breaker_state",
+          "legendFormat": "{{provider}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Agent calls by result",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(naktahu_agent_calls_total[5m])) by (agent_name, result)",
+          "legendFormat": "{{agent_name}} — {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Agent confidence (p50, by agent)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "max": 1, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(naktahu_agent_confidence_bucket[15m])) by (le, agent_name))",
+          "legendFormat": "{{agent_name}}"
+        }
+      ]
+    }
+  ]
+}
