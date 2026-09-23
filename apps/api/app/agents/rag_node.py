@@ -1,4 +1,8 @@
-"""rag_node — Redis cache + ILMU embedding + Supabase hybrid search."""
+"""rag_node — Redis cache + dual-embedding hybrid search (ILMU first, OpenAI fallback).
+
+See llm_client.py's dual-embedding invariant: ILMU vectors are only ever
+searched via hybrid_search_ilmu, OpenAI vectors only via hybrid_search.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -9,11 +13,19 @@ import weave
 from app.models.state import AgentState
 from app.services import cache as cache_svc
 from app.services.llm_client import (
+    ILMU_EMBEDDING_DIMS,
     ILMU_EMBEDDING_MODEL,
+    OPENAI_EMBEDDING_MODEL,
     ilmu_client,
+    openai_client,
 )
 from app.services.reranker import rerank_chunks, rerank_enabled
-from app.services.vector_store import ChunkResult, hybrid_search, hybrid_search_madani_schemes
+from app.services.vector_store import (
+    ChunkResult,
+    hybrid_search,
+    hybrid_search_ilmu,
+    hybrid_search_madani_schemes,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -76,27 +88,59 @@ def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
 
 
 async def _embed(query: str) -> list[float]:
-    """Embed a query with the same model document_chunks was built with.
+    """Embed for document_chunks.embedding — OpenAI OPENAI_EMBEDDING_MODEL, 1536-dim.
 
-    Deliberately no cross-provider fallback: the embedding model is a property
-    of the corpus, not a per-request choice (see llm_client.OPENAI_EMBEDDING_MODEL
-    for why substituting a same-dimension model silently returns meaningless
-    similarities rather than failing).
+    This is the model the live corpus was built with, so it's the one every
+    non-ILMU search path and every write to the `embedding` column must use.
+    Also imported by router_node (speculative embed), tools.py,
+    grant_rag_node, scripts/ingest_feed.py, madani_scheme_ingest and
+    upload_parliament — this is the single definition for that column.
 
-    Raising is the safe path and is already handled — rag_node's except below
-    returns retrieved_chunks=[], analyst_node then sets needs_clarification with
-    zero citations, and the user is asked to rephrase instead of being shown
-    sourced-looking nonsense. Also imported by router_node (speculative embed),
-    scripts/ingest_feed.py and services/madani_scheme_ingest.py, so this is the
-    single definition of that invariant for the live corpus.
+    No cross-provider fallback inside: raising is the safe path. A failure
+    here surfaces as retrieved_chunks=[] -> needs_clarification, never as
+    results compared across two embedding spaces.
+    """
+    if openai_client is None:
+        raise RuntimeError("OPENAI_API_KEY is not set — cannot embed for document_chunks.embedding")
+    resp = await openai_client.embeddings.create(input=query, model=OPENAI_EMBEDDING_MODEL)
+    return resp.data[0].embedding
+
+
+async def _embed_ilmu(query: str) -> list[float]:
+    """Embed for document_chunks.embedding_ilmu — ILMU_EMBEDDING_MODEL, 4096-dim.
+
+    Only ever paired with hybrid_search_ilmu (reads) and the embedding_ilmu
+    column (writes). The dimension check turns a wrong ILMU_EMBEDDING_MODEL
+    into a clear error instead of a Postgres vector-type failure.
     """
     resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
-    return resp.data[0].embedding
+    embedding = resp.data[0].embedding
+    if len(embedding) != ILMU_EMBEDDING_DIMS:
+        raise ValueError(
+            f"ILMU embedding has {len(embedding)} dims, expected {ILMU_EMBEDDING_DIMS} "
+            f"(model={ILMU_EMBEDDING_MODEL!r}) — check ILMU_EMBEDDING_MODEL"
+        )
+    return embedding
+
+
+async def _search_with_domain_fallback(search_fn, query: str, embedding: list[float], domain: str | None, limit: int) -> list[ChunkResult]:
+    """Run one search; if a domain-scoped search is empty, retry unfiltered.
+
+    Recall fallback: the search functions hard-filter on dc.domain, so a
+    single misclassified domain from router_node (e.g. a tax question tagged
+    "government") would return zero chunks. Retrying unfiltered lets relevant
+    chunks in another domain still surface, ranked by similarity.
+    """
+    chunks = await search_fn(query, embedding, domain=domain, limit=limit)
+    if not chunks and domain is not None:
+        log.info("rag_domain_fallback", domain=domain)
+        chunks = await search_fn(query, embedding, domain=None, limit=limit)
+    return chunks
 
 
 @weave.op()
 async def rag_node(state: AgentState) -> dict:
-    """Check Redis cache, then fall through to hybrid search on miss."""
+    """Check Redis cache; on miss, search ILMU vectors first, then OpenAI vectors."""
     query = state.get("query", "")
     language = state.get("language", "en")
     # None (not "government") when unclassified — see app/models/state.py's
@@ -112,47 +156,65 @@ async def rag_node(state: AgentState) -> dict:
         log.info("rag_cache_hit", key=key[:16])
         # router_node only ever starts this task when has_query_been_seen()
         # was False, which should make a same-query cache hit here
-        # impossible in the common case — but a same-query race (two
-        # concurrent requests for a brand-new query) or a domain/language
-        # reclassification on a repeat query can still land here with a
-        # task in flight. Cancel it rather than let it run to completion
-        # unused.
+        # impossible in the common case — but a same-query race or a
+        # domain/language reclassification on a repeat query can still land
+        # here with a task in flight. Cancel it rather than let it run unused.
         if speculative_task is not None and not speculative_task.done():
             speculative_task.cancel()
         return {"retrieved_chunks": _deserialize_chunks(cached)}
 
-    # Cache miss — generate embedding (reusing router_node's speculative
-    # task if one is in flight — see AgentState._speculative_embedding_task
-    # and cache.has_query_been_seen's docstring) and search
     log.info("rag_cache_miss", key=key[:16])
     do_rerank = rerank_enabled()
     search_limit = _RERANK_CANDIDATE_POOL if do_rerank else _FINAL_CHUNK_COUNT
-    try:
-        embedding = await speculative_task if speculative_task is not None else await _embed(query)
-        chunks = await hybrid_search(query, embedding, domain=domain, limit=search_limit)
-        # Recall fallback: hybrid_search hard-filters on dc.domain = domain_filter,
-        # so a single misclassified domain from router_node (e.g. a tax question
-        # tagged "government") returns zero chunks — the user then sees a
-        # clarification prompt with no sources at all. When a domain-scoped search
-        # comes back empty, retry once unfiltered so relevant chunks in another
-        # domain can still surface and be ranked by vector similarity.
-        if not chunks and domain is not None:
-            log.info("rag_domain_fallback", domain=domain)
-            chunks = await hybrid_search(query, embedding, domain=None, limit=search_limit)
 
-        # Additive, welfare-only: merge in madani_scheme's own semantic
-        # search (migration 038's dedicated RPC) alongside whatever
-        # document_chunks already found for this domain. Its own try/except
-        # (not the outer one) so a failure here — e.g. migration 038 not yet
-        # applied, or the still-empty table — degrades to "just the
-        # document_chunks results," never aborts retrieval for the whole
-        # query the way letting this exception hit the outer handler would.
+    # router_node's speculative task (if any) embeds with OpenAI (_embed), so
+    # it's only useful for the OpenAI path. Await it at most once.
+    openai_embedding: list[float] | None = None
+
+    async def _openai_embedding() -> list[float]:
+        nonlocal openai_embedding, speculative_task
+        if openai_embedding is None:
+            if speculative_task is not None:
+                task, speculative_task = speculative_task, None
+                openai_embedding = await task
+            else:
+                openai_embedding = await _embed(query)
+        return openai_embedding
+
+    try:
+        # 1. ILMU first (user decision, 2026-09-23). Any failure — embed error,
+        #    wrong model, migration 051 not applied — or an empty result (rows
+        #    not yet backfilled) falls through to OpenAI rather than failing
+        #    the query.
+        chunks: list[ChunkResult] = []
+        provider = "ilmu"
+        try:
+            ilmu_embedding = await _embed_ilmu(query)
+            chunks = await _search_with_domain_fallback(hybrid_search_ilmu, query, ilmu_embedding, domain, search_limit)
+            if not chunks:
+                log.info("rag_ilmu_empty_falling_back_to_openai")
+        except Exception as exc:
+            log.warning("rag_ilmu_failed_falling_back_to_openai", error=str(exc))
+            chunks = []
+
+        # 2. OpenAI fallback over the `embedding` column.
+        if not chunks:
+            provider = "openai"
+            chunks = await _search_with_domain_fallback(hybrid_search, query, await _openai_embedding(), domain, search_limit)
+
+        # Additive, welfare-only: merge in madani_scheme's own semantic search
+        # (migration 038's RPC). madani_scheme is embedded with the OpenAI
+        # model (via _embed), so it's always queried with the OpenAI vector
+        # regardless of which provider served document_chunks. Own try/except
+        # so a failure here degrades to "just the document_chunks results".
         if domain == "welfare":
             try:
-                scheme_chunks = await hybrid_search_madani_schemes(query, embedding, limit=search_limit)
+                scheme_chunks = await hybrid_search_madani_schemes(query, await _openai_embedding(), limit=search_limit)
                 chunks = chunks + scheme_chunks
             except Exception as exc:
                 log.warning("rag_madani_scheme_search_failed", error=str(exc))
+
+        log.info("rag_retrieval_provider", provider=provider, chunks=len(chunks))
 
         if do_rerank and chunks:
             chunks = await rerank_chunks(query=query, chunks=chunks, top_n=_FINAL_CHUNK_COUNT)
@@ -161,11 +223,15 @@ async def rag_node(state: AgentState) -> dict:
     except Exception as exc:
         log.warning("rag_retrieval_failed", error=str(exc))
         return {"retrieved_chunks": []}
+    finally:
+        # ILMU served the query and the speculative OpenAI embed was never
+        # needed — cancel it instead of leaving it running unawaited.
+        if speculative_task is not None and not speculative_task.done():
+            speculative_task.cancel()
 
-    # Persist to cache, and record that this query text has now been
-    # cached (domain/language-agnostic marker — see cache.mark_query_seen's
-    # docstring) so a future router_node run knows it's safe to fire a
-    # speculative embed for a repeat of this exact query text.
+    # Persist to cache, and record that this query text has now been cached
+    # (see cache.mark_query_seen's docstring) so a future router_node run
+    # knows it's safe to fire a speculative embed for a repeat of this query.
     await cache_svc.set_cached_result(key, _serialize_chunks(chunks), ttl=_CACHE_TTL)
     await cache_svc.mark_query_seen(query, ttl=_CACHE_TTL)
 

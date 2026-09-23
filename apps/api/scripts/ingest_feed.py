@@ -55,12 +55,11 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-# Reuses the query path's embedder on purpose: rows written here are searched
-# by rag_node, so both sides must use the same model or the stored vectors and
-# the query vector end up in different spaces. It raises rather than falling
-# back to another provider — a failed embed must skip the row, never write an
-# incompatible vector into document_chunks. See llm_client.OPENAI_EMBEDDING_MODEL.
-from app.agents.rag_node import _embed  # noqa: E402
+# Reuses the query path's embedders on purpose: rows written here are searched
+# by rag_node, so each column must be written by the same model that queries
+# it — _embed (OpenAI) -> `embedding`, _embed_ilmu (ILMU) -> `embedding_ilmu`.
+# See llm_client.py's dual-embedding invariant.
+from app.agents.rag_node import _embed, _embed_ilmu  # noqa: E402
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 from scripts.sources import SOURCES_BY_NAME, get_source  # noqa: E402
@@ -391,8 +390,26 @@ async def main_async(args: argparse.Namespace) -> None:
             "ministry": args.ministry,
             "embedding": embedding,
         }
+        # Second vector for the ILMU-first query path (migration 051). Best
+        # effort: an ILMU failure must not block ingesting the row — it lands
+        # with embedding_ilmu NULL and scripts/backfill_ilmu_embeddings.py
+        # fills it later. Each vector goes only into its own model's column.
         try:
-            supabase.table("document_chunks").insert(row).execute()
+            row["embedding_ilmu"] = await _embed_ilmu(entry.content)
+        except Exception as exc:
+            print(f"  WARN (ILMU embedding, row still inserted, backfill later) — {entry.title[:60]!r}: {exc}")
+        try:
+            try:
+                supabase.table("document_chunks").insert(row).execute()
+            except Exception as exc:
+                # Migration 051 not applied yet -> the column doesn't exist.
+                # Retry without it rather than failing ingestion outright.
+                if "embedding_ilmu" in row and "embedding_ilmu" in str(exc):
+                    print(f"  WARN (embedding_ilmu column missing — apply migration 051) — {entry.title[:60]!r}")
+                    row.pop("embedding_ilmu")
+                    supabase.table("document_chunks").insert(row).execute()
+                else:
+                    raise
             inserted += 1
             print(f"  OK — {entry.title[:60]!r}")
         except Exception as exc:

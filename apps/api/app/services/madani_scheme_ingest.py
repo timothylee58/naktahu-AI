@@ -37,8 +37,8 @@ def build_scheme_embedding_text(scheme: dict[str, Any]) -> str:
 
 
 async def embed_scheme(scheme: dict[str, Any]) -> list[float]:
-    """Embed one scheme row's rendered text via the same ILMU->OpenAI
-    fallback every other embedding call in this codebase uses.
+    """Embed one scheme row's rendered text with rag_node._embed (OpenAI) —
+    the same model hybrid_search_madani_schemes is queried with in rag_node.
     """
     from app.agents.rag_node import _embed
 

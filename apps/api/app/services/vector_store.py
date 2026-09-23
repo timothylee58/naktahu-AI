@@ -37,30 +37,9 @@ async def _get_client() -> AsyncClient:
     return await acreate_client(url, key)
 
 
-async def hybrid_search(
-    query: str,
-    embedding: list[float],
-    domain: str | None,
-    limit: int = 5,
-) -> list[ChunkResult]:
-    """Call the hybrid_search Postgres RPC and return typed ChunkResult objects.
-
-    Combines cosine similarity (weight 0.7) and BM25 rank (weight 0.3) as
-    defined in migration 002_hybrid_search.sql.
-    """
-    client = await _get_client()
-    params: dict = {
-        "query_text": query,
-        "query_embedding": embedding,
-        "match_count": limit,
-    }
-    if domain is not None:
-        params["domain_filter"] = domain
-
-    resp = await client.rpc("hybrid_search", params).execute()
-
+def _rows_to_chunks(rows: list[dict] | None) -> list[ChunkResult]:
     results: list[ChunkResult] = []
-    for row in (resp.data or []):
+    for row in (rows or []):
         results.append(
             ChunkResult(
                 id=row["id"],
@@ -78,6 +57,56 @@ async def hybrid_search(
             )
         )
     return results
+
+
+async def _call_search_rpc(
+    rpc_name: str,
+    query: str,
+    embedding: list[float],
+    domain: str | None,
+    limit: int,
+) -> list[ChunkResult]:
+    client = await _get_client()
+    params: dict = {
+        "query_text": query,
+        "query_embedding": embedding,
+        "match_count": limit,
+    }
+    if domain is not None:
+        params["domain_filter"] = domain
+    resp = await client.rpc(rpc_name, params).execute()
+    return _rows_to_chunks(resp.data)
+
+
+async def hybrid_search(
+    query: str,
+    embedding: list[float],
+    domain: str | None,
+    limit: int = 5,
+) -> list[ChunkResult]:
+    """Hybrid search over document_chunks.embedding (OpenAI, 1536-dim).
+
+    Combines cosine similarity (weight 0.7) and BM25 rank (weight 0.3) as
+    defined in migration 002_hybrid_search.sql. `embedding` MUST come from
+    llm_client.OPENAI_EMBEDDING_MODEL — see the dual-embedding invariant there.
+    """
+    return await _call_search_rpc("hybrid_search", query, embedding, domain, limit)
+
+
+async def hybrid_search_ilmu(
+    query: str,
+    embedding: list[float],
+    domain: str | None,
+    limit: int = 5,
+) -> list[ChunkResult]:
+    """Hybrid search over document_chunks.embedding_ilmu (ILMU, 4096-dim).
+
+    Same scoring as hybrid_search, but only over rows that have an ILMU vector
+    (migration 051). `embedding` MUST come from llm_client.ILMU_EMBEDDING_MODEL.
+    Raises if migration 051 isn't applied yet; returns [] if no rows are
+    backfilled — rag_node treats both as "fall back to OpenAI".
+    """
+    return await _call_search_rpc("hybrid_search_ilmu", query, embedding, domain, limit)
 
 
 async def hybrid_search_madani_schemes(

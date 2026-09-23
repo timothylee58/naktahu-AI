@@ -50,7 +50,7 @@ _API_ROOT = Path(__file__).resolve().parents[2]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from app.agents.rag_node import _embed  # noqa: E402 — reuse the live ILMU->OpenAI embedding fallback
+from app.agents.rag_node import _embed  # noqa: E402 — the corpus model (OpenAI) for document_chunks.embedding; see llm_client dual-embedding invariant
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 
