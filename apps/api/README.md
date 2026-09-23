@@ -74,7 +74,7 @@ Scores the relevance of each retrieved chunk (0.0–1.0) and sets `confidence_sc
 
 Streams the final answer via `AsyncGenerator`:
 - **Primary LLM:** ILMU API (OpenAI-compatible)
-- **Fallback LLM:** Anthropic `claude-sonnet-4-20250514`
+- **Fallback LLM:** Anthropic `claude-sonnet-5` (`llm_client.FALLBACK_MODEL`)
 
 A language-specific instruction is prepended to the system prompt to enforce response language matching the query language. If both LLMs fail, a localized degraded message is returned instead of a hard error.
 

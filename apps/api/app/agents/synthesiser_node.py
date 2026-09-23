@@ -153,7 +153,7 @@ async def _stream_ilmu(context: str, system_prompt: str) -> AsyncGenerator[str, 
 
 
 async def _stream_anthropic(context: str, system_prompt: str) -> AsyncGenerator[str, None]:
-    """Yield tokens from Anthropic claude-sonnet-4-20250514 stream."""
+    """Yield tokens from the Anthropic fallback stream (llm_client.FALLBACK_MODEL, currently claude-sonnet-5)."""
     async with anthropic_client.messages.stream(
         model=FALLBACK_MODEL,
         max_tokens=1024,
