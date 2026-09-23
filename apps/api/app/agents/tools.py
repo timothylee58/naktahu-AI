@@ -14,6 +14,7 @@ import structlog
 
 from app.services.llm_client import (
     ILMU_CHAT_MODEL,
+    ILMU_EMBEDDING_MODEL,
     ilmu_client,
 )
 from app.services.vector_store import ChunkResult, hybrid_search
@@ -23,16 +24,14 @@ log = structlog.get_logger(__name__)
 
 
 async def _embed(query: str) -> list[float]:
-    """Embed for document_chunks.embedding via the single shared definition.
+    """Embed with the corpus's own model — no cross-provider fallback.
 
-    Delegates to rag_node._embed (OpenAI, the corpus's model) rather than
-    keeping a second copy here — a second copy is how this file previously
-    drifted onto a different embedding model than the corpus it searches.
-    Imported lazily to avoid a module-level agents<->tools import cycle.
+    Same invariant as rag_node._embed: a same-dimension model from another
+    provider does not fail, it returns meaningless similarities against
+    ILMU-embedded chunks. See llm_client.OPENAI_EMBEDDING_MODEL.
     """
-    from app.agents.rag_node import _embed as corpus_embed
-
-    return await corpus_embed(query)
+    resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
+    return resp.data[0].embedding
 
 
 async def query_rag(

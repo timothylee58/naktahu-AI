@@ -7,9 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.agents.rag_node import _deserialize_chunks, _serialize_chunks, rag_node
-# Captured before the autouse fixture patches the module attribute, so the
-# dimension-check test exercises the real function, not the default mock.
-from app.agents.rag_node import _embed_ilmu as _real_embed_ilmu
 from app.services.vector_store import ChunkResult
 
 _FAKE_EMBEDDING = [0.1] * 1536
@@ -33,18 +30,6 @@ _STATE = {
 }
 
 
-@pytest.fixture(autouse=True)
-def _ilmu_path_finds_nothing():
-    """Default for every test: the ILMU-first path finds no rows, so rag_node
-    falls back to the OpenAI path — the path these tests assert against.
-    Tests exercising ILMU itself override these patches."""
-    with (
-        patch("app.agents.rag_node._embed_ilmu", AsyncMock(return_value=[0.0] * 4096)),
-        patch("app.agents.rag_node.hybrid_search_ilmu", AsyncMock(return_value=[])),
-    ):
-        yield
-
-
 def _mock_embed_response(embedding: list[float]) -> MagicMock:
     item = MagicMock()
     item.embedding = embedding
@@ -61,7 +46,7 @@ async def test_rag_node_cache_miss_calls_search() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)),
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -87,7 +72,7 @@ async def test_rag_node_unclassified_domain_searches_everything() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -107,7 +92,7 @@ async def test_rag_node_missing_domain_key_searches_everything() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -134,7 +119,7 @@ async def test_rag_node_cache_hit_skips_search() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=cached_data)),
         patch("app.agents.rag_node.hybrid_search", AsyncMock()) as mock_search,
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
     ):
         result = await rag_node(_STATE)
 
@@ -160,7 +145,7 @@ async def test_rag_node_cache_key_includes_domain() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", fake_get),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=[])),
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -178,7 +163,7 @@ async def test_rag_node_empty_search_result() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=[])),
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -245,7 +230,7 @@ async def test_rag_node_domain_fallback_retries_unfiltered() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", mock_search),
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -268,7 +253,7 @@ async def test_rag_node_no_fallback_when_first_search_hits() -> None:
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", mock_search),
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -293,7 +278,7 @@ async def test_rag_node_rerank_disabled_by_default_uses_final_limit(monkeypatch)
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", mock_search),
         patch("app.agents.rag_node.rerank_chunks", mock_rerank),
     ):
@@ -316,7 +301,7 @@ async def test_rag_node_rerank_enabled_widens_pool_and_calls_reranker(monkeypatc
     with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", mock_search),
         patch("app.agents.rag_node.rerank_chunks", mock_rerank),
     ):
@@ -342,7 +327,7 @@ async def test_rag_node_reuses_speculative_embedding_task_on_cache_miss() -> Non
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
         patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()),
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
     ):
         mock_client.embeddings.create = AsyncMock()  # must never be called
@@ -384,7 +369,7 @@ async def test_rag_node_marks_query_seen_after_successful_cache_write() -> None:
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
         patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()) as mock_mark,
-        patch("app.agents.rag_node.openai_client") as mock_client,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
         patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)),
     ):
         mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
@@ -393,155 +378,55 @@ async def test_rag_node_marks_query_seen_after_successful_cache_write() -> None:
     mock_mark.assert_awaited_once_with(_STATE["query"], ttl=3600)
 
 
-# ── Dual-embedding invariant (migration 051) ───────────────────────────────
-# document_chunks.embedding is OpenAI (1536); embedding_ilmu is ILMU (4096).
-# rag_node searches ILMU first and falls back to OpenAI. The rule these tests
-# pin: each search function is only ever called with its own model's vector.
-
-_ILMU_EMBEDDING = [0.2] * 4096
-_ILMU_CHUNKS = [
-    ChunkResult(
-        id="ilmu-chunk",
-        content="Geran perniagaan kecil",
-        source_title="SME Corp",
-        source_url="https://www.smecorp.gov.my",
-        ministry="MEDAC",
-        language="bm",
-        similarity=0.91,
-    )
-]
+# ── Embedding provider safety ───────────────────────────────────────────────
+# The embedding model is a property of the corpus, not a per-request choice.
+# document_chunks.embedding is vector(1536) written by ILMU; text-embedding-3-small
+# is also 1536-dimensional, so a cross-provider substitution does NOT raise — it
+# returns a vector from a different space and every cosine score against the stored
+# chunks becomes noise, which analyst_node then scores and cites. These tests pin
+# the fallback as removed.
 
 
-def _cache_patches():
-    return (
+@pytest.mark.asyncio
+async def test_embed_does_not_fall_back_to_another_provider() -> None:
+    """A failing ILMU embed must raise, never silently return a vector from a
+    different embedding space."""
+    from app.agents.rag_node import _embed
+
+    with patch("app.agents.rag_node.ilmu_client") as mock_client:
+        mock_client.embeddings.create = AsyncMock(side_effect=RuntimeError("ilmu down"))
+        with pytest.raises(RuntimeError):
+            await _embed("cukai pendapatan")
+
+
+@pytest.mark.asyncio
+async def test_rag_node_returns_no_chunks_when_embedding_fails() -> None:
+    """The safe degradation: no chunks, so analyst_node produces zero citations
+    and asks for clarification, rather than ranking noise-scored chunks."""
+    with (
         patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
         patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
-        patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()),
-    )
-
-
-@pytest.mark.asyncio
-async def test_ilmu_first_serves_query_without_touching_openai() -> None:
-    """ILMU finds rows -> they're returned; the OpenAI embed and search never run."""
-    c1, c2, c3 = _cache_patches()
-    with (
-        c1, c2, c3,
-        patch("app.agents.rag_node._embed_ilmu", AsyncMock(return_value=_ILMU_EMBEDDING)),
-        patch("app.agents.rag_node.hybrid_search_ilmu", AsyncMock(return_value=_ILMU_CHUNKS)) as ilmu_search,
-        patch("app.agents.rag_node._embed", AsyncMock()) as openai_embed,
-        patch("app.agents.rag_node.hybrid_search", AsyncMock()) as openai_search,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
     ):
-        result = await rag_node(_STATE)
-
-    assert [c.id for c in result["retrieved_chunks"]] == ["ilmu-chunk"]
-    # ILMU search got the ILMU vector, nothing else.
-    assert ilmu_search.await_args.args[1] == _ILMU_EMBEDDING
-    openai_embed.assert_not_awaited()
-    openai_search.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "ilmu_embed, ilmu_search",
-    [
-        (AsyncMock(side_effect=RuntimeError("ILMU 404 model_not_found")), AsyncMock()),
-        (AsyncMock(return_value=_ILMU_EMBEDDING), AsyncMock(side_effect=RuntimeError("function hybrid_search_ilmu does not exist"))),
-        (AsyncMock(return_value=_ILMU_EMBEDDING), AsyncMock(return_value=[])),
-    ],
-    ids=["ilmu-embed-fails", "migration-051-not-applied", "rows-not-backfilled"],
-)
-async def test_falls_back_to_openai_when_ilmu_path_unavailable(ilmu_embed, ilmu_search) -> None:
-    """Every ILMU failure mode degrades to the OpenAI column, never to no answer."""
-    c1, c2, c3 = _cache_patches()
-    with (
-        c1, c2, c3,
-        patch("app.agents.rag_node._embed_ilmu", ilmu_embed),
-        patch("app.agents.rag_node.hybrid_search_ilmu", ilmu_search),
-        patch("app.agents.rag_node._embed", AsyncMock(return_value=_FAKE_EMBEDDING)),
-        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as openai_search,
-    ):
-        result = await rag_node(_STATE)
-
-    assert [c.id for c in result["retrieved_chunks"]] == ["chunk-1"]
-    # The OpenAI search got the OpenAI vector — never the ILMU one.
-    assert openai_search.await_args.args[1] == _FAKE_EMBEDDING
-
-
-@pytest.mark.asyncio
-async def test_no_chunks_when_both_providers_fail() -> None:
-    """Both down -> empty retrieval (analyst_node then asks to rephrase), never
-    a search run with a vector we couldn't legitimately produce."""
-    c1, c2, c3 = _cache_patches()
-    with (
-        c1, c2, c3,
-        patch("app.agents.rag_node._embed_ilmu", AsyncMock(side_effect=RuntimeError("ilmu down"))),
-        patch("app.agents.rag_node._embed", AsyncMock(side_effect=RuntimeError("openai down"))),
-        patch("app.agents.rag_node.hybrid_search", AsyncMock()) as openai_search,
-    ):
+        mock_client.embeddings.create = AsyncMock(side_effect=RuntimeError("ilmu down"))
         result = await rag_node(_STATE)
 
     assert result["retrieved_chunks"] == []
-    openai_search.assert_not_awaited()
+    # Never search with a vector we could not legitimately produce.
+    mock_search.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_ilmu_success_cancels_unused_speculative_openai_task() -> None:
-    """router_node's speculative task embeds with OpenAI; when ILMU serves the
-    query it's never needed and must be cancelled, not left running."""
-    async def _slow_embed():
-        await asyncio.sleep(10)
-        return _FAKE_EMBEDDING
-
-    task = asyncio.create_task(_slow_embed())
-    c1, c2, c3 = _cache_patches()
-    with (
-        c1, c2, c3,
-        patch("app.agents.rag_node._embed_ilmu", AsyncMock(return_value=_ILMU_EMBEDDING)),
-        patch("app.agents.rag_node.hybrid_search_ilmu", AsyncMock(return_value=_ILMU_CHUNKS)),
-    ):
-        await rag_node({**_STATE, "_speculative_embedding_task": task})
-
-    await asyncio.sleep(0)
-    assert task.cancelled()
-
-
-@pytest.mark.asyncio
-async def test_embed_uses_openai_corpus_model_and_never_ilmu() -> None:
-    """_embed writes/queries the `embedding` column, so it must be the OpenAI
-    model — and must raise (not silently switch provider) when unavailable."""
-    from app.agents.rag_node import _embed
-    from app.services.llm_client import OPENAI_EMBEDDING_MODEL
-
-    with patch("app.agents.rag_node.openai_client") as oa, patch("app.agents.rag_node.ilmu_client") as ilmu:
-        oa.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
-        assert await _embed("x") == _FAKE_EMBEDDING
-        assert oa.embeddings.create.await_args.kwargs["model"] == OPENAI_EMBEDDING_MODEL
-        ilmu.embeddings.create.assert_not_called()
-
-    with patch("app.agents.rag_node.openai_client", None):
-        with pytest.raises(RuntimeError):
-            await _embed("x")
-
-
-@pytest.mark.asyncio
-async def test_embed_ilmu_rejects_wrong_dimension() -> None:
-    """A wrong ILMU_EMBEDDING_MODEL (e.g. one returning 1536 dims) must fail
-    clearly, not be written into or searched against the 4096 column."""
-    with patch("app.agents.rag_node.ilmu_client") as ilmu:
-        ilmu.embeddings.create = AsyncMock(return_value=_mock_embed_response([0.1] * 1536))
-        with pytest.raises(ValueError, match="1536 dims, expected 4096"):
-            await _real_embed_ilmu("x")
-
-
-@pytest.mark.asyncio
-async def test_other_query_paths_use_the_corpus_embedder() -> None:
-    """tools.query_rag and grant_rag_node search the OpenAI `embedding` column,
-    so they must embed through rag_node._embed — not keep their own copy (which
-    is how they previously drifted onto a different model than the corpus)."""
+async def test_no_module_imports_a_second_embedding_provider() -> None:
+    """Guards the invariant across all three query paths at once — rag_node,
+    tools and grant_rag_node each had their own copy of the same fallback."""
     import app.agents.eligibility_agent.grant_rag_node as grant_rag_node
+    import app.agents.rag_node as rag_module
     import app.agents.tools as tools_module
 
-    with patch("app.agents.rag_node._embed", AsyncMock(return_value=_FAKE_EMBEDDING)) as corpus_embed:
-        assert await tools_module._embed("q") == _FAKE_EMBEDDING
-        assert await grant_rag_node._embed_query("q") == _FAKE_EMBEDDING
-    assert corpus_embed.await_count == 2
+    for module in (rag_module, tools_module, grant_rag_node):
+        assert not hasattr(module, "openai_client"), (
+            f"{module.__name__} imported openai_client — a second embedding provider "
+            "must not be reachable from a path that queries the ILMU-embedded corpus"
+        )
