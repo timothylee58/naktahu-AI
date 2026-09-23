@@ -36,7 +36,7 @@ infra/supabase/migrations/   Numbered SQL migrations 001–016 (NOT auto-applied
 |---|---|
 | Frontend | Next.js 15 App Router, TypeScript strict, Tailwind, shadcn/ui, Framer Motion |
 | Backend | Python 3.11+, FastAPI, LangGraph 0.2+, LangChain Core |
-| LLM | ILMU API (primary, OpenAI-compatible) + `claude-sonnet-4-20250514` (synthesis fallback ONLY) |
+| LLM | ILMU API (primary, OpenAI-compatible) + `claude-sonnet-5` (synthesis fallback ONLY — Anthropic retired `claude-sonnet-4-20250514`, confirmed via a live 404 in production 2026-09-23; see `llm_client.FALLBACK_MODEL`) |
 | Embeddings | ILMU API (`ilmu-embedding`) via OpenAI-compatible SDK; reuse `app.agents.rag_node._embed` |
 | Vector DB | Supabase pgvector — hybrid search (cosine 0.7 + BM25 0.3) over `document_chunks` |
 | Cache | Redis via redis-py asyncio |

@@ -1,7 +1,7 @@
 """synthesiser_node — streams the final eligibility summary as SSE-shaped dict events.
 
 Provider order matches CLAUDE.md hard rule: ILMU primary, Anthropic
-(claude-sonnet-4-20250514) fallback for synthesis only.
+(claude-sonnet-5, see llm_client.FALLBACK_MODEL) fallback for synthesis only.
 """
 from __future__ import annotations
 

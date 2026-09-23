@@ -1,7 +1,7 @@
 """LLM provider abstraction.
 
 ILMU (OpenAI-compatible) is the primary provider for both chat and embeddings.
-Anthropic claude-sonnet-4-20250514 is the fallback for the synthesiser only.
+Anthropic claude-sonnet-5 is the fallback for the synthesiser only.
 """
 from __future__ import annotations
 
@@ -52,7 +52,18 @@ ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "ilmu-embeddi
 # scripts/ingest.py, which builds the separate dosm_documents table (not read
 # by live RAG; see CLAUDE.md Trap #14).
 OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
-FALLBACK_MODEL: str = "claude-sonnet-4-20250514"
+
+# claude-sonnet-4-20250514 was retired by Anthropic — confirmed 2026-09-23 via
+# a live production 404 from the Anthropic API itself ("not_found_error,
+# model: claude-sonnet-4-20250514"), not a guess. That 404 was firing on
+# every synthesiser-fallback attempt during a real ILMU outage (Railway logs,
+# same incident: router_node_error/rag_retrieval_failed "Connection error."
+# on 100% of requests since the last deploy) — meaning the fallback this
+# constant exists for was itself unusable for the entire time ILMU was down.
+# claude-sonnet-5 is the current model in the same tier (Sonnet), not an
+# upgrade to Opus or downgrade to Haiku — same synthesis-quality intent this
+# constant always had, just pointed at a snapshot Anthropic still serves.
+FALLBACK_MODEL: str = "claude-sonnet-5"
 
 
 def extract_json_object(raw: str) -> dict:
