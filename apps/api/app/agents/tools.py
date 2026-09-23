@@ -43,13 +43,13 @@ async def query_rag(
 ) -> list[dict[str, Any]]:
     """Hybrid-search a domain and return serialisable chunk dicts."""
     embedding = await _embed(query)
-    chunks: list[ChunkResult] = await hybrid_search(
-        query_embedding=embedding,
-        query_text=query,
-        domain=domain,
-        language=language,
-        top_k=top_k,
-    )
+    # Positional/keyword names match vector_store.hybrid_search's real
+    # signature (query, embedding, domain, limit). This call previously passed
+    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
+    # every call — silently disabling knowledge search for every vertical
+    # agent that uses query_rag_findings. hybrid_search has no language
+    # filter; `language` is kept in this function's signature for callers.
+    chunks: list[ChunkResult] = await hybrid_search(query, embedding, domain=domain, limit=top_k)
     return [
         {
             "id": c.id,
