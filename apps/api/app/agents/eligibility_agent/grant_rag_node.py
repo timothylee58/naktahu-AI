@@ -19,7 +19,6 @@ import structlog
 
 from app.agents.eligibility_agent.state import EligibilityState
 from app.services.cache import get_cached_result, set_cached_result
-from app.services.llm_client import ILMU_EMBEDDING_MODEL, ilmu_client
 
 log = structlog.get_logger(__name__)
 
@@ -33,14 +32,14 @@ def _cache_key(query: str, language: str, domain: str) -> str:
 
 
 async def _embed_query(query: str) -> list[float]:
-    """Embed with the corpus's own model — no cross-provider fallback.
+    """Embed with the corpus model via rag_node._embed — the single definition.
 
-    Same invariant as rag_node._embed: a same-dimension model from another
-    provider does not fail, it returns meaningless similarities against
-    ILMU-embedded rows. See llm_client.OPENAI_EMBEDDING_MODEL.
+    match_document_chunks searches document_chunks.embedding, so the query must
+    come from the model that column was built with (see llm_client.py).
     """
-    resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
-    return resp.data[0].embedding
+    from app.agents.rag_node import _embed
+
+    return await _embed(query)
 
 
 async def grant_rag_node(state: EligibilityState, supabase: Any) -> dict[str, Any]:

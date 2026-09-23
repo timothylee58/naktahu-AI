@@ -14,7 +14,6 @@ import structlog
 
 from app.services.llm_client import (
     ILMU_CHAT_MODEL,
-    ILMU_EMBEDDING_MODEL,
     ilmu_client,
 )
 from app.services.vector_store import ChunkResult, hybrid_search
@@ -24,14 +23,16 @@ log = structlog.get_logger(__name__)
 
 
 async def _embed(query: str) -> list[float]:
-    """Embed with the corpus's own model — no cross-provider fallback.
+    """Embed with the corpus model via the single shared definition.
 
-    Same invariant as rag_node._embed: a same-dimension model from another
-    provider does not fail, it returns meaningless similarities against
-    ILMU-embedded chunks. See llm_client.OPENAI_EMBEDDING_MODEL.
+    Delegates to rag_node._embed (ILMU gateway first, OpenAI direct fallback,
+    same model either way) instead of keeping a second copy here — a second
+    copy is how this file previously drifted from the corpus's model.
+    Imported lazily to avoid a module-level agents<->tools import cycle.
     """
-    resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
-    return resp.data[0].embedding
+    from app.agents.rag_node import _embed as corpus_embed
+
+    return await corpus_embed(query)
 
 
 async def query_rag(
@@ -43,13 +44,13 @@ async def query_rag(
 ) -> list[dict[str, Any]]:
     """Hybrid-search a domain and return serialisable chunk dicts."""
     embedding = await _embed(query)
-    chunks: list[ChunkResult] = await hybrid_search(
-        query_embedding=embedding,
-        query_text=query,
-        domain=domain,
-        language=language,
-        top_k=top_k,
-    )
+    # Positional/keyword names match vector_store.hybrid_search's real
+    # signature (query, embedding, domain, limit). This call previously passed
+    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
+    # every call — silently disabling knowledge search for every vertical
+    # agent that uses query_rag_findings. hybrid_search has no language
+    # filter; `language` is kept in this function's signature for callers.
+    chunks: list[ChunkResult] = await hybrid_search(query, embedding, domain=domain, limit=top_k)
     return [
         {
             "id": c.id,

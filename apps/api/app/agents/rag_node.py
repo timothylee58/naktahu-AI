@@ -1,4 +1,4 @@
-"""rag_node — Redis cache + ILMU embedding + Supabase hybrid search."""
+"""rag_node — Redis cache + corpus embedding (ILMU gateway first, OpenAI fallback) + Supabase hybrid search."""
 from __future__ import annotations
 
 import hashlib
@@ -9,8 +9,12 @@ import weave
 from app.models.state import AgentState
 from app.services import cache as cache_svc
 from app.services.llm_client import (
+    EMBEDDING_DIMS,
     ILMU_EMBEDDING_MODEL,
+    OPENAI_EMBEDDING_MODEL,
+    embedding_routes_share_a_model,
     ilmu_client,
+    openai_client,
 )
 from app.services.reranker import rerank_chunks, rerank_enabled
 from app.services.vector_store import ChunkResult, hybrid_search, hybrid_search_madani_schemes
@@ -75,23 +79,44 @@ def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
     ]
 
 
+def _checked(embedding: list[float], route: str) -> list[float]:
+    if len(embedding) != EMBEDDING_DIMS:
+        raise ValueError(f"{route} embedding has {len(embedding)} dims, expected {EMBEDDING_DIMS}")
+    return embedding
+
+
 async def _embed(query: str) -> list[float]:
-    """Embed a query with the same model document_chunks was built with.
+    """Embed with the corpus's model (text-embedding-3-small), ILMU gateway first.
 
-    Deliberately no cross-provider fallback: the embedding model is a property
-    of the corpus, not a per-request choice (see llm_client.OPENAI_EMBEDDING_MODEL
-    for why substituting a same-dimension model silently returns meaningless
-    similarities rather than failing).
+    Tries ILMU's route to the model, then OpenAI direct. Falling back is safe
+    only because both routes serve the SAME model — see llm_client.py. If
+    ILMU_EMBEDDING_MODEL names a different model, the ILMU route is skipped
+    entirely rather than mixing vector spaces.
 
-    Raising is the safe path and is already handled — rag_node's except below
-    returns retrieved_chunks=[], analyst_node then sets needs_clarification with
-    zero citations, and the user is asked to rephrase instead of being shown
-    sourced-looking nonsense. Also imported by router_node (speculative embed),
-    scripts/ingest_feed.py and services/madani_scheme_ingest.py, so this is the
-    single definition of that invariant for the live corpus.
+    Raises when no route works. That's the safe path and is already handled:
+    rag_node returns retrieved_chunks=[], analyst_node sets needs_clarification,
+    and the user is asked to rephrase instead of shown sourced-looking noise.
+    Also imported by router_node (speculative embed), tools, grant_rag_node,
+    scripts/ingest_feed.py, madani_scheme_ingest and upload_parliament, so this
+    is the single definition of the corpus embedding for reads AND writes.
     """
-    resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
-    return resp.data[0].embedding
+    errors: list[str] = []
+    if embedding_routes_share_a_model(ILMU_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL):
+        try:
+            resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
+            return _checked(resp.data[0].embedding, "ILMU")
+        except Exception as exc:
+            errors.append(f"ilmu: {exc}")
+            log.warning("embed_ilmu_failed_falling_back_to_openai", error=str(exc))
+    else:
+        errors.append(f"ilmu: skipped, {ILMU_EMBEDDING_MODEL!r} is not the corpus model {OPENAI_EMBEDDING_MODEL!r}")
+        log.error("embed_ilmu_model_mismatch_skipped", ilmu_model=ILMU_EMBEDDING_MODEL, corpus_model=OPENAI_EMBEDDING_MODEL)
+
+    if openai_client is not None:
+        resp = await openai_client.embeddings.create(input=query, model=OPENAI_EMBEDDING_MODEL)
+        return _checked(resp.data[0].embedding, "OpenAI")
+    errors.append("openai: OPENAI_API_KEY not set")
+    raise RuntimeError("No embedding route available — " + "; ".join(errors))
 
 
 @weave.op()
