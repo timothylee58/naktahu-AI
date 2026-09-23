@@ -11,10 +11,13 @@ import os
 import anthropic
 from openai import AsyncOpenAI
 
-# ILMU client — OpenAI SDK pointed at ILMU base URL
+# ILMU client — OpenAI SDK pointed at ILMU base URL. Default is ILMU's real
+# endpoint per docs.ilmu.ai; it was previously api.ilmu.gov.my, which doesn't
+# serve ILMU — every call failed with a bare "Connection error." (2026-09-23
+# incident) until ILMU_BASE_URL was set explicitly on Railway.
 ilmu_client = AsyncOpenAI(
     api_key=os.environ.get("ILMU_API_KEY", "placeholder"),
-    base_url=os.environ.get("ILMU_BASE_URL", "https://api.ilmu.gov.my/v1"),
+    base_url=os.environ.get("ILMU_BASE_URL", "https://api.ilmu.ai/v1"),
 )
 
 # Anthropic client — fallback for synthesiser when ILMU fails or confidence < 0.6
@@ -22,36 +25,50 @@ anthropic_client = anthropic.AsyncAnthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY", "placeholder"),
 )
 
-# OpenAI client. NOT an embedding fallback for the live RAG corpus — see the
-# warning on OPENAI_EMBEDDING_MODEL below before wiring this into any query or
-# ingestion path.
+# OpenAI client — direct fallback for embeddings (see the invariant below).
+# None when OPENAI_API_KEY is unset; the fallback is then simply unavailable.
 _openai_key = os.environ.get("OPENAI_API_KEY", "")
 openai_client: AsyncOpenAI | None = AsyncOpenAI(api_key=_openai_key) if _openai_key else None
 
 ILMU_CHAT_MODEL: str = os.environ.get("ILMU_CHAT_MODEL", "ilmu-chat")
-ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "ilmu-embedding")
 
+# ── Embeddings: ONE model, two routes to it ─────────────────────────────────
+#
 # The embedding model is a property of the CORPUS, never a per-request choice.
+# document_chunks.embedding is vector(1536) and was built with OpenAI
+# text-embedding-3-small (verified against production 2026-09-23: every row
+# is 1536-dim). Every query and every write must use that same model.
 #
-# document_chunks.embedding is vector(1536), written by ILMU_EMBEDDING_MODEL.
-# text-embedding-3-small is *also* 1536-dimensional, so substituting it does not
-# raise — pgvector happily computes a cosine distance between two vectors from
-# completely different embedding spaces and returns a number that means nothing.
-# hybrid_search weights cosine 0.7 / BM25 0.3, so the BM25 half keeps producing
-# plausible-looking results while the semantic half is noise, and analyst_node
-# then scores, ranks and cites those chunks with a confidence derived partly
-# from that noise. Nothing anywhere logs an error.
+# ILMU is a gateway that serves OpenAI's v3 embedding models itself (docs.ilmu.ai
+# Embeddings -> per-model limits: "OpenAI v3, native 1536"). So the same model
+# is reachable two ways, and rag_node._embed tries them in order:
+#   1. ILMU gateway   ILMU_EMBEDDING_MODEL   = "openai/text-embedding-3-small"
+#   2. OpenAI direct  OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+# Falling back between them is safe ONLY because it's the same model — same
+# weights, same vector space.
 #
-# Worse on the write side: scripts/ingest_feed.py embeds straight into
-# document_chunks, so a provider swap mid-ingest writes OpenAI-space rows
-# permanently alongside ILMU-space ones, with no way to tell them apart
-# afterwards.
+# Why that condition is non-negotiable: two DIFFERENT models of the same
+# dimension don't raise when compared — pgvector returns a cosine number that
+# means nothing, hybrid_search's BM25 half keeps results looking plausible, and
+# analyst_node cites them with confidence partly derived from noise. On the
+# write side, scripts/ingest_feed.py would permanently mix vector spaces in one
+# column. So _embed refuses the ILMU route unless ILMU_EMBEDDING_MODEL names the
+# same model as OPENAI_EMBEDDING_MODEL (see embedding_routes_share_a_model).
 #
-# Switching embedding providers is therefore a corpus migration — re-embed
-# every row — not a runtime fallback. This constant exists only for
-# scripts/ingest.py, which builds the separate dosm_documents table (not read
-# by live RAG; see CLAUDE.md Trap #14).
+# Switching to a genuinely different model (e.g. ILMU-hosted bge-m3 or Gemini)
+# is a corpus migration — re-embed every row — never a runtime fallback.
 OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+ILMU_EMBEDDING_MODEL: str = os.environ.get("ILMU_EMBEDDING_MODEL", "openai/text-embedding-3-small")
+# Dimension of document_chunks.embedding. Both routes are checked against it,
+# so a misconfigured model fails loudly instead of writing/querying a
+# wrong-shaped vector.
+EMBEDDING_DIMS: int = 1536
+
+
+def embedding_routes_share_a_model(ilmu_model: str, openai_model: str) -> bool:
+    """True when the ILMU gateway model ID names the same model as the direct
+    OpenAI one (ILMU prefixes the provider: "openai/text-embedding-3-small")."""
+    return ilmu_model.rsplit("/", 1)[-1] == openai_model and ilmu_model.startswith("openai/")
 
 # claude-sonnet-4-20250514 was retired by Anthropic — confirmed 2026-09-23 via
 # a live production 404 from the Anthropic API itself ("not_found_error,

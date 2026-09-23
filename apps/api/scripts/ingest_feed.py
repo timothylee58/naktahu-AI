@@ -57,9 +57,10 @@ if str(_API_ROOT) not in sys.path:
 
 # Reuses the query path's embedder on purpose: rows written here are searched
 # by rag_node, so both sides must use the same model or the stored vectors and
-# the query vector end up in different spaces. It raises rather than falling
-# back to another provider — a failed embed must skip the row, never write an
-# incompatible vector into document_chunks. See llm_client.OPENAI_EMBEDDING_MODEL.
+# the query vector end up in different spaces. _embed only ever routes between
+# two providers of the SAME model (ILMU gateway, then OpenAI direct) and raises
+# if neither works — a failed embed skips the row, never writes an incompatible
+# vector into document_chunks. See llm_client.py's embeddings section.
 from app.agents.rag_node import _embed  # noqa: E402
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
