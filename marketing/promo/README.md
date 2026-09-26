@@ -8,7 +8,7 @@ Remotion source for the naktahu.my promo videos. This is a standalone package: i
 | `Showcase-{bm,en,zh}-16x9` | 38s | Feature showcase, landscape |
 | `Showcase-{bm,en,zh}-9x16` | 38s | Feature showcase, vertical (Reels / TikTok / Shorts) |
 
-The showcase is cut to a 128.57 BPM track, which is exactly 14 frames per beat at 30fps, so every scene change lands on a beat. Bar `n` starts at frame `n * 56`.
+Scenes are 56 frames long. The showcase score (`audio/score_boombap.py`) is a 64.29 BPM half-time boom-bap beat, with 28 frames per beat, so each scene change lands on either the kick or the snare. `audio/score_showcase.py` keeps the earlier 128.57 BPM house track, which is 14 frames per beat.
 
 ## Render
 
@@ -18,7 +18,7 @@ npm install
 # 1. Generate the audio. The WAVs are build outputs and are not committed.
 python3 audio/score_promo20.py                  # stdlib only -> public/score.wav
 pip install numpy scipy
-python3 audio/score_showcase.py audio/showcase_sfx.json public/showcase.wav
+python3 audio/score_boombap.py audio/showcase_sfx.json public/showcase.wav
 
 # 2. Preview, or render
 npx remotion studio
