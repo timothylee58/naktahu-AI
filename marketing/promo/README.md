@@ -5,10 +5,10 @@ Remotion source for the naktahu.my promo videos. This is a standalone package: i
 | Composition | Length | What it is |
 |---|---|---|
 | `NaktahuPromo` | 20s, 16:9 | Brand promo (BM) |
-| `Showcase-{bm,en,zh}-16x9` | 38s | Feature showcase, landscape |
-| `Showcase-{bm,en,zh}-9x16` | 38s | Feature showcase, vertical (Reels / TikTok / Shorts) |
+| `Showcase-{bm,en,zh}-16x9` | 56.5s | Feature showcase, landscape |
+| `Showcase-{bm,en,zh}-9x16` | 56.5s | Feature showcase, vertical (Reels / TikTok / Shorts) |
 
-Scenes are 56 frames long. The showcase score (`audio/score_boombap.py`) is a 64.29 BPM half-time boom-bap beat, with 28 frames per beat, so each scene change lands on either the kick or the snare. `audio/score_showcase.py` keeps the earlier 128.57 BPM house track, which is 14 frames per beat.
+Each scene is one 84-frame bar (2.8s). The showcase score (`audio/score_parkbench.py`) is the "Park Bench" boom-bap beat, Fm7 → Dbmaj7 → Bbm7 → C7alt, at 85.71 BPM, which is exactly 21 frames per beat. That puts every scene change on beat 1. Earlier scores are kept in `audio/` for reference.
 
 ## Render
 
@@ -18,7 +18,7 @@ npm install
 # 1. Generate the audio. The WAVs are build outputs and are not committed.
 python3 audio/score_promo20.py                  # stdlib only -> public/score.wav
 pip install numpy scipy
-python3 audio/score_boombap.py audio/showcase_sfx.json public/showcase.wav
+python3 audio/score_parkbench.py audio/showcase_sfx.json public/showcase.wav
 
 # 2. Preview, or render
 npx remotion studio

@@ -152,7 +152,7 @@ export const Showcase: React.FC<{ lang: Lang }> = ({ lang }) => {
           <FeatureScene f={f} i={i} />
         </Sequence>
       ))}
-      <Sequence from={BAR * 19} durationInFrames={76} name="End card">
+      <Sequence from={BAR * 19} durationInFrames={100} name="End card">
         <EndCard />
       </Sequence>
       <Hud />

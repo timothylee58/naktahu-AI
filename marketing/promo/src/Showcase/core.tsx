@@ -3,11 +3,11 @@ import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remo
 import { C, EXPO_IN, EXPO_OUT, clamp, display, mono } from "../Promo/theme";
 import { useLang } from "./i18n";
 
-/** 128.57 BPM at 30fps: one beat is exactly 14 frames, one bar 56. */
-export const BEAT = 14;
-export const BAR = 56;
+/** 85.71 BPM at 30fps: one beat is exactly 21 frames, one bar (one scene) 84. */
+export const BEAT = 21;
+export const BAR = 84;
 export const STEP = BEAT / 4;
-export const TOTAL = 1140;
+export const TOTAL = 1696;
 
 export type Layout = {
   W: number;
