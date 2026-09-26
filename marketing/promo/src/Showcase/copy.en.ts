@@ -63,6 +63,9 @@ export const en: Copy = {
   "load.s3": "Preparing AI agents", // i18n:loading_screen.stage3
   "load.s4": "Ready", // i18n:loading_screen.stage4
   "chat.verified": "gov.my sources verified", // i18n:chat.hud.verified_sources
+  "chat.step1": "Searching knowledge base…", // components/chat/ThinkingIndicator.tsx
+  "chat.step2": "Analysing information…", // components/chat/ThinkingIndicator.tsx
+  "chat.step3": "Drafting response…", // components/chat/ThinkingIndicator.tsx
   "chat.q": "How do I register a new business with SSM?", // typewriter
   "chat.queue": "Answer is streaming… type to queue next", // i18n:chat.placeholder_queue
   "ans.text": "Sole proprietorships and partnerships can be registered online through SSM's EzBiz portal.",

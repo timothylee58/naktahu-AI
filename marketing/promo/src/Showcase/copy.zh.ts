@@ -63,6 +63,9 @@ export const zh: Copy = {
   "load.s3": "正在准备 AI 代理", // i18n:loading_screen.stage3
   "load.s4": "准备就绪", // i18n:loading_screen.stage4
   "chat.verified": "已核实 gov.my 来源", // i18n:chat.hud.verified_sources
+  "chat.step1": "正在搜索数据库…", // components/chat/ThinkingIndicator.tsx
+  "chat.step2": "正在分析信息…", // components/chat/ThinkingIndicator.tsx
+  "chat.step3": "正在撰写回复…", // components/chat/ThinkingIndicator.tsx
   "chat.q": "如何向SSM注册新公司？", // typewriter
   "chat.queue": "正在生成回答…输入以排队下一条", // i18n:chat.placeholder_queue
   "ans.text": "独资企业和合伙企业可通过 SSM 的 EzBiz 门户在线注册。",

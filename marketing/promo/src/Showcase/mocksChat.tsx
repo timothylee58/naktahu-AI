@@ -54,7 +54,7 @@ const Stamp: React.FC<{ n: number; label: string; at: number }> = ({ n, label, a
 export const ChatMock: React.FC = () => {
   const frame = useCurrentFrame();
   const t = useT();
-  const steps = ["Searching knowledge base…", "Analysing information…", "Drafting response…"];
+  const steps = [t("chat.step1"), t("chat.step2"), t("chat.step3")];
   return (
     <Window path="/chat">
       <div style={{ display: "flex", flexDirection: "column", gap: 34, height: "100%" }}>
