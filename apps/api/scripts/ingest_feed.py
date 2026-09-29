@@ -30,17 +30,33 @@ Registered sources (scripts/sources.py) can be selected by name instead of
 repeating the metadata; --source fills in url/kind/domain/ministry/language:
 
     python -m scripts.ingest_feed --source invest-malaysia-gov --dry-run
+
+Official documents published only as PDFs (the Budget speech, Fiscal
+Outlook) use `--kind pdf`: text is extracted per page with pypdf, chunked the
+same way as HTML, and every chunk cites the PDF's own URL with `#page=N`. A
+document that spans several subjects can tag each chunk with its own domain
+(`--route-domains`, see route_domain) instead of one domain for the whole run:
+
+    python -m scripts.ingest_feed --kind pdf --route-domains \
+        --feed-url https://belanjawan.mof.gov.my/pdf/belanjawan2026/ucapan/bs26.pdf \
+        --domain finance --ministry "Kementerian Kewangan Malaysia (MOF)" \
+        --language en --dry-run
+
+A registered source with `available_from` in the future (Budget 2027 before
+it's tabled) exits cleanly with an UPCOMING notice instead of fetching.
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import hashlib
+import io
 import re
 import sys
 import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Optional
@@ -102,6 +118,8 @@ class FeedEntry:
     title: str
     description: str
     link: str
+    # Per-chunk domain from route_domain; None means "use the run's --domain".
+    domain: Optional[str] = None
 
     @property
     def content(self) -> str:
@@ -218,6 +236,113 @@ def parse_html_page(html_bytes: bytes, page_url: str, fallback_title: str) -> li
     ]
 
 
+def parse_pdf(pdf_bytes: bytes, pdf_url: str, fallback_title: str) -> list[FeedEntry]:
+    """Turn a PDF into page-anchored FeedEntry chunks, so the PDF path goes
+    through the same injection scan, dedup, embed and insert as RSS/HTML.
+
+    Chunks never span pages: each one cites `<pdf_url>#page=N`, which browsers
+    open at that page — a citation chip lands on the actual paragraph rather
+    than page 1 of a 60-page speech. Paragraphs are split on blank lines; pypdf
+    often emits none, so single lines are the fallback unit and _chunk_blocks
+    packs them back up to _CHUNK_MAX_CHARS."""
+    from pypdf import PdfReader  # type: ignore[import-untyped]
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    meta_title = ""
+    try:
+        meta_title = ((reader.metadata or {}).get("/Title") or "").strip()
+    except Exception:  # malformed metadata must not block the text
+        meta_title = ""
+    title = meta_title or fallback_title
+
+    entries: list[FeedEntry] = []
+    for page_no, page in enumerate(reader.pages, start=1):
+        try:
+            text = page.extract_text() or ""
+        except Exception as exc:
+            log.warning("pdf_page_extract_failed", url=pdf_url, page=page_no, error=str(exc))
+            continue
+        paragraphs = re.split(r"\n\s*\n", text)
+        if len(paragraphs) == 1:
+            paragraphs = text.split("\n")
+        blocks = [b for b in (_WHITESPACE_RE.sub(" ", p).strip() for p in paragraphs) if b]
+        for chunk in _chunk_blocks(blocks):
+            entries.append(FeedEntry(
+                title=f"{title} (p. {page_no})",
+                description=chunk,
+                link=f"{pdf_url}#page={page_no}",
+            ))
+    return entries
+
+
+# Per-chunk domain routing for multi-subject documents (the Budget speech
+# covers tax, cash aid, schools, hospitals, EPF and housing in one PDF).
+# Deliberately a deterministic keyword score, not an LLM call: it's
+# reproducible, testable, free, and a wrong guess only costs a chunk being
+# filed under a neighbouring domain — hybrid search still finds it by text.
+# Keywords are BM + EN, lowercase, matched on word boundaries.
+_DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "tax": (
+        "cukai", "tax", "taxes", "sst", "income tax", "cukai pendapatan", "duti setem",
+        "stamp duty", "rpgt", "excise", "eksais", "pelepasan cukai", "tax relief",
+        "tax incentive", "insentif cukai", "lhdn", "withholding", "e-invois", "e-invoice",
+        "tax deduction", "potongan cukai",
+    ),
+    "welfare": (
+        "str", "sumbangan tunai rahmah", "sara", "sumbangan asas rahmah", "bantuan",
+        "b40", "golongan rentan", "vulnerable", "cash aid", "welfare", "kebajikan",
+        "jkm", "oku", "warga emas", "senior citizens", "persons with disabilities",
+        "subsidi", "subsidy", "subsidies", "social protection", "perlindungan sosial",
+    ),
+    "business": (
+        "pks", "msme", "msmes", "sme", "smes", "usahawan", "entrepreneur",
+        "entrepreneurs", "perniagaan", "business", "businesses", "pembiayaan",
+        "financing", "geran", "grant", "grants", "startup", "startups", "tekun",
+        "sme corp", "mida", "pelaburan", "investment", "nimp", "industri", "industry",
+        "eksport", "export",
+    ),
+    "education": (
+        "pendidikan", "education", "sekolah", "school", "schools", "pelajar",
+        "student", "students", "universiti", "university", "universities", "ptptn",
+        "tvet", "guru", "teacher", "teachers", "biasiswa", "scholarship",
+        "scholarships", "kpm", "kpt",
+    ),
+    "healthcare": (
+        "kesihatan", "health", "healthcare", "hospital", "hospitals", "klinik",
+        "clinic", "clinics", "perubatan", "medical", "kkm", "moh", "doktor",
+        "doctors", "jururawat", "nurses", "ubat", "medicine", "mental health",
+    ),
+    "epf": (
+        "kwsp", "epf", "i-saraan", "caruman", "contribution", "contributions",
+        "persaraan", "retirement", "akaun fleksibel", "flexible account", "perkeso",
+        "socso",
+    ),
+    "property": (
+        "rumah", "perumahan", "housing", "home", "homes", "rumah mampu milik",
+        "affordable housing", "pr1ma", "rent-to-own", "sewa", "rental", "hartanah",
+        "property", "properties", "pembeli rumah pertama", "first-time homebuyers",
+        "skim jaminan kredit perumahan",
+    ),
+}
+_DOMAIN_PATTERNS: dict[str, re.Pattern[str]] = {
+    domain: re.compile(r"\b(?:" + "|".join(re.escape(k) for k in kws) + r")\b", re.IGNORECASE)
+    for domain, kws in _DOMAIN_KEYWORDS.items()
+}
+_ROUTE_MIN_HITS = 2  # one incidental "cukai" in a chunk about schools isn't a tax chunk
+
+
+def route_domain(text: str, fallback: str) -> str:
+    """The domain whose keywords hit `text` most often (at least
+    _ROUTE_MIN_HITS times), else `fallback`. Ties go to the earlier domain in
+    _DOMAIN_KEYWORDS, so the result is deterministic."""
+    best, best_hits = fallback, _ROUTE_MIN_HITS - 1
+    for domain, pattern in _DOMAIN_PATTERNS.items():
+        hits = len(pattern.findall(text))
+        if hits > best_hits:
+            best, best_hits = domain, hits
+    return best
+
+
 def _scan_for_injection(content: str) -> Optional[str]:
     """Same pattern list applied to user queries and CSV ingestion — a
     poisoned feed entry can't smuggle an indirect prompt injection into
@@ -315,17 +440,24 @@ async def main_async(args: argparse.Namespace) -> None:
     # on the RSS path unchanged.
     kind = getattr(args, "kind", "rss")
     is_html = kind == "html"
+    noun = {"html": "page", "pdf": "PDF"}.get(kind, "feed")
 
-    print(f"Fetching {'page' if is_html else 'feed'}: {args.feed_url}")
+    print(f"Fetching {noun}: {args.feed_url}")
     try:
         raw_bytes = fetch_feed(args.feed_url)
     except httpx.HTTPError as exc:
-        print(f"ERROR: failed to fetch {'page' if is_html else 'feed'} — {exc}", file=sys.stderr)
+        print(f"ERROR: failed to fetch {noun} — {exc}", file=sys.stderr)
         sys.exit(1)
 
+    fallback_title = getattr(args, "source_title", None) or args.feed_url
     if is_html:
-        fallback_title = getattr(args, "source_title", None) or args.feed_url
         entries = parse_html_page(raw_bytes, args.feed_url, fallback_title)[: args.limit]
+    elif kind == "pdf":
+        try:
+            entries = parse_pdf(raw_bytes, args.feed_url, fallback_title)[: args.limit]
+        except Exception as exc:  # pypdf raises several unrelated types on bad input
+            print(f"ERROR: failed to parse PDF — {exc}", file=sys.stderr)
+            sys.exit(1)
     else:
         try:
             entries = parse_feed(raw_bytes)[: args.limit]
@@ -333,6 +465,15 @@ async def main_async(args: argparse.Namespace) -> None:
             print(f"ERROR: failed to parse XML feed — {exc}", file=sys.stderr)
             sys.exit(1)
     print(f"Parsed {len(entries)} entries (limit {args.limit})")
+
+    # `is True`: callers passing a MagicMock namespace (tests) mustn't opt in by accident.
+    if getattr(args, "route_domains", False) is True:
+        for entry in entries:
+            entry.domain = route_domain(entry.content, args.domain)
+        counts: dict[str, int] = {}
+        for entry in entries:
+            counts[entry.domain or args.domain] = counts.get(entry.domain or args.domain, 0) + 1
+        print("Domain routing: " + ", ".join(f"{d}={n}" for d, n in sorted(counts.items())))
 
     skipped_injection = 0
     candidates: list[tuple[FeedEntry, str]] = []
@@ -379,14 +520,14 @@ async def main_async(args: argparse.Namespace) -> None:
             continue
 
         if args.dry_run:
-            print(f"  OK (dry-run) — {entry.title[:60]!r}")
+            print(f"  OK (dry-run) [{entry.domain or args.domain}] — {entry.title[:60]!r}")
             continue
 
         row = {
             "content": entry.content,
             "content_hash": content_hash,
             "language": args.language,
-            "domain": args.domain,
+            "domain": entry.domain or args.domain,
             "source_title": entry.title,
             "source_url": entry.link or args.feed_url,
             "ministry": args.ministry,
@@ -417,8 +558,13 @@ def main() -> None:
         help="Registered source from scripts/sources.py — fills in url/kind/domain/ministry/language",
     )
     parser.add_argument("--feed-url", help="RSS/Atom feed URL, or page URL with --kind html")
-    parser.add_argument("--kind", default="rss", choices=["rss", "html"], help="Source type (default: rss)")
-    parser.add_argument("--domain", choices=sorted(_VALID_DOMAINS))
+    parser.add_argument("--kind", default="rss", choices=["rss", "html", "pdf"], help="Source type (default: rss)")
+    parser.add_argument("--domain", choices=sorted(_VALID_DOMAINS), help="Domain (the fallback domain with --route-domains)")
+    parser.add_argument(
+        "--route-domains",
+        action="store_true",
+        help="Tag each chunk with its own domain by keyword (for multi-subject documents like the Budget speech)",
+    )
     parser.add_argument("--ministry", help="Attributed source, e.g. 'Parliament of Malaysia'")
     parser.add_argument("--language", default="bm", choices=["bm", "en", "zh"])
     parser.add_argument("--limit", type=int, default=50, help="Max entries/chunks per run")
@@ -428,6 +574,15 @@ def main() -> None:
 
     if args.source:
         source = get_source(args.source)
+        if not source.is_available():
+            assert source.available_from is not None
+            days = (source.available_from - date.today()).days
+            print(
+                f"UPCOMING — {source.name} is published from {source.available_from.isoformat()} "
+                f"({days} day(s) away); nothing fetched."
+            )
+            return
+        args.route_domains = args.route_domains or source.route_domains
         args.feed_url = args.feed_url or source.url
         args.kind = source.kind
         args.domain = args.domain or source.domain
