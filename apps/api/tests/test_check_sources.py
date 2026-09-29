@@ -71,21 +71,3 @@ async def test_check_sources_reports_connection_error_as_unhealthy(monkeypatch):
 
     ok = await check_sources((_SOURCE_A,))
     assert ok is False
-
-
-@pytest.mark.asyncio
-async def test_upcoming_source_is_reported_not_fetched(monkeypatch, capsys):
-    from datetime import date
-
-    upcoming = Source(
-        name="soon", url="https://belanjawan.mof.gov.my/pdf/x.pdf", kind="pdf", domain="finance",
-        ministry="MOF", language="bm", notes="n", available_from=date(2099, 1, 1),
-    )
-    head = AsyncMock()
-    monkeypatch.setattr(httpx.AsyncClient, "head", head)
-
-    ok = await check_sources((upcoming,))
-
-    assert ok is True
-    head.assert_not_called()
-    assert "UPCOMING" in capsys.readouterr().out

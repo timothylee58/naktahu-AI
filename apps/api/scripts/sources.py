@@ -37,10 +37,9 @@ flips it to a real run — see that workflow for the exact mechanism.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
-from typing import Literal, Optional
+from typing import Literal
 
-SourceKind = Literal["rss", "html", "pdf"]
+SourceKind = Literal["rss", "html"]
 SourceLanguage = Literal["bm", "en", "zh"]
 
 
@@ -55,18 +54,6 @@ class Source:
     ministry: str
     language: SourceLanguage
     notes: str
-    # Not published yet: the ingester and health check report the source as
-    # UPCOMING (with a countdown) instead of fetching it before this date, so
-    # a scheduled run can't record a pre-publication 404 as source rot.
-    available_from: Optional[date] = None
-    # Tag each chunk with its own domain (ingest_feed.route_domain) instead of
-    # stamping the whole document with `domain` — for documents like the
-    # Budget speech that span finance, tax, welfare, education, etc.
-    # `domain` stays the fallback for chunks no rule matches.
-    route_domains: bool = False
-
-    def is_available(self, today: Optional[date] = None) -> bool:
-        return self.available_from is None or (today or date.today()) >= self.available_from
 
 
 SOURCES: tuple[Source, ...] = (
@@ -904,60 +891,6 @@ SOURCES: tuple[Source, ...] = (
         ),
     ),
 )
-
-# ── Belanjawan 2027 (Budget 2027) — tabled 9 October 2026 ───────────────
-# These URLs are PREDICTED, not verified: they follow the exact paths MOF
-# used for Budget 2026 (belanjawan2026/ucapan/ub26.pdf, bs26.pdf,
-# revenue/fiscal_outlook_2026.pdf, hasil/tinjauan_fiskal_2026.pdf,
-# economy/economic-2026.pdf), with 2026 → 2027. The PDFs don't exist until
-# tabling day, so available_from holds them back until then; from 9 Oct a
-# 404 in check_sources means MOF changed the naming and the URL needs fixing
-# here — never cite a guessed URL that didn't resolve. The tax-measures PDF is
-# deliberately absent: its filename changed between 2025 and 2026, so it
-# can't be predicted and must be added once it's published.
-_BUDGET_2027_TABLED = date(2026, 10, 9)
-_BUDGET_2027_BASE = "https://belanjawan.mof.gov.my/pdf/belanjawan2027"
-_MOF = "Kementerian Kewangan Malaysia (MOF)"
-
-BUDGET_2027_SOURCES: tuple[Source, ...] = (
-    Source(
-        name="belanjawan-2027-ucapan-bm",
-        url=f"{_BUDGET_2027_BASE}/ucapan/ub27.pdf",
-        kind="pdf", domain="finance", ministry=_MOF, language="bm",
-        notes="Ucapan Belanjawan 2027 — the original-language Budget speech.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
-    ),
-    Source(
-        name="belanjawan-2027-speech-en",
-        url=f"{_BUDGET_2027_BASE}/ucapan/bs27.pdf",
-        kind="pdf", domain="finance", ministry=_MOF, language="en",
-        notes="Budget 2027 speech — MOF's English translation of ub27.pdf.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
-    ),
-    Source(
-        name="belanjawan-2027-fiscal-outlook-en",
-        url=f"{_BUDGET_2027_BASE}/revenue/fiscal_outlook_2027.pdf",
-        kind="pdf", domain="finance", ministry=_MOF, language="en",
-        notes="Fiscal Outlook 2027 — revenue, expenditure, Medium-Term Fiscal Framework.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
-    ),
-    Source(
-        name="belanjawan-2027-tinjauan-fiskal-bm",
-        url=f"{_BUDGET_2027_BASE}/hasil/tinjauan_fiskal_2027.pdf",
-        kind="pdf", domain="finance", ministry=_MOF, language="bm",
-        notes="Tinjauan Fiskal 2027 — BM edition of the Fiscal Outlook.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
-    ),
-    Source(
-        name="belanjawan-2027-economic-outlook-en",
-        url=f"{_BUDGET_2027_BASE}/economy/economic-2027.pdf",
-        kind="pdf", domain="finance", ministry=_MOF, language="en",
-        notes="Economic Outlook 2027 — macro context behind the Budget's figures.",
-        available_from=_BUDGET_2027_TABLED, route_domains=False,
-    ),
-)
-
-SOURCES = SOURCES + BUDGET_2027_SOURCES
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
 
