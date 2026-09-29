@@ -8,6 +8,8 @@ import { S4Agents } from "./Promo/S4Agents";
 import { S5Trust } from "./Promo/S5Trust";
 import { S6End } from "./Promo/S6End";
 import { Showcase } from "./Showcase/Showcase";
+import { Walkthrough } from "./Walkthrough/Walkthrough";
+import { WALKTHROUGHS } from "./Walkthrough/scripts";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -27,6 +29,11 @@ export const RemotionRoot: React.FC = () => {
         <Composition id="Showcase-en-9x16" component={Showcase} durationInFrames={1696} fps={30} width={1080} height={1920} defaultProps={{ lang: "en" }} />
         <Composition id="Showcase-zh-16x9" component={Showcase} durationInFrames={1696} fps={30} width={1920} height={1080} defaultProps={{ lang: "zh" }} />
         <Composition id="Showcase-zh-9x16" component={Showcase} durationInFrames={1696} fps={30} width={1080} height={1920} defaultProps={{ lang: "zh" }} />
+      </Folder>
+      <Folder name="Walkthrough">
+        {WALKTHROUGHS.map((s) => (
+          <Composition key={s.id} id={`Walkthrough-${s.id}`} component={Walkthrough} durationInFrames={3000} fps={30} width={1920} height={1080} defaultProps={{ id: s.id }} />
+        ))}
       </Folder>
       <Composition id="NaktahuPromo" component={Promo} durationInFrames={600} fps={30} width={1920} height={1080} />
     </>
