@@ -348,13 +348,13 @@ export const Hud: React.FC<{ chapters: { name: string; from: number; to: number 
  */
 export const ChapterCard: React.FC<{ n: number; title: string; line: string }> = ({ n, title, line }) => {
   const frame = useCurrentFrame();
+  const { width: W, height: H } = useVideoConfig();
+  const v = H > W;
   const out = prog(frame, BEAT * 2 + 6, 12, EXPO_IN);
   if (out >= 1) return null;
   const numP = prog(frame, 0, 10);
   const wipe = prog(frame, 4, 16);
   const lineP = prog(frame, 12, 14);
-  const { width: W, height: H } = useVideoConfig();
-  const v = H > W;
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", pointerEvents: "none" }}>
       <AbsoluteFill style={{ background: "rgba(4,6,20,0.72)", backdropFilter: `blur(${14 * (1 - out)}px)`, opacity: (1 - out) * Math.min(1, frame / 4) }} />
