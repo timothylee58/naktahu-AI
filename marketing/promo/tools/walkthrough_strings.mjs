@@ -18,16 +18,19 @@ const FILES = ["ask.tsx", "business.tsx", "life.tsx", "ui.tsx", "Walkthrough.tsx
 // props/keys whose values are never shown as text
 const SKIP_KEYS = new Set([
   "style", "key", "id", "d", "viewBox", "fill", "stroke", "strokeWidth", "strokeLinecap", "strokeLinejoin",
-  "tone", "kind", "side", "color", "hue", "audio", "active", "l", "lang", "k", "icon", "transformOrigin",
+  "tone", "kind", "side", "color", "hue", "audio", "active", "l", "lang", "icon", "transformOrigin",
   "fontFamily", "background", "border", "boxShadow", "padding", "src", "href", "number",
 ]);
-const CSSISH = /^(#|rgba?\(|linear-|radial-|inset|translate|scale|rotate|blur|calc|\d)|(\dpx|%|em)\b/;
+// a value is styling only if EVERY token is a CSS token ("0 0 60px rgba(…)"),
+// so copy that merely starts with a number ("3 matching grants") is kept
+const CSS_TOKEN = /^(-?[\d.]+(px|%|em|deg|s|ms|fr)?|#[0-9a-f]{3,8}|rgba?\(.*|hsla?\(.*|linear-.*|radial-.*|inset|solid|dashed|auto|none|[a-z-]+\(.*|.*\)|,),?$/i;
+const isCss = (t) => t.split(/\s+/).every((tok) => CSS_TOKEN.test(tok));
 
 const found = new Set();
 const keep = (s) => {
   const t = s.trim();
   if (!t || !/[A-Za-zÀ-ɏ一-鿿]/.test(t)) return false;
-  if (CSSISH.test(t)) return false;
+  if (isCss(t)) return false;
   if (/^[a-z0-9_-]+$/.test(t)) return false; // css keywords, ids, file stems
   if (/\.(tsx?|wav|pdf|png|json)$/.test(t) && !/\s/.test(t)) return false;
   return true;

@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Audio } from "@remotion/media";
 import { Mark } from "../Promo/Mark";
 import { Finish } from "../Promo/Shared";
@@ -23,6 +23,7 @@ import {
   type CurKey,
   EXPO_IN,
   Hud,
+  Landscape,
   Spotlight,
   clamp,
   display,
@@ -62,6 +63,8 @@ export type Script = {
 const Hook: React.FC<{ s: Script }> = ({ s }) => {
   const frame = useCurrentFrame();
   const t = useW();
+  const { width: W, height: H } = useVideoConfig();
+  const v = H > W;
   const out = prog(frame, HOOK.dur - 8, 8, EXPO_IN);
   const collapse = prog(frame, BAR - 6, 18);
   return (
@@ -69,8 +72,8 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
       {s.hook.chaos.map((tab, i) => {
         const a = (i * 137.5 * Math.PI) / 180;
         const r = 300 + (i % 3) * 120;
-        const x = 960 + Math.cos(a) * r * 1.5;
-        const y = 540 + Math.sin(a) * r * 0.75;
+        const x = W / 2 + Math.cos(a) * r * (v ? 0.55 : 1.5);
+        const y = H / 2 + Math.sin(a) * r * (v ? 1.9 : 0.75);
         const p = prog(frame, i * 3, 14);
         const drift = Math.sin(frame / 20 + i) * 8;
         return (
@@ -78,8 +81,8 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
             key={tab}
             style={{
               position: "absolute",
-              left: x + (960 - x) * collapse,
-              top: y + drift + (540 - y) * collapse,
+              left: x + (W / 2 - x) * collapse,
+              top: y + drift + (H / 2 - y) * collapse,
               translate: "-50% -50%",
               rotate: `${(i % 2 ? 1 : -1) * (3 + (i % 4)) * (1 - collapse)}deg`,
               scale: `${(0.7 + 0.3 * p) * (1 - collapse * 0.9)}`,
@@ -102,9 +105,9 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
         );
       })}
       <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
-        <div style={{ width: 1600 }}>
+        <div style={{ width: v ? W - 120 : 1600 }}>
           {s.hook.lines.map((l, i) => (
-            <Slam key={l} chunks={[t(l)]} at={[BAR + i * BEAT * 2 - (i ? 0 : 4)]} size={150} align="center" accent={i === s.hook.accent ? [0] : []} />
+            <Slam key={l} chunks={[t(l)]} at={[BAR + i * BEAT * 2 - (i ? 0 : 4)]} size={v ? 118 : 150} align="center" accent={i === s.hook.accent ? [0] : []} />
           ))}
         </div>
       </AbsoluteFill>
@@ -116,6 +119,8 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
 const Title: React.FC<{ s: Script }> = ({ s }) => {
   const frame = useCurrentFrame();
   const t = useW();
+  const { width: W, height: H } = useVideoConfig();
+  const v = H > W;
   const out = prog(frame, TITLE.dur - 10, 10, EXPO_IN);
   const word = "naktahu.my".split("");
   const line = prog(frame, BEAT * 2, 16);
@@ -140,8 +145,8 @@ const Title: React.FC<{ s: Script }> = ({ s }) => {
         <span style={{ fontFamily: mono, fontSize: 28, letterSpacing: "0.24em", color: C.amber }}>{t("WALKTHROUGH")} {s.number}</span>
         <div style={{ width: 90 * line, height: 2, background: C.amber }} />
       </div>
-      <div style={{ fontSize: 96, fontWeight: 800, letterSpacing: "-0.04em", color: C.white, clipPath: `inset(0 ${(1 - name) * 100}% 0 0)` }}>{t(s.name)}</div>
-      <div style={{ fontSize: 36, fontWeight: 500, color: C.mute, opacity: prog(frame, BEAT * 4, 14) }}>{t(s.tagline)}</div>
+      <div style={{ fontSize: v ? 84 : 96, maxWidth: W - 120, textAlign: "center", lineHeight: 1.05, fontWeight: 800, letterSpacing: "-0.04em", color: C.white, clipPath: `inset(0 ${(1 - name) * 100}% 0 0)` }}>{t(s.name)}</div>
+      <div style={{ fontSize: 36, maxWidth: W - 120, textAlign: "center", fontWeight: 500, color: C.mute, opacity: prog(frame, BEAT * 4, 14) }}>{t(s.tagline)}</div>
     </AbsoluteFill>
   );
 };
@@ -150,18 +155,24 @@ const Title: React.FC<{ s: Script }> = ({ s }) => {
 const Recap: React.FC<{ s: Script }> = ({ s }) => {
   const frame = useCurrentFrame();
   const t = useW();
+  const { width: W, height: H } = useVideoConfig();
+  const v = H > W;
   const out = prog(frame, RECAP.dur - 8, 8, EXPO_IN);
   const card = prog(frame, BAR - 4, 16);
+  // fit the one-row recap to the frame: longer translations get a smaller size
+  const words = s.recap.lines.map(t);
+  const chars = words.reduce((n, w) => n + [...w].reduce((m, c) => m + (/[\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF]/.test(c) ? 1.8 : 1), 0), 0);
+  const recapSize = v ? 130 : Math.min(140, Math.floor((W - 260) / (chars * 0.56)));
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 40, opacity: 1 - out, filter: `blur(${out * 10}px)` }}>
-      <div style={{ display: "flex", gap: 56, translate: `0 ${-card * 60}px` }}>
+      <div style={{ display: "flex", flexDirection: v ? "column" : "row", alignItems: "center", gap: v ? 10 : 56, whiteSpace: "nowrap", translate: `0 ${-card * 60}px` }}>
         {s.recap.lines.map((l, i) => (
-          <Slam key={l} chunks={[t(l)]} at={[i * BEAT]} size={140} accent={i === s.recap.lines.length - 1 ? [0] : []} />
+          <Slam key={l} chunks={[words[i]]} at={[i * BEAT]} size={recapSize} align={v ? "center" : "left"} accent={i === s.recap.lines.length - 1 ? [0] : []} />
         ))}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 28, padding: "30px 44px", borderRadius: 30, background: "rgba(20,26,66,0.85)", border: "1.5px solid rgba(123,145,255,0.45)", boxShadow: "0 30px 80px rgba(0,0,0,0.45), 0 0 90px rgba(59,91,255,0.25)", opacity: card, scale: `${0.85 + 0.15 * card}`, fontFamily: display }}>
+      <div style={{ display: "flex", flexDirection: v ? "column" : "row", maxWidth: W - 120, textAlign: "center", alignItems: "center", gap: v ? 14 : 28, padding: "30px 44px", borderRadius: 30, background: "rgba(20,26,66,0.85)", border: "1.5px solid rgba(123,145,255,0.45)", boxShadow: "0 30px 80px rgba(0,0,0,0.45), 0 0 90px rgba(59,91,255,0.25)", opacity: card, scale: `${0.85 + 0.15 * card}`, fontFamily: display }}>
         <div style={{ fontFamily: mono, fontSize: 24, letterSpacing: "0.18em", color: C.amber }}>{t(s.recap.plan)}</div>
-        <div style={{ width: 2, height: 46, background: "rgba(160,175,255,0.3)" }} />
+        {!v && <div style={{ width: 2, height: 46, background: "rgba(160,175,255,0.3)" }} />}
         <div style={{ fontSize: 36, fontWeight: 700, color: C.white }}>{t(s.recap.planDetail)}</div>
       </div>
     </AbsoluteFill>
@@ -177,12 +188,14 @@ const ChapterScene: React.FC<{ c: Chapter; n: number }> = ({ c, n }) => {
   return (
     <AbsoluteFill>
       <AbsoluteFill style={{ opacity: vis }}>
-        <Camera keys={c.cam}>
-          <Screen />
-          {c.spots?.map((s) => <Spotlight key={`${s.f}-${s.x}`} {...s} from={s.f} />)}
-          {c.callouts?.map((k) => <Callout key={`${k.f}-${k.text}`} {...k} text={t(k.text)} from={k.f} />)}
-          {c.cursor && <Cursor keys={c.cursor} />}
-        </Camera>
+        <Landscape>
+          <Camera keys={c.cam}>
+            <Screen />
+            {c.spots?.map((s) => <Spotlight key={`${s.f}-${s.x}`} {...s} from={s.f} />)}
+            {c.callouts?.map((k) => <Callout key={`${k.f}-${k.text}`} {...k} text={t(k.text)} from={k.f} />)}
+            {c.cursor && <Cursor keys={c.cursor} />}
+          </Camera>
+        </Landscape>
       </AbsoluteFill>
       {c.captions.map((k) => (
         <Caption key={k.f} from={k.f} to={k.to} text={t(k.text)} detail={k.detail && t(k.detail)} />

@@ -436,7 +436,7 @@ const Deadlines: React.FC = () => {
         <Abs key={r.name} x={356} y={310 + i * 104} w={1000}>
           <Rise at={10 + i * 6}>
             <div style={{ display: "flex", alignItems: "center", gap: 22, height: 88, padding: "0 26px", borderRadius: 18, background: G.panel, border: `1.5px solid ${G.border}` }}>
-              <div style={{ width: 70, textAlign: "center", fontFamily: mono, fontSize: 16, lineHeight: 1.2, color: C.mute }}>{r.due.split(" ").slice(0, 2).join(" ")}</div>
+              <div style={{ width: 70, textAlign: "center", fontFamily: mono, fontSize: 16, lineHeight: 1.2, color: C.mute }}>{t(r.due)}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 23, fontWeight: 700 }}>{tx(r.name)}</div>
                 <div style={{ fontSize: 17, color: C.mute }}>{tx(r.d)} · {tx(r.f)}{" "}{t("· View official source ↗")}</div>

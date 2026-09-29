@@ -46,6 +46,8 @@ export const camAt = (keys: CamKey[], frame: number, move = 24): Required<CamKey
 };
 
 export const CamContext = React.createContext<{ scale: number }>({ scale: 1 });
+/** The frame the Camera composes for; set by <Landscape> so a 9:16 cut can film a 16:9 shot. */
+const FrameSize = React.createContext<{ W: number; H: number } | null>(null);
 
 /**
  * Films app space. At z=1 the whole app fits with a cinematic margin; the
@@ -53,7 +55,8 @@ export const CamContext = React.createContext<{ scale: number }>({ scale: 1 });
  */
 export const Camera: React.FC<{ keys: CamKey[]; move?: number; children: React.ReactNode }> = ({ keys, move, children }) => {
   const frame = useCurrentFrame();
-  const { width: W, height: H } = useVideoConfig();
+  const cfg = useVideoConfig();
+  const { W, H } = React.useContext(FrameSize) ?? { W: cfg.width, H: cfg.height };
   const cam = camAt(keys, frame, move);
   const fit = Math.min(W / APP_W, H / APP_H) * 0.86;
   const scale = fit * cam.z;
@@ -77,6 +80,23 @@ export const Camera: React.FC<{ keys: CamKey[]; move?: number; children: React.R
         <CamContext.Provider value={{ scale }}>{children}</CamContext.Provider>
       </div>
     </AbsoluteFill>
+  );
+};
+
+/**
+ * 9:16 reframe: the landscape shot, exactly as the 16:9 cut frames it,
+ * played in a 16:9 window across the vertical frame — the HUD above and the
+ * captions below it — so zooms, callouts and cursor land the same in both cuts.
+ */
+export const VERTICAL_WINDOW = { scale: 0.7, centerY: 0.45 };
+export const Landscape: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { width: W, height: H } = useVideoConfig();
+  if (H <= W) return <>{children}</>;
+  const k = VERTICAL_WINDOW.scale;
+  return (
+    <div style={{ position: "absolute", left: (W - 1920 * k) / 2, top: H * VERTICAL_WINDOW.centerY - (1080 * k) / 2, width: 1920, height: 1080, transform: `scale(${k})`, transformOrigin: "0 0" }}>
+      <FrameSize.Provider value={{ W: 1920, H: 1080 }}>{children}</FrameSize.Provider>
+    </div>
   );
 };
 
@@ -246,7 +266,8 @@ export const Caret: React.FC<{ on?: boolean; h?: number }> = ({ on = true, h = 3
  */
 export const Caption: React.FC<{ from: number; to: number; text: string; detail?: string }> = ({ from, to, text, detail }) => {
   const frame = useCurrentFrame();
-  const { height: H } = useVideoConfig();
+  const { width: W, height: H } = useVideoConfig();
+  const v = H > W;
   const inP = prog(frame, from, 14);
   const outP = prog(frame, to - 8, 8, EXPO_IN);
   if (inP <= 0 || outP >= 1) return null;
@@ -255,8 +276,9 @@ export const Caption: React.FC<{ from: number; to: number; text: string; detail?
       style={{
         position: "absolute",
         left: 64,
-        bottom: 64,
-        maxWidth: 1100,
+        // 9:16: just under the landscape window
+        ...(v ? { top: H * VERTICAL_WINDOW.centerY + (1080 * VERTICAL_WINDOW.scale) / 2 + 56 } : { bottom: 64 }),
+        maxWidth: v ? W - 128 : 1100,
         display: "flex",
         flexDirection: "column",
         gap: 8,
@@ -271,8 +293,8 @@ export const Caption: React.FC<{ from: number; to: number; text: string; detail?
         filter: `blur(${(1 - inP) * 6 + outP * 6}px)`,
       }}
     >
-      <div style={{ fontFamily: display, fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15, color: C.white }}>{text}</div>
-      {detail && <div style={{ fontFamily: display, fontSize: 27, fontWeight: 500, lineHeight: 1.35, color: C.mute }}>{detail}</div>}
+      <div style={{ fontFamily: display, fontSize: v ? 48 : 40, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15, color: C.white }}>{text}</div>
+      {detail && <div style={{ fontFamily: display, fontSize: v ? 32 : 27, fontWeight: 500, lineHeight: 1.35, color: C.mute }}>{detail}</div>}
     </div>
   );
 };
@@ -286,6 +308,7 @@ export const Hud: React.FC<{ chapters: { name: string; from: number; to: number 
   const idx = chapters.findIndex((c) => frame >= c.from && frame < c.to);
   const x0 = 64;
   const x1 = W - 64;
+  const v = H > W;
   const seg = (x1 - x0 - (chapters.length - 1) * 10) / chapters.length;
   const cur = chapters[idx];
   return (
@@ -294,10 +317,15 @@ export const Hud: React.FC<{ chapters: { name: string; from: number; to: number 
         NAKTAHU.MY <span style={{ color: C.amber }}>·</span> {series}
       </div>
       {cur && (
-        <div key={idx} style={{ position: "absolute", right: W - x1, top: 38, display: "flex", alignItems: "baseline", gap: 14, fontFamily: display }}>
+        <div key={idx} style={{ position: "absolute", ...(v ? { left: x0, top: 90 } : { right: W - x1, top: 38 }), display: "flex", alignItems: "baseline", gap: 14, fontFamily: display }}>
           <span style={{ fontFamily: mono, fontSize: 26, color: C.amber }}>{String(idx + 1).padStart(2, "0")}</span>
           <span style={{ fontFamily: mono, fontSize: 22, color: C.mute }}>/ {String(chapters.length).padStart(2, "0")}</span>
           <span style={{ fontSize: 28, fontWeight: 700, color: C.white, opacity: prog(frame, cur.from, 12), translate: `${(1 - prog(frame, cur.from, 12)) * 20}px 0` }}>{cur.name}</span>
+        </div>
+      )}
+      {v && cur && (
+        <div key={`big-${idx}`} style={{ position: "absolute", left: x0, right: W - x1, top: H * VERTICAL_WINDOW.centerY - (1080 * VERTICAL_WINDOW.scale) / 2 - 150, fontFamily: display, fontSize: 76, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, color: C.white, opacity: prog(frame, cur.from + 50, 14), translate: `0 ${(1 - prog(frame, cur.from + 50, 14)) * 24}px` }}>
+          {cur.name}
         </div>
       )}
       <div style={{ position: "absolute", left: x0, top: H - 22, display: "flex", gap: 10 }}>
@@ -325,16 +353,18 @@ export const ChapterCard: React.FC<{ n: number; title: string; line: string }> =
   const numP = prog(frame, 0, 10);
   const wipe = prog(frame, 4, 16);
   const lineP = prog(frame, 12, 14);
+  const { width: W, height: H } = useVideoConfig();
+  const v = H > W;
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", pointerEvents: "none" }}>
       <AbsoluteFill style={{ background: "rgba(4,6,20,0.72)", backdropFilter: `blur(${14 * (1 - out)}px)`, opacity: (1 - out) * Math.min(1, frame / 4) }} />
-      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 48, opacity: 1 - out, translate: `${out * -120}px 0`, filter: `blur(${out * 10}px)` }}>
+      <div style={{ position: "relative", display: "flex", flexDirection: v ? "column" : "row", alignItems: "center", gap: v ? 24 : 48, maxWidth: W - 120, textAlign: v ? "center" : "left", opacity: 1 - out, translate: `${out * -120}px 0`, filter: `blur(${out * 10}px)` }}>
         <div style={{ fontFamily: display, fontSize: 260, fontWeight: 800, letterSpacing: "-0.06em", lineHeight: 0.9, color: "transparent", WebkitTextStroke: `3px ${C.blueHi}`, opacity: numP, scale: `${1.4 - 0.4 * numP}` }}>
           {String(n).padStart(2, "0")}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: v ? "center" : "flex-start", gap: 14 }}>
           <div style={{ overflow: "hidden" }}>
-            <div style={{ fontFamily: display, fontSize: 110, fontWeight: 800, letterSpacing: "-0.045em", lineHeight: 1, color: C.white, clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)` }}>{title}</div>
+            <div style={{ fontFamily: display, fontSize: (v ? 96 : 110) * Math.min(1, 14 / Math.max(14, [...title].length)) ** 0.6, fontWeight: 800, letterSpacing: "-0.045em", lineHeight: 1, color: C.white, clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)` }}>{title}</div>
           </div>
           <div style={{ fontFamily: display, fontSize: 40, fontWeight: 500, color: C.mute, opacity: lineP, translate: `0 ${(1 - lineP) * 14}px` }}>{line}</div>
         </div>
