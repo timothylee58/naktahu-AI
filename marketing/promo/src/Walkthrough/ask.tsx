@@ -3,16 +3,18 @@ import { useCurrentFrame } from "remotion";
 import { Mark } from "../Promo/Mark";
 import { C, EXPO_OUT, display, mono, prog, streamed, typed } from "./engine";
 import { Abs, AppShell, Button, Card, Check, Chip, DemoFlag, Field, G, Rise, Spinner } from "./ui";
+import { LANG_CODE, LANG_NAME, type WLang, useW, useWLang } from "./i18n";
 import type { Chapter, Script } from "./Walkthrough";
 
 /**
  * Walkthrough 01 — Ask anything. One citizen, one question (the landing
  * page's own demo: child tax relief), followed from typing to sharing.
- * UI labels are the product's real EN strings (apps/web i18n).
+ * UI labels are the product's real EN strings (apps/web i18n); every string
+ * goes through useW(), and the answer itself is written per language below.
  */
 
 const Q = "How do I claim child tax relief?";
-const ANSWER: Record<"en" | "bm" | "zh", string[]> = {
+const ANSWER: Record<WLang, string[]> = {
   en: [
     "Relief depends on your child's age and studies — up to RM8,000 a year per child in higher education, subject to current LHDN conditions.",
     "Claim it when you file your income tax return on MyTax (e-Filing), under the child relief section.",
@@ -35,10 +37,14 @@ const SOURCES = [
 ];
 const FOLLOWUPS = ["Which documents should I keep?", "When is the e-Filing deadline?", "Can I claim for a disabled child?"];
 const HISTORY = [Q, "EPF withdrawal for a home", "Register a company with SSM"];
+/** The two languages the translate menu switches to, after the video's own. */
+const SWITCH_TO: Record<WLang, [WLang, WLang]> = { en: ["bm", "zh"], bm: ["en", "zh"], zh: ["bm", "en"] };
 
 // ---------------------------------------------------------------- shared chat pieces
-const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string; rec?: number; press?: number; lang?: string }> = ({ value, focus, placeholder = "How do I register a company with SSM?", rec, press, lang = "EN" }) => {
+const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string; rec?: number; press?: number; lang?: string }> = ({ value, focus, placeholder = "How do I register a company with SSM?", rec, press, lang }) => {
   const frame = useCurrentFrame();
+  const t = useW();
+  const base = useWLang();
   const recording = rec !== undefined && frame >= rec;
   const lvl = (i: number) => 0.25 + 0.75 * Math.abs(Math.sin(frame / 3 + i * 1.7) * Math.sin(frame / 7 + i));
   return (
@@ -53,12 +59,12 @@ const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string;
             </div>
           ) : (
             <>
-              {value || placeholder}
+              {value || t(placeholder)}
               {focus && <span style={{ display: "inline-block", width: 3, height: 32, marginLeft: 3, background: C.blueHi, verticalAlign: "middle", opacity: Math.floor(frame / 8) % 2 ? 0 : 1 }} />}
             </>
           )}
         </div>
-        <div style={{ padding: "8px 14px", borderRadius: 999, background: G.panel, border: `1px solid ${G.border}`, fontFamily: mono, fontSize: 18, color: C.mute }}>{lang}</div>
+        <div style={{ padding: "8px 14px", borderRadius: 999, background: G.panel, border: `1px solid ${G.border}`, fontFamily: mono, fontSize: 18, color: C.mute }}>{lang ?? LANG_CODE[base]}</div>
         {/* voice */}
         <div style={{ width: 70, height: 70, borderRadius: 35, display: "flex", alignItems: "center", justifyContent: "center", background: recording ? "rgba(230,30,37,0.85)" : G.panelHi, boxShadow: recording ? `0 0 0 ${8 + 6 * Math.sin(frame / 4)}px rgba(230,30,37,0.25)` : "none" }}>
           <svg width="30" height="30" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3" fill="white" /><path d="M5 11 a7 7 0 0 0 14 0 M12 18 V21" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" /></svg>
@@ -68,7 +74,7 @@ const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string;
           <svg width="30" height="30" viewBox="0 0 28 28"><path d="M14 22 V6 M7 13 L14 6 L21 13" stroke="white" strokeWidth="3.2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </div>
       </div>
-      <div style={{ position: "absolute", left: 32, top: 120, fontSize: 17, color: "rgba(139,147,196,0.7)" }}>Enter to send · Ctrl+Enter · Esc to clear</div>
+      <div style={{ position: "absolute", left: 32, top: 120, fontSize: 17, color: "rgba(139,147,196,0.7)" }}>{t("Enter to send · Ctrl+Enter · Esc to clear")}</div>
     </Abs>
   );
 };
@@ -84,11 +90,12 @@ const Avatar: React.FC<{ at: number; x: number; y: number }> = ({ at, x, y }) =>
 
 const UserBubble: React.FC<{ text: string; at: number; y: number }> = ({ text, at, y }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const p = prog(frame, at, 12);
   return (
     <Abs x={960} y={y} w={900}>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <div style={{ opacity: p, scale: `${0.8 + 0.2 * p}`, transformOrigin: "100% 100%", background: C.blue, color: "white", fontSize: 30, fontWeight: 600, padding: "20px 30px", borderRadius: "28px 28px 8px 28px", boxShadow: "0 18px 44px rgba(59,91,255,0.4)" }}>{text}</div>
+        <div style={{ opacity: p, scale: `${0.8 + 0.2 * p}`, transformOrigin: "100% 100%", background: C.blue, color: "white", fontSize: 30, fontWeight: 600, padding: "20px 30px", borderRadius: "28px 28px 8px 28px", boxShadow: "0 18px 44px rgba(59,91,255,0.4)" }}>{t(text)}</div>
       </div>
     </Abs>
   );
@@ -96,6 +103,7 @@ const UserBubble: React.FC<{ text: string; at: number; y: number }> = ({ text, a
 
 const Thinking: React.FC<{ at: number; y: number; doneAt?: number }> = ({ at, y, doneAt = 1e9 }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const steps = ["Searching knowledge base…", "Analysing information…", "Drafting response…"];
   if (frame >= doneAt) return null;
   return (
@@ -111,7 +119,7 @@ const Thinking: React.FC<{ at: number; y: number; doneAt?: number }> = ({ at, y,
               <div style={{ width: 34, height: 34, borderRadius: 17, border: `2.5px solid ${done ? G.green : C.blueHi}`, display: "flex", alignItems: "center", justifyContent: "center", background: done ? G.greenSoft : "transparent" }}>
                 {done ? <Check /> : <Spinner size={18} color={C.blueHi} />}
               </div>
-              {s}
+              {t(s)}
             </div>
           );
         })}
@@ -121,10 +129,12 @@ const Thinking: React.FC<{ at: number; y: number; doneAt?: number }> = ({ at, y,
 };
 
 /** The answer, streamed word by word from `at`, or instantly when `at` is in the past. `lang` swaps in a translation with a blur crossfade. */
-const Answer: React.FC<{ at: number; y: number; langs?: { f: number; l: "en" | "bm" | "zh" }[]; sourcesAt?: number }> = ({ at, y, langs = [], sourcesAt }) => {
+const Answer: React.FC<{ at: number; y: number; langs?: { f: number; l: WLang }[]; sourcesAt?: number }> = ({ at, y, langs = [], sourcesAt }) => {
   const frame = useCurrentFrame();
+  const t = useW();
+  const base = useWLang();
   const cur = [...langs].reverse().find((k) => frame >= k.f);
-  const lang = cur?.l ?? "en";
+  const lang = cur?.l ?? base;
   const swap = cur ? prog(frame, cur.f, 14) : 1;
   const cjk = lang === "zh";
   let budget = Math.floor((frame - at) * 0.95);
@@ -156,8 +166,8 @@ const Answer: React.FC<{ at: number; y: number; langs?: { f: number; l: "en" | "
               <div style={{ opacity: p, scale: `${0.8 + 0.2 * p}`, display: "flex", alignItems: "center", gap: 14, padding: "12px 18px 12px 12px", borderRadius: 16, background: "rgba(59,91,255,0.14)", border: "1.5px solid rgba(123,145,255,0.5)" }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: C.blue, fontFamily: mono, fontSize: 19, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.n}</div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: 21, fontWeight: 700 }}>{s.title}</span>
-                  <span style={{ fontFamily: mono, fontSize: 15, color: C.mute }}>{s.agency} · {s.date}</span>
+                  <span style={{ fontSize: 21, fontWeight: 700 }}>{t(s.title)}</span>
+                  <span style={{ fontFamily: mono, fontSize: 15, color: C.mute }}>{s.agency} · {t(s.date)}</span>
                 </div>
               </div>
             </Abs>
@@ -175,11 +185,12 @@ const ACTIONS = [
 ];
 const ActionRow: React.FC<{ y: number; at: number; hot?: string }> = ({ y, at, hot }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   return (
     <>
       {ACTIONS.map((a, i) => (
         <Abs key={a.k} x={a.x} y={y} w={a.w} h={48}>
-          <div style={{ opacity: prog(frame, at + i * 3, 10), height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, color: hot === a.k ? C.white : C.mute, background: hot === a.k ? "rgba(59,91,255,0.25)" : G.panel, border: `1.5px solid ${hot === a.k ? C.blueHi : G.border}` }}>{a.k}</div>
+          <div style={{ opacity: prog(frame, at + i * 3, 10), height: 48, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, color: hot === a.k ? C.white : C.mute, background: hot === a.k ? "rgba(59,91,255,0.25)" : G.panel, border: `1.5px solid ${hot === a.k ? C.blueHi : G.border}` }}>{t(a.k)}</div>
         </Abs>
       ))}
       <Abs x={1274} y={y} w={140} h={48}>
@@ -195,13 +206,14 @@ const actionCenter = (k: string, y: number) => {
 
 const Menu: React.FC<{ x: number; y: number; w: number; items: string[]; at: number; to?: number; hot?: number }> = ({ x, y, w, items, at, to = 1e9, hot }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const p = Math.min(prog(frame, at, 10), 1 - prog(frame, to, 6));
   if (p <= 0) return null;
   return (
     <Abs x={x} y={y} w={w}>
       <div style={{ opacity: p, scale: `${0.94 + 0.06 * p}`, transformOrigin: "20% 0%", background: "rgba(16,21,56,0.98)", border: `1.5px solid ${G.border}`, borderRadius: 18, padding: 8, boxShadow: "0 30px 70px rgba(0,0,0,0.55)" }}>
         {items.map((it, i) => (
-          <div key={it} style={{ height: 52, display: "flex", alignItems: "center", padding: "0 18px", borderRadius: 12, fontSize: 22, fontWeight: 600, background: hot === i ? "rgba(59,91,255,0.3)" : "transparent" }}>{it}</div>
+          <div key={it} style={{ height: 52, display: "flex", alignItems: "center", padding: "0 18px", borderRadius: 12, fontSize: 22, fontWeight: 600, background: hot === i ? "rgba(59,91,255,0.3)" : "transparent" }}>{t(it)}</div>
         ))}
       </div>
     </Abs>
@@ -212,12 +224,13 @@ const menuItem = (x: number, y: number, i: number) => ({ x: x + 150, y: y + 8 + 
 
 const Toast: React.FC<{ text: string; at: number; dur?: number }> = ({ text, at, dur = 60 }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const p = Math.min(prog(frame, at, 10), 1 - prog(frame, at + dur, 8));
   if (p <= 0) return null;
   return (
     <Abs x={960} y={130} w={300}>
       <div style={{ opacity: p, translate: `0 ${(1 - p) * -20}px`, display: "flex", alignItems: "center", gap: 12, justifyContent: "center", padding: "14px 22px", borderRadius: 16, background: G.greenSoft, border: `1.5px solid ${G.green}`, fontSize: 22, fontWeight: 700 }}>
-        <Check /> {text}
+        <Check /> {t(text)}
       </div>
     </Abs>
   );
@@ -227,6 +240,7 @@ const Toast: React.FC<{ text: string; at: number; dur?: number }> = ({ text, at,
 const C1 = { start: 120, chat: 132, focus: 172, type: 182, send: 262, think: 280 };
 const LandingOrChat: React.FC = () => {
   const frame = useCurrentFrame();
+  const t = useW();
   const landing = frame < C1.chat;
   const sent = frame >= C1.send;
   return (
@@ -238,10 +252,10 @@ const LandingOrChat: React.FC = () => {
               <Rise at={0}><Chip on size={20}>🇲🇾 Built for Malaysia</Chip></Rise>
               <Rise at={4}>
                 <div style={{ fontSize: 78, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, maxWidth: 1250 }}>
-                  Ask anything about the <span style={{ color: C.blueHi }}>Malaysian government.</span>
+                  {t("Ask anything about the")} <span style={{ color: C.blueHi }}>{t("Malaysian government.")}</span>
                 </div>
               </Rise>
-              <Rise at={9}><div style={{ fontSize: 30, color: C.mute }}>Ask once. Know now.</div></Rise>
+              <Rise at={9}><div style={{ fontSize: 30, color: C.mute }}>{t("Ask once. Know now.")}</div></Rise>
             </div>
           </Abs>
           <Abs x={820} y={580}><Rise at={12}><Button press={C1.start} size={24}>Start Asking</Button></Rise></Abs>
@@ -262,7 +276,7 @@ const LandingOrChat: React.FC = () => {
           {!sent && (
             <Abs x={300} y={190} w={1620}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 26 }}>
-                <Rise at={C1.chat}><div style={{ fontSize: 58, fontWeight: 800, letterSpacing: "-0.035em" }}>What do you need to know today?</div></Rise>
+                <Rise at={C1.chat}><div style={{ fontSize: 58, fontWeight: 800, letterSpacing: "-0.035em" }}>{t("What do you need to know today?")}</div></Rise>
                 <Rise at={C1.chat + 4}>
                   <div style={{ display: "flex", gap: 14 }}>
                     <Chip on tone="blue">● Bilingual engine active</Chip>
@@ -293,7 +307,7 @@ const LandingOrChat: React.FC = () => {
               <Thinking at={C1.think + 4} y={270} />
             </>
           )}
-          <InputBar value={sent ? "" : typed(Q, frame, C1.type, 2.2)} focus={frame >= C1.focus && !sent} press={C1.send} />
+          <InputBar value={sent ? "" : typed(t(Q), frame, C1.type, 2.2)} focus={frame >= C1.focus && !sent} press={C1.send} />
         </>
       )}
     </AppShell>
@@ -334,6 +348,7 @@ const ch1: Chapter = {
 const C2 = { stream: 40, sources: 190, hover: 250, pop: 262 };
 const Grounded: React.FC = () => {
   const frame = useCurrentFrame();
+  const t = useW();
   const popP = Math.min(prog(frame, C2.pop, 12), 1 - prog(frame, 440, 8));
   return (
     <AppShell active="Home">
@@ -346,13 +361,13 @@ const Grounded: React.FC = () => {
       {popP > 0 && (
         <Abs x={460} y={410} w={520}>
           <div style={{ opacity: popP, scale: `${0.9 + 0.1 * popP}`, transformOrigin: "20% 100%", padding: 26, borderRadius: 22, background: "rgba(16,21,56,0.98)", border: `1.5px solid ${C.blueHi}`, boxShadow: "0 30px 70px rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", gap: 14, fontSize: 22 }}>
-            <div style={{ fontSize: 24, fontWeight: 800 }}>2024 Tax Relief Schedule</div>
-            <div style={{ color: C.mute }}>In effect from 1 Jan 2024</div>
+            <div style={{ fontSize: 24, fontWeight: 800 }}>{t("2024 Tax Relief Schedule")}</div>
+            <div style={{ color: C.mute }}>{t("In effect from 1 Jan 2024")}</div>
             <div style={{ display: "flex", gap: 12 }}>
               <Chip on tone="green" size={18}>Confidence: 92%</Chip>
               <Chip size={18}>Verified 12 Sep 2026</Chip>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, color: C.blueHi, fontWeight: 700 }}>View official source ↗ <span style={{ fontFamily: mono, fontSize: 18, color: C.mute }}>hasil.gov.my</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: C.blueHi, fontWeight: 700 }}>{t("View official source ↗")} <span style={{ fontFamily: mono, fontSize: 18, color: C.mute }}>hasil.gov.my</span></div>
           </div>
         </Abs>
       )}
@@ -397,18 +412,22 @@ const C3 = { t1: 70, bm: 104, t2: 190, zh: 222, mic: 300, heard: 340 };
 const VOICE_Q = "Macam mana nak keluarkan KWSP untuk beli rumah?";
 const Language: React.FC = () => {
   const frame = useCurrentFrame();
+  const base = useWLang();
+  const [first, second] = SWITCH_TO[base];
+  // the two target languages sit at the top of the menu, where the cursor clicks
+  const items = [LANG_NAME[first], LANG_NAME[second], LANG_NAME[base]];
   const menu1 = frame >= C3.t1 && frame < C3.bm + 6;
   const menu2 = frame >= C3.t2 && frame < C3.zh + 6;
   return (
-    <AppShell active="Home" lang={frame >= C3.zh ? "中文" : frame >= C3.bm ? "BM" : "EN"}>
+    <AppShell active="Home" lang={LANG_CODE[frame >= C3.zh ? second : frame >= C3.bm ? first : base]}>
       <UserBubble text={Q} at={-20} y={150} />
       <Avatar at={-20} x={380} y={260} />
-      <Answer at={-400} y={265} sourcesAt={-40} langs={[{ f: C3.bm, l: "bm" }, { f: C3.zh, l: "zh" }]} />
+      <Answer at={-400} y={265} sourcesAt={-40} langs={[{ f: C3.bm, l: first }, { f: C3.zh, l: second }]} />
       <ActionRow y={700} at={-40} hot={menu1 || menu2 ? "Translate answer" : undefined} />
-      <InputBar value={frame >= C3.heard ? typed(VOICE_Q, frame, C3.heard, 1.1) : ""} rec={frame >= C3.mic && frame < 430 ? C3.mic : undefined} focus={frame >= 430} lang={frame >= C3.mic ? "BM" : "EN"} />
+      <InputBar value={frame >= C3.heard ? typed(VOICE_Q, frame, C3.heard, 1.1) : ""} rec={frame >= C3.mic && frame < 430 ? C3.mic : undefined} focus={frame >= 430} lang={frame >= C3.mic ? "BM" : LANG_CODE[base]} />
       <DemoFlag />
-      {menu1 && <Menu {...MENU} items={["Bahasa Malaysia", "中文", "English"]} at={C3.t1 + 2} hot={frame >= C3.bm - 8 ? 0 : undefined} />}
-      {menu2 && <Menu {...MENU} items={["Bahasa Malaysia", "中文", "English"]} at={C3.t2 + 2} hot={frame >= C3.zh - 8 ? 1 : undefined} />}
+      {menu1 && <Menu {...MENU} items={items} at={C3.t1 + 2} hot={frame >= C3.bm - 8 ? 0 : undefined} />}
+      {menu2 && <Menu {...MENU} items={items} at={C3.t2 + 2} hot={frame >= C3.zh - 8 ? 1 : undefined} />}
     </AppShell>
   );
 };
@@ -448,6 +467,8 @@ const SMENU = { x: 586, y: 756, w: 380 };
 const C4 = { share: 50, copy: 96, page: 170 };
 const Share: React.FC = () => {
   const frame = useCurrentFrame();
+  const t = useW();
+  const base = useWLang();
   if (frame < C4.page) {
     return (
       <AppShell active="Home">
@@ -476,19 +497,19 @@ const Share: React.FC = () => {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 48, height: 48 }}><Mark frame={200} size={48} bubbleAt={0} bloomAt={0} id="sharehdr" /></div>
           <span style={{ fontSize: 32, fontWeight: 800 }}>naktahu<span style={{ color: C.blue }}>.my</span></span>
-          <span style={{ fontSize: 22, color: C.mute, marginLeft: 12 }}>Ask about government</span>
+          <span style={{ fontSize: 22, color: C.mute, marginLeft: 12 }}>{t("Ask about government")}</span>
         </div>
         <Button size={22}>Ask NakTahu</Button>
       </div>
       <div style={{ position: "absolute", top: 210, left: 240, right: 240 }}>
         <Card style={{ padding: 44, display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em" }}>{Q}</div>
-          {ANSWER.en.map((a) => <div key={a} style={{ fontSize: 27, lineHeight: 1.5, color: "rgba(244,246,255,0.9)" }}>{a}</div>)}
+          <div style={{ fontSize: 40, fontWeight: 800, letterSpacing: "-0.02em" }}>{t(Q)}</div>
+          {ANSWER[base].map((a) => <div key={a} style={{ fontSize: 27, lineHeight: 1.5, color: "rgba(244,246,255,0.9)" }}>{a}</div>)}
           <div style={{ display: "flex", gap: 16 }}>
-            {SOURCES.map((s) => <Chip key={s.n} on size={19}>{s.n} · {s.title}</Chip>)}
+            {SOURCES.map((s) => <Chip key={s.n} on size={19}>{s.n} · {t(s.title)}</Chip>)}
           </div>
         </Card>
-        <div style={{ marginTop: 26, fontSize: 21, color: C.mute, textAlign: "center" }}>Shared from NakTahu AI. Verify important information against official sources.</div>
+        <div style={{ marginTop: 26, fontSize: 21, color: C.mute, textAlign: "center" }}>{t("Shared from NakTahu AI. Verify important information against official sources.")}</div>
       </div>
       <DemoFlag />
     </div>
@@ -530,6 +551,7 @@ const FU_Y = 670;
 const FU_X = [460, 890, 1320];
 const Deeper: React.FC = () => {
   const frame = useCurrentFrame();
+  const t = useW();
   const scroll = prog(frame, C5.scroll, 20) * 480;
   const suggestP = prog(frame, C5.suggest, 12);
   return (
@@ -538,26 +560,30 @@ const Deeper: React.FC = () => {
         <UserBubble text={Q} at={-20} y={150} />
         <Avatar at={-20} x={380} y={260} />
         <Answer at={-400} y={265} sourcesAt={-40} />
-        <Abs x={460} y={FU_Y - 44} w={600}><div style={{ fontSize: 20, fontWeight: 700, color: C.mute }}>Suggested follow-ups</div></Abs>
-        {FOLLOWUPS.map((t, i) => (
-          <Abs key={t} x={FU_X[i]} y={FU_Y} w={410}>
-            <div style={{ height: 56, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, background: i === 0 && frame >= C5.follow ? "rgba(59,91,255,0.3)" : G.panel, border: `1.5px solid ${i === 0 && frame >= C5.follow ? C.blueHi : G.border}` }}>{t}</div>
+        <Abs x={460} y={FU_Y - 44} w={600}><div style={{ fontSize: 20, fontWeight: 700, color: C.mute }}>{t("Suggested follow-ups")}</div></Abs>
+        {FOLLOWUPS.map((fu, i) => (
+          <Abs key={fu} x={FU_X[i]} y={FU_Y} w={410}>
+            <div style={{ height: 56, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, background: i === 0 && frame >= C5.follow ? "rgba(59,91,255,0.3)" : G.panel, border: `1.5px solid ${i === 0 && frame >= C5.follow ? C.blueHi : G.border}` }}>{t(fu)}</div>
           </Abs>
         ))}
         <UserBubble text={FOLLOWUPS[0]} at={C5.scroll + 6} y={790} />
         <Avatar at={C5.scroll + 14} x={380} y={890} />
         <Abs x={460} y={900} w={1300}>
           <div style={{ fontSize: 30, lineHeight: 1.5, color: "rgba(244,246,255,0.95)" }}>
-            {streamed("Keep your child's birth certificate, plus proof of enrolment for any child in higher education. LHDN can ask for them for up to 7 years.", frame, C5.scroll + 22, 0.8)}
+            {streamed(t("Keep your child's birth certificate, plus proof of enrolment for any child in higher education. LHDN can ask for them for up to 7 years."), frame, C5.scroll + 22, 0.8)}
           </div>
         </Abs>
       </div>
-      <InputBar value={frame >= C5.type ? typed("Grants I qualify for", frame, C5.type, 2) : ""} focus={frame >= C5.type - 10} />
+      <InputBar value={frame >= C5.type ? typed(t("Grants I qualify for"), frame, C5.type, 2) : ""} focus={frame >= C5.type - 10} />
       <DemoFlag />
       {suggestP > 0 && (
         <Abs x={360} y={800} w={1500}>
           <div style={{ opacity: suggestP, translate: `0 ${(1 - suggestP) * 20}px`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 14px 26px", borderRadius: 20, background: "rgba(255,178,56,0.12)", border: "1.5px solid rgba(255,178,56,0.55)", fontSize: 23, fontWeight: 600 }}>
-            <span>✦ This looks like a <b style={{ color: C.amber }}>Grant Finder</b> question</span>
+            <span>
+              {t("✦ This looks like a {agent} question")
+                .split("{agent}")
+                .map((part, i) => (i === 0 ? part : [<b key="a" style={{ color: C.amber }}>{t("Grant Finder")}</b>, part]))}
+            </span>
             <Button size={20} press={C5.open}>Open →</Button>
           </div>
         </Abs>

@@ -6,6 +6,7 @@ import { Finish } from "../Promo/Shared";
 import { EndCard } from "../Showcase/bookends";
 import { Slam } from "../Showcase/core";
 import { LangProvider } from "../Showcase/i18n";
+import { type WLang, WLangProvider, useW } from "./i18n";
 import { WALKTHROUGHS } from "./scripts";
 import { CH0, CH_DUR, END, HOOK, RECAP, TITLE } from "./timeline";
 import {
@@ -60,11 +61,12 @@ export type Script = {
 /** Bars 0-1: the problem, as a cloud of open tabs, answered by a two-beat slam. */
 const Hook: React.FC<{ s: Script }> = ({ s }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const out = prog(frame, HOOK.dur - 8, 8, EXPO_IN);
   const collapse = prog(frame, BAR - 6, 18);
   return (
     <AbsoluteFill style={{ opacity: 1 - out, filter: `blur(${out * 12}px)` }}>
-      {s.hook.chaos.map((t, i) => {
+      {s.hook.chaos.map((tab, i) => {
         const a = (i * 137.5 * Math.PI) / 180;
         const r = 300 + (i % 3) * 120;
         const x = 960 + Math.cos(a) * r * 1.5;
@@ -73,7 +75,7 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
         const drift = Math.sin(frame / 20 + i) * 8;
         return (
           <div
-            key={t}
+            key={tab}
             style={{
               position: "absolute",
               left: x + (960 - x) * collapse,
@@ -95,14 +97,14 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
             }}
           >
             <span style={{ fontFamily: mono, fontSize: 18, color: C.mute, marginRight: 12 }}>tab</span>
-            {t}
+            {t(tab)}
           </div>
         );
       })}
       <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
         <div style={{ width: 1600 }}>
           {s.hook.lines.map((l, i) => (
-            <Slam key={l} chunks={[l]} at={[BAR + i * BEAT * 2 - (i ? 0 : 4)]} size={150} align="center" accent={i === s.hook.accent ? [0] : []} />
+            <Slam key={l} chunks={[t(l)]} at={[BAR + i * BEAT * 2 - (i ? 0 : 4)]} size={150} align="center" accent={i === s.hook.accent ? [0] : []} />
           ))}
         </div>
       </AbsoluteFill>
@@ -113,6 +115,7 @@ const Hook: React.FC<{ s: Script }> = ({ s }) => {
 /** Bars 2-3: logo drop into the walkthrough title. */
 const Title: React.FC<{ s: Script }> = ({ s }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const out = prog(frame, TITLE.dur - 10, 10, EXPO_IN);
   const word = "naktahu.my".split("");
   const line = prog(frame, BEAT * 2, 16);
@@ -134,11 +137,11 @@ const Title: React.FC<{ s: Script }> = ({ s }) => {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 20, opacity: line }}>
         <div style={{ width: 90 * line, height: 2, background: C.amber }} />
-        <span style={{ fontFamily: mono, fontSize: 28, letterSpacing: "0.24em", color: C.amber }}>WALKTHROUGH {s.number}</span>
+        <span style={{ fontFamily: mono, fontSize: 28, letterSpacing: "0.24em", color: C.amber }}>{t("WALKTHROUGH")} {s.number}</span>
         <div style={{ width: 90 * line, height: 2, background: C.amber }} />
       </div>
-      <div style={{ fontSize: 96, fontWeight: 800, letterSpacing: "-0.04em", color: C.white, clipPath: `inset(0 ${(1 - name) * 100}% 0 0)` }}>{s.name}</div>
-      <div style={{ fontSize: 36, fontWeight: 500, color: C.mute, opacity: prog(frame, BEAT * 4, 14) }}>{s.tagline}</div>
+      <div style={{ fontSize: 96, fontWeight: 800, letterSpacing: "-0.04em", color: C.white, clipPath: `inset(0 ${(1 - name) * 100}% 0 0)` }}>{t(s.name)}</div>
+      <div style={{ fontSize: 36, fontWeight: 500, color: C.mute, opacity: prog(frame, BEAT * 4, 14) }}>{t(s.tagline)}</div>
     </AbsoluteFill>
   );
 };
@@ -146,19 +149,20 @@ const Title: React.FC<{ s: Script }> = ({ s }) => {
 /** Bars 34-35: three-word recap on the beat, then the plan that gets you started. */
 const Recap: React.FC<{ s: Script }> = ({ s }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   const out = prog(frame, RECAP.dur - 8, 8, EXPO_IN);
   const card = prog(frame, BAR - 4, 16);
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 40, opacity: 1 - out, filter: `blur(${out * 10}px)` }}>
       <div style={{ display: "flex", gap: 56, translate: `0 ${-card * 60}px` }}>
         {s.recap.lines.map((l, i) => (
-          <Slam key={l} chunks={[l]} at={[i * BEAT]} size={140} accent={i === s.recap.lines.length - 1 ? [0] : []} />
+          <Slam key={l} chunks={[t(l)]} at={[i * BEAT]} size={140} accent={i === s.recap.lines.length - 1 ? [0] : []} />
         ))}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 28, padding: "30px 44px", borderRadius: 30, background: "rgba(20,26,66,0.85)", border: "1.5px solid rgba(123,145,255,0.45)", boxShadow: "0 30px 80px rgba(0,0,0,0.45), 0 0 90px rgba(59,91,255,0.25)", opacity: card, scale: `${0.85 + 0.15 * card}`, fontFamily: display }}>
-        <div style={{ fontFamily: mono, fontSize: 24, letterSpacing: "0.18em", color: C.amber }}>{s.recap.plan}</div>
+        <div style={{ fontFamily: mono, fontSize: 24, letterSpacing: "0.18em", color: C.amber }}>{t(s.recap.plan)}</div>
         <div style={{ width: 2, height: 46, background: "rgba(160,175,255,0.3)" }} />
-        <div style={{ fontSize: 36, fontWeight: 700, color: C.white }}>{s.recap.planDetail}</div>
+        <div style={{ fontSize: 36, fontWeight: 700, color: C.white }}>{t(s.recap.planDetail)}</div>
       </div>
     </AbsoluteFill>
   );
@@ -166,6 +170,7 @@ const Recap: React.FC<{ s: Script }> = ({ s }) => {
 
 const ChapterScene: React.FC<{ c: Chapter; n: number }> = ({ c, n }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   // the whole filmed screen fades up under the chapter card and out at the end
   const vis = Math.min(prog(frame, 0, 10), 1 - prog(frame, CH_DUR - 8, 8, EXPO_IN));
   const Screen = c.Screen;
@@ -175,25 +180,33 @@ const ChapterScene: React.FC<{ c: Chapter; n: number }> = ({ c, n }) => {
         <Camera keys={c.cam}>
           <Screen />
           {c.spots?.map((s) => <Spotlight key={`${s.f}-${s.x}`} {...s} from={s.f} />)}
-          {c.callouts?.map((k) => <Callout key={`${k.f}-${k.text}`} {...k} from={k.f} />)}
+          {c.callouts?.map((k) => <Callout key={`${k.f}-${k.text}`} {...k} text={t(k.text)} from={k.f} />)}
           {c.cursor && <Cursor keys={c.cursor} />}
         </Camera>
       </AbsoluteFill>
       {c.captions.map((k) => (
-        <Caption key={k.f} from={k.f} to={k.to} text={k.text} detail={k.detail} />
+        <Caption key={k.f} from={k.f} to={k.to} text={t(k.text)} detail={k.detail && t(k.detail)} />
       ))}
-      <ChapterCard n={n} title={c.title} line={c.line} />
+      <ChapterCard n={n} title={t(c.title)} line={t(c.line)} />
     </AbsoluteFill>
   );
 };
 
 /** Looked up by id: composition props are JSON-serialised, which would drop each chapter's Screen component. */
-export const Walkthrough: React.FC<{ id: string }> = ({ id }) => {
+export const Walkthrough: React.FC<{ id: string; lang: WLang }> = ({ id, lang }) => (
+  <WLangProvider lang={lang}>
+    <LangProvider lang={lang}>
+      <WalkthroughBody id={id} />
+    </LangProvider>
+  </WLangProvider>
+);
+
+const WalkthroughBody: React.FC<{ id: string }> = ({ id }) => {
+  const t = useW();
   const s = WALKTHROUGHS.find((w) => w.id === id)!;
   const drums = (f: number) => f >= 2 * BAR && f < END.from && !s.drops.some(([a, b]) => f >= a && f < b);
-  const chapters = s.chapters.map((c, i) => ({ name: c.name, from: CH0 + i * CH_DUR, to: CH0 + (i + 1) * CH_DUR }));
+  const chapters = s.chapters.map((c, i) => ({ name: t(c.name), from: CH0 + i * CH_DUR, to: CH0 + (i + 1) * CH_DUR }));
   return (
-    <LangProvider lang="en">
       <AbsoluteFill>
         <Backdrop hue={s.hue} drums={drums} />
         <Sequence from={HOOK.from} durationInFrames={HOOK.dur} name="Hook">
@@ -213,11 +226,10 @@ export const Walkthrough: React.FC<{ id: string }> = ({ id }) => {
         <Sequence from={END.from} durationInFrames={END.dur} name="End card">
           <EndCard />
         </Sequence>
-        <Hud chapters={chapters} show={[CH0, RECAP.from]} series={s.series} />
+        <Hud chapters={chapters} show={[CH0, RECAP.from]} series={t(s.series)} />
         <Finish />
         <Audio src={staticFile(s.audio)} />
       </AbsoluteFill>
-    </LangProvider>
   );
 };
 

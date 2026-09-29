@@ -32,9 +32,11 @@ export const RemotionRoot: React.FC = () => {
         <Composition id="Showcase-zh-9x16" component={Showcase} durationInFrames={1696} fps={30} width={1080} height={1920} defaultProps={{ lang: "zh" }} />
       </Folder>
       <Folder name="Walkthrough">
-        {WALKTHROUGHS.map((s) => (
-          <Composition key={s.id} id={`Walkthrough-${s.id}`} component={Walkthrough} durationInFrames={TOTAL} fps={30} width={1920} height={1080} defaultProps={{ id: s.id }} />
-        ))}
+        {WALKTHROUGHS.flatMap((s) =>
+          (["en", "bm", "zh"] as const).map((lang) => (
+            <Composition key={`${s.id}-${lang}`} id={`Walkthrough-${s.id}-${lang}`} component={Walkthrough} durationInFrames={TOTAL} fps={30} width={1920} height={1080} defaultProps={{ id: s.id, lang }} />
+          )),
+        )}
       </Folder>
       <Composition id="NaktahuPromo" component={Promo} durationInFrames={600} fps={30} width={1920} height={1080} />
     </>

@@ -226,9 +226,11 @@ export const typed = (text: string, frame: number, start: number, fpc = 1.1) =>
 
 /** Word-streamed text, the way the answer engine renders tokens as they arrive. */
 export const streamed = (text: string, frame: number, start: number, wordsPerFrame = 0.9) => {
-  const words = text.split(" ");
-  const n = Math.max(0, Math.floor((frame - start) * wordsPerFrame));
-  return words.slice(0, n).join(" ");
+  // Chinese has no spaces: stream it character by character, a little faster
+  const cjk = /[\u4E00-\u9FFF]/.test(text);
+  const units = cjk ? Array.from(text) : text.split(" ");
+  const n = Math.max(0, Math.floor((frame - start) * wordsPerFrame * (cjk ? 2 : 1)));
+  return units.slice(0, n).join(cjk ? "" : " ");
 };
 
 export const Caret: React.FC<{ on?: boolean; h?: number }> = ({ on = true, h = 30 }) => {

@@ -7,13 +7,21 @@ Remotion source for the naktahu.my promo videos. This is a standalone package: i
 | `NaktahuPromo` | 20s, 16:9 | Brand promo (BM) |
 | `Showcase-{bm,en,zh}-16x9` | 56.5s | Feature showcase, landscape |
 | `Showcase-{bm,en,zh}-9x16` | 56.5s | Feature showcase, vertical (Reels / TikTok / Shorts) |
-| `Walkthrough-ask` | 100s, 16:9 | Walkthrough 01 — Ask anything: question → cited answer → BM/中文 + voice → share → follow-ups |
-| `Walkthrough-business` | 100s, 16:9 | Walkthrough 02 — Run your business: agents hub → Grant Finder → Grant Draft → PatuhiKu → Deadline Monitor |
-| `Walkthrough-life` | 100s, 16:9 | Walkthrough 03 — Life moments: Health Triage → Immigration → Check Assistance → Retrenchment → Study Agent |
+| `Walkthrough-ask-{en,bm,zh}` | 100s, 16:9 | Walkthrough 01 — Ask anything: question → cited answer → BM/中文 + voice → share → follow-ups |
+| `Walkthrough-business-{en,bm,zh}` | 100s, 16:9 | Walkthrough 02 — Run your business: agents hub → Grant Finder → Grant Draft → PatuhiKu → Deadline Monitor |
+| `Walkthrough-life-{en,bm,zh}` | 100s, 16:9 | Walkthrough 03 — Life moments: Health Triage → Immigration → Check Assistance → Retrenchment → Study Agent |
 
 Each scene is one 84-frame bar (2.8s). The showcase score (`audio/score_parkbench.py`) is the "Park Bench" boom-bap beat, Fm7 → Dbmaj7 → Bbm7 → C7alt, at 85.71 BPM, which is exactly 21 frames per beat. That puts every scene change on beat 1. Earlier scores are kept in `audio/` for reference.
 
 The walkthroughs (`src/Walkthrough/`) film a rebuilt app shell with a virtual camera (`engine.tsx`: camera keys, cursor, callouts, spotlight, captions). Each video is a script (`ask.tsx`, `business.tsx`, `life.tsx`) on a fixed timeline (`timeline.ts`): hook, title, five 6-bar chapters, recap, end card, at 90 BPM (20 frames per beat). UI labels are the product's real EN strings; grant, deadline and scheme results are illustrative and carry an on-screen "illustrative demo data" flag.
+
+Walkthrough copy is written in English in the scripts and translated at render time (`src/Walkthrough/i18n.tsx`): `wt.bm.ts` and `wt.zh.ts` map each English string to BM / 中文, using the product's own i18n wording wherever the product already has the string. After changing any walkthrough text:
+
+```bash
+node tools/walkthrough_strings.mjs --check   # lists strings missing from wt.bm.ts / wt.zh.ts
+```
+
+then rebuild the Chinese font subset (below) so new Han characters render.
 
 ## Render
 

@@ -2,11 +2,14 @@ import React from "react";
 import { useCurrentFrame } from "remotion";
 import { Mark } from "../Promo/Mark";
 import { C, EXPO_OUT, display, mono, prog } from "./engine";
+import { useW } from "./i18n";
 
 /**
  * App-space UI kit: a faithful-in-spirit rebuild of the naktahu.my app shell
  * (sidebar rail, header, cards, fields) at 1920x1080, so the camera can film
- * it like a screen recording. Labels come from apps/web's real EN strings.
+ * it like a screen recording. Labels come from apps/web's real EN strings;
+ * the kit translates string props/children through useW(), so scripts can
+ * pass English and get the walkthrough's language.
  */
 export const SIDEBAR_W = 300;
 export const HEADER_H = 96;
@@ -48,6 +51,7 @@ export const AppShell: React.FC<{
   history?: { today: string[]; earlier?: string[]; highlight?: number };
   children: React.ReactNode;
 }> = ({ active = "Home", credits = "3 credits", lang = "EN", history, children }) => {
+  const t = useW();
   return (
     <div style={{ position: "absolute", inset: 0, borderRadius: 34, overflow: "hidden", background: "linear-gradient(160deg, #0E1438 0%, #080C26 100%)", border: `1.5px solid ${G.border}`, boxShadow: "0 60px 160px rgba(0,0,0,0.6), 0 0 140px rgba(59,91,255,0.18)", fontFamily: display, color: C.white }}>
       {/* sidebar */}
@@ -61,26 +65,26 @@ export const AppShell: React.FC<{
           return (
             <div key={n} style={{ display: "flex", alignItems: "center", gap: 16, height: 54, padding: "0 16px", borderRadius: 14, background: on ? "rgba(59,91,255,0.2)" : "transparent", color: on ? C.white : C.mute, fontSize: 23, fontWeight: on ? 700 : 500, boxShadow: on ? `inset 3px 0 0 ${C.blueHi}` : "none" }}>
               <NavIcon k={n} size={24} />
-              {n}
+              {t(n)}
             </div>
           );
         })}
         {history && (
           <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid ${G.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: mono, fontSize: 16, letterSpacing: "0.14em", color: C.mute, padding: "0 16px 8px" }}>
-              <NavIcon k="History" size={18} /> QUERY HISTORY
+              <NavIcon k="History" size={18} /> {t("QUERY HISTORY")}
             </div>
-            <div style={{ fontSize: 16, color: C.mute, padding: "4px 16px", fontWeight: 600 }}>Today</div>
+            <div style={{ fontSize: 16, color: C.mute, padding: "4px 16px", fontWeight: 600 }}>{t("Today")}</div>
             {history.today.map((q, i) => (
               <div key={q} style={{ fontSize: 19, padding: "10px 16px", borderRadius: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", background: history.highlight === i ? "rgba(59,91,255,0.2)" : "transparent", color: history.highlight === i ? C.white : "rgba(244,246,255,0.75)" }}>
-                {q}
+                {t(q)}
               </div>
             ))}
             {history.earlier && (
               <>
-                <div style={{ fontSize: 16, color: C.mute, padding: "10px 16px 4px", fontWeight: 600 }}>Earlier</div>
+                <div style={{ fontSize: 16, color: C.mute, padding: "10px 16px 4px", fontWeight: 600 }}>{t("Earlier")}</div>
                 {history.earlier.map((q) => (
-                  <div key={q} style={{ fontSize: 19, padding: "10px 16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "rgba(244,246,255,0.55)" }}>{q}</div>
+                  <div key={q} style={{ fontSize: 19, padding: "10px 16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "rgba(244,246,255,0.55)" }}>{t(q)}</div>
                 ))}
               </>
             )}
@@ -89,10 +93,10 @@ export const AppShell: React.FC<{
       </div>
       {/* header */}
       <div style={{ position: "absolute", left: SIDEBAR_W, right: 0, top: 0, height: HEADER_H, borderBottom: `1px solid ${G.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 48px" }}>
-        <div style={{ fontSize: 22, color: C.mute, fontWeight: 600 }}>Ask about government</div>
+        <div style={{ fontSize: 22, color: C.mute, fontWeight: 600 }}>{t("Ask about government")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ padding: "10px 18px", borderRadius: 999, background: G.panel, border: `1px solid ${G.border}`, fontFamily: mono, fontSize: 19, color: C.white }}>{lang}</div>
-          <div style={{ padding: "10px 20px", borderRadius: 999, background: G.amberSoft, border: "1px solid rgba(255,178,56,0.45)", fontSize: 19, fontWeight: 700, color: C.amber }}>{credits}</div>
+          <div style={{ padding: "10px 20px", borderRadius: 999, background: G.amberSoft, border: "1px solid rgba(255,178,56,0.45)", fontSize: 19, fontWeight: 700, color: C.amber }}>{t(credits)}</div>
           <div style={{ width: 46, height: 46, borderRadius: 23, background: `linear-gradient(135deg, ${C.blueHi}, ${C.blueDeep})`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20 }}>A</div>
         </div>
       </div>
@@ -120,9 +124,16 @@ export const Card: React.FC<{ children: React.ReactNode; style?: React.CSSProper
   <div style={{ background: G.panel, border: `1.5px solid ${glow ? "rgba(123,145,255,0.6)" : G.border}`, borderRadius: 24, padding: 28, boxShadow: glow ? "0 0 60px rgba(59,91,255,0.3)" : "none", ...style }}>{children}</div>
 );
 
-export const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ fontSize: 19, fontWeight: 600, color: C.mute, marginBottom: 10 }}>{children}</div>
-);
+/** Translate a child that is a plain string; leave elements alone. */
+const useTr = () => {
+  const t = useW();
+  return (c: React.ReactNode) => (typeof c === "string" ? t(c) : c);
+};
+
+export const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const tr = useTr();
+  return <div style={{ fontSize: 19, fontWeight: 600, color: C.mute, marginBottom: 10 }}>{tr(children)}</div>;
+};
 
 /** Text input that shows a placeholder until `value` has content, with a focus ring while `focus`. */
 export const Field: React.FC<{ value: string; placeholder?: string; focus?: boolean; w?: number | string; h?: number; size?: number; caret?: boolean; multiline?: boolean }> = ({
@@ -136,6 +147,7 @@ export const Field: React.FC<{ value: string; placeholder?: string; focus?: bool
   multiline,
 }) => {
   const frame = useCurrentFrame();
+  const t = useW();
   return (
     <div
       style={{
@@ -156,7 +168,7 @@ export const Field: React.FC<{ value: string; placeholder?: string; focus?: bool
       }}
     >
       <span>
-        {value || placeholder}
+        {value ? t(value) : placeholder && t(placeholder)}
         {focus && caret !== false && <span style={{ display: "inline-block", width: 2.5, height: size * 1.15, marginLeft: 2, background: C.blueHi, verticalAlign: "middle", opacity: Math.floor(frame / 8) % 2 ? 0 : 1 }} />}
       </span>
     </div>
@@ -170,9 +182,10 @@ export const Chip: React.FC<{ children: React.ReactNode; on?: boolean; size?: nu
     amber: [G.amberSoft, C.amber],
     red: [G.redSoft, "#FF6B6F"],
   }[tone];
+  const tr = useTr();
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: `${size * 0.45}px ${size * 0.9}px`, borderRadius: 999, fontSize: size, fontWeight: 600, whiteSpace: "nowrap", background: on ? tones[0] : G.panel, border: `1.5px solid ${on ? tones[1] : G.border}`, color: on ? C.white : "rgba(244,246,255,0.8)" }}>
-      {children}
+      {tr(children)}
     </div>
   );
 };
@@ -187,6 +200,7 @@ export const Button: React.FC<{ children: React.ReactNode; press?: number; kind?
   w,
 }) => {
   const frame = useCurrentFrame();
+  const tr = useTr();
   const down = press !== undefined && frame >= press - 2 && frame < press + 5;
   const bg = kind === "primary" ? `linear-gradient(135deg, #5872FF, ${C.blueDeep})` : kind === "green" ? "linear-gradient(135deg, #3DDC97, #1FA56C)" : G.panelHi;
   return (
@@ -211,7 +225,7 @@ export const Button: React.FC<{ children: React.ReactNode; press?: number; kind?
       }}
     >
       {busy && <Spinner size={size} />}
-      {children}
+      {tr(children)}
     </div>
   );
 };
@@ -238,9 +252,10 @@ export const Rise: React.FC<{ at: number; children: React.ReactNode; y?: number;
 };
 
 /** A small "illustrative data" flag, so demo numbers are never mistaken for real figures. */
-export const DemoFlag: React.FC = () => (
-  <div style={{ position: "absolute", right: 28, bottom: 22, fontFamily: mono, fontSize: 15, letterSpacing: "0.12em", color: "rgba(139,147,196,0.7)" }}>ILLUSTRATIVE DEMO DATA</div>
-);
+export const DemoFlag: React.FC = () => {
+  const t = useW();
+  return <div style={{ position: "absolute", right: 28, bottom: 22, fontFamily: mono, fontSize: 15, letterSpacing: "0.12em", color: "rgba(139,147,196,0.7)" }}>{t("ILLUSTRATIVE DEMO DATA")}</div>;
+};
 
 /** Absolutely position a child in APP coordinates, from inside the shell's content area. */
 export const Abs: React.FC<{ x: number; y: number; w?: number; h?: number; children: React.ReactNode; style?: React.CSSProperties }> = ({ x, y, w, h, children, style }) => (
@@ -248,14 +263,17 @@ export const Abs: React.FC<{ x: number; y: number; w?: number; h?: number; child
 );
 
 /** Agent page heading: title, optional plan/credit badge, and the page's real subheading. */
-export const Heading: React.FC<{ title: string; sub: string; badge?: string; tone?: "green" | "amber" | "blue" }> = ({ title, sub, badge, tone = "amber" }) => (
-  <Abs x={356} y={140} w={1500}>
-    <Rise at={0}>
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-        <div style={{ fontSize: 50, fontWeight: 800, letterSpacing: "-0.035em" }}>{title}</div>
-        {badge && <Chip on tone={tone} size={18}>{badge}</Chip>}
-      </div>
-      <div style={{ fontSize: 23, color: C.mute, marginTop: 10, maxWidth: 1400, lineHeight: 1.4 }}>{sub}</div>
-    </Rise>
-  </Abs>
-);
+export const Heading: React.FC<{ title: string; sub: string; badge?: string; tone?: "green" | "amber" | "blue" }> = ({ title, sub, badge, tone = "amber" }) => {
+  const t = useW();
+  return (
+    <Abs x={356} y={140} w={1500}>
+      <Rise at={0}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <div style={{ fontSize: 50, fontWeight: 800, letterSpacing: "-0.035em" }}>{t(title)}</div>
+          {badge && <Chip on tone={tone} size={18}>{badge}</Chip>}
+        </div>
+        <div style={{ fontSize: 23, color: C.mute, marginTop: 10, maxWidth: 1400, lineHeight: 1.4 }}>{t(sub)}</div>
+      </Rise>
+    </Abs>
+  );
+};
