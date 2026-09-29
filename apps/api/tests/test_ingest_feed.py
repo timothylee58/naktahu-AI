@@ -652,3 +652,24 @@ def test_cli_upcoming_source_exits_cleanly_without_fetching(monkeypatch, capsys)
     assert "UPCOMING" in out and "2099-01-01" in out
     fetch.assert_not_called()
     run.assert_not_called()
+
+
+def test_existing_hashes_batches_the_in_query():
+    """A long PDF yields hundreds of chunks; one .in_() GET with every hash
+    would overflow the URI limit, so the lookup is split into batches."""
+    from scripts.ingest_feed import _HASH_BATCH, _existing_hashes
+
+    hashes = [f"{i:064x}" for i in range(_HASH_BATCH * 2 + 5)]
+    table = MagicMock()
+    table.select.return_value.in_.side_effect = lambda col, batch: MagicMock(
+        execute=MagicMock(return_value=MagicMock(data=[{"content_hash": batch[0]}]))
+    )
+    sb = MagicMock()
+    sb.table.return_value = table
+
+    found = _existing_hashes(sb, hashes)
+
+    sizes = [len(c.args[1]) for c in table.select.return_value.in_.call_args_list]
+    assert sizes == [_HASH_BATCH, _HASH_BATCH, 5]
+    assert found == {hashes[0], hashes[_HASH_BATCH], hashes[_HASH_BATCH * 2]}
+    assert _existing_hashes(sb, []) == set()

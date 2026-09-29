@@ -418,11 +418,18 @@ def fetch_feed(url: str) -> bytes:
         return resp.content
 
 
+# PostgREST sends .in_() as a GET query string; each sha256 hash adds ~65
+# chars, so a long PDF's hundreds of chunks would overflow the server's
+# URI limit in one request. 100 hashes keeps each URL around 7KB.
+_HASH_BATCH = 100
+
+
 def _existing_hashes(supabase, hashes: list[str]) -> set[str]:
-    if not hashes:
-        return set()
-    res = supabase.table("document_chunks").select("content_hash").in_("content_hash", hashes).execute()
-    return {row["content_hash"] for row in (res.data or [])}
+    found: set[str] = set()
+    for i in range(0, len(hashes), _HASH_BATCH):
+        res = supabase.table("document_chunks").select("content_hash").in_("content_hash", hashes[i : i + _HASH_BATCH]).execute()
+        found.update(row["content_hash"] for row in (res.data or []))
+    return found
 
 
 async def main_async(args: argparse.Namespace) -> None:
