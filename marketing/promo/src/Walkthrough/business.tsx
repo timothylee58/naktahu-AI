@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { C, display, mono, prog, streamed, typed } from "./engine";
-import { Abs, AppShell, Button, Card, Check, Chip, DemoFlag, Field, G, Label, Rise } from "./ui";
+import { Abs, AppShell, Button, Card, Check, Chip, DemoFlag, Field, G, Heading, Label, Rise } from "./ui";
 import type { Chapter, Script } from "./Walkthrough";
 
 /**
@@ -10,18 +10,6 @@ import type { Chapter, Script } from "./Walkthrough";
  * Agent names, fields, buttons and pricing are the product's real strings;
  * grant/deadline rows are illustrative and flagged on screen as demo data.
  */
-
-const Heading: React.FC<{ title: string; sub: string; badge?: string; at?: number }> = ({ title, sub, badge, at = 0 }) => (
-  <Abs x={356} y={140} w={1500}>
-    <Rise at={at}>
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-        <div style={{ fontSize: 50, fontWeight: 800, letterSpacing: "-0.035em" }}>{title}</div>
-        {badge && <Chip on tone="amber" size={18}>{badge}</Chip>}
-      </div>
-      <div style={{ fontSize: 23, color: C.mute, marginTop: 10, maxWidth: 1400, lineHeight: 1.4 }}>{sub}</div>
-    </Rise>
-  </Abs>
-);
 
 // ---------------------------------------------------------------- 1. agents hub
 const AGENTS: { name: string; badge: string; tone: "green" | "amber" | "blue"; desc: string; icon: string }[] = [
@@ -88,10 +76,10 @@ const ch1: Chapter = {
     { f: H1.hover, x: 560, y: 660 },
     { f: H1.click, x: 560, y: 660, click: true },
   ],
-  callouts: [{ f: 200, to: 290, x: 900, y: 1020, text: "1 credit = RM5 = one full run", side: "top" }],
+  callouts: [{ f: 200, to: 290, x: 900, y: 1020, text: "1 credit = RM5 · cost varies by agent", side: "top" }],
   captions: [
     { f: 64, to: 190, text: "Some questions need more than an answer.", detail: "Agents walk you through the whole task, step by step." },
-    { f: 196, to: 300, text: "Pay per use — or not at all.", detail: "Many agents are free. Credits cover the heavy ones." },
+    { f: 196, to: 300, text: "Pay per use — or not at all.", detail: "Many agents are free; others cost 1–3 credits a run." },
     { f: 306, to: 470, text: "Start with money on the table.", detail: "Grant Finder matches your business to government grants." },
   ],
 };
@@ -108,7 +96,7 @@ const GrantFinder: React.FC = () => {
   const busy = frame >= G2.find && frame < G2.results;
   return (
     <AppShell active="Agents" credits="8 credits">
-      <Heading title="Grant Finder" badge="New" sub="Match your business profile to Malaysian government grants — with scoring, near-miss detection, and a recommended application sequence." />
+      <Heading title="Grant Finder" badge="Recommended" sub="Match your business profile to Malaysian government grants — with scoring, near-miss detection, and a recommended application sequence." />
       <Abs x={356} y={330} w={620}>
         <Card style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           <div>

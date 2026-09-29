@@ -9,6 +9,7 @@ import { S5Trust } from "./Promo/S5Trust";
 import { S6End } from "./Promo/S6End";
 import { Showcase } from "./Showcase/Showcase";
 import { Walkthrough } from "./Walkthrough/Walkthrough";
+import { TOTAL } from "./Walkthrough/engine";
 import { WALKTHROUGHS } from "./Walkthrough/scripts";
 
 export const RemotionRoot: React.FC = () => {
@@ -32,7 +33,7 @@ export const RemotionRoot: React.FC = () => {
       </Folder>
       <Folder name="Walkthrough">
         {WALKTHROUGHS.map((s) => (
-          <Composition key={s.id} id={`Walkthrough-${s.id}`} component={Walkthrough} durationInFrames={3000} fps={30} width={1920} height={1080} defaultProps={{ id: s.id }} />
+          <Composition key={s.id} id={`Walkthrough-${s.id}`} component={Walkthrough} durationInFrames={TOTAL} fps={30} width={1920} height={1080} defaultProps={{ id: s.id }} />
         ))}
       </Folder>
       <Composition id="NaktahuPromo" component={Promo} durationInFrames={600} fps={30} width={1920} height={1080} />

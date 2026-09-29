@@ -25,7 +25,7 @@ python3 audio/score_promo20.py                  # stdlib only -> public/score.wa
 pip install numpy scipy
 python3 audio/score_parkbench.py audio/showcase_sfx.json public/showcase.wav
 for w in ask business life; do   # walkthroughs: click/whoosh cues come from each script
-  npx tsx tools/walkthrough_sfx.ts $w > /tmp/$w.sfx.json
+  npx --yes tsx@4.20.6 tools/walkthrough_sfx.ts $w > /tmp/$w.sfx.json
   python3 audio/score_walkthrough.py audio/walkthrough_$w.json public/wt-$w.wav /tmp/$w.sfx.json
 done
 

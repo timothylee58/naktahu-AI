@@ -2,7 +2,7 @@ import React from "react";
 import { useCurrentFrame } from "remotion";
 import { Mark } from "../Promo/Mark";
 import { C, EXPO_OUT, display, mono, prog, streamed, typed } from "./engine";
-import { Abs, AppShell, Button, Card, Check, Chip, Field, G, Rise, Spinner } from "./ui";
+import { Abs, AppShell, Button, Card, Check, Chip, DemoFlag, Field, G, Rise, Spinner } from "./ui";
 import type { Chapter, Script } from "./Walkthrough";
 
 /**
@@ -37,7 +37,7 @@ const FOLLOWUPS = ["Which documents should I keep?", "When is the e-Filing deadl
 const HISTORY = [Q, "EPF withdrawal for a home", "Register a company with SSM"];
 
 // ---------------------------------------------------------------- shared chat pieces
-const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string; rec?: number; press?: number }> = ({ value, focus, placeholder = "How do I register a company with SSM?", rec, press }) => {
+const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string; rec?: number; press?: number; lang?: string }> = ({ value, focus, placeholder = "How do I register a company with SSM?", rec, press, lang = "EN" }) => {
   const frame = useCurrentFrame();
   const recording = rec !== undefined && frame >= rec;
   const lvl = (i: number) => 0.25 + 0.75 * Math.abs(Math.sin(frame / 3 + i * 1.7) * Math.sin(frame / 7 + i));
@@ -58,7 +58,7 @@ const InputBar: React.FC<{ value: string; focus?: boolean; placeholder?: string;
             </>
           )}
         </div>
-        <div style={{ padding: "8px 14px", borderRadius: 999, background: G.panel, border: `1px solid ${G.border}`, fontFamily: mono, fontSize: 18, color: C.mute }}>EN</div>
+        <div style={{ padding: "8px 14px", borderRadius: 999, background: G.panel, border: `1px solid ${G.border}`, fontFamily: mono, fontSize: 18, color: C.mute }}>{lang}</div>
         {/* voice */}
         <div style={{ width: 70, height: 70, borderRadius: 35, display: "flex", alignItems: "center", justifyContent: "center", background: recording ? "rgba(230,30,37,0.85)" : G.panelHi, boxShadow: recording ? `0 0 0 ${8 + 6 * Math.sin(frame / 4)}px rgba(230,30,37,0.25)` : "none" }}>
           <svg width="30" height="30" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3" fill="white" /><path d="M5 11 a7 7 0 0 0 14 0 M12 18 V21" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" /></svg>
@@ -342,6 +342,7 @@ const Grounded: React.FC = () => {
       <Answer at={C2.stream} y={265} sourcesAt={C2.sources} />
       <ActionRow y={700} at={C2.sources + 10} />
       <InputBar value="" />
+      <DemoFlag />
       {popP > 0 && (
         <Abs x={460} y={410} w={520}>
           <div style={{ opacity: popP, scale: `${0.9 + 0.1 * popP}`, transformOrigin: "20% 100%", padding: 26, borderRadius: 22, background: "rgba(16,21,56,0.98)", border: `1.5px solid ${C.blueHi}`, boxShadow: "0 30px 70px rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", gap: 14, fontSize: 22 }}>
@@ -404,7 +405,8 @@ const Language: React.FC = () => {
       <Avatar at={-20} x={380} y={260} />
       <Answer at={-400} y={265} sourcesAt={-40} langs={[{ f: C3.bm, l: "bm" }, { f: C3.zh, l: "zh" }]} />
       <ActionRow y={700} at={-40} hot={menu1 || menu2 ? "Translate answer" : undefined} />
-      <InputBar value={frame >= C3.heard ? typed(VOICE_Q, frame, C3.heard, 1.1) : ""} rec={frame >= C3.mic && frame < 430 ? C3.mic : undefined} focus={frame >= 430} />
+      <InputBar value={frame >= C3.heard ? typed(VOICE_Q, frame, C3.heard, 1.1) : ""} rec={frame >= C3.mic && frame < 430 ? C3.mic : undefined} focus={frame >= 430} lang={frame >= C3.mic ? "BM" : "EN"} />
+      <DemoFlag />
       {menu1 && <Menu {...MENU} items={["Bahasa Malaysia", "中文", "English"]} at={C3.t1 + 2} hot={frame >= C3.bm - 8 ? 0 : undefined} />}
       {menu2 && <Menu {...MENU} items={["Bahasa Malaysia", "中文", "English"]} at={C3.t2 + 2} hot={frame >= C3.zh - 8 ? 1 : undefined} />}
     </AppShell>
@@ -454,6 +456,7 @@ const Share: React.FC = () => {
         <Answer at={-400} y={265} sourcesAt={-40} />
         <ActionRow y={700} at={-40} hot={frame >= C4.share && frame < C4.copy + 6 ? "Share" : undefined} />
         <InputBar value="" />
+      <DemoFlag />
         {frame >= C4.share && frame < C4.copy + 6 && (
           <Menu {...SMENU} items={["Copy link", "Share to WhatsApp", "Share to Telegram", "Share to Facebook", "Draft a caption (AI)"]} at={C4.share + 2} hot={frame >= C4.copy - 8 ? 0 : undefined} />
         )}
@@ -487,6 +490,7 @@ const Share: React.FC = () => {
         </Card>
         <div style={{ marginTop: 26, fontSize: 21, color: C.mute, textAlign: "center" }}>Shared from NakTahu AI. Verify important information against official sources.</div>
       </div>
+      <DemoFlag />
     </div>
   );
 };
@@ -549,6 +553,7 @@ const Deeper: React.FC = () => {
         </Abs>
       </div>
       <InputBar value={frame >= C5.type ? typed("Grants I qualify for", frame, C5.type, 2) : ""} focus={frame >= C5.type - 10} />
+      <DemoFlag />
       {suggestP > 0 && (
         <Abs x={360} y={800} w={1500}>
           <div style={{ opacity: suggestP, translate: `0 ${(1 - suggestP) * 20}px`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 14px 26px", borderRadius: 20, background: "rgba(255,178,56,0.12)", border: "1.5px solid rgba(255,178,56,0.55)", fontSize: 23, fontWeight: 600 }}>

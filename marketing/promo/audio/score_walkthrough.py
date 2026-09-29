@@ -5,7 +5,7 @@ flute, dusty drums); the per-video config JSON sets the key, progression,
 swing, flute hook and drum drop-outs, plus the UI sound effects cued to the
 picture. 90 BPM keeps the maths exact at 30fps: beat = 20 frames, bar = 80.
 
-    npx tsx tools/walkthrough_sfx.ts ask > /tmp/ask.sfx.json
+    npx --yes tsx@4.20.6 tools/walkthrough_sfx.ts ask > /tmp/ask.sfx.json
     python audio/score_walkthrough.py audio/walkthrough_ask.json public/wt-ask.wav /tmp/ask.sfx.json
 """
 import json

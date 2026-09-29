@@ -1,7 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
 import { C, mono, prog, streamed, typed } from "./engine";
-import { Abs, AppShell, Button, Card, Check, Chip, DemoFlag, Field, G, Label, Rise, Spinner } from "./ui";
+import { Abs, AppShell, Button, Card, Check, Chip, DemoFlag, Field, G, Heading, Label, Rise, Spinner } from "./ui";
 import type { Chapter, Script } from "./Walkthrough";
 
 /**
@@ -10,18 +10,6 @@ import type { Chapter, Script } from "./Walkthrough";
  * sitting SPM. Labels are the product's real strings; results are
  * illustrative and flagged on screen as demo data.
  */
-
-const Heading: React.FC<{ title: string; sub: string; badge?: string; tone?: "green" | "amber" | "blue" }> = ({ title, sub, badge, tone = "green" }) => (
-  <Abs x={356} y={140} w={1500}>
-    <Rise at={0}>
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-        <div style={{ fontSize: 50, fontWeight: 800, letterSpacing: "-0.035em" }}>{title}</div>
-        {badge && <Chip on tone={tone} size={18}>{badge}</Chip>}
-      </div>
-      <div style={{ fontSize: 23, color: C.mute, marginTop: 10, maxWidth: 1400, lineHeight: 1.4 }}>{sub}</div>
-    </Rise>
-  </Abs>
-);
 
 const Group: React.FC<{ label: string; opts: string[]; on: (o: string) => boolean; size?: number }> = ({ label, opts, on, size = 18 }) => (
   <div>
@@ -38,7 +26,7 @@ const Triage: React.FC = () => {
   const frame = useCurrentFrame();
   return (
     <AppShell active="Agents">
-      <Heading title="Health Triage" badge="Free" sub="BM symptom intake → KKM guidance → clinic/hospital recommendation." />
+      <Heading title="Health Triage" badge="Free" tone="green" sub="BM symptom intake → KKM guidance → clinic/hospital recommendation." />
       <Abs x={356} y={300} w={1500}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 24px", borderRadius: 16, background: "rgba(230,30,37,0.2)", border: "1.5px solid rgba(255,107,111,0.6)", fontSize: 22, fontWeight: 800 }}>🚨 Emergency? Call 999 now</div>
       </Abs>
@@ -208,7 +196,7 @@ const Assistance: React.FC = () => {
   const frame = useCurrentFrame();
   return (
     <AppShell active="Agents">
-      <Heading title="Check Assistance" badge="Free" sub="Match your household profile to cost-of-living assistance schemes (Ihsan MADANI and similar)." />
+      <Heading title="Check Assistance" badge="Free" tone="green" sub="Match your household profile to cost-of-living assistance schemes (Ihsan MADANI and similar)." />
       <Abs x={356} y={310} w={640}>
         <Card style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", gap: 10 }}>{["Demographics", "Household", "Status"].map((s, i) => <Chip key={s} on={i === 0} size={17}>{s}</Chip>)}</div>
@@ -276,14 +264,14 @@ const R = { type: 70, start: 150, result: 190 };
 const RET_TEXT = "I worked 3 years, salary RM4,500, given 14 days notice";
 const RETS = [
   { h: "Estimated Statutory Termination Benefit", big: "≈ RM 7,788", note: "15 days' wages × 3 years of service", tone: C.white },
-  { h: "EIS Claim Eligibility", big: "Likely eligible", note: "Claim with PERKESO within 60 days", tone: "#3DDC97" },
-  { h: "Notice Period Status", big: "14 days short", note: "4 weeks' notice for 2–5 years' service", tone: C.amber },
+  { h: "EIS Claim Eligibility", big: "Check with PERKESO", note: "If you contributed to EIS, claim within 60 days", tone: C.amber },
+  { h: "Notice Period Status", big: "28 days short", note: "6 weeks' notice for 2–5 years' service", tone: C.amber },
 ];
 const Retrenchment: React.FC = () => {
   const frame = useCurrentFrame();
   return (
     <AppShell active="Agents">
-      <Heading title="Retrenchment Navigator" badge="Free" sub="EIS claim eligibility, statutory termination benefits, and a next-steps checklist." />
+      <Heading title="Retrenchment Navigator" badge="Free" tone="green" sub="EIS claim eligibility, statutory termination benefits, and a next-steps checklist." />
       <Abs x={356} y={310} w={1500}>
         <div style={{ display: "flex", gap: 16 }}>
           <div style={{ flex: 1 }}><Field value={typed(RET_TEXT, frame, R.type, 1.2)} placeholder="I worked 3 years, salary RM4,500, given 14 days notice…" focus={frame >= R.type - 8 && frame < R.start} h={76} /></div>
@@ -344,7 +332,7 @@ const ch4: Chapter = {
   ],
   captions: [
     { f: 64, to: 190, text: "Describe what happened, in one line.", detail: "Years of service, salary, notice given." },
-    { f: 196, to: 390, text: "What you're owed, worked out.", detail: "Termination benefit, EIS eligibility, notice period." },
+    { f: 196, to: 390, text: "What you're owed, worked out.", detail: "Termination benefit, notice period, and where EIS fits in." },
     { f: 396, to: 470, text: "Then, what to do next.", detail: "A checklist, in order." },
   ],
 };

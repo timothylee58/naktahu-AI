@@ -48,7 +48,6 @@ export const AppShell: React.FC<{
   history?: { today: string[]; earlier?: string[]; highlight?: number };
   children: React.ReactNode;
 }> = ({ active = "Home", credits = "3 credits", lang = "EN", history, children }) => {
-  const frame = useCurrentFrame();
   return (
     <div style={{ position: "absolute", inset: 0, borderRadius: 34, overflow: "hidden", background: "linear-gradient(160deg, #0E1438 0%, #080C26 100%)", border: `1.5px solid ${G.border}`, boxShadow: "0 60px 160px rgba(0,0,0,0.6), 0 0 140px rgba(59,91,255,0.18)", fontFamily: display, color: C.white }}>
       {/* sidebar */}
@@ -97,7 +96,7 @@ export const AppShell: React.FC<{
           <div style={{ width: 46, height: 46, borderRadius: 23, background: `linear-gradient(135deg, ${C.blueHi}, ${C.blueDeep})`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20 }}>A</div>
         </div>
       </div>
-      <div style={{ position: "absolute", left: SIDEBAR_W, right: 0, top: HEADER_H, bottom: 0, opacity: Math.min(1, frame / 6 + 1) }}>{children}</div>
+      <div style={{ position: "absolute", left: SIDEBAR_W, right: 0, top: HEADER_H, bottom: 0 }}>{children}</div>
     </div>
   );
 };
@@ -246,4 +245,17 @@ export const DemoFlag: React.FC = () => (
 /** Absolutely position a child in APP coordinates, from inside the shell's content area. */
 export const Abs: React.FC<{ x: number; y: number; w?: number; h?: number; children: React.ReactNode; style?: React.CSSProperties }> = ({ x, y, w, h, children, style }) => (
   <div style={{ position: "absolute", left: x - SIDEBAR_W, top: y - HEADER_H, width: w, height: h, ...style }}>{children}</div>
+);
+
+/** Agent page heading: title, optional plan/credit badge, and the page's real subheading. */
+export const Heading: React.FC<{ title: string; sub: string; badge?: string; tone?: "green" | "amber" | "blue" }> = ({ title, sub, badge, tone = "amber" }) => (
+  <Abs x={356} y={140} w={1500}>
+    <Rise at={0}>
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div style={{ fontSize: 50, fontWeight: 800, letterSpacing: "-0.035em" }}>{title}</div>
+        {badge && <Chip on tone={tone} size={18}>{badge}</Chip>}
+      </div>
+      <div style={{ fontSize: 23, color: C.mute, marginTop: 10, maxWidth: 1400, lineHeight: 1.4 }}>{sub}</div>
+    </Rise>
+  </Abs>
 );
