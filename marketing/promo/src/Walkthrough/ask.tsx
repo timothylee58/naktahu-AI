@@ -608,7 +608,7 @@ export const ASK: Script = {
   recap: { lines: ["Ask.", "Verify.", "Share."], plan: "FREE", planDetail: "25 questions a day — free, no credit card needed" },
   hue: ["59,91,255", "120,70,255"],
   audio: "wt-ask.wav",
-  drops: [],
+  drops: [[1280, 1440]],
 };
 
 export { EXPO_OUT };

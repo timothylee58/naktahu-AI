@@ -463,7 +463,7 @@ export const LIFE: Script = {
   recap: { lines: ["Guided.", "Grounded.", "Free."], plan: "FREE CIVIC TOOLS", planDetail: "Health Triage, Check Assistance, Retrenchment Navigator" },
   hue: ["59,91,255", "61,200,151"],
   audio: "wt-life.wav",
-  drops: [],
+  drops: [[1280, 1440]],
 };
 
 export { Spinner };

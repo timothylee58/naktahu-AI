@@ -516,7 +516,7 @@ export const BUSINESS: Script = {
   recap: { lines: ["Find.", "Draft.", "Comply."], plan: "PRO — BUSINESS", planDetail: "RM 99/mo per workspace · up to 5 staff" },
   hue: ["59,91,255", "255,150,56"],
   audio: "wt-business.wav",
-  drops: [],
+  drops: [[1280, 1440]],
 };
 
 export { display };
