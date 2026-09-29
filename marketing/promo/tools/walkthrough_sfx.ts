@@ -20,4 +20,5 @@ s.chapters.forEach((c, i) => {
 ev.push({ kind: "whoosh", frame: RECAP.from - 6, sec: 0.4 }, { kind: "bell", frame: RECAP.from + 80, note: 84 });
 // Exit only once stdout has flushed: the font loaders in the imported UI reject
 // outside a browser, and process.exit() alone can truncate a piped write.
+process.on("unhandledRejection", () => {}); // loadFont() rejects outside a browser; the cues don't need fonts
 process.stdout.write(JSON.stringify(ev) + "\n", () => process.exit(0));
