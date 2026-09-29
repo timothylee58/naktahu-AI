@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from datetime import date
 
 import httpx
 
@@ -39,9 +40,18 @@ async def _check_one(client: httpx.AsyncClient, source: Source) -> tuple[Source,
 
 async def check_sources(sources: tuple[Source, ...]) -> bool:
     """Returns True if every source is healthy (2xx)."""
+    # Not-yet-published sources (Budget 2027 before tabling day) would 404 by
+    # design; report them as UPCOMING with a countdown instead of as rot.
+    today = date.today()
+    for s in sources:
+        if not s.is_available(today) and s.available_from is not None:
+            days = (s.available_from - today).days
+            print(f"SOON  {s.name:45s} {s.url}  — UPCOMING, published {s.available_from.isoformat()} ({days}d)")
+    live = tuple(s for s in sources if s.is_available(today))
+
     headers = {"User-Agent": _USER_AGENT}
     async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS, headers=headers) as client:
-        results = await asyncio.gather(*(_check_one(client, s) for s in sources))
+        results = await asyncio.gather(*(_check_one(client, s) for s in live))
 
     all_ok = True
     for source, status, error in results:
