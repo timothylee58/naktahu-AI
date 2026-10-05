@@ -377,6 +377,8 @@ const MS: Translations = {
   'landing.tagline.12': 'Kerajaan ada maklumat. Kami bawakan kepada anda.',
   'landing.hero.cta': 'Mula Bertanya',
   'landing.hero.secondary_cta': 'Terokai Ejen AI',
+  'landing.hero.secondary_cta_hint': 'Pematuhan, geran, pembelajaran, kesihatan & imigresen',
+  'landing.hero.search_label': 'Tanya soalan tentang kerajaan Malaysia',
   'landing.features.title': 'Kenapa NakTahu?',
   'landing.features.bilingual.title': 'Tiga Bahasa',
   'landing.features.bilingual.desc':
@@ -1412,6 +1414,8 @@ const EN: Translations = {
   'landing.tagline.12': 'The government has the answer. We bring it to you.',
   'landing.hero.cta': 'Start Asking',
   'landing.hero.secondary_cta': 'Explore AI Agents',
+  'landing.hero.secondary_cta_hint': 'Compliance, grants, study, health & immigration',
+  'landing.hero.search_label': 'Ask a question about Malaysian government services',
   'landing.features.title': 'Why NakTahu?',
   'landing.features.bilingual.title': 'Trilingual BM · EN · 中文',
   'landing.features.bilingual.desc':
@@ -2446,6 +2450,8 @@ const ZH: Translations = {
   'landing.tagline.12': '政府有答案，我们帮你找到它。',
   'landing.hero.cta': '开始提问',
   'landing.hero.secondary_cta': '探索 AI 智能代理',
+  'landing.hero.secondary_cta_hint': '合规、补助金、学习、健康与移民',
+  'landing.hero.search_label': '询问有关马来西亚政府服务的问题',
   'landing.features.title': '为什么选择 NakTahu？',
   'landing.features.bilingual.title': '三语 BM·EN·中文',
   'landing.features.bilingual.desc': '以马来语、英语或中文提问，均可获得准确答案。',
