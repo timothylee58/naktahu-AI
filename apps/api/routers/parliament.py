@@ -23,6 +23,7 @@ from middleware.rate_limit import anonymous_limiter
 from services.parliament import (
     get_bill_vote_summary,
     get_mp_by_constituency,
+    get_mps_by_postcode,
     list_constituencies,
     search_mps,
 )
@@ -31,12 +32,34 @@ router = APIRouter(prefix="/api/v1/parliament", tags=["parliament"])
 
 _CONSTITUENCY_CODE_RE = re.compile(r"^[A-Za-z]\.?\d{1,3}$")
 _BILL_NUMBER_RE = re.compile(r"^[A-Za-z0-9 ./-]{1,64}$")
+_POSTCODE_RE = re.compile(r"^\d{5}$")
 
 
 class MpVoteSummaryEntry(BaseModel):
     vote: str
     vote_count: int
     party_breakdown: Optional[dict[str, Any]] = None
+
+
+class PostcodeMpOut(BaseModel):
+    full_name: str
+    salutation: Optional[str] = None
+    constituency_code: str
+    constituency_name: str
+    state: Optional[str] = None
+    party: Optional[str] = None
+    coalition: Optional[str] = None
+    parlimen_url: Optional[str] = None
+    office_address: Optional[str] = None
+    office_phone: Optional[str] = None
+    office_email: Optional[str] = None
+
+
+class PostcodeMpsResponse(BaseModel):
+    postcode: str
+    # More than one when the postcode straddles seats; empty when the
+    # postcode -> seat crosswalk (migration 054) has no rows for it.
+    mps: list[PostcodeMpOut]
 
 
 class ConstituencyOut(BaseModel):
@@ -63,6 +86,19 @@ async def search_mp(
 
     results = await search_mps(request.app.state.supabase, q, limit=limit)
     return {"results": results}
+
+
+@router.get("/postcode/{postcode}", response_model=PostcodeMpsResponse)
+@anonymous_limiter.limit("60/minute")
+async def mps_by_postcode(request: Request, response: Response, postcode: str):
+    # 404 rather than 422 for a malformed path segment, matching get_mp below.
+    if not _POSTCODE_RE.match(postcode):
+        raise HTTPException(status_code=404, detail="Not a Malaysian postcode")
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Parliament Watch is temporarily unavailable")
+
+    mps = await get_mps_by_postcode(request.app.state.supabase, postcode)
+    return PostcodeMpsResponse(postcode=postcode, mps=[PostcodeMpOut(**mp) for mp in mps])
 
 
 @router.get("/mp/{constituency_code}")

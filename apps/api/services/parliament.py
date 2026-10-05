@@ -113,3 +113,51 @@ async def list_constituencies(
         return res.data or []
 
     return await asyncio.to_thread(_list)
+
+
+_POSTCODE_MP_FIELDS = (
+    "full_name,salutation,constituency_code,constituency_name,state,party,coalition,"
+    "parlimen_url,office_address,office_phone,office_email"
+)
+
+
+async def get_mps_by_postcode(supabase_client: Client, postcode: str) -> list[dict[str, Any]]:
+    """Every active MP whose seat the postcode falls in (migration 054).
+
+    A postcode can straddle seats, so this returns all of them, ordered by
+    constituency code, rather than picking one. Empty when the crosswalk has
+    no rows for the postcode (or hasn't been loaded yet).
+    """
+
+    def _codes() -> list[str]:
+        res = (
+            supabase_client.table("postcode_constituencies")
+            .select("constituency_code")
+            .eq("postcode", postcode)
+            .execute()
+        )
+        return sorted({row["constituency_code"] for row in (res.data or [])})
+
+    try:
+        codes = await asyncio.to_thread(_codes)
+    except Exception as exc:
+        # Most likely migration 054 isn't applied yet (no such table). Degrade
+        # to "no MP found" so the landing page keeps its state-only line,
+        # rather than a 500 on every postcode typed.
+        logger.warning("postcode_constituencies_unavailable", error=str(exc)[:200])
+        return []
+    if not codes:
+        return []
+
+    def _mps() -> list[dict[str, Any]]:
+        res = (
+            supabase_client.table("mp_profiles")
+            .select(_POSTCODE_MP_FIELDS)
+            .in_("constituency_code", codes)
+            .eq("constituency_type", "parliament")
+            .eq("is_active", True)
+            .execute()
+        )
+        return sorted(res.data or [], key=lambda mp: mp.get("constituency_code") or "")
+
+    return await asyncio.to_thread(_mps)
