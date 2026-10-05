@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,6 +13,8 @@ import {
 } from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
 import { LandingFeatureShowcase } from './LandingFeatureShowcase';
@@ -147,19 +149,25 @@ export function LandingClient() {
   // down.
   const [isEnteringChat, setIsEnteringChat] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
-  const handleStartChat = (e: ReactMouseEvent<HTMLAnchorElement>) => {
-    // Modified clicks (open in new tab/window, middle-click) must keep
-    // working exactly like a plain <a href>/<Link> — only a plain left
-    // click gets the custom transition.
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
+  const enterChat = (href: string) => {
     if (reduceMotion) {
-      router.push('/chat');
+      router.push(href);
       return;
     }
     setIsEnteringChat(true);
     setShowLoadingScreen(true);
-    window.setTimeout(() => router.push('/chat'), CHAT_MORPH_MS);
+    window.setTimeout(() => router.push(href), CHAT_MORPH_MS);
+  };
+
+  // The hero search bar is a real input: whatever the visitor types is
+  // carried into /chat via ?q= (the same prefill the domain chips use), and
+  // an empty submit just opens chat. Start Asking is the bar's submit button.
+  const [heroQuery, setHeroQuery] = useState('');
+  const [heroFocused, setHeroFocused] = useState(false);
+  const handleHeroSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const q = heroQuery.trim();
+    enterChat(q ? `/chat?q=${encodeURIComponent(q)}` : '/chat');
   };
 
   // Every OTHER real navigation this page offers (header nav links, domain
@@ -334,17 +342,20 @@ export function LandingClient() {
         </p>
         </motion.div>
 
-        <motion.div
+        <motion.form
           custom={3}
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className={`w-full max-w-xl border rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
+          role="search"
+          onSubmit={handleHeroSubmit}
+          className={`w-full max-w-xl border rounded-2xl pl-4 sm:pl-5 pr-1.5 py-1.5 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
+            aria-hidden
             className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
           >
             <path
@@ -353,8 +364,50 @@ export function LandingClient() {
               clipRule="evenodd"
             />
           </svg>
-          <TypewriterQueryWrapper isDark={isDark} />
-        </motion.div>
+          <div className="relative flex-1 min-w-0 text-left">
+            <Input
+              type="text"
+              value={heroQuery}
+              onChange={(e) => setHeroQuery(e.target.value)}
+              onFocus={() => setHeroFocused(true)}
+              onBlur={() => setHeroFocused(false)}
+              maxLength={500}
+              enterKeyHint="search"
+              aria-label={t('landing.hero.search_label')}
+              className={`border-0 px-0 py-2 text-sm sm:text-base rounded-none focus:ring-0 ${
+                isDark ? 'text-white' : 'text-zinc-900'
+              }`}
+            />
+            {/* The rotating example queries are the idle placeholder: shown
+                only while the field is empty and unfocused, so they never sit
+                on top of what the visitor is typing. */}
+            {!heroQuery && !heroFocused && (
+              <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap">
+                <TypewriterQueryWrapper isDark={isDark} />
+              </div>
+            )}
+          </div>
+          <Button
+            type="submit"
+            aria-label={t('landing.hero.cta')}
+            className="relative flex-shrink-0 inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim active:scale-[0.97] transition-all duration-150 text-white font-semibold h-10 sm:h-11 px-3 sm:px-5 rounded-xl text-sm shadow-md shadow-blue-900/30 locale-nowrap group"
+          >
+            <span className="hidden sm:inline">{t('landing.hero.cta')}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden
+              className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-0.5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </Button>
+        </motion.form>
 
         {/* Trust disclaimer — moved from above the headline (where it
             competed with it for first-glance attention) to a quiet
@@ -402,46 +455,51 @@ export function LandingClient() {
         <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="w-full max-w-xl">
           <PostcodePersonalizer
             className={`flex flex-wrap items-center justify-center gap-2 ${mutedText}`}
-            inputClassName={`w-40 border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors ${domainPillClass}`}
+            inputClassName={`w-56 text-center border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors ${domainPillClass}`}
           />
         </motion.div>
 
-        <motion.div
-          custom={6}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="flex flex-col items-center gap-3"
-        >
+        <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show">
+          {/* Start Asking now lives inside the search bar, so Explore AI
+              Agents is the hero's one standalone action: a real secondary
+              button (glass pill, icon, arrow that leads on hover) instead of
+              a bare text link that read as a footnote. */}
           <Link
-            href="/chat"
-            onClick={handleStartChat}
-            className="relative inline-flex items-center gap-2 overflow-hidden bg-nk-official hover:bg-nk-official-dim hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap group"
+            href="/agents"
+            onClick={(e) => handleNavClick('/agents', e)}
+            className={`group inline-flex items-center gap-3 rounded-full border pl-2 pr-4 py-2 text-sm font-medium backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 locale-nowrap ${
+              isDark
+                ? 'border-white/15 bg-white/[0.04] text-zinc-100 hover:border-nk-official/50 hover:bg-white/[0.07] hover:shadow-[0_8px_30px_rgba(37,99,235,0.18)]'
+                : 'border-zinc-200 bg-white/70 text-zinc-800 hover:border-nk-official/40 hover:shadow-[0_8px_24px_rgba(37,99,235,0.12)]'
+            }`}
           >
-            {t('landing.hero.cta')}
+            <span
+              aria-hidden
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-nk-official/15 text-nk-official"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path d="M10 1.5a.75.75 0 0 1 .71.51l1.07 3.2a2 2 0 0 0 1.26 1.26l3.2 1.07a.75.75 0 0 1 0 1.42l-3.2 1.07a2 2 0 0 0-1.26 1.26l-1.07 3.2a.75.75 0 0 1-1.42 0l-1.07-3.2a2 2 0 0 0-1.26-1.26l-3.2-1.07a.75.75 0 0 1 0-1.42l3.2-1.07a2 2 0 0 0 1.26-1.26l1.07-3.2A.75.75 0 0 1 10 1.5ZM15.5 13a.5.5 0 0 1 .47.33l.4 1.2a1 1 0 0 0 .63.63l1.2.4a.5.5 0 0 1 0 .94l-1.2.4a1 1 0 0 0-.63.63l-.4 1.2a.5.5 0 0 1-.94 0l-.4-1.2a1 1 0 0 0-.63-.63l-1.2-.4a.5.5 0 0 1 0-.94l1.2-.4a1 1 0 0 0 .63-.63l.4-1.2A.5.5 0 0 1 15.5 13Z" />
+              </svg>
+            </span>
+            <span className="flex flex-col items-start leading-tight">
+              <span>{t('landing.hero.secondary_cta')}</span>
+              <span className={`hidden sm:block text-[11px] font-normal ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                {t('landing.hero.secondary_cta_hint')}
+              </span>
+            </span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className="w-5 h-5"
+              aria-hidden
+              className="w-4 h-4 opacity-60 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
             >
               <path
                 fillRule="evenodd"
-                d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z"
+                d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
                 clipRule="evenodd"
               />
             </svg>
-          </Link>
-          {/* Single secondary link instead of two stacked links (Explore
-              Agents + a separate pricing-note row) — freemium pricing is
-              one click away via the "Pricing" nav item and on /agents
-              itself; the hero doesn't need to restate it. */}
-          <Link
-            href="/agents"
-            onClick={(e) => handleNavClick('/agents', e)}
-            className="text-sm transition-colors locale-nowrap hover:text-nk-official"
-          >
-            {t('landing.hero.secondary_cta')}
           </Link>
         </motion.div>
         </motion.div>

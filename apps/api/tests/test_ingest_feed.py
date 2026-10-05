@@ -673,3 +673,132 @@ def test_existing_hashes_batches_the_in_query():
     assert sizes == [_HASH_BATCH, _HASH_BATCH, 5]
     assert found == {hashes[0], hashes[_HASH_BATCH], hashes[_HASH_BATCH * 2]}
     assert _existing_hashes(sb, []) == set()
+
+
+# ── Validity windows and the supersede review queue (migrations 052/053) ─────
+
+from scripts.ingest_feed import (  # noqa: E402
+    _insert_chunk,
+    date_fields,
+    queue_supersede_candidates,
+)
+
+_DATED_RSS = """<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Pelepasan gaya hidup dinaikkan</title>
+    <description>Pelepasan gaya hidup dinaikkan kepada RM3,000 berkuat kuasa pada 1 Januari 2027.</description>
+    <link>https://www.hasil.gov.my/news/1</link>
+    <pubDate>Tue, 10 Nov 2026 08:00:00 +0800</pubDate>
+  </item>
+</channel></rss>
+""".encode("utf-8")
+
+
+def _no_overrides() -> MagicMock:
+    return MagicMock(effective_date=None, effective_until=None, announced_date=None)
+
+
+def test_parse_feed_reads_pubdate():
+    [entry] = parse_feed(_DATED_RSS)
+    assert entry.published is not None and entry.published.isoformat() == "2026-11-10"
+
+
+def test_date_fields_extracts_window_and_announcement():
+    [entry] = parse_feed(_DATED_RSS)
+    assert date_fields(entry, _no_overrides()) == {
+        "effective_date": "2027-01-01",
+        "announced_date": "2026-11-10",
+    }
+
+
+def test_date_fields_cli_overrides_win():
+    [entry] = parse_feed(_DATED_RSS)
+    args = MagicMock(effective_date="2027-02-01", effective_until="2027-12-31", announced_date="2026-11-01")
+    assert date_fields(entry, args) == {
+        "effective_date": "2027-02-01",
+        "effective_until": "2027-12-31",
+        "announced_date": "2026-11-01",
+    }
+
+
+def test_date_fields_empty_for_undated_entry():
+    entry = FeedEntry(title="Hansard", description="The Dewan Rakyat debated the Bill.", link="x")
+    assert date_fields(entry, _no_overrides()) == {}
+
+
+@pytest.mark.asyncio
+async def test_main_async_writes_dates_on_row(monkeypatch):
+    sb = _mock_supabase()
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_DATED_RSS))
+    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
+
+    args = MagicMock(feed_url="https://www.hasil.gov.my/rss", domain="finance", ministry="LHDN",
+                     language="bm", limit=50, dry_run=False, kind="rss", route_domains=False,
+                     effective_date=None, effective_until=None, announced_date=None)
+    await main_async(args)
+
+    row = sb.table.return_value.insert.call_args.args[0]
+    assert row["effective_date"] == "2027-01-01"
+    assert row["announced_date"] == "2026-11-10"
+    assert "effective_until" not in row
+
+
+def test_insert_retries_without_date_columns_before_migration_052():
+    sb = MagicMock()
+    ok = MagicMock(data=[{"id": "new-1"}])
+    sb.table.return_value.insert.return_value.execute.side_effect = [
+        Exception("Could not find the 'announced_date' column of 'document_chunks'"), ok,
+    ]
+    row = {"content": "c", "effective_date": "2027-01-01", "announced_date": "2026-11-10"}
+
+    assert _insert_chunk(sb, row) == "new-1"
+    retried = sb.table.return_value.insert.call_args_list[1].args[0]
+    assert retried == {"content": "c"}
+
+
+def test_insert_does_not_swallow_unrelated_errors():
+    sb = MagicMock()
+    sb.table.return_value.insert.return_value.execute.side_effect = Exception("network down")
+    with pytest.raises(Exception, match="network down"):
+        _insert_chunk(sb, {"content": "c", "effective_date": "2027-01-01"})
+
+
+def _neighbours_supabase(neighbours: list[dict]) -> MagicMock:
+    sb = MagicMock()
+    sb.rpc.return_value.execute.return_value = MagicMock(data=neighbours)
+    return sb
+
+
+def test_queue_supersede_candidates_queues_older_similar_chunks():
+    sb = _neighbours_supabase([
+        {"id": "new-1", "similarity": 0.99, "effective_date": "2027-01-01"},  # itself
+        {"id": "old-1", "similarity": 0.91, "effective_date": "2026-01-01"},  # older, similar -> queued
+        {"id": "old-2", "similarity": 0.88, "effective_date": None},          # undated, similar -> queued
+        {"id": "far-1", "similarity": 0.40, "effective_date": "2025-01-01"},  # not similar
+        {"id": "newer", "similarity": 0.95, "effective_date": "2027-06-01"},  # newer than the new one
+    ])
+    queued = queue_supersede_candidates(sb, "new-1", "Lifestyle relief", [0.0] * 1536, "tax", "2027-01-01")
+
+    assert queued == 2
+    rows = sb.table.return_value.upsert.call_args.args[0]
+    assert [r["old_chunk_id"] for r in rows] == ["old-1", "old-2"]
+    assert all(r["new_chunk_id"] == "new-1" for r in rows)
+    sb.table.assert_called_with("supersede_candidates")
+
+
+@pytest.mark.parametrize(
+    ("domain", "effective_date"),
+    [("finance", "2027-01-01"), ("tax", None)],
+)
+def test_queue_supersede_candidates_skips_non_strict_or_undated(domain, effective_date):
+    sb = _neighbours_supabase([{"id": "old-1", "similarity": 0.99, "effective_date": None}])
+    assert queue_supersede_candidates(sb, "new-1", "t", [0.0], domain, effective_date) == 0
+    sb.rpc.assert_not_called()
+
+
+def test_queue_supersede_candidates_never_fails_ingestion():
+    sb = MagicMock()
+    sb.rpc.side_effect = Exception('relation "supersede_candidates" does not exist')
+    assert queue_supersede_candidates(sb, "new-1", "t", [0.0], "tax", "2027-01-01") == 0

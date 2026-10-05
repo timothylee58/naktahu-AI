@@ -210,3 +210,94 @@ def test_parliament_domain_in_canonical_domain_list():
     """
     assert "parliament" in _VALID_DOMAINS
     assert "hansard" not in _VALID_DOMAINS
+
+
+# ── GET /api/v1/parliament/postcode/{postcode} (migration 054) ──────────────
+
+_FAKE_POSTCODE_MP = {
+    "full_name": "Test MP",
+    "salutation": "YB",
+    "constituency_code": "P999",
+    "constituency_name": "Testville",
+    "state": "Test State",
+    "party": "Test Party",
+    "coalition": None,
+    "parlimen_url": None,
+    "office_address": None,
+    "office_phone": None,
+    "office_email": None,
+}
+
+
+def _route_tables(sb, crosswalk: list[dict], mps: list[dict]) -> tuple[MagicMock, MagicMock]:
+    crosswalk_table, mp_table = MagicMock(), MagicMock()
+    crosswalk_table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=crosswalk)
+    mp_table.select.return_value.in_.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(data=mps)
+    sb.table.side_effect = lambda name: crosswalk_table if name == "postcode_constituencies" else mp_table
+    return crosswalk_table, mp_table
+
+
+def test_postcode_lookup_returns_every_mp_for_a_straddling_postcode(client):
+    c, sb, _, _ = client
+    second = {**_FAKE_POSTCODE_MP, "full_name": "Other MP", "constituency_code": "P998"}
+    _, mp_table = _route_tables(
+        sb,
+        [{"constituency_code": "P999"}, {"constituency_code": "P998"}],
+        [_FAKE_POSTCODE_MP, second],
+    )
+
+    res = c.get("/api/v1/parliament/postcode/50450")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["postcode"] == "50450"
+    assert [m["constituency_code"] for m in body["mps"]] == ["P998", "P999"]
+    codes = mp_table.select.return_value.in_.call_args.args[1]
+    assert codes == ["P998", "P999"]
+
+
+def test_postcode_lookup_empty_when_crosswalk_has_no_rows(client):
+    c, sb, _, _ = client
+    _, mp_table = _route_tables(sb, [], [])
+
+    res = c.get("/api/v1/parliament/postcode/50450")
+    assert res.status_code == 200
+    assert res.json() == {"postcode": "50450", "mps": []}
+    mp_table.select.assert_not_called()
+
+
+def test_postcode_lookup_degrades_when_table_missing(client):
+    """Before migration 054 is applied the crosswalk query errors: return no
+    MPs (the landing page keeps its state-only line), not a 500."""
+    c, sb, _, _ = client
+    crosswalk_table, _ = _route_tables(sb, [], [])
+    crosswalk_table.select.return_value.eq.return_value.execute.side_effect = Exception(
+        'relation "postcode_constituencies" does not exist'
+    )
+
+    res = c.get("/api/v1/parliament/postcode/50450")
+    assert res.status_code == 200
+    assert res.json()["mps"] == []
+
+
+@pytest.mark.parametrize("bad", ["5045", "504500", "5045a", "abcde"])
+def test_postcode_lookup_rejects_malformed_postcode(client, bad):
+    c, _, _, _ = client
+    assert c.get(f"/api/v1/parliament/postcode/{bad}").status_code == 404
+
+
+def test_postcode_lookup_503_when_supabase_unavailable(client):
+    c, _, _, _ = client
+    original = api_main.app.state.supabase
+    api_main.app.state.supabase = None
+    try:
+        assert c.get("/api/v1/parliament/postcode/50450").status_code == 503
+    finally:
+        api_main.app.state.supabase = original
+
+
+def test_postcode_lookup_rate_limited(client):
+    c, sb, _, _ = client
+    _route_tables(sb, [], [])
+    statuses = [c.get("/api/v1/parliament/postcode/50450").status_code for _ in range(61)]
+    assert statuses[:60] == [200] * 60
+    assert statuses[60] == 429
