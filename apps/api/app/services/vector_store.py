@@ -4,7 +4,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+import structlog
 from supabase import AsyncClient, acreate_client
+
+from app.services.malay_morph import build_keyword_tsquery
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -45,8 +50,9 @@ async def hybrid_search(
 ) -> list[ChunkResult]:
     """Call the hybrid_search Postgres RPC and return typed ChunkResult objects.
 
-    Combines cosine similarity (weight 0.7) and BM25 rank (weight 0.3) as
-    defined in migration 002_hybrid_search.sql.
+    Combines cosine similarity (weight 0.7) and a bounded keyword rank
+    (weight 0.3). The keyword side gets a Malay-affix-expanded tsquery
+    (``keyword_query``, migration 051) so "memohon" matches "permohonan".
     """
     client = await _get_client()
     params: dict = {
@@ -56,8 +62,21 @@ async def hybrid_search(
     }
     if domain is not None:
         params["domain_filter"] = domain
+    keyword_query = build_keyword_tsquery(query)
+    if keyword_query is not None:
+        params["keyword_query"] = keyword_query
 
-    resp = await client.rpc("hybrid_search", params).execute()
+    try:
+        resp = await client.rpc("hybrid_search", params).execute()
+    except Exception as exc:
+        if "keyword_query" not in params:
+            raise
+        # Migration 051 not applied yet: PostgREST has no hybrid_search
+        # overload taking keyword_query. Retry with the pre-051 arguments
+        # so retrieval degrades to the old keyword matching, not an error.
+        logger.warning("hybrid_search_keyword_query_unsupported", error=str(exc))
+        params.pop("keyword_query")
+        resp = await client.rpc("hybrid_search", params).execute()
 
     results: list[ChunkResult] = []
     for row in (resp.data or []):
