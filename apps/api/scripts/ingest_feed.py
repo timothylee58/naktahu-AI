@@ -77,9 +77,11 @@ if str(_API_ROOT) not in sys.path:
 # two providers of the SAME model (ILMU gateway, then OpenAI direct) and raises
 # if neither works — a failed embed skips the row, never writes an incompatible
 # vector into document_chunks. See llm_client.py's embeddings section.
+from app.agents.analyst_node import _STRICT_DOMAINS  # noqa: E402
 from app.agents.rag_node import _embed  # noqa: E402
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
+from scripts.effective_dates import extract_validity_window, parse_published  # noqa: E402
 from scripts.sources import SOURCES_BY_NAME, get_source  # noqa: E402
 
 load_dotenv()
@@ -120,6 +122,10 @@ class FeedEntry:
     link: str
     # Per-chunk domain from route_domain; None means "use the run's --domain".
     domain: Optional[str] = None
+    # Feed item's publish date (RSS pubDate / Atom published). Stored as
+    # announced_date: for a ministry announcement it is when the change was
+    # announced. None for HTML/PDF sources, which carry no per-item date.
+    published: Optional[date] = None
 
     @property
     def content(self) -> str:
@@ -406,7 +412,10 @@ def parse_feed(xml_bytes: bytes) -> list[FeedEntry]:
 
         if not title:
             continue
-        entries.append(FeedEntry(title=title, description=_strip_html(description), link=link))
+        published = parse_published(
+            _text(children.get("pubDate")) or _text(children.get("published")) or _text(children.get("updated"))
+        )
+        entries.append(FeedEntry(title=title, description=_strip_html(description), link=link, published=published))
 
     return entries
 
@@ -430,6 +439,95 @@ def _existing_hashes(supabase, hashes: list[str]) -> set[str]:
         res = supabase.table("document_chunks").select("content_hash").in_("content_hash", hashes[i : i + _HASH_BATCH]).execute()
         found.update(row["content_hash"] for row in (res.data or []))
     return found
+
+
+# Pre-052 databases have no effective_until/announced_date columns; an insert
+# naming them fails. Matched against the error text to retry without them.
+_DATE_COLUMNS = ("effective_date", "effective_until", "announced_date")
+
+# Supersede candidates: how similar (hybrid_search's combined 0.7 cosine +
+# 0.3 keyword score) an older chunk must be to be queued for review, and how
+# many neighbours to look at. Tunable; a false candidate only costs a reviewer
+# a "reject", while auto-retiring is never done (see migration 053).
+_SUPERSEDE_MIN_SIMILARITY = 0.75
+_SUPERSEDE_NEIGHBOURS = 5
+
+
+def _date_arg(args: argparse.Namespace, name: str) -> Optional[date]:
+    """An ISO date CLI override, or None. Tolerates mock namespaces in tests."""
+    value = getattr(args, name, None)
+    if not isinstance(value, str) or not value:
+        return None
+    return date.fromisoformat(value)
+
+
+def date_fields(entry: FeedEntry, args: argparse.Namespace) -> dict[str, str]:
+    """effective_date / effective_until / announced_date for one row.
+
+    CLI overrides win (for a document whose dates a human has checked, e.g.
+    a Budget PDF); otherwise the text is scanned for explicit validity phrases
+    (scripts/effective_dates.py). Only known dates are returned, so a row with
+    none keeps today's behaviour and pre-052 databases see no new columns.
+    """
+    window = extract_validity_window(entry.content)
+    values = {
+        "effective_date": _date_arg(args, "effective_date") or window.effective_date,
+        "effective_until": _date_arg(args, "effective_until") or window.effective_until,
+        "announced_date": _date_arg(args, "announced_date") or entry.published,
+    }
+    return {k: v.isoformat() for k, v in values.items() if v is not None}
+
+
+def _insert_chunk(supabase, row: dict) -> Optional[str]:
+    """Insert one row and return its id; retry without date columns pre-052."""
+    try:
+        res = supabase.table("document_chunks").insert(row).execute()
+    except Exception as exc:
+        dated = [k for k in _DATE_COLUMNS if k in row]
+        if not dated or not any(k in str(exc) for k in _DATE_COLUMNS):
+            raise
+        log.warning("ingest_date_columns_unsupported", columns=dated, error=str(exc)[:200])
+        res = supabase.table("document_chunks").insert({k: v for k, v in row.items() if k not in dated}).execute()
+    data = res.data if isinstance(res.data, list) else []
+    return data[0].get("id") if data else None
+
+
+def queue_supersede_candidates(
+    supabase, new_id: str, title: str, embedding: list[float], domain: str, effective_date: Optional[str]
+) -> int:
+    """Queue older, very similar chunks in the same domain for human review.
+
+    Only for time-sensitive domains, and only when the new chunk states when
+    it takes effect — that is what makes it a new version of a rule rather
+    than a re-published page. Never marks anything superseded itself.
+    Best-effort: a failure here (e.g. migration 053 not applied) is logged and
+    never fails the ingestion run.
+    """
+    if domain not in _STRICT_DOMAINS or not effective_date or not new_id:
+        return 0
+    try:
+        res = supabase.rpc("hybrid_search", {
+            "query_text": title,
+            "query_embedding": embedding,
+            "domain_filter": domain,
+            "match_count": _SUPERSEDE_NEIGHBOURS,
+        }).execute()
+        neighbours = res.data if isinstance(res.data, list) else []
+        rows = [
+            {"new_chunk_id": new_id, "old_chunk_id": n["id"], "similarity": float(n["similarity"])}
+            for n in neighbours
+            if n.get("id") != new_id
+            and float(n.get("similarity") or 0) >= _SUPERSEDE_MIN_SIMILARITY
+            and (not n.get("effective_date") or str(n["effective_date"]) < effective_date)
+        ]
+        if rows:
+            supabase.table("supersede_candidates").upsert(
+                rows, on_conflict="new_chunk_id,old_chunk_id", ignore_duplicates=True
+            ).execute()
+        return len(rows)
+    except Exception as exc:
+        log.warning("supersede_candidates_failed", new_chunk_id=new_id, error=str(exc)[:200])
+        return 0
 
 
 async def main_async(args: argparse.Namespace) -> None:
@@ -526,8 +624,10 @@ async def main_async(args: argparse.Namespace) -> None:
             errors += 1
             continue
 
+        dates = date_fields(entry, args)
         if args.dry_run:
-            print(f"  OK (dry-run) [{entry.domain or args.domain}] — {entry.title[:60]!r}")
+            dated = f" {dates}" if dates else ""
+            print(f"  OK (dry-run) [{entry.domain or args.domain}]{dated} — {entry.title[:60]!r}")
             continue
 
         row = {
@@ -539,11 +639,17 @@ async def main_async(args: argparse.Namespace) -> None:
             "source_url": entry.link or args.feed_url,
             "ministry": args.ministry,
             "embedding": embedding,
+            **dates,
         }
         try:
-            supabase.table("document_chunks").insert(row).execute()
+            new_id = _insert_chunk(supabase, row)
             inserted += 1
             print(f"  OK — {entry.title[:60]!r}")
+            queued = queue_supersede_candidates(
+                supabase, new_id, entry.title, embedding, row["domain"], dates.get("effective_date")
+            )
+            if queued:
+                print(f"    queued {queued} possible superseded chunk(s) for review (scripts/review_supersede.py)")
         except Exception as exc:
             print(f"  FAILED (insert) — {entry.title[:60]!r}: {exc}")
             errors += 1
@@ -577,6 +683,9 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=50, help="Max entries/chunks per run")
     parser.add_argument("--dry-run", action="store_true", help="Parse and embed but do not write to Supabase")
     parser.add_argument("--source-title", help="Fallback title for HTML pages with no <title>/<h1>")
+    parser.add_argument("--effective-date", help="YYYY-MM-DD the rule takes effect (overrides text extraction)")
+    parser.add_argument("--effective-until", help="YYYY-MM-DD last day the rule applies (overrides text extraction)")
+    parser.add_argument("--announced-date", help="YYYY-MM-DD the change was announced (overrides the feed date)")
     args = parser.parse_args()
 
     if args.source:
