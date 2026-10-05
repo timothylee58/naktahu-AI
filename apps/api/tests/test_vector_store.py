@@ -284,3 +284,47 @@ async def test_hybrid_search_madani_schemes_empty_table_returns_empty_list(
         results = await hybrid_search_madani_schemes("query", FAKE_EMBEDDING)
 
     assert results == []
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_passes_malay_expanded_keyword_query(mock_supabase_client: AsyncMock) -> None:
+    """The keyword side gets an affix-expanded tsquery (migration 051)."""
+    with patch(
+        "app.services.vector_store._get_client",
+        AsyncMock(return_value=mock_supabase_client),
+    ):
+        await hybrid_search("cara memohon PTPTN", FAKE_EMBEDDING, domain=None)
+
+    params = mock_supabase_client.rpc.call_args[0][1]
+    assert "permohonan" in params["keyword_query"]
+    assert params["query_text"] == "cara memohon PTPTN"
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_omits_keyword_query_for_cjk(mock_supabase_client: AsyncMock) -> None:
+    with patch(
+        "app.services.vector_store._get_client",
+        AsyncMock(return_value=mock_supabase_client),
+    ):
+        await hybrid_search("如何申请学贷", FAKE_EMBEDDING, domain=None)
+
+    assert "keyword_query" not in mock_supabase_client.rpc.call_args[0][1]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_falls_back_when_migration_051_missing(mock_supabase_client: AsyncMock) -> None:
+    """Before 051 is applied the RPC rejects keyword_query; retry without it."""
+    ok = MagicMock()
+    ok.data = []
+    mock_supabase_client.rpc.return_value.execute = AsyncMock(
+        side_effect=[Exception("Could not find the function public.hybrid_search"), ok]
+    )
+    with patch(
+        "app.services.vector_store._get_client",
+        AsyncMock(return_value=mock_supabase_client),
+    ):
+        results = await hybrid_search("cara memohon PTPTN", FAKE_EMBEDDING, domain=None)
+
+    assert results == []
+    assert mock_supabase_client.rpc.call_count == 2
+    assert "keyword_query" not in mock_supabase_client.rpc.call_args_list[1][0][1]

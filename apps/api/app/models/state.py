@@ -64,6 +64,11 @@ class AgentState(TypedDict, total=False):
     # effective_date, days_since_effective) for chunks whose effective_date has
     # passed by more than the staleness window.
     stale_warnings: list[dict[str, Any]]
+    # Announced-but-not-yet-effective rules (effective_date in the future),
+    # set aside by analyst_node so they are never stated as the current rule.
+    # Each: chunk_id, source_title, ministry, source_url, effective_date,
+    # announced_date, content. The synthesiser mentions them as upcoming.
+    pending_changes: list[dict[str, Any]]
     # Set when the query asks about the user's own case-specific record
     # (e.g. "what's my EPF balance") rather than a general rules question —
     # NakTahu has no access to any user's records, so this carries the real

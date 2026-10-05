@@ -144,6 +144,19 @@ faithfulness cannot measure — see `scripts/evals/temporal_scorer.py` and
 `scripts/evals/README.md`. This suite gates `analyst_node`'s runtime behaviour;
 that metric scores the same freshness axis over a dataset.
 
+### 5. `keyword_recall.jsonl` — keyword layer, Malay morphology
+
+16 query/chunk pairs (12 BM, 4 EN) where the chunk answers the query but
+uses a different affixed form of the same Malay root ("memohon" vs
+"permohonan"). `test_keyword_recall.py` reproduces Postgres's `simple` text
+config in Python and compares plainto_tsquery semantics (baseline) against
+the affix-expanded tsquery from `app/services/malay_morph.py` (migration
+051). It asserts BM recall improves, English does not regress, and no
+query's expansion matches another fixture's chunk (a precision guard). It
+measures the keyword half of hybrid_search only — not embeddings or live
+ranking — and the fixtures are hand-written, so extend them with real
+corpus misses as they are found.
+
 ## Running
 
 ```bash

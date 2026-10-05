@@ -126,12 +126,38 @@ def _freshness_instruction(answer_as_of: str | None) -> str:
     )
 
 
+def _pending_changes_instruction() -> str:
+    """System-prompt guidance when an announced change is not yet in force.
+
+    analyst_node keeps such rules out of the context documents, so the model
+    answers from the rule in force today; this tells it to also mention the
+    upcoming change, with its dates, instead of either ignoring it or
+    presenting it as already current.
+    """
+    return (
+        "ANNOUNCED CHANGES: The section 'Announced changes (not yet in effect)' lists rules "
+        "that have been announced but do not apply yet. Answer with the rule that applies "
+        "today from the context documents. Then state the upcoming change separately, with "
+        "the date it takes effect (and the announcement date if given). Never present an "
+        "announced change as the current rule. If the context documents contain no current "
+        "rule, say so and give only the announced change, clearly labelled as upcoming."
+    )
+
+
 def _build_context(state: AgentState) -> str:
     chunks: list[ChunkResult] = state.get("retrieved_chunks", [])
     query = state.get("query", "")
     parts = [f"Query: {query}\n\nContext documents:"]
     for i, chunk in enumerate(chunks, 1):
         parts.append(f"[{i}] {chunk.source_title}\n{chunk.content}")
+    pending = state.get("pending_changes") or []
+    if pending:
+        parts.append("Announced changes (not yet in effect):")
+        for change in pending:
+            dates = f"effective from {change.get('effective_date')}"
+            if change.get("announced_date"):
+                dates += f", announced {change['announced_date']}"
+            parts.append(f"- {change.get('source_title')} ({dates})\n{change.get('content')}")
     return "\n\n".join(parts)
 
 
@@ -295,6 +321,8 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
     system_prompt = _build_system_prompt(language)
     if state.get("stale_warning"):
         system_prompt = f"{system_prompt}\n\n{_freshness_instruction(state.get('answer_as_of'))}"
+    if state.get("pending_changes"):
+        system_prompt = f"{system_prompt}\n\n{_pending_changes_instruction()}"
     context = _build_context(state)
     emitted_any = False
     try:
