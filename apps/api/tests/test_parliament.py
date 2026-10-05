@@ -301,3 +301,15 @@ def test_postcode_lookup_rate_limited(client):
     statuses = [c.get("/api/v1/parliament/postcode/50450").status_code for _ in range(61)]
     assert statuses[:60] == [200] * 60
     assert statuses[60] == 429
+
+
+def test_query_request_accepts_only_a_five_digit_postcode():
+    from pydantic import ValidationError
+
+    from app.routers.query import QueryRequest
+
+    assert QueryRequest(query="who is my MP", postcode="50450").postcode == "50450"
+    assert QueryRequest(query="who is my MP").postcode is None
+    for bad in ["5045", "50450; drop", "abcde"]:
+        with pytest.raises(ValidationError):
+            QueryRequest(query="who is my MP", postcode=bad)

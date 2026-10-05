@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Citation, SSEMetadata } from '@/lib/types';
 import { API_BASE } from '@/lib/api-base';
+import { readSavedPostcode } from '@/lib/postcode';
 
 export interface UseSSEStreamParams {
   sessionId?: string;
@@ -117,6 +118,8 @@ export function useSSEStream({
               language: lang,
               domain: 'general',
               session_id: sessionId,
+              // Lets "who is my MP?" resolve via the saved postcode.
+              postcode: readSavedPostcode(),
             }),
             signal: controller.signal,
           });

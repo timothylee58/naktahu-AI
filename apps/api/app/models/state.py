@@ -69,6 +69,9 @@ class AgentState(TypedDict, total=False):
     # Each: chunk_id, source_title, ministry, source_url, effective_date,
     # announced_date, content. The synthesiser mentions them as upcoming.
     pending_changes: list[dict[str, Any]]
+    # The visitor's saved 5-digit postcode, sent by the chat client. Lets
+    # parliament_query_node answer "who is my MP?" via postcode_constituencies.
+    user_postcode: Optional[str]
     # Set when the query asks about the user's own case-specific record
     # (e.g. "what's my EPF balance") rather than a general rules question —
     # NakTahu has no access to any user's records, so this carries the real
