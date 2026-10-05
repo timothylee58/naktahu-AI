@@ -19,7 +19,7 @@ import binascii
 import json
 import os
 from functools import lru_cache
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Optional
 
 import httpx
 import structlog
