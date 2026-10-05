@@ -34,6 +34,12 @@ class ChunkResult:
     # verified/pulled the source, not when the cited rule takes effect. ISO
     # timestamp string or None for rows from before the RPC returned it.
     retrieved_at: str | None = None
+    # Validity window (migration 052). effective_until: last day the rule
+    # applies (None = open-ended). announced_date: when a change was announced.
+    # A chunk with a future effective_date is a pending change, not the
+    # current rule — see analyst_node.
+    effective_until: str | None = None
+    announced_date: str | None = None
 
 
 async def _get_client() -> AsyncClient:
@@ -94,6 +100,8 @@ async def hybrid_search(
                 effective_date=row.get("effective_date"),
                 superseded_by=row.get("superseded_by"),
                 retrieved_at=row.get("retrieved_at"),
+                effective_until=row.get("effective_until"),
+                announced_date=row.get("announced_date"),
             )
         )
     return results

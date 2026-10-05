@@ -395,3 +395,46 @@ async def test_fallback_suggestions_property_domain_not_government_default() -> 
     assert any(
         kw in s.lower() for s in property_suggestions for kw in ("land", "title", "strata", "property")
     )
+
+
+def test_build_context_lists_pending_changes_separately() -> None:
+    from app.agents.synthesiser_node import _build_context
+
+    context = _build_context({
+        "query": "lifestyle tax relief",
+        "retrieved_chunks": [],
+        "pending_changes": [{
+            "source_title": "Budget announcement",
+            "effective_date": "2027-01-01",
+            "announced_date": "2026-11-10",
+            "content": "Lifestyle relief rises to RM3,000.",
+        }],
+    })
+    assert "Announced changes (not yet in effect):" in context
+    assert "effective from 2027-01-01, announced 2026-11-10" in context
+    assert "RM3,000" in context
+
+
+def test_build_context_has_no_pending_section_without_changes() -> None:
+    from app.agents.synthesiser_node import _build_context
+
+    assert "Announced changes" not in _build_context({"query": "q", "retrieved_chunks": []})
+
+
+@pytest.mark.asyncio
+async def test_pending_changes_add_instruction_to_system_prompt() -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_stream(context: str, system_prompt: str) -> AsyncGenerator[str, None]:
+        captured["prompt"] = system_prompt
+        yield "ok"
+
+    state = {
+        "query": "lifestyle tax relief",
+        "language": "en",
+        "retrieved_chunks": [],
+        "pending_changes": [{"source_title": "t", "effective_date": "2027-01-01", "content": "c"}],
+    }
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_stream):
+        _ = [t async for t in stream_synthesis(state)]
+    assert "ANNOUNCED CHANGES" in captured["prompt"]
