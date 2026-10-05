@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import { API_BASE } from '@/lib/api-base';
 import { useI18n } from '@/lib/i18n';
-import { resolveStateFromPostcode } from '@/lib/postcode';
+import { readSavedPostcode, resolveStateFromPostcode, SAVED_POSTCODE_KEY } from '@/lib/postcode';
 
 const STORAGE_KEY = 'naktahu_postcode_state';
 // The postcode itself, kept alongside the state so a returning visitor's MP
-// lookup can be re-run without asking for it again.
-const POSTCODE_KEY = 'naktahu_postcode';
+// lookup can be re-run without asking again — and sent with chat queries.
+const POSTCODE_KEY = SAVED_POSTCODE_KEY;
 
 interface PostcodeMp {
   full_name: string;
@@ -43,15 +43,6 @@ function readStoredState(): string | null {
   if (typeof window === 'undefined') return null;
   try {
     return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function readStoredPostcode(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return localStorage.getItem(POSTCODE_KEY);
   } catch {
     return null;
   }
@@ -98,7 +89,7 @@ export function PostcodePersonalizer({ className, inputClassName }: PostcodePers
   useEffect(() => {
     const stored = readStoredState();
     if (stored) setStateId(stored);
-    const storedPostcode = readStoredPostcode();
+    const storedPostcode = readSavedPostcode();
     if (stored && storedPostcode) lookUpMps(storedPostcode);
   }, []);
 

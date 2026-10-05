@@ -34,6 +34,10 @@ class QueryRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=1000)
     session_id: Optional[str] = Field(default=None, max_length=128)
     language: Optional[Language] = None
+    # The visitor's saved postcode (from the landing page), so "who is my
+    # MP?" can be answered via postcode_constituencies (migration 054)
+    # without the user retyping it. Only digits ever reach the pipeline.
+    postcode: Optional[str] = Field(default=None, pattern=r"^\d{5}$")
 
     @field_validator("session_id")
     @classmethod
@@ -73,6 +77,7 @@ async def _run_pipeline(
     user_id: Optional[str],
     domain: Optional[str] = None,
     on_token: Optional[Callable[[str], Awaitable[None]]] = None,
+    postcode: Optional[str] = None,
 ) -> dict:
     """Execute the full LangGraph pipeline and return a structured result dict.
 
@@ -107,6 +112,8 @@ async def _run_pipeline(
     }
     if domain:
         inputs["domain"] = domain
+    if postcode:
+        inputs["user_postcode"] = postcode
 
     tokens: list[str] = []
     final_state: AgentState = {}  # type: ignore[assignment]
@@ -152,6 +159,7 @@ async def _stream_pipeline(
     session_id: str,
     user_id: Optional[str],
     domain: Optional[str] = None,
+    postcode: Optional[str] = None,
 ) -> AsyncGenerator[tuple[str, Any], None]:
     """Runs _run_pipeline in the background and yields ("token", str) events
     the moment each one arrives, followed by exactly one final
@@ -175,7 +183,9 @@ async def _stream_pipeline(
 
     async def produce() -> None:
         try:
-            result = await _run_pipeline(query, session_id, user_id, domain=domain, on_token=on_token)
+            result = await _run_pipeline(
+                query, session_id, user_id, domain=domain, on_token=on_token, postcode=postcode
+            )
             await queue.put(("result", result))
         except Exception as exc:  # noqa: BLE001 — re-raised to the consumer below, not swallowed
             await queue.put(("error", exc))
@@ -200,11 +210,14 @@ async def _sse_generator(
     user_ctx: Optional[UserContext],
     request: Request,
     language_hint: Optional[str],
+    postcode: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     try:
         tokens: list[str] = []
         final_state: dict = {}
-        async for kind, payload in _stream_pipeline(query, session_id, user_ctx.user_id if user_ctx else None):
+        async for kind, payload in _stream_pipeline(
+            query, session_id, user_ctx.user_id if user_ctx else None, postcode=postcode
+        ):
             if kind == "token":
                 tokens.append(payload)
                 yield _sse("token", {"text": payload})
@@ -290,7 +303,7 @@ async def query_endpoint(
     log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
 
     return StreamingResponse(
-        _sse_generator(clean_query, session_id, user_ctx, request, body.language),
+        _sse_generator(clean_query, session_id, user_ctx, request, body.language, body.postcode),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

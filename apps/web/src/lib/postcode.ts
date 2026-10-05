@@ -39,3 +39,20 @@ export function resolveStateFromPostcode(postcode: string): MalaysiaStateId | nu
   const state = PREFIX_TO_STATE[trimmed.slice(0, 2)];
   return state && (MALAYSIA_STATE_IDS as readonly string[]).includes(state) ? state : null;
 }
+
+/** localStorage key for the visitor's saved postcode (set by the landing
+ * page's PostcodePersonalizer). The chat sends it with each query so "who is
+ * my MP?" can be answered without the visitor retyping it. */
+export const SAVED_POSTCODE_KEY = 'naktahu_postcode';
+
+/** The saved 5-digit postcode, or undefined. Never throws: storage can be
+ * unavailable in private browsing, and that must not break sending a query. */
+export function readSavedPostcode(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const value = localStorage.getItem(SAVED_POSTCODE_KEY);
+    return value && /^\d{5}$/.test(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}

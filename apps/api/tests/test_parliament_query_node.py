@@ -239,3 +239,126 @@ def test_route_after_guard_blocked_query_ends_even_if_flagged_structured():
         "parliament_mp_query": None,
     }
     assert _route_after_guard(state) == END
+
+
+# ── "Who is MY MP?" — resolved via postcode_constituencies (migration 054) ──
+
+_FAKE_SEAT_MP = {
+    "full_name": "Test MP",
+    "salutation": "YB",
+    "constituency_code": "P999",
+    "constituency_name": "Testville",
+    "party": "Test Party",
+    "parlimen_url": None,
+    "office_address": "No. 1, Jalan Contoh",
+    "office_phone": "03-0000 0000",
+    "office_email": None,
+}
+
+
+def _own_seat_state(**extra) -> dict:
+    return {
+        "query": "Who is the Member of Parliament for my constituency and how do I contact them?",
+        "language": "en",
+        "parliament_mp_query": "my constituency",
+        **extra,
+    }
+
+
+@pytest.mark.asyncio
+async def test_own_seat_without_postcode_asks_for_one_instead_of_name_search():
+    search = AsyncMock(return_value=[])
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.search_mps", new=search), \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode", new=AsyncMock()) as by_postcode:
+        result = await parliament_query_node(_own_seat_state())
+
+    assert "postcode" in result["streaming_token_buffer"]
+    assert "No MP records found" not in result["streaming_token_buffer"]
+    search.assert_not_awaited()
+    by_postcode.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_own_seat_uses_saved_postcode_and_returns_office_details():
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode",
+               new=AsyncMock(return_value=[_FAKE_SEAT_MP])) as by_postcode:
+        result = await parliament_query_node(_own_seat_state(user_postcode="50450"))
+
+    by_postcode.assert_awaited_once()
+    assert by_postcode.await_args.args[1] == "50450"
+    text = result["streaming_token_buffer"]
+    assert "YB Test MP (Test Party) is the MP for P999 Testville." in text
+    assert "No. 1, Jalan Contoh" in text and "03-0000 0000" in text
+    assert result["citations"][0]["url"] == "https://www.parlimen.gov.my"
+
+
+@pytest.mark.asyncio
+async def test_postcode_in_question_wins_over_saved_one():
+    state = _own_seat_state(
+        query="Who is my MP for 47301?", parliament_mp_query="my MP", user_postcode="50450"
+    )
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode",
+               new=AsyncMock(return_value=[_FAKE_SEAT_MP])) as by_postcode:
+        await parliament_query_node(state)
+
+    assert by_postcode.await_args.args[1] == "47301"
+
+
+@pytest.mark.asyncio
+async def test_bare_postcode_as_mp_query_is_a_postcode_lookup():
+    state = {"query": "MP 50450", "language": "en", "parliament_mp_query": "50450"}
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode",
+               new=AsyncMock(return_value=[_FAKE_SEAT_MP])) as by_postcode:
+        await parliament_query_node(state)
+    assert by_postcode.await_args.args[1] == "50450"
+
+
+@pytest.mark.asyncio
+async def test_straddling_postcode_lists_every_mp():
+    second = {**_FAKE_SEAT_MP, "full_name": "Other MP", "salutation": None, "constituency_code": "P998",
+              "constituency_name": "Sampleton", "office_address": None, "office_phone": None}
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode",
+               new=AsyncMock(return_value=[_FAKE_SEAT_MP, second])):
+        result = await parliament_query_node(_own_seat_state(user_postcode="50450"))
+
+    text = result["streaming_token_buffer"]
+    assert text.startswith("Postcode 50450 spans 2 parliamentary seats:")
+    assert "Other MP (Test Party) is the MP for P998 Sampleton. Office: no office contact on record yet." in text
+    assert len(result["citations"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_unmapped_postcode_says_so_without_guessing():
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode", new=AsyncMock(return_value=[])):
+        result = await parliament_query_node(_own_seat_state(user_postcode="50450"))
+
+    assert "can't match postcode 50450" in result["streaming_token_buffer"]
+    assert result["citations"] == []
+
+
+@pytest.mark.asyncio
+async def test_bm_own_seat_phrase_is_detected():
+    state = {"query": "Siapa Ahli Parlimen kawasan saya?", "language": "bm",
+             "parliament_mp_query": "kawasan saya"}
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.search_mps", new=AsyncMock()) as search:
+        result = await parliament_query_node(state)
+    assert "poskod" in result["streaming_token_buffer"]
+    search.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_named_constituency_still_uses_name_search():
+    state = {"query": "Who is the MP for Testville?", "language": "en", "parliament_mp_query": "Testville"}
+    with patch("app.agents.parliament_query_node._get_client", return_value=MagicMock()), \
+         patch("app.agents.parliament_query_node.search_mps", new=AsyncMock(return_value=[])) as search, \
+         patch("app.agents.parliament_query_node.get_mps_by_postcode", new=AsyncMock()) as by_postcode:
+        await parliament_query_node(state)
+    search.assert_awaited_once()
+    by_postcode.assert_not_awaited()
