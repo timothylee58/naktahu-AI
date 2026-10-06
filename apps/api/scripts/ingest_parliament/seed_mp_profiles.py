@@ -38,6 +38,7 @@ if str(_API_ROOT) not in sys.path:
 
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
+from scripts.ingest_parliament.party_names import normalise_party, unrecognised  # noqa: E402
 
 log = structlog.get_logger(__name__)
 
@@ -85,7 +86,9 @@ def validate_record(record: dict) -> tuple[dict, str] | tuple[None, str]:
         "constituency_code": constituency_code,
         "constituency_name": record["constituency_name"].strip(),
         "constituency_type": "parliament",
-        "party": (record.get("party") or "").strip() or None,
+        # One party arrives under many spellings; store one canonical name so
+        # ILIKE search and per-party counts work (see party_names.py).
+        "party": normalise_party(record.get("party")),
         "state": (record.get("state") or "").strip() or None,
         "mymp_id": record.get("mymp_id"),
         "is_active": True,
@@ -117,6 +120,15 @@ def seed(supabase, records: list[dict], dry_run: bool) -> dict[str, int]:
             continue
         stats["validated"] += 1
         to_upsert.append(cleaned)
+
+    unknown = unrecognised(row["party"] for row in to_upsert)
+    if unknown:
+        # Kept as written, not guessed at: a person decides (add an alias in
+        # party_names.py, or fix the source). Coalition labels land here too.
+        log.warning("mp_roster_unrecognised_parties", parties=dict(unknown))
+    blank = sum(1 for row in to_upsert if not row["party"])
+    if blank:
+        log.warning("mp_roster_missing_party", count=blank)
 
     if dry_run:
         log.info("mp_roster_seed_dry_run", would_upsert=len(to_upsert))
