@@ -201,3 +201,24 @@ class TestSeed:
         stats = seed(mock_supabase, records, dry_run=False)
         assert stats["upserted"] == 0
         mock_supabase.table.assert_not_called()
+
+
+class TestPartyNormalisationInSeed:
+    def _record(self, party):
+        return {"full_name": "Test MP", "constituency_code": "P999", "constituency_name": "Testville",
+                "party": party, "state": "Test State", "mymp_id": "test-mp"}
+
+    def test_spelling_variants_are_stored_as_one_canonical_party(self):
+        for raw in ("PPBM", "Parti Pribumi Bersatu Malaysia", "Malaysian United Indigenous Party (BERSATU)"):
+            cleaned, _ = validate_record(self._record(raw))
+            assert cleaned["party"] == "BERSATU"
+
+    def test_missing_party_stays_none(self):
+        cleaned, _ = validate_record(self._record(None))
+        assert cleaned["party"] is None
+
+    def test_unrecognised_parties_are_reported_not_dropped(self, capsys):
+        sb = MagicMock()
+        stats = seed(sb, [self._record("GRS")], dry_run=True)
+        assert stats["validated"] == 1
+        assert "mp_roster_unrecognised_parties" in capsys.readouterr().out
