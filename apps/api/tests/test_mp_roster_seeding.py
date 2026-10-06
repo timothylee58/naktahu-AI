@@ -19,6 +19,7 @@ from scripts.ingest_parliament.fetch_mp_roster import (  # noqa: E402
     _normalise_record,
     _parse_profile_html,
     _parse_sitemap_html,
+    apply_current_mp_overrides,
     find_seat_clashes,
     normalise_seat_code,
     state_for_seat,
@@ -109,6 +110,19 @@ class TestSeatHelpers:
             {"constituency_code": "P002", "mymp_id": "c"},
         ]
         assert find_seat_clashes(recs) == {"P001": ["a", "b"]}
+
+
+    def test_override_keeps_only_the_sitting_mp(self):
+        recs = [
+            {"constituency_code": "P098", "mymp_id": "amirudin-bin-shari"},
+            {"constituency_code": "P098", "mymp_id": "mohamed-azmin-bin-ali"},
+            {"constituency_code": "P001", "mymp_id": "x"},
+            {"constituency_code": "P001", "mymp_id": "y"},
+        ]
+        out = apply_current_mp_overrides(recs)
+        assert {r["mymp_id"] for r in out} == {"amirudin-bin-shari", "x", "y"}
+        # a clash with no override stays visible
+        assert find_seat_clashes(out) == {"P001": ["x", "y"]}
 
 
 _PROFILE = """
