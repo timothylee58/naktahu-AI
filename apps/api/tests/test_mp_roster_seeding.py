@@ -17,7 +17,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.ingest_parliament.fetch_mp_roster import (  # noqa: E402
     _normalise_record,
-    _parse_listing_html,
+    _parse_profile_html,
+    _parse_sitemap_html,
+    find_seat_clashes,
+    normalise_seat_code,
+    state_for_seat,
 )
 from scripts.ingest_parliament.seed_mp_profiles import (  # noqa: E402
     seed,
@@ -39,7 +43,7 @@ class TestNormaliseRecord:
         result = _normalise_record(raw)
         assert result == {
             "full_name": "Ahmad Faizal bin Azumu",
-            "constituency_code": "P.062",
+            "constituency_code": "P062",
             "constituency_name": "Tambun",
             "party": "PH",
             "state": "Perak",
@@ -69,9 +73,9 @@ class TestNormaliseRecord:
             "full_name": "Someone",
             "constituency_raw": "P.062",
         })
-        assert result["constituency_name"] == "P.062"
+        assert result["constituency_name"] == "P062"
 
-    def test_empty_party_and_state_become_none_not_empty_string(self):
+    def test_empty_party_becomes_none_and_blank_state_is_derived_from_seat(self):
         result = _normalise_record({
             "full_name": "Someone",
             "constituency_raw": "P.062 Tambun",
@@ -79,35 +83,65 @@ class TestNormaliseRecord:
             "state": "  ",
         })
         assert result["party"] is None
-        assert result["state"] is None
+        assert result["state"] == "Perak"  # P062 -> Perak
 
 
-class TestParseListingHtml:
-    def test_no_matching_cards_returns_empty_not_raises(self):
-        # The whole point of this test: an HTML structure that doesn't match
-        # _MP_CARD_SELECTOR must fail LOUD-BUT-SAFE (empty list, logged
-        # warning) not crash the pipeline — this is exactly the "selectors
-        # are unverified against the live site" scenario the module
-        # docstring warns about.
-        html = "<html><body><p>Totally different markup</p></body></html>"
-        assert _parse_listing_html(html) == []
+class TestSeatHelpers:
+    def test_normalise_seat_code_variants(self):
+        assert normalise_seat_code("P.062") == "P062"
+        assert normalise_seat_code("p62") == "P062"
+        assert normalise_seat_code("P137") == "P137"
 
-    def test_parses_a_plausible_card_shape(self):
-        # One plausible card shape matching the current (unverified) best-
-        # guess selectors — documents what this parser DOES handle, not a
-        # claim that mymp.org.my's real markup looks like this.
-        html = """
-        <div class="mp-card">
-          <h3 class="mp-name">Ahmad Faizal bin Azumu</h3>
-          <span class="mp-constituency">P.062 Tambun</span>
-          <span class="mp-party">PH</span>
-          <span class="mp-state">Perak</span>
-        </div>
-        """
-        result = _parse_listing_html(html)
-        assert len(result) == 1
-        assert result[0]["full_name"] == "Ahmad Faizal bin Azumu"
-        assert result[0]["constituency_code"] == "P.062"
+    def test_normalise_seat_code_rejects_out_of_range(self):
+        assert normalise_seat_code("P223") is None
+        assert normalise_seat_code("P000") is None
+        assert normalise_seat_code("N.12") is None
+
+    def test_state_for_seat_boundaries(self):
+        assert state_for_seat("P001") == "Perlis"
+        assert state_for_seat("P137") == "Melaka"
+        assert state_for_seat("P222") == "Sarawak"
+
+    def test_find_seat_clashes(self):
+        recs = [
+            {"constituency_code": "P001", "mymp_id": "a"},
+            {"constituency_code": "P001", "mymp_id": "b"},
+            {"constituency_code": "P002", "mymp_id": "c"},
+        ]
+        assert find_seat_clashes(recs) == {"P001": ["a", "b"]}
+
+
+_PROFILE = """
+<p class="x"><span class="text-primary">P137</span>
+<span class="text-constituency font-weight-bold">HANG TUAH JAYA</span></p>
+<h2 class="p-name mb-2"><p class="mb-1">Adam Adli Abd Halim</p>
+<p class="badge badge-pill badge-dark">Parti Keadilan Rakyat (PKR)</p></h2>
+"""
+
+
+class TestParseProfileHtml:
+    def test_parses_live_profile_shape(self):
+        r = _parse_profile_html(_PROFILE, "adam-adli-abd-halim")
+        assert r["constituency_code"] == "P137"
+        assert r["constituency_name"] == "Hang Tuah Jaya"
+        assert r["full_name"] == "Adam Adli Abd Halim"
+        assert r["party"] == "Parti Keadilan Rakyat (PKR)"
+        assert r["state"] == "Melaka"
+        assert r["mymp_id"] == "adam-adli-abd-halim"
+
+    def test_unrecognised_markup_returns_none_not_raises(self):
+        assert _parse_profile_html("<html><body>nope</body></html>", "x") is None
+
+
+class TestParseSitemapHtml:
+    def test_extracts_unique_profile_slugs(self):
+        html = (
+            '<a href="https://mymp.org.my/p/a-b">A</a>'
+            '<a href="https://mymp.org.my/p/a-b">A</a>'
+            '<a href="/p/c-d">C</a>'
+            '<a href="https://mymp.org.my/about">x</a>'
+        )
+        assert _parse_sitemap_html(html) == ["a-b", "c-d"]
 
 
 # ── seed_mp_profiles: validation + injection scan ────────────────────────
