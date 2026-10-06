@@ -95,6 +95,16 @@ _STATE_BY_SEAT_RANGE: tuple[tuple[int, int, str], ...] = (
 )
 
 
+# Seats where mymp.org.my lists a former MP beside the current one. Keyed by
+# seat code -> the profile slug of the sitting MP; confirmed by the project
+# owner on 2026-10-07 (P098 Gombak: Amirudin Shari; P161 Pulai: Suhaizan
+# Kaiat, spelled "Kayat" in mymp's slug). Re-check after any by-election.
+CURRENT_MP_SLUG_OVERRIDES: dict[str, str] = {
+    "P098": "amirudin-bin-shari",
+    "P161": "suhaizan-bin-kayat",
+}
+
+
 def _clean_text(el) -> str:
     return " ".join(el.get_text(" ", strip=True).split()) if el else ""
 
@@ -191,6 +201,20 @@ def find_seat_clashes(records: list[dict]) -> dict[str, list[str]]:
     return {code: slugs for code, slugs in by_seat.items() if len(slugs) > 1}
 
 
+def apply_current_mp_overrides(records: list[dict]) -> list[dict]:
+    """For seats in CURRENT_MP_SLUG_OVERRIDES, keep only the named profile.
+    Other clashing seats are left alone so find_seat_clashes still flags them."""
+    clashing = find_seat_clashes(records)
+    drop = {
+        slug
+        for code, slugs in clashing.items()
+        if CURRENT_MP_SLUG_OVERRIDES.get(code) in slugs
+        for slug in slugs
+        if slug != CURRENT_MP_SLUG_OVERRIDES[code]
+    }
+    return [r for r in records if r["mymp_id"] not in drop]
+
+
 async def fetch_roster() -> list[dict]:
     records: list[dict] = []
     async with httpx.AsyncClient(headers=HEADERS, timeout=30, follow_redirects=True) as client:
@@ -201,11 +225,20 @@ async def fetch_roster() -> list[dict]:
 
         for i, slug in enumerate(slugs, 1):
             await asyncio.sleep(REQUEST_DELAY_S)
-            try:
-                page = await client.get(f"{MYMP_BASE}/p/{slug}")
-                page.raise_for_status()
-            except httpx.HTTPError as exc:
-                log.warning("mp_roster_profile_fetch_failed", slug=slug, error=str(exc)[:200])
+            page = None
+            for attempt in range(1, 4):
+                try:
+                    page = await client.get(f"{MYMP_BASE}/p/{slug}")
+                    page.raise_for_status()
+                    break
+                except httpx.HTTPError as exc:
+                    page = None
+                    log.warning(
+                        "mp_roster_profile_fetch_failed", slug=slug, attempt=attempt,
+                        error=repr(exc)[:200],
+                    )
+                    await asyncio.sleep(REQUEST_DELAY_S * 2 * attempt)
+            if page is None:
                 continue
             record = _parse_profile_html(page.text, slug)
             if record:
@@ -213,7 +246,7 @@ async def fetch_roster() -> list[dict]:
             if i % 25 == 0:
                 log.info("mp_roster_progress", fetched=i, of=len(slugs))
 
-    return sorted(records, key=lambda r: r["constituency_code"])
+    return sorted(apply_current_mp_overrides(records), key=lambda r: r["constituency_code"])
 
 
 async def main(dry_run: bool) -> int:
