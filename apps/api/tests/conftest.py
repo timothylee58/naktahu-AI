@@ -109,18 +109,6 @@ def _make_auth_headers(user_id: str = "test-user-1", plan: str = "pro") -> dict[
     )
     return {"Authorization": f"Bearer {token}"}
 
-    def _make(user_id: str = "test-user-1", plan: str = "pro") -> dict[str, str]:
-        token = jwt.encode(
-            {
-                "sub": user_id,
-                "aud": settings.supabase_jwt_aud,
-                "app_metadata": {"plan": plan},
-                "exp": int(time.time()) + 3600,
-            },
-            settings.jwt_secret,
-            algorithm="HS256",
-        )
-        return {"Authorization": f"Bearer {token}"}
 
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
