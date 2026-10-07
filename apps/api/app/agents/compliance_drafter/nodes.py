@@ -1,5 +1,4 @@
 """Compliance Drafter LangGraph nodes."""
-from __future__ import annotations
 
 from html import escape as _esc
 from typing import Any

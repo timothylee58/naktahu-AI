@@ -4,7 +4,6 @@ No checkpointer: unlike eligibility_agent (multi-turn business-grant
 intake), this agent takes one complete 14-field profile and returns one
 result, the same single-shot shape as sme_compliance_navigator.
 """
-from __future__ import annotations
 
 from typing import Any
 

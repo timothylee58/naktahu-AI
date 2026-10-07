@@ -6,7 +6,6 @@ projection section is a SKELETON — a structured template for the founder
 to fill in — never real, verified numbers. Every section and its HTML/JSON
 rendering must make that unambiguous.
 """
-from __future__ import annotations
 
 from typing import Any
 

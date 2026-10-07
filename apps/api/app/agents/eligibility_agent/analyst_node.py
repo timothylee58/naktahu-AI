@@ -6,7 +6,6 @@ sequence) across the matched grants.
 Scoring never fabricates eligibility: every pass/fail check is derived
 directly from grant_database fields and the intake-derived business profile.
 """
-from __future__ import annotations
 
 from datetime import date
 from typing import Any

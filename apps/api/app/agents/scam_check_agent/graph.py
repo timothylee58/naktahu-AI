@@ -4,7 +4,6 @@ No checkpointer: one pasted text in, one verdict out — same single-shot
 shape as welfare_eligibility_agent, not eligibility_agent's multi-turn
 intake.
 """
-from __future__ import annotations
 
 from typing import Any
 
