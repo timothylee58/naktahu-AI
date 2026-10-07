@@ -336,3 +336,34 @@ class TestSeatCodeFormat:
 
         assert canonical_seat_code("P.001") == canonical_seat_code(" p 001 ") == "P001"
         assert canonical_seat_code("") == ""
+
+
+class TestScraperToSeedHandoff:
+    """The scraper's output is the seed's input, and the seed's output joins to
+    postcode_constituencies on an EXACT constituency_code match. Format drift
+    between the three has already caused one near-miss ("P.137" vs "P137")."""
+
+    def test_scraped_profile_flows_through_the_seed_unchanged_where_it_should(self):
+        scraped = _parse_profile_html(_PROFILE, "adam-adli-abd-halim")
+        cleaned, reason = validate_record(scraped)
+
+        assert reason == ""
+        assert cleaned["constituency_code"] == "P137"
+        # one canonical party name, whatever spelling the profile used
+        assert scraped["party"] == "Parti Keadilan Rakyat (PKR)"
+        assert cleaned["party"] == "PKR"
+
+    def test_stored_seat_code_matches_the_postcode_crosswalk_form(self):
+        from scripts.ingest_parliament.seed_postcode_seats import normalise_code
+
+        scraped = _parse_profile_html(_PROFILE, "adam-adli-abd-halim")
+        cleaned, _ = validate_record(scraped)
+        # services/parliament.py joins the two tables on this exact string.
+        assert cleaned["constituency_code"] == normalise_code("P.137")
+
+    def test_every_seat_belongs_to_a_state(self):
+        """The state is derived from the seat number, so a gap in the ranges
+        would silently leave some MPs with no state."""
+        from scripts.ingest_parliament.fetch_mp_roster import state_for_seat
+
+        assert all(state_for_seat(f"P{n:03d}") for n in range(1, 223))
