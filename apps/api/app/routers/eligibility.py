@@ -104,7 +104,7 @@ class CompatibilityResponse(BaseModel):
     unrecognised_programmes: list[str] = Field(default_factory=list, max_length=10)
     advice: list[str] = Field(default_factory=list, max_length=10)
     degraded: bool = False
-    language: Literal["bm", "en"] = "en"
+    language: Literal["bm", "en", "zh"] = "en"
 
 
 def _checkpointer(request: Request) -> Any:

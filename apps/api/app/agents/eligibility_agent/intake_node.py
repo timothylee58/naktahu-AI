@@ -41,6 +41,15 @@ _QUESTIONS_BM = [
     "Adakah anda mempunyai status Malaysia Digital (MD), dan pernahkah anda menerima geran kerajaan sebelum ini?",
 ]
 
+_QUESTIONS_ZH = [
+    "您经营的是哪种类型的企业（独资经营、私人有限公司 Sdn Bhd、初创企业、有限责任合伙 LLP 或合作社），"
+    "所属行业是什么？",
+    "您企业的年营业额（令吉）是多少，有多少名员工？企业是否为土著（Bumiputera）所有？",
+    "您是否拥有马来西亚数码（Malaysia Digital, MD）资格，以前是否获得过政府补助金？",
+]
+
+_QUESTIONS = {"bm": _QUESTIONS_BM, "en": _QUESTIONS_EN, "zh": _QUESTIONS_ZH}
+
 _EXTRACTION_SYSTEM_PROMPT = """\
 You extract structured business-profile fields from a Malaysian SME owner's free-text
 answer during a grant-eligibility intake conversation. Return ONLY a JSON object with any
@@ -106,7 +115,7 @@ async def intake_node(state: EligibilityState) -> dict[str, Any]:
             "current_turn": turn,
         }
 
-    questions = _QUESTIONS_BM if language == "bm" else _QUESTIONS_EN
+    questions = _QUESTIONS.get(language, _QUESTIONS_EN)
     idx = min(turn, len(questions) - 1)
     return {
         "business_profile": profile,

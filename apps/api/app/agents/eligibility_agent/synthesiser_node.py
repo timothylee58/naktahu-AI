@@ -17,6 +17,7 @@ log = structlog.get_logger(__name__)
 _LANG_INSTRUCTION = {
     "bm": "PENTING: Jawab dalam Bahasa Malaysia sahaja.",
     "en": "IMPORTANT: Answer in English only.",
+    "zh": "重要：您必须只用简体中文回答。",
 }
 
 _SYSTEM_PROMPT = (
