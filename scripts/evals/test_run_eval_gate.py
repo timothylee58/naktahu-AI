@@ -76,7 +76,7 @@ def test_missing_faithfulness_is_failure_when_required() -> None:
 
 
 def test_gate_thresholds() -> None:
-    assert FAITHFULNESS_GATE == 0.7
+    assert FAITHFULNESS_GATE == 0.75
     assert TEMPORAL_ACCURACY_GATE == 0.6
 
 
@@ -96,3 +96,25 @@ def test_main_fails_when_faithfulness_below_gate() -> None:
 def test_main_fails_when_faithfulness_required_but_missing() -> None:
     code = main(["--samples", str(_DEFAULT_SAMPLES), "--require-faithfulness", "--no-record"])
     assert code == 1
+
+
+def test_faithfulness_boundary_is_inclusive_at_the_gate() -> None:
+    at_gate, _ = evaluate_gates({"faithfulness": 0.75, "temporal_accuracy": 0.9})
+    just_under, _ = evaluate_gates({"faithfulness": 0.749, "temporal_accuracy": 0.9})
+    assert at_gate == []
+    assert any("faithfulness" in f for f in just_under)
+
+
+def test_unmeasured_faithfulness_is_announced_not_silently_skipped(capsys, monkeypatch) -> None:
+    monkeypatch.delenv("FAITHFULNESS_SCORE", raising=False)
+    assert main(["--samples", str(_DEFAULT_SAMPLES), "--no-record"]) == 0
+    out = capsys.readouterr().out
+    assert "NOT MEASURED" in out
+    assert "GATE PASSED" in out  # the temporal gate still ran and passed
+
+
+def test_measured_faithfulness_is_printed_with_its_value(capsys, monkeypatch) -> None:
+    monkeypatch.delenv("FAITHFULNESS_SCORE", raising=False)
+    assert main(["--samples", str(_DEFAULT_SAMPLES), "--faithfulness", "0.81", "--no-record"]) == 0
+    out = capsys.readouterr().out
+    assert "NOT MEASURED" not in out and "0.810" in out

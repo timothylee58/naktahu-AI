@@ -205,3 +205,24 @@ it runs every case through the real pipeline and prints accuracy plus a
 confidence-calibration table; it fails if any answer is wrong at confidence >= 0.6,
 because the trust layer's job is to make that count zero. To grow it, add the
 questions your users actually ask.
+
+### 6. `grant_agent_cases.jsonl` — does the Eligibility Agent decide correctly?
+
+`test_grant_agent.py` gates the agent's own decision logic with no credentials,
+running the real `analyst_node`, `grant_compatibility_check` and
+`verification.assess_results` over 38 golden cases:
+
+| gate | threshold | why |
+|---|---|---|
+| match precision | 1.00 (zero false eligibles) | telling an applicant a grant applies when it does not is the harmful error |
+| match recall / near-miss exactness | 0.90 | |
+| stacking accuracy / unsafe `stackable` | 1.00 / 0 | a pair with no evidence must be `unknown`, never `stackable` |
+| verification accuracy / unsafe `confirmed` | 1.00 / 0 | never `confirmed` when the evidence does not support it |
+
+The fixtures are **synthetic** programmes: they test that the rules do what we
+designed, not what a real agency's rules or deadlines currently are (that is the
+live Tavily verification's job). Deadlines use `deadline_days` relative to today
+so the cases never age out. Three sensitivity tests deliberately break the
+Bumiputera rule, the unknown-pair handling and the domain check, to prove the
+gates can fail. This is **not** answer faithfulness; see `scripts/evals/README.md`.
+

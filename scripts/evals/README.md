@@ -76,7 +76,7 @@ class TemporalAccuracy(Metric):
 Two deploy gates run in CI (`.github/workflows/ci.yml` → `eval-gate` job):
 
 ```python
-if scores["faithfulness"] < 0.7:        # existing gate
+if scores["faithfulness"] < 0.75:       # existing gate
     sys.exit(1)
 if scores["temporal_accuracy"] < 0.6:   # new freshness gate
     sys.exit(1)
@@ -89,7 +89,10 @@ if scores["temporal_accuracy"] < 0.6:   # new freshness gate
   `FAITHFULNESS_SCORE` (produced by a live RAGAS run, which needs LLM
   credentials). When absent its gate is **skipped** unless
   `--require-faithfulness` is set, so credential-free CI still enforces the
-  temporal gate.
+  temporal gate. The run prints `NOT MEASURED` in that case so a skipped gate
+  never reads as a passed one. **Nothing in this repo computes the faithfulness
+  score** — there is no RAGAS runner here; today it arrives from outside (a CI
+  secret). Until a real run produces it, treat the 0.75 gate as unmeasured.
 - Each run is recorded to the **`eval_runs`** table (migration 009), including
   `avg_temporal_accuracy`, `faithfulness`, `passed`, and the full `scores` — a
   best-effort insert that is skipped when Supabase creds are absent (never fails
