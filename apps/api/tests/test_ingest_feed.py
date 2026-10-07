@@ -802,3 +802,73 @@ def test_queue_supersede_candidates_never_fails_ingestion():
     sb = MagicMock()
     sb.rpc.side_effect = Exception('relation "supersede_candidates" does not exist')
     assert queue_supersede_candidates(sb, "new-1", "t", [0.0], "tax", "2027-01-01") == 0
+
+
+# ── Budget 2027 readiness ────────────────────────────────────────────────────
+
+import dataclasses  # noqa: E402
+
+# date, ingest_main, route_domain and BUDGET_2027_SOURCES are imported above.
+
+_TABLING_DAY = date(2026, 10, 9)
+
+
+def test_every_budget_2027_source_records_the_tabling_day():
+    assert BUDGET_2027_SOURCES
+    for source in BUDGET_2027_SOURCES:
+        assert source.announced_date == _TABLING_DAY, source.name
+        assert source.available_from == _TABLING_DAY, source.name
+
+
+def test_source_announced_date_reaches_the_ingest_args(monkeypatch):
+    """--source fills announced_date from the registry: a PDF has no per-item
+    publish date, so without this every Budget chunk would have none."""
+    source = dataclasses.replace(get_source("belanjawan-2027-speech-en"), available_from=None)
+    captured = {}
+    monkeypatch.setattr("scripts.ingest_feed.get_source", lambda name: source)
+    monkeypatch.setattr("scripts.ingest_feed.asyncio.run", lambda coro: (captured.setdefault("args", None), coro.close()))
+    monkeypatch.setattr(
+        "scripts.ingest_feed.main_async", lambda args: (captured.__setitem__("args", args), _noop())[1]
+    )
+    monkeypatch.setattr(sys, "argv", ["ingest_feed", "--source", "belanjawan-2027-speech-en", "--dry-run"])
+    ingest_main()
+    assert captured["args"].announced_date == "2026-10-09"
+
+
+def test_cli_announced_date_overrides_the_registry(monkeypatch):
+    source = dataclasses.replace(get_source("belanjawan-2027-speech-en"), available_from=None)
+    captured = {}
+    monkeypatch.setattr("scripts.ingest_feed.get_source", lambda name: source)
+    monkeypatch.setattr("scripts.ingest_feed.asyncio.run", lambda coro: coro.close())
+    monkeypatch.setattr(
+        "scripts.ingest_feed.main_async", lambda args: (captured.__setitem__("args", args), _noop())[1]
+    )
+    monkeypatch.setattr(
+        sys, "argv",
+        ["ingest_feed", "--source", "belanjawan-2027-speech-en", "--announced-date", "2026-10-10", "--dry-run"],
+    )
+    ingest_main()
+    assert captured["args"].announced_date == "2026-10-10"
+
+
+async def _noop():
+    return None
+
+
+def test_budget_day_paragraph_is_stamped_routed_and_dated_correctly():
+    """A fake paragraph in the Budget speech's style (all names and figures are
+    invented) must come out of the ingest helpers as: a tax chunk, effective from
+    1 Jan 2027 with NO end date, announced on tabling day."""
+    entry = FeedEntry(
+        title="Budget 2027 speech (p. 41)",
+        description=(
+            "Mulai Tahun Taksiran 2027, pelepasan cukai pendapatan individu bagi perbelanjaan gaya hidup "
+            "dinaikkan daripada RM2,500 kepada RM3,000. Insentif cukai ini akan membantu pembayar cukai."
+        ),
+        link="https://example.invalid/bs27.pdf#page=41",
+    )
+    source = dataclasses.replace(get_source("belanjawan-2027-speech-en"), available_from=None)
+    args = MagicMock(effective_date=None, effective_until=None, announced_date=source.announced_date.isoformat())
+
+    assert route_domain(entry.content, "finance") == "tax"
+    assert date_fields(entry, args) == {"effective_date": "2027-01-01", "announced_date": "2026-10-09"}

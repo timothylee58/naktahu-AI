@@ -66,4 +66,45 @@ def test_query_size_is_bounded() -> None:
     assert tsq is not None
     groups = tsq.split(" & ")
     assert len(groups) <= 8
-    assert all(len(g.split(" | ")) <= 64 for g in groups)
+    assert all(len(g.split(" | ")) <= 96 for g in groups)
+
+
+# ── Cross-language synonyms ──────────────────────────────────────────────────
+
+@pytest.mark.parametrize(
+    ("query", "expected_in_group"),
+    [
+        ("bajet 2027", "belanjawan"),
+        ("budget 2027", "belanjawan"),
+        ("belanjawan 2027", "bajet"),
+        ("epf", "kwsp"),       # under 4 letters: must not be skipped by the length gate
+        ("tax", "cukai"),
+        ("kwsp", "epf"),
+    ],
+)
+def test_synonyms_bridge_languages(query: str, expected_in_group: str) -> None:
+    tsq = build_keyword_tsquery(query)
+    assert tsq is not None
+    assert expected_in_group in tsq.split(" & ")[0]
+
+
+def test_synonyms_keep_and_semantics_across_words():
+    groups = build_keyword_tsquery("income tax relief").split(" & ")
+    assert len(groups) == 3
+    assert "pendapatan" in groups[0] and "cukai" in groups[1] and "pelepasan" in groups[2]
+
+
+def test_ambiguous_grant_geran_is_not_a_synonym():
+    """`geran` also means a land title: expanding English "grant" to it would
+    pull in unrelated property text."""
+    tsq = build_keyword_tsquery("grant")
+    assert tsq is not None and "geran" not in tsq
+
+
+def test_words_without_synonyms_are_unchanged():
+    assert "belanjawan" not in build_keyword_tsquery("memohon")
+
+
+def test_synonym_expansion_stays_bounded():
+    tsq = build_keyword_tsquery("budget")
+    assert len(tsq.split(" | ")) <= 96

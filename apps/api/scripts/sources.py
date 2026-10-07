@@ -59,6 +59,11 @@ class Source:
     # UPCOMING (with a countdown) instead of fetching it before this date, so
     # a scheduled run can't record a pre-publication 404 as source rot.
     available_from: Optional[date] = None
+    # When the document was announced/tabled. A PDF has no per-item publish date
+    # the way an RSS entry does, so this is what ingest_feed stamps on every
+    # chunk's announced_date (migration 052): it lets an answer say "announced
+    # on {date}, effective {date}". None = unknown (left unset, never guessed).
+    announced_date: Optional[date] = None
     # Tag each chunk with its own domain (ingest_feed.route_domain) instead of
     # stamping the whole document with `domain` — for documents like the
     # Budget speech that span finance, tax, welfare, education, etc.
@@ -925,35 +930,35 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         url=f"{_BUDGET_2027_BASE}/ucapan/ub27.pdf",
         kind="pdf", domain="finance", ministry=_MOF, language="bm",
         notes="Ucapan Belanjawan 2027 — the original-language Budget speech.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
+        available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
     ),
     Source(
         name="belanjawan-2027-speech-en",
         url=f"{_BUDGET_2027_BASE}/ucapan/bs27.pdf",
         kind="pdf", domain="finance", ministry=_MOF, language="en",
         notes="Budget 2027 speech — MOF's English translation of ub27.pdf.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
+        available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
     ),
     Source(
         name="belanjawan-2027-fiscal-outlook-en",
         url=f"{_BUDGET_2027_BASE}/revenue/fiscal_outlook_2027.pdf",
         kind="pdf", domain="finance", ministry=_MOF, language="en",
         notes="Fiscal Outlook 2027 — revenue, expenditure, Medium-Term Fiscal Framework.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
+        available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
     ),
     Source(
         name="belanjawan-2027-tinjauan-fiskal-bm",
         url=f"{_BUDGET_2027_BASE}/hasil/tinjauan_fiskal_2027.pdf",
         kind="pdf", domain="finance", ministry=_MOF, language="bm",
         notes="Tinjauan Fiskal 2027 — BM edition of the Fiscal Outlook.",
-        available_from=_BUDGET_2027_TABLED, route_domains=True,
+        available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
     ),
     Source(
         name="belanjawan-2027-economic-outlook-en",
         url=f"{_BUDGET_2027_BASE}/economy/economic-2027.pdf",
         kind="pdf", domain="finance", ministry=_MOF, language="en",
         notes="Economic Outlook 2027 — macro context behind the Budget's figures.",
-        available_from=_BUDGET_2027_TABLED, route_domains=False,
+        available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=False,
     ),
 )
 

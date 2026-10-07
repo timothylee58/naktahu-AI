@@ -705,6 +705,10 @@ def main() -> None:
         args.ministry = args.ministry or source.ministry
         args.language = source.language if args.language == "bm" else args.language
         args.source_title = args.source_title or source.name
+        # A registered source's announcement date (e.g. the Budget's tabling day)
+        # fills announced_date unless --announced-date overrides it.
+        if source.announced_date and not getattr(args, "announced_date", None):
+            args.announced_date = source.announced_date.isoformat()
 
     missing = [n for n in ("feed_url", "domain", "ministry") if not getattr(args, n)]
     if missing:

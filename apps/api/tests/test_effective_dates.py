@@ -47,6 +47,24 @@ def test_ambiguous_or_missing_dates_return_nothing(text: str) -> None:
     assert window.effective_date is None
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # "from YA 2027" starts a rule that keeps applying: NOT a one-year window,
+        # which would make the rule look expired after 31 Dec 2027.
+        ("Mulai Tahun Taksiran 2027, pelepasan cukai dinaikkan kepada RM3,000.", ValidityWindow(date(2027, 1, 1), None)),
+        ("With effect from YA 2027 the relief is raised.", ValidityWindow(date(2027, 1, 1), None)),
+        ("Berkuat kuasa pada Tahun Taksiran 2027.", ValidityWindow(date(2027, 1, 1), None)),
+        ("Tahun Taksiran 2027 dan seterusnya, kadar ini terpakai.", ValidityWindow(date(2027, 1, 1), None)),
+        ("Year of assessment 2027 and subsequent years.", ValidityWindow(date(2027, 1, 1), None)),
+        # "for YA 2027" is a one-year window.
+        ("Pelepasan untuk Tahun Taksiran 2027 ialah RM3,000.", ValidityWindow(date(2027, 1, 1), date(2027, 12, 31))),
+    ],
+)
+def test_year_of_assessment_start_versus_window(text: str, expected: ValidityWindow) -> None:
+    assert extract_validity_window(text) == expected
+
+
 def test_contradictory_window_is_dropped() -> None:
     assert extract_validity_window("Effective 1 March 2027, valid until 31 December 2026.") == ValidityWindow()
 
