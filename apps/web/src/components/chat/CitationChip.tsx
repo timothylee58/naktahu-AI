@@ -172,7 +172,7 @@ export function CitationChip({ citation, index }: CitationChipProps) {
             <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400 locale-text-balance">{title}</p>
             {effectiveDate && (
               <p className="mt-1.5 text-[11px] font-mono text-zinc-700 dark:text-zinc-300">
-                {t('citation.as_of').replace('{date}', effectiveDate)}
+                {t(citation.not_yet_effective ? 'citation.takes_effect' : 'citation.as_of').replace('{date}', effectiveDate)}
               </p>
             )}
             {confidencePct !== null && (

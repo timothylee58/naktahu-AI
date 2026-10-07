@@ -23,6 +23,9 @@ class Citation(TypedDict):
     # Never synthesise a date here; None must render as no date, not as
     # today's date or an ingestion timestamp.
     effective_date: NotRequired[str | None]
+    # True when the cited rule has been announced but takes effect after
+    # today (effective_date is then in the future). Absent/False otherwise.
+    not_yet_effective: NotRequired[bool]
     # ISO timestamp NakTahu last ingested/verified this specific source, from
     # document_chunks.created_at (migration 048). NOT the same thing as
     # effective_date above — this says "we checked this source on {date}",

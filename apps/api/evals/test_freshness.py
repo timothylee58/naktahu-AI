@@ -162,12 +162,17 @@ def _november_corpus() -> list[ChunkResult]:
 @pytest.mark.asyncio
 async def test_announced_change_is_not_stated_as_current_rule() -> None:
     """Before 052, prefer-newest ranked the not-yet-effective rule first, so the
-    answer stated next year's figure as today's. The current rule must drive
-    the answer and citations."""
+    answer stated next year's figure as today's. The rule in force must drive
+    the answer; the announced change is cited separately and flagged."""
     result = await analyst_node({"query": "lifestyle tax relief", "domain": "tax", "retrieved_chunks": _november_corpus()})
 
-    cited = [c["url"] for c in result["citations"]]
-    assert cited and all("relief-current" in u for u in cited), cited
+    in_force = [c for c in result["citations"] if not c.get("not_yet_effective")]
+    announced = [c for c in result["citations"] if c.get("not_yet_effective")]
+    assert in_force and all("relief-current" in c["url"] for c in in_force), result["citations"]
+    assert [c["url"] for c in announced] == ["https://www.hasil.gov.my/relief-next"]
+    assert announced[0]["effective_date"] == _NEXT_MONTH
+    assert announced[0]["stale_disclaimer"] is False
+    assert result["citations"][-1].get("not_yet_effective"), "announced change must not outrank the rule in force"
     assert [c.id for c in result["retrieved_chunks"]] == ["relief-current-a", "relief-current-b"]
     assert result["needs_clarification"] is False
     assert result["stale_warning"] is False
@@ -199,12 +204,43 @@ async def test_expired_rule_is_never_cited() -> None:
 
 
 @pytest.mark.asyncio
-async def test_only_announced_change_in_corpus_is_not_presented_as_current() -> None:
-    """The current rule was never ingested: no current evidence, so the answer
-    must not go out as confident; the upcoming change is still passed on."""
+async def test_single_announced_chunk_is_still_passed_on_but_needs_corroboration() -> None:
+    """One announced chunk cannot clear the two-chunk evidence gate, so the
+    question is clarified; the announced change is still carried in state."""
     corpus = [_window_chunk("relief-next", "Lifestyle tax relief rises to RM3,000.", _NEXT_MONTH, None, _ANNOUNCED)]
     result = await analyst_node({"query": "lifestyle tax relief", "domain": "tax", "retrieved_chunks": corpus})
 
-    assert result["citations"] == []
     assert result["needs_clarification"] is True
     assert [c["chunk_id"] for c in result["pending_changes"]] == ["relief-next"]
+
+
+@pytest.mark.asyncio
+async def test_question_about_an_announcement_is_answered_from_it() -> None:
+    """The Budget-day case: nothing is in force yet, but the announcement itself
+    is what the user asks about ("what did Budget 2027 change for X?"). That used
+    to dead-end in a generic clarification, discarding exactly the content the
+    user wanted. It must flow to the synthesiser, cited and flagged as upcoming."""
+    corpus = [
+        _window_chunk("budget-a", "Budget announcement: lifestyle tax relief rises to RM3,000.", _NEXT_MONTH, None, _ANNOUNCED),
+        _window_chunk("budget-b", "Budget announcement: relief for books and sports equipment is extended.", _NEXT_MONTH, None, _ANNOUNCED),
+    ]
+    result = await analyst_node({"query": "budget announcement lifestyle tax relief", "domain": "tax", "retrieved_chunks": corpus})
+
+    assert result["needs_clarification"] is False
+    assert result["retrieved_chunks"] == [], "nothing is in force: context documents must be empty"
+    assert {c["chunk_id"] for c in result["pending_changes"]} == {"budget-a", "budget-b"}
+    assert result["citations"] and all(c["not_yet_effective"] for c in result["citations"])
+    assert all(c["effective_date"] == _NEXT_MONTH for c in result["citations"])
+    assert result["stale_warning"] is False
+
+
+@pytest.mark.asyncio
+async def test_most_relevant_announced_change_comes_first_not_just_the_soonest() -> None:
+    soon = (date.today() + timedelta(days=5)).isoformat()
+    corpus = [
+        _window_chunk("off-topic-soon", "Announcement about road tax rebates for electric vehicles.", soon, None, _ANNOUNCED),
+        _window_chunk("on-topic-later", "Lifestyle tax relief rises to RM3,000 for books and sports.", _NEXT_MONTH, None, _ANNOUNCED),
+    ]
+    result = await analyst_node({"query": "lifestyle tax relief books sports", "domain": "tax", "retrieved_chunks": corpus})
+
+    assert result["pending_changes"][0]["chunk_id"] == "on-topic-later"

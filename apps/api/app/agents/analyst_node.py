@@ -92,6 +92,10 @@ def _is_expired(chunk: ChunkResult) -> bool:
 
 
 _MAX_PENDING_CHANGES = 3
+# When there is no rule in force at all and the answer is built from announced
+# changes alone (e.g. "what did Budget 2027 announce for EPF?" asked before any
+# of it takes effect), those chunks ARE the evidence, so allow more of them.
+_MAX_PENDING_ANNOUNCED_ONLY = 5
 
 
 def _pending_change(chunk: ChunkResult) -> dict:
@@ -104,6 +108,27 @@ def _pending_change(chunk: ChunkResult) -> dict:
         "announced_date": chunk.announced_date,
         "content": chunk.content,
     }
+
+
+def _build_citation(chunk: ChunkResult, score: float, domain: str | None, *, pending: bool = False) -> Citation:
+    citation = Citation(
+        title=chunk.source_title,
+        ministry=chunk.ministry,
+        url=chunk.source_url,
+        confidence=score,
+        # A rule that has not started cannot be stale.
+        stale_disclaimer=False if pending else _is_stale(chunk, domain),
+        # Same value the staleness verdict is computed from, so the date a
+        # user sees and the "may be outdated" flag can never disagree. None
+        # when the chunk has no date — the UI renders nothing rather than
+        # inventing one.
+        effective_date=_staleness_ref(chunk),
+        retrieved_at=chunk.retrieved_at,
+    )
+    if pending:
+        # Lets the UI say "takes effect {date}" instead of "in effect from".
+        citation["not_yet_effective"] = True
+    return citation
 
 
 def _stale_threshold(domain: str | None) -> int:
@@ -212,14 +237,20 @@ async def analyst_node(state: AgentState) -> dict:
     #     pending_changes so the synthesiser states the current rule AND the
     #     announced change, instead of presenting the future rule as current.
     expired = [c for c in live if _is_expired(c)]
-    pending = sorted(
-        (c for c in live if _is_pending(c) and not _is_expired(c)),
-        key=lambda c: c.effective_date or "",
-    )
     chunks = [c for c in live if not _is_expired(c) and not _is_pending(c)]
-    pending_changes = [_pending_change(c) for c in pending[:_MAX_PENDING_CHANGES]]
+    # Most relevant announced change first (then soonest to take effect), so the
+    # few that fit in the answer's context are the ones the question is about,
+    # not merely the earliest-dated.
+    pending_scored = sorted(
+        ((_score_chunk(c, query), c) for c in live if _is_pending(c) and not _is_expired(c)),
+        key=lambda t: (-t[0], t[1].effective_date or ""),
+    )
+    pending = [c for _, c in pending_scored]
+    announced_only = not chunks and bool(pending)
+    cap = _MAX_PENDING_ANNOUNCED_ONLY if announced_only else _MAX_PENDING_CHANGES
+    pending_changes = [_pending_change(c) for c in pending[:cap]]
     if expired or pending:
-        log.info("analyst_validity_window", expired=len(expired), pending=len(pending))
+        log.info("analyst_validity_window", expired=len(expired), pending=len(pending), announced_only=announced_only)
 
     # 2. Record effective-date staleness for the surviving chunks.
     stale_warnings: list[dict] = []
@@ -234,7 +265,7 @@ async def analyst_node(state: AgentState) -> dict:
             "days_since_effective": days_old,
         })
 
-    if not chunks:
+    if not chunks and not pending:
         # Either nothing was retrieved, or everything retrieved was superseded.
         log.warning("analyst_no_usable_chunks", superseded_count=superseded_count)
         retrieval_score.observe(0.0)
@@ -255,9 +286,12 @@ async def analyst_node(state: AgentState) -> dict:
     # break score ties toward the most recent source (prefer-newest), so when
     # both last year's and this year's figure are in the corpus, the newer one
     # drives the answer.
+    # With nothing in force, the announced changes are the evidence (see
+    # announced_only above); they are never stale, so no recency penalty applies.
+    evidence = pending if announced_only else chunks
     scored: list[tuple[float, str, ChunkResult]] = [
         (_adjusted_score(_score_chunk(chunk, query), _is_stale(chunk, domain)), _recency_key(chunk), chunk)
-        for chunk in chunks
+        for chunk in evidence
     ]
     scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
 
@@ -266,22 +300,17 @@ async def analyst_node(state: AgentState) -> dict:
     retrieval_score.observe(confidence)
 
     citations: list[Citation] = [
-        Citation(
-            title=chunk.source_title,
-            ministry=chunk.ministry,
-            url=chunk.source_url,
-            confidence=score,
-            stale_disclaimer=_is_stale(chunk, domain),
-            # Same value the staleness verdict above is computed from, so
-            # the date a user sees and the "may be outdated" flag can never
-            # disagree. None when the chunk has no date — the UI renders
-            # nothing rather than inventing one.
-            effective_date=_staleness_ref(chunk),
-            retrieved_at=chunk.retrieved_at,
-        )
+        _build_citation(chunk, score, domain, pending=announced_only)
         for score, _, chunk in top3
         if chunk.source_url  # omit fabricated / empty URLs per CLAUDE.md
     ]
+    if pending and not announced_only:
+        # The answer will also mention the announced change, so cite it too —
+        # keeping the 1-3 chip limit by giving up the weakest current citation.
+        best_pending = pending[0]
+        if best_pending.source_url and all(c["url"] != best_pending.source_url for c in citations):
+            pending_citation = _build_citation(best_pending, pending_scored[0][0], domain, pending=True)
+            citations = citations[:2] + [pending_citation]
 
     # Freshness verdict for the answer as a whole: after prefer-newest sorting,
     # the top-ranked chunk is the freshest sufficiently-relevant evidence. If it
@@ -315,6 +344,7 @@ async def analyst_node(state: AgentState) -> dict:
         superseded_dropped=superseded_count,
         expired_dropped=len(expired),
         pending_changes=len(pending_changes),
+        announced_only=announced_only,
         agency_contact=agency_contact["agency"] if agency_contact else None,
     )
     return {
