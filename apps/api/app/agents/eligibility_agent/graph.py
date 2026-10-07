@@ -18,6 +18,7 @@ from app.agents.eligibility_agent.analyst_node import analyst_node
 from app.agents.eligibility_agent.grant_rag_node import grant_rag_node
 from app.agents.eligibility_agent.intake_node import intake_node
 from app.agents.eligibility_agent.state import EligibilityState
+from app.agents.eligibility_agent.verification import verify_node
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.runtime import supabase_from_config
@@ -38,10 +39,12 @@ def build_eligibility_agent_graph() -> StateGraph:
     graph.add_node("intake", intake_node)
     graph.add_node("grant_rag", _grant_rag_node)
     graph.add_node("analyst", analyst_node)
+    graph.add_node("verify", verify_node)
     graph.add_edge(START, "intake")
     graph.add_conditional_edges("intake", _route_after_intake, {"grant_rag": "grant_rag", END: END})
     graph.add_edge("grant_rag", "analyst")
-    graph.add_edge("analyst", END)
+    graph.add_edge("analyst", "verify")
+    graph.add_edge("verify", END)
     return graph
 
 
