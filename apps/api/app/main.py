@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from supabase import create_client
 
-from app.agents.checkpointer import init_checkpointer
+from app.agents.checkpointer import close_checkpointer, init_checkpointer
 from app.core.telemetry import configure_telemetry
 from app.core.weave_tracing import init_weave
 from app.middleware.request_id import RequestIDMiddleware
@@ -91,6 +91,7 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
 
     if application.state.redis:
         await application.state.redis.aclose()
+    await close_checkpointer()
     log.info("shutdown")
 
 

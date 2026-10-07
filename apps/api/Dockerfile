@@ -23,6 +23,10 @@ WORKDIR /app
 #     text layout and font lookup, dlopen()ed by weasyprint/text/ffi.py
 #   libharfbuzz-subset0: optional (WeasyPrint falls back to fontTools without
 #     it) but it is the documented Debian dependency and is tiny
+#   libpq5: psycopg's client library for the LangGraph Postgres checkpointer.
+#     Without it `import psycopg` fails with "libpq library not found", the
+#     checkpointer falls back to per-process memory, and with two uvicorn
+#     workers a confirm can land on a worker that never saw the session.
 #   fonts-dejavu-core: Latin/Malay glyphs
 #   fonts-wqy-microhei: Chinese glyphs (reports can be in zh). About 5 MB
 #     installed (Debian Installed-Size), versus about 91 MB for fonts-noto-cjk,
@@ -36,6 +40,7 @@ RUN apt-get update \
         libharfbuzz0b \
         libharfbuzz-subset0 \
         libfontconfig1 \
+        libpq5 \
         fonts-dejavu-core \
         fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
