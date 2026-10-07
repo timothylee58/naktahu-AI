@@ -93,3 +93,40 @@ async def test_a_session_survives_a_different_worker() -> None:
 
     assert out["status"] == "completed"
     assert out["signed_url"] == "https://signed.example/r.pdf"
+
+
+@pytest.mark.skipif(not _PG_URL, reason="set TEST_DATABASE_URL to a throwaway Postgres to run")
+@pytest.mark.asyncio
+async def test_workers_booting_together_on_a_fresh_database_all_get_postgres() -> None:
+    """saver.setup() alone races: concurrent first boots hit a unique violation."""
+    import asyncio
+
+    import psycopg
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg.rows import dict_row
+    from psycopg_pool import AsyncConnectionPool
+
+    conn = await psycopg.AsyncConnection.connect(_PG_URL, autocommit=True)
+    await conn.execute(
+        "DROP TABLE IF EXISTS checkpoint_migrations, checkpoints, checkpoint_blobs, checkpoint_writes CASCADE"
+    )
+    await conn.close()
+
+    async def worker() -> str:
+        pool = AsyncConnectionPool(
+            conninfo=_PG_URL,
+            max_size=5,
+            open=False,
+            kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        )
+        await pool.open(wait=True, timeout=10)
+        try:
+            await cp.setup_schema(pool, AsyncPostgresSaver(pool))
+            return "ok"
+        except Exception as exc:
+            return f"{type(exc).__name__}: {exc}"
+        finally:
+            await pool.close()
+
+    results = await asyncio.gather(*[worker() for _ in range(4)])
+    assert results == ["ok"] * 4
