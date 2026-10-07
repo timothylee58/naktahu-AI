@@ -306,6 +306,7 @@ def test_rotate_key_not_owned_or_inactive_returns_404(client) -> None:
     sb.table.return_value.update.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
         data=[]
     )
+    assert res.status_code == 422
 
     res = c.post("/api/v1/developer/keys/someone-elses-key/rotate", headers=_auth_header())
 

@@ -109,6 +109,18 @@ def _make_auth_headers(user_id: str = "test-user-1", plan: str = "pro") -> dict[
     )
     return {"Authorization": f"Bearer {token}"}
 
+    def _make(user_id: str = "test-user-1", plan: str = "pro") -> dict[str, str]:
+        token = jwt.encode(
+            {
+                "sub": user_id,
+                "aud": settings.supabase_jwt_aud,
+                "app_metadata": {"plan": plan},
+                "exp": int(time.time()) + 3600,
+            },
+            settings.jwt_secret,
+            algorithm="HS256",
+        )
+        return {"Authorization": f"Bearer {token}"}
 
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
@@ -145,9 +157,8 @@ def auth_headers_business() -> dict[str, str]:
 
 
 @pytest.fixture
-def auth_headers_anonymous() -> dict[str, str]:
-    """Generate headers for anonymous (unauthenticated) requests."""
-    return {}
+def auth_headers_student(make_auth_headers) -> dict[str, str]:
+    return make_auth_headers(user_id="test-student-user", plan="student")
 
 
 @pytest.fixture
@@ -222,14 +233,6 @@ def mock_redis():
     redis_client.pipeline = MagicMock(return_value=pipe)
 
     return redis_client
-
-
-@pytest.fixture
-def mock_llm_client():
-    """Standardized LLM client mock (ILMU + Claude fallback)."""
-    mock = AsyncMock()
-    mock.invoke = AsyncMock(return_value="Test response")
-    return mock
 
 
 # ─────────────────────────────────────────────────────────────────────────────
