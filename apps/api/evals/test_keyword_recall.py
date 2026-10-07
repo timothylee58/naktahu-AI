@@ -16,6 +16,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from app.services.malay_morph import build_keyword_tsquery
 
 _FIXTURES = [
@@ -60,11 +62,28 @@ def test_english_keyword_recall_does_not_regress() -> None:
 
 
 def test_expansion_does_not_match_unrelated_chunks() -> None:
-    """Precision guard: a query's expansion must not hit the other fixtures' chunks."""
+    """Precision guard: a query's expansion must not hit another fixture's chunk
+    UNLESS the two share a `topic`. Cross-language synonyms mean a BM query
+    legitimately matches an English chunk on the same subject, so same-topic
+    fixtures are allowed to overlap; everything else must stay apart."""
     for q in _FIXTURES:
         for other in _FIXTURES:
-            if other is not q:
-                assert not _expanded_match(q["query"], other["chunk"]), (q["query"], other["query"])
+            if other is q or (q.get("topic") and q.get("topic") == other.get("topic")):
+                continue
+            assert not _expanded_match(q["query"], other["chunk"]), (q["query"], other["query"])
+
+
+@pytest.mark.parametrize(
+    ("bm_or_en_query", "other_language_chunk"),
+    [
+        ("pengeluaran KWSP", "Members may make a full EPF withdrawal at the withdrawal age of 55."),
+        ("bajet 2027", "Budget 2027 raises the individual income tax relief for lifestyle spending."),
+        ("EPF contribution rate", "Kadar caruman KWSP bagi majikan dan pekerja kekal tidak berubah."),
+    ],
+)
+def test_cross_language_synonyms_match_the_same_subject(bm_or_en_query: str, other_language_chunk: str) -> None:
+    assert not _plain_match(bm_or_en_query, other_language_chunk)  # the old keyword layer missed these
+    assert _expanded_match(bm_or_en_query, other_language_chunk)
 
 
 def test_every_plain_match_still_matches() -> None:

@@ -1,7 +1,7 @@
 {"query": "memohon PTPTN", "chunk": "Permohonan pinjaman PTPTN dibuka kepada pelajar yang telah menerima tawaran kemasukan.", "language": "bm"}
 {"query": "pendaftaran perniagaan SSM", "chunk": "Pemilik tunggal perlu mendaftar perniagaan dengan SSM sebelum memulakan operasi.", "language": "bm"}
 {"query": "bayaran cukai pendapatan", "chunk": "Pembayar cukai boleh membuat pembayaran cukai pendapatan melalui e-Bayar LHDN.", "language": "bm"}
-{"query": "pengeluaran KWSP", "chunk": "Ahli boleh mengeluarkan simpanan KWSP Akaun 2 untuk tujuan perumahan.", "language": "bm"}
+{"query": "pengeluaran KWSP", "chunk": "Ahli boleh mengeluarkan simpanan KWSP Akaun 2 untuk tujuan perumahan.", "language": "bm", "topic": "epf"}
 {"query": "membaharui lesen memandu", "chunk": "Pembaharuan lesen memandu boleh dibuat di kaunter JPJ atau secara dalam talian.", "language": "bm"}
 {"query": "kelayakan bantuan", "chunk": "Pemohon yang layak akan menerima bantuan dalam tempoh 30 hari.", "language": "bm"}
 {"query": "mengira caruman PERKESO", "chunk": "Pengiraan caruman PERKESO adalah berdasarkan gaji bulanan pekerja.", "language": "bm"}
@@ -11,6 +11,10 @@
 {"query": "pertukaran nama hak milik tanah", "chunk": "Permohonan untuk menukar nama hak milik tanah dikemukakan kepada Pejabat Tanah.", "language": "bm"}
 {"query": "pembatalan pendaftaran syarikat", "chunk": "Syarikat yang tidak aktif boleh dibatalkan pendaftaran oleh SSM.", "language": "bm"}
 {"query": "renew passport", "chunk": "Malaysian citizens can renew passport online through the Immigration Department portal.", "language": "en"}
-{"query": "EPF withdrawal age", "chunk": "Members may make a full EPF withdrawal at the withdrawal age of 55.", "language": "en"}
+{"query": "EPF withdrawal age", "chunk": "Members may make a full EPF withdrawal at the withdrawal age of 55.", "language": "en", "topic": "epf"}
 {"query": "income tax filing deadline", "chunk": "The income tax filing deadline for individuals without business income is 30 April.", "language": "en"}
 {"query": "SOCSO contribution rate", "chunk": "The SOCSO contribution rate depends on the employee's monthly wage category.", "language": "en"}
+{"query": "bajet 2027", "chunk": "Belanjawan 2027 dibentangkan di Dewan Rakyat pada bulan Oktober.", "language": "bm", "topic": "budget-2027"}
+{"query": "budget 2027 housing", "chunk": "Belanjawan 2027: peruntukan perumahan untuk rakyat diumumkan.", "language": "bm", "topic": "budget-2027"}
+{"query": "EPF contribution rate", "chunk": "Kadar caruman KWSP bagi majikan dan pekerja kekal tidak berubah.", "language": "bm", "topic": "epf"}
+{"query": "Belanjawan 2027 tax relief", "chunk": "Budget 2027 raises the individual income tax relief for lifestyle spending.", "language": "en", "topic": "budget-2027"}

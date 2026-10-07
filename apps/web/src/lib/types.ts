@@ -12,6 +12,8 @@ export interface Citation {
    * date or a fetch timestamp, which would misrepresent how current the
    * underlying government source actually is. */
   effective_date?: string | null;
+  /** True when the rule is announced but takes effect after today. */
+  not_yet_effective?: boolean;
   /** ISO timestamp NakTahu last ingested/verified this specific source
    * (document_chunks.created_at, via migration 048). Distinct from
    * effective_date: this says "we checked this on {date}", not "this rule

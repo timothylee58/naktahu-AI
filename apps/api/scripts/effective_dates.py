@@ -52,6 +52,16 @@ _RANGE_RE = re.compile(
     re.IGNORECASE,
 )
 _YA_RE = re.compile(r"(?:tahun\s+taksiran|year\s+of\s+assessment|\bYA)\s*(\d{4})", re.IGNORECASE)
+# "mulai Tahun Taksiran 2027" / "with effect from YA 2027" starts a rule that
+# keeps applying, unlike "for YA 2027", which is a one-year window. Budget
+# speeches use the open-ended form constantly; treating it as a one-year
+# window would make the rule look expired after 31 December of that year.
+_YA_START_RE = re.compile(
+    r"(?:berkuat\s*kuasa|berkuatkuasa|mulai|bermula|effective|with\s+effect\s+from|commencing|starting|from|dari|daripada)"
+    r"(?:\s+(?:pada|on))?\s+(?:tahun\s+taksiran|year\s+of\s+assessment|\bYA)\s*(\d{4})",
+    re.IGNORECASE,
+)
+_ONWARDS_RE = re.compile(r"dan\s+seterusnya|seterusnya|and\s+(?:subsequent|following)\s+years?|onwards?", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -89,15 +99,20 @@ def extract_validity_window(text: str) -> ValidityWindow:
         if d := _to_date(*m.groups()):
             untils.add(d)
 
+    for m in _YA_START_RE.finditer(text):
+        starts.add(date(int(m.group(1)), 1, 1))
+
     start, until = _single(starts), _single(untils)
 
     # Year of Assessment N covers income year N. Used only when the text gives
-    # no explicit dates, and only when it names a single YA.
+    # no explicit dates, and only when it names a single YA. "YA N and onwards"
+    # is a start, not a window.
     if not starts and not untils:
         years = {int(y) for y in _YA_RE.findall(text)}
         if len(years) == 1:
             year = years.pop()
-            start, until = date(year, 1, 1), date(year, 12, 31)
+            start = date(year, 1, 1)
+            until = None if _ONWARDS_RE.search(text) else date(year, 12, 31)
 
     if start and until and until < start:
         # Contradictory; matches the CHECK constraint in migration 052.

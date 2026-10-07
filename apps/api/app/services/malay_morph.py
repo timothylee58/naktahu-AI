@@ -139,6 +139,58 @@ def expand_token(word: str) -> list[str]:
     return list(seen)[:_MAX_VARIANTS]
 
 
+# Cross-language terms that name the same thing. Dense retrieval bridges these
+# on its own, but the keyword half of hybrid_search does not: "Bajet 2027" never
+# keyword-matches a document titled "Belanjawan 2027", and "EPF" never matches
+# "KWSP". Single-token pairs only, kept deliberately short and unambiguous:
+# `grant`/`geran` is left out because `geran` also means a land title in
+# Malaysian usage, and expanding it would pull in unrelated property text.
+_SYNONYM_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("budget", "bajet", "belanjawan"),
+    ("tax", "cukai"),
+    ("rate", "kadar"),
+    ("income", "pendapatan"),
+    ("relief", "pelepasan"),
+    ("epf", "kwsp"),
+    ("socso", "perkeso"),
+    ("withdrawal", "pengeluaran"),
+    ("contribution", "caruman"),
+    ("retirement", "persaraan"),
+    ("subsidy", "subsidi"),
+    ("loan", "pinjaman"),
+    ("passport", "pasport"),
+    ("licence", "license", "lesen"),
+    ("allowance", "elaun"),
+    ("employer", "majikan"),
+    ("employee", "pekerja"),
+    ("salary", "wage", "gaji"),
+    ("housing", "perumahan"),
+    ("school", "sekolah"),
+    ("health", "kesihatan"),
+    ("scholarship", "biasiswa"),
+    ("inflation", "inflasi"),
+    ("deficit", "defisit"),
+    ("allocation", "peruntukan"),
+    ("expenditure", "perbelanjaan"),
+)
+_SYNONYMS: dict[str, tuple[str, ...]] = {
+    term: tuple(other for other in group if other != term)
+    for group in _SYNONYM_GROUPS
+    for term in group
+}
+# Each synonym contributes itself plus a few of its own affixed forms.
+_SYNONYM_VARIANTS = 12
+
+
+def _with_synonyms(token: str, variants: list[str]) -> list[str]:
+    extra: list[str] = []
+    for synonym in _SYNONYMS.get(token, ()):
+        extra.append(synonym)
+        if synonym.isalpha() and len(synonym) >= _MIN_ROOT:
+            extra.extend(expand_token(synonym)[:_SYNONYM_VARIANTS])
+    return list(dict.fromkeys([*variants, *extra]))
+
+
 def build_keyword_tsquery(query: str) -> str | None:
     """Build a to_tsquery('simple', ...) string, or None if nothing to expand.
 
@@ -153,6 +205,8 @@ def build_keyword_tsquery(query: str) -> str | None:
             continue
         seen.add(tok)
         variants = expand_token(tok) if tok.isalpha() and len(tok) >= _MIN_ROOT else [tok]
+        # Outside the length gate on purpose: "tax" and "epf" are under 4 letters.
+        variants = _with_synonyms(tok, variants)
         groups.append("(" + " | ".join(variants) + ")")
         if len(groups) >= _MAX_GROUPS:
             break

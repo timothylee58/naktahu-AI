@@ -122,7 +122,9 @@ class TestValidateRecord:
             "state": "Perak",
         })
         assert reason == ""
-        assert cleaned["constituency_code"] == "P.062"
+        # Stored undotted, the form migration 025 documents for parliamentary
+        # seats ("P130") and the one mp_profiles / postcode_constituencies use.
+        assert cleaned["constituency_code"] == "P062"
         assert cleaned["constituency_type"] == "parliament"
         assert cleaned["is_active"] is True
 
@@ -259,3 +261,30 @@ class TestManualPartyOverrides:
 
         assert set(po.MANUAL_PARTY_OVERRIDES) == set(po._CHECKED_FOR)
         assert len(po.MANUAL_PARTY_OVERRIDES) == 8
+
+
+class TestSeatCodeFormat:
+    def _record(self, code, name="Rushdan Bin Rusmi", party=None):
+        return {"full_name": name, "constituency_code": code, "constituency_name": "Padang Besar",
+                "party": party, "state": "Perlis", "mymp_id": "x"}
+
+    @pytest.mark.parametrize("code", ["P001", "P.001", "p001", "p.001", " P.001 "])
+    def test_override_applies_whatever_the_code_format(self, code):
+        """The repo's own scraper keeps the period ("P.062 stays as-is"); an
+        override keyed 'P001' must still apply or it silently never would."""
+        cleaned, _ = validate_record(self._record(code))
+        assert cleaned["party"] == "PAS"
+
+    def test_stored_code_is_canonical_so_a_rerun_updates_rather_than_duplicates(self):
+        cleaned, _ = validate_record(self._record("P.001"))
+        assert cleaned["constituency_code"] == "P001"
+
+    def test_state_seat_codes_keep_their_period(self):
+        cleaned, _ = validate_record(self._record("N.28", name="Someone Else"))
+        assert cleaned["constituency_code"] == "N.28"
+
+    def test_canonical_seat_code(self):
+        from scripts.ingest_parliament.party_overrides import canonical_seat_code
+
+        assert canonical_seat_code("P.001") == canonical_seat_code(" p 001 ") == "P001"
+        assert canonical_seat_code("") == ""

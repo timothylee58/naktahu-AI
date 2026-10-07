@@ -14,6 +14,7 @@ tables.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 import structlog
@@ -45,6 +46,18 @@ _CHECKED_FOR = {
 }
 
 
+def canonical_seat_code(code: str) -> str:
+    """'P.001', 'p001', ' P 001 ' -> 'P001'.
+
+    Scrapers disagree on whether a seat code carries a period, and the postcode
+    crosswalk (seed_postcode_seats.normalise_code) and the rows already in
+    mp_profiles use the undotted form. Comparing or storing the raw code lets a
+    dotted one silently miss an override, or create a second row for a seat
+    that already exists.
+    """
+    return re.sub(r"[\s.]", "", code or "").upper()
+
+
 def _same_person(a: str, b: str) -> bool:
     return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
 
@@ -53,6 +66,7 @@ def apply_party_override(
     constituency_code: str, full_name: str, scraped_party: Optional[str]
 ) -> Optional[str]:
     """The override for this seat if it applies to this MP, else scraped_party."""
+    constituency_code = canonical_seat_code(constituency_code)
     override = MANUAL_PARTY_OVERRIDES.get(constituency_code)
     if override is None:
         return scraped_party
