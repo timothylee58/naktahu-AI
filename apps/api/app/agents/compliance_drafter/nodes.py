@@ -1,6 +1,7 @@
 """Compliance Drafter LangGraph nodes."""
 from __future__ import annotations
 
+from html import escape as _esc
 from typing import Any
 
 import structlog
@@ -13,11 +14,33 @@ from app.agents.tools import query_rag_findings
 
 log = structlog.get_logger(__name__)
 
+# Each section searches the corpus domain that actually holds its content. This
+# map used to send tax and EPF to "finance" and business to "government", but
+# those domains predate migration 016 (which added tax/epf/business) and hold no
+# chunks: production has tax, business and epf content and NONE under finance or
+# government, so every section of every report came back empty.
 _DOMAIN_MAP = {
-    "tax": "finance",
-    "business": "government",
-    "epf": "finance",
+    "tax": "tax",
+    "business": "business",
+    "epf": "epf",
 }
+
+# An empty section must say so. A bare heading with nothing under it reads as
+# "no obligations here", which on a compliance report is the dangerous reading.
+_NO_SOURCES = {
+    "bm": "Tiada sumber rasmi dijumpai untuk bahagian ini lagi. Semak terus dengan agensi berkaitan.",
+    "en": "No official source was found for this section yet. Check directly with the relevant agency.",
+    "zh": "此部分暂未找到官方来源，请直接向相关机构核实。",
+}
+
+
+def _link(url: str) -> str:
+    """An anchor for a real http(s) URL, else "" — a missing or non-web URL is
+    omitted rather than rendered as an empty or javascript: link."""
+    url = (url or "").strip()
+    if not url.lower().startswith(("https://", "http://")):
+        return ""
+    return f" <a href='{_esc(url, quote=True)}'>{_esc(url)}</a>"
 
 
 async def intake_node(state: ComplianceDrafterState) -> dict[str, Any]:
@@ -85,20 +108,27 @@ async def compile_node(state: ComplianceDrafterState) -> dict[str, Any]:
       ),
   }
 
+  language = state.get("language") or "bm"
+  no_sources = _NO_SOURCES.get(language, _NO_SOURCES["bm"])
+  # Everything interpolated below can carry markup (business_type is user input;
+  # titles and summaries come from ingested documents), and the HTML is rendered
+  # to PDF server-side, so it is escaped.
   html_parts = [
       "<html><head><meta charset='utf-8'><title>Compliance Report</title></head><body>",
-      f"<h1>Compliance Report — {state.get('business_type', 'Business')}</h1>",
+      f"<h1>Compliance Report — {_esc(str(state.get('business_type') or 'Business'))}</h1>",
   ]
   for sec in sections:
-      html_parts.append(f"<h2>{sec['title']}</h2><ul>")
+      html_parts.append(f"<h2>{_esc(sec['title'])}</h2><ul>")
+      if not sec["findings"]:
+          html_parts.append(f"<li><em>{_esc(no_sources)}</em></li>")
       for f in sec["findings"]:
           html_parts.append(
-              f"<li><strong>{f.get('source_title', '')}</strong>: "
-              f"{f.get('summary', '')[:300]} "
-              f"<a href='{f.get('source_url', '')}'>{f.get('source_url', '')}</a></li>"
+              f"<li><strong>{_esc(f.get('source_title', ''))}</strong>: "
+              f"{_esc((f.get('summary') or '')[:300])}"
+              f"{_link(f.get('source_url', ''))}</li>"
           )
       html_parts.append("</ul>")
-  html_parts.append(f"<p><em>{report_json['disclaimer']}</em></p></body></html>")
+  html_parts.append(f"<p><em>{_esc(report_json['disclaimer'])}</em></p></body></html>")
 
   return {
       "report_sections": sections,
@@ -139,7 +169,7 @@ async def notify_node(state: ComplianceDrafterState) -> dict[str, Any]:
           subject="Your NakTahu Compliance Report",
           html_body=(
               f"<p>Your compliance report is ready.</p>"
-              f"<p><a href='{state.get('signed_url')}'>Download PDF</a></p>"
+              f"<p><a href='{_esc(str(state.get('signed_url')), quote=True)}'>Download PDF</a></p>"
           ),
       )
   tool_calls = list(state.get("tool_calls") or [])

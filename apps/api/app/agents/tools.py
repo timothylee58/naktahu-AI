@@ -474,15 +474,22 @@ async def send_email(
         log.info("send_email_skipped", reason="not_configured")
         return False
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={"from": from_addr, "to": [to], "subject": subject, "html": html_body},
-        )
-        if resp.status_code >= 400:
-            log.warning("send_email_failed", status=resp.status_code)
-            return False
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={"from": from_addr, "to": [to], "subject": subject, "html": html_body},
+            )
+    except httpx.HTTPError as exc:
+        # A timeout or dropped connection must not fail the whole agent run: by
+        # now the report already exists, and raising here would surface a 500 and
+        # skip recording the generated document. Report "not sent" instead.
+        log.warning("send_email_failed", error=type(exc).__name__)
+        return False
+    if resp.status_code >= 400:
+        log.warning("send_email_failed", status=resp.status_code)
+        return False
     return True
 
 
