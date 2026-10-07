@@ -39,6 +39,7 @@ if str(_API_ROOT) not in sys.path:
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 from scripts.ingest_parliament.party_names import normalise_party, unrecognised  # noqa: E402
+from scripts.ingest_parliament.party_overrides import apply_party_override  # noqa: E402
 
 log = structlog.get_logger(__name__)
 
@@ -81,14 +82,19 @@ def validate_record(record: dict) -> tuple[dict, str] | tuple[None, str]:
         if matched:
             return None, f"injection_suspected:{field}:{matched}"
 
+    full_name = record["full_name"].strip()
+    # A hand-checked party (scripts/ingest_parliament/party_overrides.py) wins
+    # over the scrape, but only while the seat still has the MP it was checked for.
+    scraped_party = apply_party_override(constituency_code, full_name, record.get("party"))
+
     cleaned = {
-        "full_name": record["full_name"].strip(),
+        "full_name": full_name,
         "constituency_code": constituency_code,
         "constituency_name": record["constituency_name"].strip(),
         "constituency_type": "parliament",
         # One party arrives under many spellings; store one canonical name so
         # ILIKE search and per-party counts work (see party_names.py).
-        "party": normalise_party(record.get("party")),
+        "party": normalise_party(scraped_party),
         "state": (record.get("state") or "").strip() or None,
         "mymp_id": record.get("mymp_id"),
         "is_active": True,
