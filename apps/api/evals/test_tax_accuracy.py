@@ -12,14 +12,19 @@ a confidently wrong SME tax rate reached users. This suite adds an answer key.
   metric is "wrong answers at or above the 0.6 confidence threshold": it must
   be zero, because that is the trust layer's whole job.
 
-Answer-key figures live in tax_accuracy.jsonl with a `key_status`. Cases marked
-`verify_against_lhdn_pr_8_2025` are year-sensitive and must be confirmed against
-LHDN before being treated as ground truth; the live run reports them separately.
+Answer-key figures live in tax_accuracy.jsonl with a `key_status`:
+- `stable_statutory`: long-standing figures I am confident of but which were NOT
+  re-checked against LHDN from the build sandbox (it cannot reach hasil.gov.my).
+- `verify_before_use`: year-sensitive figures (SME bands, service tax, digital
+  service tax) that must be confirmed against the current official source.
+A human should still spot-check the whole key against LHDN/Customs before it
+gates anything; a wrong key is worse than no key.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +32,7 @@ import pytest
 
 _EVALS_DIR = Path(__file__).parent
 _CONFIDENCE_THRESHOLD = 0.6
+_KEY_STATUSES = {"stable_statutory", "verify_before_use"}
 
 # The answer a user was actually shown for the SME question (screenshot, Oct 2026):
 # a flat 24% with an invented RM9,000 company relief. Must score as WRONG.
@@ -48,16 +54,28 @@ def load_cases() -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _contains(text: str, phrase: str) -> bool:
+    """Case-insensitive match; a phrase starting or ending in a digit must not be
+    part of a longer number, so "1%" does not match "10%" and "30%" not "130%"."""
+    phrase = phrase.lower()
+    pattern = re.escape(phrase)
+    if phrase[0].isdigit():
+        pattern = r"(?<![\d,.])" + pattern
+    if phrase[-1].isdigit():
+        pattern = pattern + r"(?![\d])"
+    return re.search(pattern, text) is not None
+
+
 def score_answer(answer: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
     """Pass only if every required group has at least one of its phrases and no
-    forbidden phrase appears. Case-insensitive; returns (passed, reasons)."""
+    forbidden phrase appears. Returns (passed, reasons)."""
     text = answer.lower()
     reasons: list[str] = []
     for group in case.get("must_contain_groups", []):
-        if not any(phrase.lower() in text for phrase in group):
+        if not any(_contains(text, phrase) for phrase in group):
             reasons.append(f"missing one of {group}")
     for phrase in case.get("must_not_contain", []):
-        if phrase.lower() in text:
+        if _contains(text, phrase):
             reasons.append(f"contains forbidden {phrase!r}")
     return (not reasons), reasons
 
@@ -70,9 +88,25 @@ def test_answer_key_is_well_formed() -> None:
     assert len(ids) == len(set(ids)), "duplicate case ids"
     for case in _CASES:
         assert {"id", "query", "key_status", "must_contain_groups", "must_not_contain", "note"} <= case.keys()
-        assert case["key_status"] in {"verified", "verify_against_lhdn_pr_8_2025"}
+        assert case["key_status"] in _KEY_STATUSES
         if not case.get("expect_low_confidence"):
             assert case["must_contain_groups"], f"{case['id']}: an answerable case needs required facts"
+
+
+def test_the_answer_key_has_thirty_cases_across_both_languages_and_a_decline_set() -> None:
+    assert len(_CASES) >= 30
+    assert sum(1 for c in _CASES if c.get("expect_low_confidence")) >= 2
+    bm_markers = ("apakah", "bilakah", "berapa", "berapakah")
+    assert sum(1 for c in _CASES if c["query"].lower().startswith(bm_markers)) >= 5
+
+
+def test_numbers_are_matched_as_whole_numbers() -> None:
+    case = {"must_contain_groups": [["1%"]], "must_not_contain": []}
+    assert not score_answer("The rate is 10% on the balance.", case)[0]
+    assert score_answer("The rate is 1% on the first RM100,000.", case)[0]
+    case = {"must_contain_groups": [["500,000"]], "must_not_contain": []}
+    assert not score_answer("The threshold is RM1,500,000.", case)[0]
+    assert score_answer("The threshold is RM500,000.", case)[0]
 
 
 def test_the_answer_users_were_shown_is_scored_wrong() -> None:
