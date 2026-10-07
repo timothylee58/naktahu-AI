@@ -90,11 +90,16 @@ async def query_epf_node(state: ComplianceDrafterState) -> dict[str, Any]:
 async def compile_node(state: ComplianceDrafterState) -> dict[str, Any]:
   """Assemble HITL preview report from domain findings."""
   sections: list[dict[str, Any]] = []
-  for label, key in [
-      ("Tax (LHDN)", "tax_findings"),
-      ("Business (SSM)", "business_findings"),
-      ("EPF/KWSP", "epf_findings"),
+  requested = state.get("domains") or ["tax", "business", "epf"]
+  for domain, label, key in [
+      ("tax", "Tax (LHDN)", "tax_findings"),
+      ("business", "Business (SSM)", "business_findings"),
+      ("epf", "EPF/KWSP", "epf_findings"),
   ]:
+      # A section the user did not ask for is left out. Rendering it would say
+      # "no official source was found" for a topic nobody searched.
+      if domain not in requested:
+          continue
       findings = state.get(key) or []
       sections.append({"title": label, "findings": findings})
 

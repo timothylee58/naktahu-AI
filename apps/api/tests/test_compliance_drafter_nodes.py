@@ -90,6 +90,33 @@ async def test_an_empty_section_says_so_instead_of_showing_a_bare_heading(langua
     assert html.count(nodes._NO_SOURCES[language]) == 2  # business and epf; tax has a finding
 
 
+@pytest.mark.asyncio
+async def test_sections_the_user_did_not_request_are_left_out() -> None:
+    """Asking for tax only must not produce 'no official source found' for
+    business and EPF, which were never searched."""
+    out = await compile_node({
+        "language": "en", "business_type": "sole_proprietor", "domains": ["tax"], "tax_findings": [_FINDING],
+    })
+
+    assert [sec["title"] for sec in out["report_sections"]] == ["Tax (LHDN)"]
+    assert "Business (SSM)" not in out["report_html"] and "EPF/KWSP" not in out["report_html"]
+    assert nodes._NO_SOURCES["en"] not in out["report_html"]
+
+
+@pytest.mark.asyncio
+async def test_a_requested_section_with_no_findings_still_says_so() -> None:
+    out = await compile_node({"language": "en", "domains": ["tax", "epf"], "tax_findings": [_FINDING], "epf_findings": []})
+
+    assert [sec["title"] for sec in out["report_sections"]] == ["Tax (LHDN)", "EPF/KWSP"]
+    assert out["report_html"].count(nodes._NO_SOURCES["en"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_no_domains_given_means_all_three_sections() -> None:
+    out = await compile_node({"language": "en"})  # intake_node's default
+    assert len(out["report_sections"]) == 3
+
+
 # ── Notification email ───────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
