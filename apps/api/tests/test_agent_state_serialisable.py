@@ -39,6 +39,9 @@ from app.services.agent_runner import (
 )
 
 
+_EMPTY_FRESHNESS = {"current": [], "announced": [], "dropped": {"superseded": 0, "expired": 0}}
+
+
 class FakeUnpickleableClient:
     """Stands in for supabase.Client: holds a lock, so it cannot be serialised.
 
@@ -195,7 +198,7 @@ async def test_continue_compliance_drafter_accepts_supabase_client():
     is blocked in this sandbox), matching test_agent_runner_continue.py's
     established pattern for the sibling agents."""
     cp = MemorySaver()
-    with patch("app.agents.compliance_drafter.nodes.query_rag_findings", AsyncMock(return_value=[])):
+    with patch("app.agents.compliance_drafter.nodes.query_rag_freshness", AsyncMock(return_value=_EMPTY_FRESHNESS)):
         result = await continue_compliance_drafter(
             session_id="cd-arity-check",
             user_id="u1",

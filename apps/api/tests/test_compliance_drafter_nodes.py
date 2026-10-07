@@ -40,8 +40,8 @@ def test_every_section_searches_a_canonical_corpus_domain() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("node", "domain"), [(query_tax_node, "tax"), (query_epf_node, "epf")])
 async def test_query_nodes_search_their_own_domain(node, domain) -> None:
-    search = AsyncMock(return_value=[_FINDING])
-    with patch.object(nodes, "query_rag_findings", search):
+    search = AsyncMock(return_value={"current": [_FINDING], "announced": [], "dropped": {"superseded": 0, "expired": 0}})
+    with patch.object(nodes, "query_rag_freshness", search):
         out = await node({"domains": ["tax", "business", "epf"], "business_type": "sole_proprietor", "language": "en"})
     assert search.await_args.args[1] == domain
     assert out[f"{domain}_findings"] == [_FINDING]

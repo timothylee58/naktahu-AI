@@ -6,12 +6,13 @@ import binascii
 import io
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 import structlog
 
+from app.agents.freshness import is_stale, parse_date, partition_by_freshness, staleness_ref
 from app.services.llm_client import (
     ILMU_CHAT_MODEL,
     ilmu_client,
@@ -35,6 +36,22 @@ async def _embed(query: str) -> list[float]:
     return await corpus_embed(query)
 
 
+async def search_chunks(query: str, domain: str, *, top_k: int = 5) -> list[ChunkResult]:
+    """Hybrid-search a domain and return the raw ``ChunkResult`` rows.
+
+    Callers that need the freshness helpers (``app.agents.freshness``) work on
+    these objects; ``query_rag`` is the serialisable dict view of the same call.
+    """
+    embedding = await _embed(query)
+    # Positional/keyword names match vector_store.hybrid_search's real
+    # signature (query, embedding, domain, limit). This call previously passed
+    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
+    # every call — silently disabling knowledge search for every vertical
+    # agent that uses query_rag_findings. hybrid_search has no language
+    # filter; `language` is kept in query_rag's signature for callers.
+    return await hybrid_search(query, embedding, domain=domain, limit=top_k)
+
+
 async def query_rag(
     query: str,
     domain: str,
@@ -42,15 +59,15 @@ async def query_rag(
     language: str = "bm",
     top_k: int = 5,
 ) -> list[dict[str, Any]]:
-    """Hybrid-search a domain and return serialisable chunk dicts."""
-    embedding = await _embed(query)
-    # Positional/keyword names match vector_store.hybrid_search's real
-    # signature (query, embedding, domain, limit). This call previously passed
-    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
-    # every call — silently disabling knowledge search for every vertical
-    # agent that uses query_rag_findings. hybrid_search has no language
-    # filter; `language` is kept in this function's signature for callers.
-    chunks: list[ChunkResult] = await hybrid_search(query, embedding, domain=domain, limit=top_k)
+    """Hybrid-search a domain and return serialisable chunk dicts.
+
+    The freshness fields (effective_date, effective_until, announced_date,
+    superseded_by, expiry_aware, source_date, retrieved_at) are included
+    additively. Nothing is filtered here: callers that must not present
+    superseded, expired or not-yet-in-force rules as current use
+    ``query_rag_freshness`` instead.
+    """
+    chunks = await search_chunks(query, domain, top_k=top_k)
     return [
         {
             "id": c.id,
@@ -59,6 +76,13 @@ async def query_rag(
             "source_url": c.source_url,
             "ministry": c.ministry,
             "similarity": c.similarity,
+            "effective_date": c.effective_date,
+            "effective_until": c.effective_until,
+            "announced_date": c.announced_date,
+            "superseded_by": c.superseded_by,
+            "expiry_aware": c.expiry_aware,
+            "source_date": c.source_date,
+            "retrieved_at": c.retrieved_at,
         }
         for c in chunks
     ]
@@ -84,6 +108,68 @@ async def query_rag_findings(
 ) -> list[dict[str, Any]]:
     chunks = await query_rag(query, domain, language=language)
     return _chunks_to_findings(chunks, domain)
+
+
+# Compliance reports list obligations, so they search wider than the 3 findings
+# a Q&A-style agent keeps: superseded and expired rows are dropped *after*
+# retrieval and must not leave a section short of the current rules.
+_FRESHNESS_TOP_K = 8
+_MAX_CURRENT_FINDINGS = 3
+_MAX_ANNOUNCED_FINDINGS = 3
+
+
+def _dated_finding(chunk: ChunkResult, domain: str, *, stale: bool = False) -> dict[str, Any]:
+    """JSON-serialisable finding carrying its dates (no ChunkResult in state)."""
+    return {
+        "domain": domain,
+        "summary": chunk.content[:400],
+        "source_title": chunk.source_title,
+        "source_url": chunk.source_url,
+        "similarity": chunk.similarity,
+        "effective_date": chunk.effective_date,
+        "effective_until": chunk.effective_until,
+        "announced_date": chunk.announced_date,
+        "retrieved_at": chunk.retrieved_at,
+        "stale": stale,
+        # The date the staleness verdict was computed from, so the date a
+        # reader sees and the "may be outdated" flag cannot disagree.
+        "stale_ref_date": staleness_ref(chunk) if stale else None,
+    }
+
+
+async def query_rag_freshness(
+    query: str,
+    domain: str,
+    language: str = "bm",
+) -> dict[str, Any]:
+    """Search a domain and split the hits by validity, for report builders.
+
+    Returns ``{"current", "announced", "dropped"}``:
+
+    - ``current``: in force today (not superseded, not expired, not future-dated),
+      each flagged ``stale`` when its date is older than the domain's window.
+    - ``announced``: ``effective_date`` in the future, not expired, not
+      superseded. Never to be presented as a current obligation.
+    - ``dropped``: ``{"superseded": n, "expired": n}``, counts of rows left out.
+
+    ``language`` is accepted for parity with ``query_rag_findings`` (the search
+    has no language filter). Chunks with no dates are treated as current and
+    never flagged: absence of a date is not evidence of staleness.
+    """
+    chunks = await search_chunks(query, domain, top_k=_FRESHNESS_TOP_K)
+    part = partition_by_freshness(chunks)
+    current = [
+        _dated_finding(c, domain, stale=is_stale(c, domain))
+        for c in part.current[:_MAX_CURRENT_FINDINGS]
+    ]
+    # Soonest to take effect first; sorted() is stable, so ties keep relevance order.
+    announced_chunks = sorted(part.announced, key=lambda c: parse_date(c.effective_date) or date.max)
+    announced = [_dated_finding(c, domain) for c in announced_chunks[:_MAX_ANNOUNCED_FINDINGS]]
+    return {
+        "current": current,
+        "announced": announced,
+        "dropped": {"superseded": len(part.superseded), "expired": len(part.expired)},
+    }
 
 
 def extract_pdf_text(document_base64: str) -> str:
