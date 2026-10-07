@@ -1,6 +1,7 @@
 """Shared agent tools: RAG query, PDF generation, email notification."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import io
@@ -150,14 +151,25 @@ async def query_rag_freshness(
       each flagged ``stale`` when its date is older than the domain's window.
     - ``announced``: ``effective_date`` in the future, not expired, not
       superseded. Never to be presented as a current obligation.
-    - ``dropped``: ``{"superseded": n, "expired": n}``, counts of rows left out.
+    - ``dropped``: ``{"superseded": n, "expired": n, "low_relevance": n}``,
+      counts of rows left out.
 
     ``language`` is accepted for parity with ``query_rag_findings`` (the search
     has no language filter). Chunks with no dates are treated as current and
     never flagged: absence of a date is not evidence of staleness.
     """
     chunks = await search_chunks(query, domain, top_k=_FRESHNESS_TOP_K)
-    part = partition_by_freshness(chunks)
+    # Relevance floor: hybrid_search always returns its top-k however poor the
+    # match, so a thin corpus yields confident-looking citations that have
+    # nothing to do with the question. A section with nothing relevant says so
+    # ("no official source found") instead. The floor is on the combined
+    # cosine+keyword score; see drafter_min_relevance in core/config.py.
+    floor = settings.drafter_min_relevance
+    relevant = [c for c in chunks if c.similarity >= floor]
+    low_relevance = len(chunks) - len(relevant)
+    if low_relevance:
+        log.info("drafter_low_relevance_dropped", domain=domain, dropped=low_relevance, floor=floor)
+    part = partition_by_freshness(relevant)
     current = [
         _dated_finding(c, domain, stale=is_stale(c, domain))
         for c in part.current[:_MAX_CURRENT_FINDINGS]
@@ -168,7 +180,11 @@ async def query_rag_freshness(
     return {
         "current": current,
         "announced": announced,
-        "dropped": {"superseded": len(part.superseded), "expired": len(part.expired)},
+        "dropped": {
+            "superseded": len(part.superseded),
+            "expired": len(part.expired),
+            "low_relevance": low_relevance,
+        },
     }
 
 
@@ -467,7 +483,9 @@ async def generate_pdf(
     not a PDF.
     """
     try:
-        pdf_bytes = _render_pdf_bytes(html)
+        # WeasyPrint is synchronous and CPU-bound; run it in a worker thread so a
+        # slow report cannot stall every other request on the event loop.
+        pdf_bytes = await asyncio.to_thread(_render_pdf_bytes, html)
     except (ImportError, OSError) as exc:
         log.error("pdf_weasyprint_unavailable", error=str(exc), error_type=type(exc).__name__)
         return "", "", ""
@@ -577,14 +595,22 @@ async def generate_docx(
         doc.save(buf)
         docx_bytes = buf.getvalue()
     except Exception as exc:
-        log.warning("python_docx_unavailable", error=str(exc))
-        docx_bytes = str(report_json).encode("utf-8")
+        # Used to upload str(report_json) under a .docx name: a file Word cannot
+        # open, behind a "Download" link. Fail closed instead, like generate_pdf.
+        log.error("docx_render_failed", error=str(exc), error_type=type(exc).__name__)
+        return "", "", ""
+
+    if not docx_bytes.startswith(b"PK"):
+        # A .docx is a zip archive; anything else is not a Word document.
+        log.error("docx_render_not_docx", size=len(docx_bytes))
+        return "", "", ""
 
     storage_path = f"agents/{agent_type}/{user_id}/{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.docx"
     bucket = settings.supabase_storage_bucket
 
     if not supabase_client:
-        return storage_path, "", ""
+        log.error("docx_storage_unavailable", reason="supabase client missing")
+        return "", "", ""
 
     try:
         supabase_client.storage.from_(bucket).upload(
@@ -601,10 +627,13 @@ async def generate_docx(
             86_400,
         )
         url = signed.get("signedURL") or signed.get("signedUrl") or ""
+        if not url:
+            log.error("docx_signed_url_missing", path=storage_path)
+            return "", "", ""
         return storage_path, url, expires_at.isoformat()
     except Exception as exc:
-        log.warning("docx_upload_failed", error=str(exc))
-        return storage_path, "", ""
+        log.error("docx_upload_failed", error=str(exc))
+        return "", "", ""
 
 
 async def send_email(

@@ -300,6 +300,20 @@ async def generate_export_node(state: GrantDraftState, config: RunnableConfig | 
             supabase_client=supabase,
         )
         tool_calls.append({"tool": "generate_docx", "path": path})
+        if not path or not url:
+            # generate_docx returns ("", "", "") when no real Word document
+            # could be made and stored; surface it like the PDF branch does.
+            from app.agents.tools import PDF_GENERATION_ERROR
+
+            log.error("grant_draft_docx_failed", session_id=state.get("session_id"))
+            return {
+                "docx_storage_path": "",
+                "signed_url": "",
+                "url_expires_at": None,
+                "awaiting_hitl": False,
+                "error": PDF_GENERATION_ERROR,
+                "tool_calls": tool_calls,
+            }
         return {
             "docx_storage_path": path,
             "signed_url": url,

@@ -66,6 +66,18 @@ class Settings(BaseSettings):
         default="generated-documents",
         validation_alias=AliasChoices("SUPABASE_STORAGE_BUCKET", "supabase_storage_bucket"),
     )
+    # Minimum hybrid (0.7 cosine + 0.3 keyword) score for a chunk to appear in a
+    # Compliance Drafter report. 0.2 removes clearly unrelated chunks without
+    # touching plausible matches (a cosine of ~0.3 with no keyword hit scores
+    # 0.21). Not tuned on live scores: the drafter logs what it drops
+    # (drafter_low_relevance_dropped) so this can be adjusted from real runs.
+    # 0 disables the floor.
+    drafter_min_relevance: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        validation_alias=AliasChoices("DRAFTER_MIN_RELEVANCE", "drafter_min_relevance"),
+    )
     # Static bearer token required to scrape GET /metrics (Prometheus can't do
     # the JWT login flow get_current_user uses). Empty = endpoint always 401s
     # — fail closed on an unconfigured environment, never fail open.

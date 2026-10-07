@@ -140,6 +140,7 @@ async def _search_section(state: ComplianceDrafterState, key: str, query: str) -
         "announced": len(result["announced"]),
         "superseded_dropped": result["dropped"]["superseded"],
         "expired_dropped": result["dropped"]["expired"],
+        "low_relevance_dropped": result["dropped"].get("low_relevance", 0),
     })
     return {
         f"{key}_findings": result["current"],

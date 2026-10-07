@@ -262,8 +262,9 @@ class TestGenerateDocx:
         }
         path, url, expires = await generate_docx(report_json, user_id="user-1", supabase_client=None)
 
-        assert path.endswith(".docx")
-        assert url == ""  # no supabase_client -> no upload, matches generate_pdf's degrade shape
+        # No storage client means no download can exist: fail closed, like
+        # generate_pdf, rather than return a path to a file that was never stored.
+        assert (path, url, expires) == ("", "", "")
 
     @pytest.mark.asyncio
     async def test_docx_bytes_round_trip_contain_headings(self):
