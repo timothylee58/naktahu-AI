@@ -25,7 +25,7 @@ from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigat
 from app.agents.runtime import thread_config as _thread_config
 from app.agents.scam_check_agent.graph import get_scam_check_agent_graph
 from app.agents.study_agent.graph import get_study_agent_graph
-from app.agents.tools import PdfGenerationError
+from app.agents.tools import PDF_GENERATION_ERROR, PdfGenerationError
 from app.agents.welfare_eligibility_agent.graph import get_welfare_eligibility_agent_graph
 
 log = structlog.get_logger(__name__)
@@ -162,6 +162,38 @@ async def continue_compliance_drafter(
     return resp
 
 
+async def _rewind_failed_export(graph: Any, session_id: str) -> None:
+    """Re-open a run whose PDF/DOCX export failed so confirming again retries it.
+
+    The export node records the failure and the graph then runs to END, so a
+    second confirm would resume a finished thread and do nothing. Writing the
+    state back "as" the compile node puts the thread at the same pause it had
+    before the first confirm (next node: generate_pdf / generate_export, report
+    already built), so only the export step runs again — no new searches, the
+    report the user reviewed is unchanged. A thread in any other state is left
+    alone. Compliance Drafter and Grant Draft Generator share this shape: both
+    have a "compile" node feeding an interrupt_before export node.
+    """
+    config = _thread_config(session_id)
+    snapshot = await graph.aget_state(config)
+    values = dict(snapshot.values) if snapshot and snapshot.values else {}
+    if snapshot is None or snapshot.next or values.get("error") != PDF_GENERATION_ERROR:
+        return
+    if not values.get("report_html"):
+        return
+    log.info("compliance_drafter_pdf_retry", session_id=session_id)
+    await graph.aupdate_state(
+        config,
+        {"error": None, "signed_url": "", "url_expires_at": None, "awaiting_hitl": True},
+        as_node="compile",
+    )
+    # The rewrite counts as new progress, so the graph's interrupt_before fires
+    # again on the next run and that run would only pause, not generate. Take
+    # that pause here (a no-op: nothing executes before generate_pdf) so the
+    # caller's resume really runs the PDF step.
+    await graph.ainvoke(None, config=config)
+
+
 async def confirm_compliance_drafter(
     *,
     session_id: str,
@@ -172,6 +204,7 @@ async def confirm_compliance_drafter(
     edits: Optional[dict[str, Any]] = None,  # unused — compliance-drafter has no editable-draft UI
 ) -> dict[str, Any]:
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
+    await _rewind_failed_export(graph, session_id)
     await graph.aupdate_state(_thread_config(session_id), {"_user_email": user_email})
     values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
     # generate_pdf_node sets `error` when no real PDF could be produced; log
@@ -269,6 +302,7 @@ async def confirm_grant_draft_generator(
     edits: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    await _rewind_failed_export(graph, session_id)
     state_update: dict[str, Any] = {"_user_email": user_email}
     if edits:
         # compile_node already ran before the interrupt and baked the

@@ -139,7 +139,7 @@ async def test_superseded_and_expired_chunks_are_dropped_and_counted() -> None:
 
     assert [f["source_title"] for f in out["current"]] == ["Fake Source ok"]
     assert out["announced"] == []
-    assert out["dropped"] == {"superseded": 1, "expired": 2}
+    assert out["dropped"] == {"superseded": 1, "expired": 2, "low_relevance": 0}
 
 
 @pytest.mark.asyncio
@@ -163,7 +163,7 @@ async def test_an_announced_chunk_that_is_also_expired_or_superseded_is_dropped(
         _chunk("b", effective_date=_d(30), superseded_by="a"),
     ])
     assert out["current"] == [] and out["announced"] == []
-    assert out["dropped"] == {"superseded": 1, "expired": 1}
+    assert out["dropped"] == {"superseded": 1, "expired": 1, "low_relevance": 0}
 
 
 @pytest.mark.asyncio
@@ -198,7 +198,7 @@ async def test_undated_chunks_are_current_and_never_flagged() -> None:
     (finding,) = out["current"]
     assert finding["stale"] is False
     assert finding["effective_date"] is None and finding["announced_date"] is None
-    assert out["dropped"] == {"superseded": 0, "expired": 0}
+    assert out["dropped"] == {"superseded": 0, "expired": 0, "low_relevance": 0}
 
 
 @pytest.mark.asyncio
@@ -299,10 +299,10 @@ async def test_query_node_stores_json_state_and_splits_current_from_announced() 
     json.dumps(out)  # no ChunkResult objects in state
     assert [f["source_title"] for f in out["tax_findings"]] == ["Fake Source now"]
     assert [f["source_title"] for f in out["tax_announced"]] == ["Fake Source next"]
-    assert out["tax_dropped"] == {"superseded": 1, "expired": 0}
+    assert out["tax_dropped"] == {"superseded": 1, "expired": 0, "low_relevance": 0}
     assert out["tool_calls"][-1] == {
         "tool": "query_rag", "domain": "tax", "hits": 1, "announced": 1,
-        "superseded_dropped": 1, "expired_dropped": 0,
+        "superseded_dropped": 1, "expired_dropped": 0, "low_relevance_dropped": 0,
     }
 
 

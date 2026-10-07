@@ -377,7 +377,7 @@ async def test_confirm_reports_error_and_does_not_persist_a_document() -> None:
     values = {"session_id": "s1", "error": PDF_GENERATION_ERROR, "signed_url": "", "pdf_storage_path": ""}
     sb = MagicMock()
     with (
-        patch.object(agent_runner, "get_compliance_drafter_graph", return_value=MagicMock(aupdate_state=AsyncMock())),
+        patch.object(agent_runner, "get_compliance_drafter_graph", return_value=MagicMock(aupdate_state=AsyncMock(), aget_state=AsyncMock(return_value=None))),
         patch.object(agent_runner, "_run_graph", AsyncMock(return_value=(values, ()))),
         patch.object(agent_runner, "_log_run") as log_run,
         patch.object(agent_runner, "_persist_document") as persist,
