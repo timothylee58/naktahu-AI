@@ -36,6 +36,11 @@ def _verification_note(grant: dict[str, Any]) -> str:
     if status == "confirmed":
         return f" [deadline {v.get('found_deadline')} confirmed on the agency site]"
     if status == "changed":
+        if not v.get("db_deadline"):
+            return (
+                f" [WARNING: the agency site states a deadline of {v.get('found_deadline')} but we "
+                "have no deadline on record - tell the user to check the agency site]"
+            )
         return (
             f" [WARNING: the agency site now says the deadline is {v.get('found_deadline')}, "
             f"our records say {v.get('db_deadline')} - tell the user to check the agency site]"

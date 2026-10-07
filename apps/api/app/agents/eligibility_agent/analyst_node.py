@@ -46,6 +46,7 @@ _PASSTHROUGH_FIELDS = (
     "conflicts_with",
     "notes_en",
     "last_verified",
+    "source_url",
 )
 
 

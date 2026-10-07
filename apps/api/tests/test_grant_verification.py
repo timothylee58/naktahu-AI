@@ -280,3 +280,34 @@ async def test_sse_grant_events_carry_the_verification_record_and_prompt_warns()
     grant_events = [e for e in events if e["type"] == "grant"]
     assert grant_events[0]["data"]["verification"] == changed
     assert "WARNING" in captured["prompt"] and "2026-11-30" in captured["prompt"]
+
+
+# ── Bugbot findings on PR #236, verified and fixed ───────────────────────────
+
+def test_source_url_survives_scoring_so_a_grant_with_only_source_url_can_be_verified():
+    from app.agents.eligibility_agent.analyst_node import _score_grant
+
+    grant = {
+        "programme_name": "X", "agency": "A", "source_url": "https://mdec.my/x",
+        "application_url": None, "deadline_is_rolling": True, "eligible_sectors": ["all"],
+        "bumiputera_required": False, "company_age_min_months": 0,
+    }
+    profile = {"business_type": "sdn_bhd", "registered_months": 24, "sector": "technology",
+               "annual_revenue_myr": 1, "is_bumiputera": False, "employee_count": 3, "existing_grants": []}
+    scored = _score_grant(grant, profile)
+    assert scored["source_url"] == "https://mdec.my/x"
+
+
+async def test_grant_with_only_source_url_is_searched_on_that_domain():
+    client = _client([_page("Deadline: 31 December 2026")])
+    out = await v.verify_grant(_grant(application_url=None, source_url="https://www.mdec.my/x"), client)
+    assert out["status"] != v.UNAVAILABLE
+    assert client.search.await_args.kwargs["include_domains"] == ["mdec.my"]
+
+
+def test_prompt_never_says_none_when_no_deadline_is_on_record():
+    note = _verification_note(
+        {"verification": {"status": "changed", "found_deadline": "2026-11-30", "db_deadline": None}}
+    )
+    assert "None" not in note
+    assert "2026-11-30" in note and "no deadline on record" in note

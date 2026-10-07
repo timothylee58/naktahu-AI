@@ -189,10 +189,12 @@ function VerificationStamp({ grant }: { grant: Grant }) {
       date: datePart(v?.checked_at ?? null),
       domain: v?.source_domain ?? '',
     });
+  } else if (status === 'changed' && !v?.db_deadline) {
+    text = fmt(t('agents.grant-finder.verify.new_deadline'), { found: v?.found_deadline ?? '' });
   } else if (status === 'changed') {
     text = fmt(t('agents.grant-finder.verify.changed'), {
-      found: v?.found_deadline ?? '?',
-      recorded: v?.db_deadline ?? '?',
+      found: v?.found_deadline ?? '',
+      recorded: v?.db_deadline ?? '',
     });
   } else if (status === 'closed') {
     text = t('agents.grant-finder.verify.closed');
