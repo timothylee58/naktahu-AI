@@ -203,16 +203,18 @@ def find_seat_clashes(records: list[dict]) -> dict[str, list[str]]:
 
 def apply_current_mp_overrides(records: list[dict]) -> list[dict]:
     """For seats in CURRENT_MP_SLUG_OVERRIDES, keep only the named profile.
-    Other clashing seats are left alone so find_seat_clashes still flags them."""
-    clashing = find_seat_clashes(records)
-    drop = {
-        slug
-        for code, slugs in clashing.items()
-        if CURRENT_MP_SLUG_OVERRIDES.get(code) in slugs
-        for slug in slugs
-        if slug != CURRENT_MP_SLUG_OVERRIDES[code]
-    }
-    return [r for r in records if r["mymp_id"] not in drop]
+
+    A pinned seat accepts ONLY its pinned slug, whether or not a clash was seen.
+    If the sitting MP's page fails every retry while the former MP's page loads,
+    there is no clash to detect: keeping the lone former MP would write the wrong
+    person (and a later seed would overwrite the correct row). Dropping it makes
+    the seat show up as missing instead, which main() reports.
+
+    Other seats are untouched, so find_seat_clashes still flags their clashes."""
+    return [
+        r for r in records
+        if CURRENT_MP_SLUG_OVERRIDES.get(r["constituency_code"], r["mymp_id"]) == r["mymp_id"]
+    ]
 
 
 async def fetch_roster() -> list[dict]:

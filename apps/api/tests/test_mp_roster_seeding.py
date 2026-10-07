@@ -124,6 +124,19 @@ class TestSeatHelpers:
         # a clash with no override stays visible
         assert find_seat_clashes(out) == {"P001": ["x", "y"]}
 
+    def test_pinned_seat_drops_a_lone_former_mp_so_it_reads_as_missing(self):
+        """The sitting MP's page failed every retry; only the former MP loaded.
+        There is no clash to detect, but keeping the former MP would write the
+        wrong person. Dropping leaves the seat uncovered, which main() reports."""
+        recs = [
+            {"constituency_code": "P098", "mymp_id": "mohamed-azmin-bin-ali"},   # former MP only
+            {"constituency_code": "P161", "mymp_id": "suhaizan-bin-kayat"},       # sitting MP present
+            {"constituency_code": "P001", "mymp_id": "x"},
+        ]
+        out = apply_current_mp_overrides(recs)
+        assert {r["mymp_id"] for r in out} == {"suhaizan-bin-kayat", "x"}
+        assert "P098" not in {r["constituency_code"] for r in out}
+
 
 _PROFILE = """
 <p class="x"><span class="text-primary">P137</span>
