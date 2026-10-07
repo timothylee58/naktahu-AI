@@ -302,3 +302,64 @@ async def test_grant_confirm_again_after_a_failed_export_retries_only_the_export
     assert second["status"] == "completed" and not second.get("error")
     assert second["signed_url"] == "https://signed.example/g"
     assert len(calls) == 2
+
+
+# ── the Supabase client must actually reach nodes that take `config` ──────────
+#
+# These modules once had `from __future__ import annotations`, which turns the
+# `config: RunnableConfig | None` annotation into a string. LangGraph only
+# injects `config` when the annotation is the real type, so every such node got
+# config=None: supabase_from_config() returned None and, in production, every
+# PDF export failed with "supabase client missing" (and the other agents lost
+# their database client the same way).
+
+_CONFIG_NODES = [
+    ("app.agents.compliance_drafter.nodes", "generate_pdf_node"),
+    ("app.agents.grant_draft_generator.nodes", "fetch_grant_node"),
+    ("app.agents.grant_draft_generator.nodes", "generate_export_node"),
+    ("app.agents.eligibility_agent.analyst_node", "analyst_node"),
+    ("app.agents.eligibility_agent.graph", "_grant_rag_node"),
+    ("app.agents.scam_check_agent.graph", "_check_node"),
+    ("app.agents.welfare_eligibility_agent.graph", "_match_node"),
+]
+
+
+@pytest.mark.parametrize(("module", "name"), _CONFIG_NODES)
+def test_langgraph_will_inject_config_into_the_node(module: str, name: str) -> None:
+    import importlib
+
+    from langgraph._internal._runnable import RunnableCallable
+
+    func = getattr(importlib.import_module(module), name)
+    assert "config" in RunnableCallable(func=None, afunc=func).func_accepts
+
+
+@pytest.mark.asyncio
+async def test_the_supabase_client_reaches_generate_pdf_through_the_real_graph() -> None:
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from app.agents.compliance_drafter import nodes
+    from app.services import agent_runner
+
+    checkpointer = MemorySaver()
+    empty = {"current": [], "announced": [], "dropped": {"superseded": 0, "expired": 0, "low_relevance": 0}}
+    seen: dict[str, Any] = {}
+    client = object()
+
+    async def fake_pdf(_html: str, **kwargs: Any) -> tuple[str, str, str]:
+        seen["client"] = kwargs.get("supabase_client")
+        return "p.pdf", "https://signed.example/r.pdf", "2030-01-01T00:00:00+00:00"
+
+    with (
+        patch.object(nodes, "query_rag_freshness", AsyncMock(return_value=empty)),
+        patch("app.agents.tools.generate_pdf", fake_pdf),
+        patch("app.agents.tools.send_email", AsyncMock(return_value=True)),
+    ):
+        started = await agent_runner.start_compliance_drafter(
+            user_id="u1", user_email=None, payload={}, supabase_client=client, checkpointer=checkpointer
+        )
+        await agent_runner.confirm_compliance_drafter(
+            session_id=started["session_id"], user_id="u1", user_email=None, supabase_client=client, checkpointer=checkpointer
+        )
+
+    assert seen["client"] is client

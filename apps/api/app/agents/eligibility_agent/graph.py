@@ -8,7 +8,6 @@ synthesiser_node is a streaming async generator, not a graph node — it's
 invoked directly by app/routers/eligibility.py once intake_complete is True,
 the same way grant_finder's match_node used to run inline in a single pass.
 """
-from __future__ import annotations
 
 from typing import Any, Optional
 
