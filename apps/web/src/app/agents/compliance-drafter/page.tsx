@@ -1,15 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
 import { mapApiErrorDetail } from '@/lib/auth-headers';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
+import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
 import { useI18n } from '@/lib/i18n';
 
 type Step = 'business' | 'domains' | 'preview' | 'done';
+
+const STEP_ORDER: Step[] = ['business', 'domains', 'preview', 'done'];
 
 const BUSINESS_TYPES = [
   { id: 'sole_proprietor', labelKey: 'agents.compliance-drafter.business.sole', icon: '🏪', desc: 'Enterprise Perseorangan' },
@@ -24,9 +26,24 @@ const DOMAIN_OPTIONS = [
 ] as const;
 
 const DOMAIN_COLORS: Record<string, { bg: string; border: string; badge: string; text: string }> = {
-  tax: { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', text: 'text-red-800' },
-  business: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700', text: 'text-blue-800' },
-  epf: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700', text: 'text-amber-800' },
+  tax: {
+    bg: 'bg-red-50 dark:bg-red-500/10',
+    border: 'border-red-200 dark:border-red-500/30',
+    badge: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
+    text: 'text-red-800 dark:text-red-200',
+  },
+  business: {
+    bg: 'bg-blue-50 dark:bg-blue-500/10',
+    border: 'border-blue-200 dark:border-blue-500/30',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+    text: 'text-blue-800 dark:text-blue-200',
+  },
+  epf: {
+    bg: 'bg-amber-50 dark:bg-amber-500/10',
+    border: 'border-amber-200 dark:border-amber-500/30',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+    text: 'text-amber-800 dark:text-amber-200',
+  },
 };
 
 interface DomainSection {
@@ -101,11 +118,16 @@ function resolveAgentError(message: string, t: (key: string) => string): string 
   return mapApiErrorDetail(message, t);
 }
 
-export default function ComplianceDrafterPage() {
+function ComplianceDrafterPageInner() {
   const { t, locale } = useI18n();
-  const { start, post } = useAgentApi();
+  const { start, post, get } = useAgentApi();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>('business');
-  const [businessType, setBusinessType] = useState('sole_proprietor');
+  // No default selected — this report has legal/financial consequences,
+  // so a rushed "click Next without reading" shouldn't silently generate
+  // a report for the wrong business type. Force an active choice instead.
+  const [businessType, setBusinessType] = useState('');
+  const [businessTypeTouched, setBusinessTypeTouched] = useState(false);
   const [domains, setDomains] = useState<string[]>(['tax', 'business', 'epf']);
   const [context, setContext] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -114,15 +136,40 @@ export default function ComplianceDrafterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Was mapping zh -> 'en' — a real correctness bug, not just a hardcoded
+  // default: a Chinese-locale user's report generation request was silently
+  // tagged as English.
   const queryLanguage = useMemo(() => {
     if (locale === 'ms') return 'bm';
-    if (locale === 'zh') return 'en';
+    if (locale === 'zh') return 'zh';
     return 'en';
   }, [locale]);
+
+  const reportSections = useMemo(() => (report ? parseReportSections(report) : []), [report]);
 
   const toggleDomain = (id: string) => {
     setDomains((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
   };
+
+  // Resume from History's "?run=<agent_runs.id>" link — jump straight to
+  // the report preview instead of the intake flow. Silent fallback to a
+  // fresh intake on any failure (bad/expired link) rather than an error.
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    if (!runId) return;
+    (async () => {
+      try {
+        const run = await get(`/api/v1/agent-runs/${runId}`);
+        const output = (run.output as Record<string, unknown>) ?? {};
+        setSessionId(typeof run.session_id === 'string' ? run.session_id : null);
+        setReport((output.report_json as Record<string, unknown>) ?? output);
+        setStep('preview');
+      } catch {
+        /* stale/invalid run id — stays on the fresh intake flow */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startAgent = async () => {
     setLoading(true);
@@ -164,26 +211,14 @@ export default function ComplianceDrafterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-[#0A0F1E] dark:text-white">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-[#0A0F1E]/80">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link
-            href="/chat"
-            className="inline-flex items-center gap-1.5 text-sm text-blue-600 transition-colors hover:text-blue-500 dark:text-blue-400 locale-nowrap"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            {t('nav.home')}
-          </Link>
-          <span className="text-zinc-300 dark:text-white/20" aria-hidden>/</span>
-          <h1 className="text-sm font-bold">{t('agents.compliance-drafter.title')}</h1>
-        </div>
-      </header>
+    <>
+      <AgentPageHeader title={t('agents.compliance-drafter.title')} />
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6"
+        className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-6"
       >
         {error && (
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2 dark:text-red-300 dark:bg-red-500/10 dark:border-red-500/30">
@@ -191,25 +226,58 @@ export default function ComplianceDrafterPage() {
           </div>
         )}
 
+        {step !== 'done' && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              <span>
+                {t('agents.compliance-drafter.step_of')
+                  .replace('{current}', String(STEP_ORDER.indexOf(step) + 1))
+                  .replace('{total}', String(STEP_ORDER.length - 1))}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden dark:bg-white/10">
+              <div
+                className="h-full rounded-full bg-nk-official transition-all duration-300"
+                style={{ width: `${((STEP_ORDER.indexOf(step) + 1) / (STEP_ORDER.length - 1)) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {step === 'business' && (
           <section className="bg-white rounded-2xl border border-zinc-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-white/10">
-            <h2 className="font-semibold">{t('agents.compliance-drafter.step1')}</h2>
+            <div>
+              <h2 className="font-semibold">{t('agents.compliance-drafter.step1')}</h2>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {t('agents.compliance-drafter.intro')}
+              </p>
+            </div>
             <div className="flex flex-col gap-2">
               {BUSINESS_TYPES.map((b) => (
-                <label key={b.id} className="flex items-center gap-2 text-sm">
+                <label key={b.id} className="flex items-start gap-2 text-sm">
                   <input
                     type="radio"
                     name="business"
                     checked={businessType === b.id}
-                    onChange={() => setBusinessType(b.id)}
-                    className="accent-blue-600"
+                    onChange={() => { setBusinessType(b.id); setBusinessTypeTouched(true); }}
+                    className="accent-nk-official mt-0.5"
                   />
-                  {t(b.labelKey)}
+                  <span className="flex flex-col">
+                    <span>{t(b.labelKey)}</span>
+                    {/* Official SSM registration-category name — kept as-is
+                        rather than translated, the same way "Sdn Bhd" isn't
+                        translated in the label above; was defined on this
+                        const array but never actually rendered anywhere. */}
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500">{b.desc}</span>
+                  </span>
                 </label>
               ))}
+              {businessTypeTouched && !businessType && (
+                <p className="text-xs text-red-600 dark:text-red-400">{t('agents.compliance-drafter.business_required')}</p>
+              )}
             </div>
             <textarea
-              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-blue-400 dark:border-white/10 dark:placeholder:text-zinc-500"
+              className="w-full border border-zinc-200 rounded-xl p-3 text-sm bg-transparent transition-colors focus:outline-none focus:border-nk-official dark:border-white/10 dark:placeholder:text-zinc-500"
               placeholder={t('agents.compliance-drafter.context_placeholder')}
               rows={3}
               value={context}
@@ -217,8 +285,14 @@ export default function ComplianceDrafterPage() {
             />
             <button
               type="button"
-              onClick={() => setStep('domains')}
-              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold"
+              onClick={() => {
+                if (!businessType) {
+                  setBusinessTypeTouched(true);
+                  return;
+                }
+                setStep('domains');
+              }}
+              className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold"
             >
               {t('agents.compliance-drafter.next')}
             </button>
@@ -234,7 +308,7 @@ export default function ComplianceDrafterPage() {
                   type="checkbox"
                   checked={domains.includes(d.id)}
                   onChange={() => toggleDomain(d.id)}
-                  className="accent-blue-600"
+                  className="accent-nk-official"
                 />
                 {t(d.labelKey)}
               </label>
@@ -251,7 +325,7 @@ export default function ComplianceDrafterPage() {
                 type="button"
                 disabled={loading || domains.length === 0}
                 onClick={() => void startAgent()}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
               >
                 {loading ? t('agents.compliance-drafter.generating') : t('agents.compliance-drafter.generate')}
               </button>
@@ -260,21 +334,72 @@ export default function ComplianceDrafterPage() {
         )}
 
         {loading && step === 'domains' && (
-          <AgentLoadingSkeleton message="Menjana laporan pematuhan…" />
+          <AgentLoadingSkeleton message={t('agents.compliance-drafter.generating')} />
         )}
 
         {step === 'preview' && report && (
-          <section className="bg-white rounded-2xl border border-blue-200 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-blue-500/30">
-            <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
-            <pre className="text-xs bg-zinc-50 border border-zinc-100 rounded-xl p-4 overflow-auto max-h-80 dark:bg-black/30 dark:border-white/10 dark:text-zinc-300">
-              {JSON.stringify(report, null, 2)}
-            </pre>
+          <section className="bg-white rounded-2xl border border-nk-official/30 p-6 flex flex-col gap-4 shadow-sm dark:bg-white/5 dark:border-nk-official/40">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">{t('agents.compliance-drafter.step3')}</h2>
+              <button
+                type="button"
+                onClick={() => setStep('domains')}
+                className="text-xs text-zinc-500 hover:text-zinc-900 transition-colors dark:text-zinc-400 dark:hover:text-white"
+              >
+                {t('agents.compliance-drafter.back')}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {reportSections.map((section, i) => {
+                const colors = DOMAIN_COLORS[section.domain] ?? DOMAIN_COLORS.business;
+                return (
+                  <details
+                    key={`${section.domain}-${i}`}
+                    open
+                    className={`rounded-xl border p-4 ${colors.bg} ${colors.border}`}
+                  >
+                    <summary className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                      <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${colors.badge}`}>
+                        {t(DOMAIN_OPTIONS.find((d) => d.id === section.domain)?.labelKey ?? '') || section.domain}
+                      </span>
+                      <span className={colors.text}>{section.title}</span>
+                    </summary>
+                    {section.items.length > 0 && (
+                      <ul className={`mt-3 text-sm list-disc pl-5 space-y-1 ${colors.text}`}>
+                        {section.items.map((line, j) => <li key={j}>{line}</li>)}
+                      </ul>
+                    )}
+                    {section.deadlines && section.deadlines.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-1">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                          {t('agents.compliance-drafter.deadlines')}
+                        </span>
+                        <ul className="text-sm list-disc pl-5 space-y-1 text-amber-700 dark:text-amber-300">
+                          {section.deadlines.map((line, j) => <li key={j}>{line}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </details>
+                );
+              })}
+            </div>
+
+            <details className="text-xs">
+              <summary className="cursor-pointer text-zinc-500 dark:text-zinc-400">
+                {t('agents.compliance-drafter.raw_json')}
+              </summary>
+              <pre className="mt-2 text-xs bg-zinc-50 border border-zinc-100 rounded-xl p-4 overflow-auto max-h-80 dark:bg-black/30 dark:border-white/10 dark:text-zinc-300">
+                {JSON.stringify(report, null, 2)}
+              </pre>
+            </details>
+
             <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('agents.compliance-drafter.credit_note')}</p>
             <button
               type="button"
               disabled={loading}
               onClick={() => void confirmReport()}
-              className="self-end px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-semibold disabled:opacity-50"
+              className="self-end px-4 py-2 rounded-xl bg-nk-official hover:bg-nk-official-dim transition-colors text-white text-sm font-semibold disabled:opacity-50"
             >
               {loading ? t('agents.compliance-drafter.confirming') : t('agents.compliance-drafter.confirm')}
             </button>
@@ -285,7 +410,7 @@ export default function ComplianceDrafterPage() {
           <section className="bg-white rounded-2xl border border-green-200 p-6 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-green-500/30">
             <h2 className="font-semibold text-green-800 dark:text-green-400">{t('agents.compliance-drafter.step4')}</h2>
             {downloadUrl ? (
-              <a href={downloadUrl} className="text-blue-600 underline text-sm dark:text-blue-400" target="_blank" rel="noreferrer">
+              <a href={downloadUrl} className="text-nk-official-dim underline text-sm dark:text-nk-official" target="_blank" rel="noreferrer">
                 {t('agents.compliance-drafter.download')}
               </a>
             ) : (
@@ -294,13 +419,21 @@ export default function ComplianceDrafterPage() {
             <button
               type="button"
               onClick={() => { setStep('business'); setReport(null); setSessionId(null); setDownloadUrl(null); }}
-              className="self-start text-sm text-blue-600 hover:underline"
+              className="self-start text-sm text-nk-official-dim hover:underline"
             >
-              ← Jana laporan baru
+              {t('agents.compliance-drafter.new_report')}
             </button>
           </section>
         )}
       </motion.div>
-    </main>
+    </>
+  );
+}
+
+export default function ComplianceDrafterPage() {
+  return (
+    <Suspense>
+      <ComplianceDrafterPageInner />
+    </Suspense>
   );
 }

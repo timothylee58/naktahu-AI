@@ -1,6 +1,7 @@
 """Tests for app.agents.rag_node."""
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -260,3 +261,237 @@ async def test_rag_node_no_fallback_when_first_search_hits() -> None:
 
     assert len(result["retrieved_chunks"]) == 1
     assert mock_search.call_count == 1
+
+
+# ── RERANK_ENABLED behaviour ───────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_rag_node_rerank_disabled_by_default_uses_final_limit(monkeypatch) -> None:
+    """RERANK_ENABLED unset: hybrid_search is called with the normal
+    5-chunk limit, and rerank_chunks is never invoked — the feature flag
+    must not change default behaviour."""
+    monkeypatch.delenv("RERANK_ENABLED", raising=False)
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+    mock_search = AsyncMock(return_value=_FAKE_CHUNKS)
+    mock_rerank = AsyncMock()
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", mock_search),
+        patch("app.agents.rag_node.rerank_chunks", mock_rerank),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        result = await rag_node(_STATE)
+
+    assert mock_search.await_args.kwargs.get("limit") == 5
+    mock_rerank.assert_not_called()
+    assert len(result["retrieved_chunks"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_rag_node_rerank_enabled_widens_pool_and_calls_reranker(monkeypatch) -> None:
+    monkeypatch.setenv("RERANK_ENABLED", "true")
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+    wide_chunks = _FAKE_CHUNKS * 3  # simulate a wider candidate pool
+    mock_search = AsyncMock(return_value=wide_chunks)
+    mock_rerank = AsyncMock(return_value=_FAKE_CHUNKS)
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", mock_search),
+        patch("app.agents.rag_node.rerank_chunks", mock_rerank),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        result = await rag_node(_STATE)
+
+    assert mock_search.await_args.kwargs.get("limit") == 12
+    mock_rerank.assert_awaited_once()
+    assert result["retrieved_chunks"] == _FAKE_CHUNKS
+
+
+# ── Speculative embedding task (router_node hand-off) ──────────────────────
+
+@pytest.mark.asyncio
+async def test_rag_node_reuses_speculative_embedding_task_on_cache_miss() -> None:
+    """A speculative task from router_node must be awaited instead of
+    rag_node calling _embed() itself — that's the whole point of the
+    hand-off (see AgentState._speculative_embedding_task's docstring)."""
+    task = asyncio.ensure_future(asyncio.sleep(0, result=_FAKE_EMBEDDING))
+    state = {**_STATE, "_speculative_embedding_task": task}
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
+    ):
+        mock_client.embeddings.create = AsyncMock()  # must never be called
+        result = await rag_node(state)
+
+    mock_client.embeddings.create.assert_not_awaited()
+    assert mock_search.await_args.args[1] == _FAKE_EMBEDDING
+    assert len(result["retrieved_chunks"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_rag_node_cache_hit_cancels_pending_speculative_task() -> None:
+    """A same-query race (see router_node's own comment on this) can land
+    a speculative task in flight even though this run turns out to be a
+    cache hit — it must be cancelled, not left to run to completion for a
+    result nothing will use."""
+    async def _never_resolves():
+        await asyncio.sleep(10)
+        return _FAKE_EMBEDDING
+
+    task = asyncio.ensure_future(_never_resolves())
+    state = {**_STATE, "_speculative_embedding_task": task}
+
+    with patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=_serialize_chunks(_FAKE_CHUNKS))):
+        result = await rag_node(state)
+
+    assert task.cancelled() or task.cancelling() > 0
+    assert len(result["retrieved_chunks"]) == 1
+    task.cancel()  # ensure cleanup regardless of which branch fired above
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+@pytest.mark.asyncio
+async def test_rag_node_marks_query_seen_after_successful_cache_write() -> None:
+    embed_resp = _mock_embed_response(_FAKE_EMBEDDING)
+
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.cache_svc.mark_query_seen", AsyncMock()) as mock_mark,
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=embed_resp)
+        await rag_node(_STATE)
+
+    mock_mark.assert_awaited_once_with(_STATE["query"], ttl=3600)
+
+
+# ── Embedding routing invariant ────────────────────────────────────────────
+# The corpus is text-embedding-3-small (1536). _embed may reach that ONE model
+# two ways — ILMU gateway ("openai/text-embedding-3-small") first, OpenAI direct
+# second — and must never fall back to, or route through, a different model.
+
+from app.services.llm_client import embedding_routes_share_a_model  # noqa: E402
+
+
+def _routes(ilmu, openai):
+    """Patch both clients; `openai=None` means OPENAI_API_KEY unset."""
+    return (
+        patch("app.agents.rag_node.ilmu_client", ilmu),
+        patch("app.agents.rag_node.openai_client", openai),
+    )
+
+
+@pytest.mark.asyncio
+async def test_embed_uses_ilmu_route_first() -> None:
+    from app.agents.rag_node import _embed
+
+    ilmu, oa = MagicMock(), MagicMock()
+    ilmu.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
+    oa.embeddings.create = AsyncMock()
+    p1, p2 = _routes(ilmu, oa)
+    with p1, p2:
+        assert await _embed("cukai") == _FAKE_EMBEDDING
+    assert ilmu.embeddings.create.await_args.kwargs["model"] == "openai/text-embedding-3-small"
+    oa.embeddings.create.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_embed_falls_back_to_openai_direct_for_the_same_model() -> None:
+    from app.agents.rag_node import _embed
+
+    ilmu, oa = MagicMock(), MagicMock()
+    ilmu.embeddings.create = AsyncMock(side_effect=RuntimeError("ILMU down"))
+    oa.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
+    p1, p2 = _routes(ilmu, oa)
+    with p1, p2:
+        assert await _embed("cukai") == _FAKE_EMBEDDING
+    assert oa.embeddings.create.await_args.kwargs["model"] == "text-embedding-3-small"
+
+
+@pytest.mark.asyncio
+async def test_embed_skips_ilmu_route_when_it_names_a_different_model() -> None:
+    """A different ILMU model (e.g. bge-m3) must never embed for this corpus —
+    same-dimension models don't error, they silently return noise scores."""
+    from app.agents.rag_node import _embed
+
+    ilmu, oa = MagicMock(), MagicMock()
+    ilmu.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
+    oa.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
+    p1, p2 = _routes(ilmu, oa)
+    with p1, p2, patch("app.agents.rag_node.ILMU_EMBEDDING_MODEL", "bge-m3"):
+        await _embed("cukai")
+    ilmu.embeddings.create.assert_not_called()
+    oa.embeddings.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_embed_rejects_wrong_dimension_from_either_route() -> None:
+    from app.agents.rag_node import _embed
+
+    ilmu, oa = MagicMock(), MagicMock()
+    ilmu.embeddings.create = AsyncMock(return_value=_mock_embed_response([0.1] * 1024))
+    oa.embeddings.create = AsyncMock(return_value=_mock_embed_response([0.1] * 3072))
+    p1, p2 = _routes(ilmu, oa)
+    with p1, p2, pytest.raises(ValueError, match="3072 dims, expected 1536"):
+        await _embed("cukai")
+    # The 1024-dim ILMU vector was rejected too (it fell through to OpenAI).
+    oa.embeddings.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_rag_node_returns_no_chunks_when_no_embedding_route_works() -> None:
+    """Both routes down -> empty retrieval (analyst_node asks to rephrase),
+    never a search with a vector we couldn't legitimately produce."""
+    ilmu = MagicMock()
+    ilmu.embeddings.create = AsyncMock(side_effect=RuntimeError("ILMU down"))
+    p1, p2 = _routes(ilmu, None)
+    with (
+        p1, p2,
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)) as mock_search,
+    ):
+        result = await rag_node(_STATE)
+
+    assert result["retrieved_chunks"] == []
+    mock_search.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "ilmu_model, openai_model, same",
+    [
+        ("openai/text-embedding-3-small", "text-embedding-3-small", True),
+        ("text-embedding-3-small", "text-embedding-3-small", False),  # unprefixed: ILMU 404s it
+        ("openai/text-embedding-3-large", "text-embedding-3-small", False),
+        ("bge-m3", "text-embedding-3-small", False),
+        ("cohere/text-embedding-3-small", "text-embedding-3-small", False),
+    ],
+)
+def test_embedding_routes_share_a_model(ilmu_model, openai_model, same) -> None:
+    assert embedding_routes_share_a_model(ilmu_model, openai_model) is same
+
+
+@pytest.mark.asyncio
+async def test_other_query_paths_use_the_shared_embedder() -> None:
+    """tools.query_rag and grant_rag_node search the same column, so they must
+    embed through rag_node._embed rather than keep their own copies."""
+    import app.agents.eligibility_agent.grant_rag_node as grant_rag_node
+    import app.agents.tools as tools_module
+
+    with patch("app.agents.rag_node._embed", AsyncMock(return_value=_FAKE_EMBEDDING)) as corpus_embed:
+        assert await tools_module._embed("q") == _FAKE_EMBEDDING
+        assert await grant_rag_node._embed_query("q") == _FAKE_EMBEDDING
+    assert corpus_embed.await_count == 2

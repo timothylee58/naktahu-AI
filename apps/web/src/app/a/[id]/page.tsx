@@ -7,13 +7,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { CitationChip } from '@/components/chat/CitationChip';
 import type { Citation } from '@/lib/types';
-
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
+import { API_BASE } from '@/lib/api-base';
 
 interface SharedAnswer {
   id: string;
@@ -59,15 +56,13 @@ export default function SharedAnswerPage() {
   return (
     <div className="min-h-screen bg-zinc-50/50 flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-        <Link href="/" className="flex flex-col">
-          <span className="text-base font-bold text-zinc-900 tracking-tight">
-            {t('header.title')}
-          </span>
+        <Link href="/" className="flex flex-col text-zinc-900">
+          <NakTahuWordmark markSize={20} className="text-base" />
           <span className="text-xs text-zinc-500">{t('header.subtitle')}</span>
         </Link>
         <Link
           href="/chat"
-          className="text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-4 py-2 transition-colors shadow-sm"
+          className="text-sm font-semibold bg-nk-official hover:bg-nk-official-dim text-white rounded-full px-4 py-2 transition-colors shadow-sm"
         >
           {t('share.cta')}
         </Link>
@@ -84,7 +79,7 @@ export default function SharedAnswerPage() {
         {status === 'not-found' && (
           <div className="text-center py-16">
             <p className="text-zinc-500">{t('share.not_found')}</p>
-            <Link href="/chat" className="mt-4 inline-block text-sm font-semibold text-blue-600 hover:text-blue-500">
+            <Link href="/chat" className="mt-4 inline-block text-sm font-semibold text-nk-official-dim hover:text-nk-official">
               {t('share.cta')}
             </Link>
           </div>
@@ -104,13 +99,13 @@ export default function SharedAnswerPage() {
             className="flex flex-col gap-4"
           >
             <div className="flex justify-end">
-              <div className="max-w-[85%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-sm">
+              <div className="max-w-[85%] bg-nk-official text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed shadow-sm">
                 {answer.query}
               </div>
             </div>
 
             <div className="flex justify-start gap-2.5">
-              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center mt-1 shadow-sm">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-nk-official to-nk-official-dim flex items-center justify-center mt-1 shadow-sm">
                 <span className="text-white text-[10px] font-bold">AI</span>
               </div>
               <div className="max-w-[85%] flex flex-col gap-2">

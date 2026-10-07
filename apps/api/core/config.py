@@ -66,6 +66,13 @@ class Settings(BaseSettings):
         default="generated-documents",
         validation_alias=AliasChoices("SUPABASE_STORAGE_BUCKET", "supabase_storage_bucket"),
     )
+    # Static bearer token required to scrape GET /metrics (Prometheus can't do
+    # the JWT login flow get_current_user uses). Empty = endpoint always 401s
+    # — fail closed on an unconfigured environment, never fail open.
+    metrics_auth_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("METRICS_AUTH_TOKEN", "metrics_auth_token"),
+    )
     resend_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("RESEND_API_KEY", "resend_api_key"),
@@ -78,8 +85,17 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"),
     )
+    # Defaults OFF: production observed the ILMU-backed soft classifier
+    # wrongly flag three unrelated, thoroughly benign civic queries as
+    # harmful (lost ID document, contacting an MP, registering a company)
+    # despite two rounds of system-prompt tuning (see guard_node.py's
+    # _GUARD_LLM_SYSTEM_PROMPT history). The hard keyword layer
+    # (_is_blocked_intent) stays fully active regardless of this setting —
+    # only the flaky second-pass LLM check is gated by it. Re-enable via
+    # GUARD_LLM_CHECK_ENABLED=true once the classifier's real-world
+    # false-positive rate has been investigated and brought down.
     guard_llm_check_enabled: bool = Field(
-        default=True,
+        default=False,
         validation_alias=AliasChoices("GUARD_LLM_CHECK_ENABLED", "guard_llm_check_enabled"),
     )
 
@@ -116,6 +132,23 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("STRIPE_PRICE_STUDENT", "stripe_price_student"),
     )
+    # Annual variants — same plan claim as their monthly counterpart, just a
+    # different Stripe Price (10x monthly for pro/business ~= 2 months free;
+    # student is a steeper 75%-off annual price). Separate Stripe Price IDs,
+    # not a discount applied at checkout time, since Stripe subscriptions are
+    # priced per-Price.
+    stripe_price_pro_individu_annual: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_PRO_INDIVIDU_ANNUAL", "stripe_price_pro_individu_annual"),
+    )
+    stripe_price_pro_perniagaan_annual: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_PRO_PERNIAGAAN_ANNUAL", "stripe_price_pro_perniagaan_annual"),
+    )
+    stripe_price_student_annual: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_STUDENT_ANNUAL", "stripe_price_student_annual"),
+    )
     stripe_price_credits_5: str = Field(
         default="",
         validation_alias=AliasChoices("STRIPE_PRICE_CREDITS_5", "stripe_price_credits_5"),
@@ -145,6 +178,42 @@ class Settings(BaseSettings):
     hitpay_base_url: str = Field(
         default="https://api.sandbox.hit-pay.com/v1",
         validation_alias=AliasChoices("HITPAY_BASE_URL", "hitpay_base_url"),
+    )
+
+    # ── Deadline Monitor calendar sync (migration 039) ──────────────────────
+    # Write-only OAuth: NakTahu creates/updates/deletes calendar EVENTS for a
+    # user's subscribed deadlines, never reads their existing calendar. All
+    # four *_client_id/_client_secret values come from apps YOU must register
+    # yourself (Google Cloud Console + Microsoft Entra — this sandbox has no
+    # account/browser access to do it) — see services/calendar_sync.py's
+    # module docstring for the exact registration steps and redirect URIs.
+    # Empty default (not a placeholder-looking value) so a missing credential
+    # fails loudly/obviously rather than silently trying garbage against the
+    # real OAuth endpoint.
+    google_calendar_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CALENDAR_CLIENT_ID", "google_calendar_client_id"),
+    )
+    google_calendar_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CALENDAR_CLIENT_SECRET", "google_calendar_client_secret"),
+    )
+    microsoft_calendar_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("MICROSOFT_CALENDAR_CLIENT_ID", "microsoft_calendar_client_id"),
+    )
+    microsoft_calendar_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("MICROSOFT_CALENDAR_CLIENT_SECRET", "microsoft_calendar_client_secret"),
+    )
+    # Fernet key (44-char urlsafe-base64, from `Fernet.generate_key()`) used
+    # to encrypt refresh tokens at rest in calendar_connections — the only
+    # long-lived calendar secret this app stores. Never derived from
+    # jwt_secret or any other existing secret: a leak of one must not also
+    # compromise the other.
+    calendar_token_encryption_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CALENDAR_TOKEN_ENCRYPTION_KEY", "calendar_token_encryption_key"),
     )
 
 

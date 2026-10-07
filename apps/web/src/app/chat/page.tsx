@@ -11,14 +11,16 @@ import { useI18n } from '@/lib/i18n';
 import { useSSEStream } from '@/lib/hooks/useSSEStream';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import type { Message } from '@/lib/types';
+import { ChatAmbientMesh } from '@/components/chat/ChatAmbientMesh';
 import { ChatBubble } from '@/components/chat/ChatBubble';
+import { ChatEmptyOrbit } from '@/components/chat/ChatEmptyOrbit';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
 import { canAccessHistory } from '@/lib/auth-plan';
-import { sidebarHistoryKey } from '@/lib/history';
+import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } from '@/lib/history';
 
 let msgCounter = 0;
 function makeId() {
@@ -36,7 +38,12 @@ function ChatPageInner() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [injectedQuery, setInjectedQuery] = useState(() => searchParams.get('q') ?? '');
+  // A message sent while the current answer is still streaming — held here
+  // and auto-fired once isStreaming flips false, instead of blocking input
+  // entirely until the in-flight answer completes.
+  const [queuedQuery, setQueuedQuery] = useState<string | null>(null);
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -48,6 +55,11 @@ function ChatPageInner() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Tracked as a ref (not state) so the auto-scroll effect can read it
+  // synchronously without re-running on every scroll pixel — only the
+  // "jump to latest" button's visibility needs to trigger a re-render.
+  const isAtBottomRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   const conversationChars = useMemo(
     () => messages.reduce((sum, msg) => sum + msg.content.length, 0),
@@ -63,6 +75,7 @@ function ChatPageInner() {
     error,
     startStream,
     reset,
+    stop,
   } = useSSEStream({ language: locale, accessToken: accessToken ?? undefined });
 
   const streamingAssistantId = useRef<string | null>(null);
@@ -70,10 +83,24 @@ function ChatPageInner() {
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    isAtBottomRef.current = true;
+    setShowJumpToLatest(false);
   }, []);
 
+  const handleScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 120;
+    isAtBottomRef.current = atBottom;
+    setShowJumpToLatest(!atBottom);
+  }, []);
+
+  // Auto-scroll only while the user is already at (or near) the bottom —
+  // if they've scrolled up to re-read something mid-answer, new tokens
+  // must not yank them back down.
   useEffect(() => {
-    scrollToBottom();
+    if (isAtBottomRef.current) scrollToBottom();
   }, [messages, tokens, scrollToBottom]);
 
   // When first token arrives, remove ThinkingIndicator and show streaming bubble
@@ -165,6 +192,8 @@ function ChatPageInner() {
                   content: t('error.stream'),
                   tokens: [],
                   isStreaming: false,
+                  isError: true,
+                  query: lastUserQuery.current,
                 }
               : m,
           ),
@@ -175,12 +204,33 @@ function ChatPageInner() {
     }
   }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleNewChat = useCallback(() => {
+    reset();
+    setMessages([]);
+    setThinkingId(null);
+    setInjectedQuery('');
+    setQueuedQuery(null);
+    lastUserQuery.current = '';
+    streamingAssistantId.current = null;
+    bubbleCreated.current = false;
+    isAtBottomRef.current = true;
+    setShowJumpToLatest(false);
+  }, [reset]);
+
   const handleSend = useCallback(
     (query: string) => {
+      if (isStreaming) {
+        // Don't reset()/abort the in-flight answer — hold this one until
+        // it finishes, then fire it automatically (see the dequeue effect).
+        setQueuedQuery(query);
+        return;
+      }
+
       lastUserQuery.current = query;
       reset();
       streamingAssistantId.current = null;
       bubbleCreated.current = false;
+      isAtBottomRef.current = true;
 
       const userMsg: Message = {
         id: makeId(),
@@ -207,8 +257,17 @@ function ChatPageInner() {
       setMessages((prev) => [...prev, userMsg, thinkMsg]);
       startStream(query, locale);
     },
-    [reset, startStream, locale],
+    [isStreaming, reset, startStream, locale],
   );
+
+  // Fire a queued message once the current stream actually finishes.
+  useEffect(() => {
+    if (!isStreaming && queuedQuery) {
+      const q = queuedQuery;
+      setQueuedQuery(null);
+      handleSend(q);
+    }
+  }, [isStreaming, queuedQuery, handleSend]);
 
   const handleRegenerate = useCallback(() => {
     if (!lastUserQuery.current) return;
@@ -222,9 +281,68 @@ function ChatPageInner() {
     handleSend(lastUserQuery.current);
   }, [handleSend]);
 
-  const handleSelectHistoryQuery = useCallback((query: string) => {
-    setInjectedQuery(query);
+  const handleStop = useCallback(() => {
+    stop();
+    // If the abort lands before any token arrived, the finalise-on-
+    // isStreaming-false effect never fires (streamingAssistantId is still
+    // null — no bubble was ever created to finalise) — the "thinking"
+    // placeholder would otherwise sit there forever. Clear it directly.
+    if (!bubbleCreated.current && thinkingId) {
+      setMessages((prev) => prev.filter((m) => m.id !== thinkingId));
+      setThinkingId(null);
+    }
+  }, [stop, thinkingId]);
+
+  const handleSelectHistoryQuery = useCallback((entry: HistoryEntry) => {
     setSidebarOpen(false);
+    // Rows written before migration 028 have no stored response_text — fall
+    // back to the old re-prompt behavior since there's nothing to show back.
+    const responseText = entry.response_text;
+    if (!responseText) {
+      setInjectedQuery(entry.query);
+      return;
+    }
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: makeId(),
+        role: 'user',
+        content: entry.query,
+        tokens: [],
+        citations: [],
+        confidence: null,
+        isStreaming: false,
+      },
+      {
+        id: makeId(),
+        role: 'assistant',
+        content: responseText,
+        tokens: [],
+        citations: (entry.citations as Message['citations']) ?? [],
+        confidence: entry.confidence ?? null,
+        isStreaming: false,
+        query: entry.query,
+        domain: entry.domain,
+        language: entry.language,
+        suggestions: entry.suggestions ?? [],
+        agencyContact: entry.agency_contact ?? undefined,
+      },
+    ]);
+  }, []);
+
+  // Pick up a history entry handed off from /history's "click to view"
+  // (see HISTORY_RESTORE_STORAGE_KEY) — sessionStorage instead of a URL
+  // param since response_text can be long.
+  useEffect(() => {
+    const raw = sessionStorage.getItem(HISTORY_RESTORE_STORAGE_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(HISTORY_RESTORE_STORAGE_KEY);
+    try {
+      handleSelectHistoryQuery(JSON.parse(raw) as HistoryEntry);
+    } catch {
+      // Malformed/stale payload — ignore rather than crash the page.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChipSelect = useCallback((query: string) => {
@@ -236,21 +354,17 @@ function ChatPageInner() {
 
   const showChips = messages.length === 0 && !isStreaming;
 
-  const pageBg = isDark ? 'bg-[#0A0F1E]' : 'bg-zinc-50/50';
+  const pageBg = isDark ? 'bg-[#12151C]' : 'bg-zinc-50/50';
   const headerClass = isDark
-    ? 'border-white/10 bg-[#0A0F1E]/90 text-white'
+    ? 'border-white/10 bg-[#12151C]/90 text-white'
     : 'border-zinc-100 bg-white/90 text-zinc-900';
   const headerSub = isDark ? 'text-zinc-400' : 'text-zinc-500';
   const menuBtn = isDark
     ? 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
     : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800';
   const emptyTitle = isDark ? 'text-zinc-200' : 'text-zinc-700';
-  const emptyDesc = isDark ? 'text-zinc-500' : 'text-zinc-400';
-  const domainPill = isDark
-    ? 'text-blue-300 bg-blue-500/10 border-blue-500/30'
-    : 'text-blue-600 bg-blue-50 border-blue-100';
   const inputBarClass = isDark
-    ? 'border-white/10 bg-[#0A0F1E]/90'
+    ? 'border-white/10 bg-[#12151C]/90'
     : 'border-zinc-100 bg-white/90';
   const hintClass = isDark ? 'text-zinc-500' : 'text-zinc-400';
 
@@ -264,6 +378,8 @@ function ChatPageInner() {
         user={user}
         accessToken={accessToken}
         onSelectQuery={handleSelectHistoryQuery}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
 
       <div className="flex flex-col flex-1 min-w-0 h-full">
@@ -289,47 +405,103 @@ function ChatPageInner() {
           </button>
 
           <Link href="/" className="flex flex-col">
-            <span className="text-base font-bold tracking-tight">
-              {t('header.title')}
-            </span>
+            <NakTahuWordmark markSize={20} className="text-base" />
             <span className={`text-xs ${headerSub}`}>{t('header.subtitle')}</span>
           </Link>
         </div>
-        <ThemeToggle variant={isDark ? 'dark' : 'light'} />
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className={`flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 transition-colors ${menuBtn}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            <span className="hidden sm:inline">{t('chat.new_chat')}</span>
+          </button>
+        )}
       </header>
 
       {/* message list */}
+      <div className="relative flex-1 min-h-0">
+      {messages.length === 0 && <ChatAmbientMesh />}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto px-4 py-6 space-y-5 scroll-smooth"
       >
+        <div
+          className={`max-w-3xl mx-auto w-full space-y-5 ${
+            // With no messages yet the identity block is the ONLY thing in
+            // this scroll area, so it should sit in the optical centre of the
+            // conversation column rather than clinging to the top. min-h-full
+            // + centred flex does that without affecting the normal
+            // message-list layout once a conversation starts.
+            messages.length === 0 ? 'min-h-full flex flex-col justify-center' : ''
+          }`}
+        >
         {messages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: 'easeOut' }}
-            className="flex flex-col items-center justify-center h-full text-center gap-5 select-none px-6"
+            className="flex flex-col items-center justify-center text-center gap-5 select-none px-6 py-14"
           >
-            {/* Logo mark */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg shadow-blue-900/30 ring-1 ring-white/10">
-              <svg viewBox="0 0 32 32" className="w-9 h-9" fill="none" aria-hidden>
-                <circle cx="16" cy="16" r="12" fill="white" fillOpacity="0.15" />
-                <path d="M9 12h14M9 16h9M9 20h11" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="flex flex-col gap-1">
-              <p className={`text-lg font-bold ${emptyTitle}`}>NakTahu AI</p>
-              <p className={`text-sm max-w-[260px] leading-relaxed ${emptyDesc}`}>{t('chat.empty')}</p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2 max-w-xs">
-              {(['tax', 'epf', 'business', 'immigration'] as const).map((d) => (
-                <span
-                  key={d}
-                  className={`text-[11px] font-medium border rounded-full px-2.5 py-1 transition-colors hover:shadow-sm ${domainPill}`}
-                >
-                  {t(`domain.${d}`)}
+            {/* Identity mark — the loading screen's extruded speech-bubble
+                logo, orbited by the six real agencies the landing hero
+                names. Replaces the static kawung roundel that sat here: the
+                user has just come through PageLoadingScreen on "Mula
+                Bertanya", so carrying that same mark into /chat makes this
+                screen read as the destination of that transition, and the
+                orbit states the sourcing promise structurally instead of
+                only in the trust chips below. */}
+            <ChatEmptyOrbit />
+
+            {/* Greeting only — the separate muted subtitle line (chat.empty:
+                "Ask me anything about Malaysian government services") was
+                dropped rather than kept alongside both the greeting and the
+                trust strip below: three stacked sentences saying overlapping
+                things ("ask a question" / "about gov services" / "answers
+                are sourced") read as one message repeated three ways. The
+                trust strip below already implies the scope+sourcing promise
+                in one line; chat.empty stays defined in i18n (harmless to
+                leave unused) in case a future surface wants it again. */}
+            <p className={`text-3xl sm:text-4xl font-bold tracking-tight locale-text-balance ${emptyTitle}`}>
+              {t('chat.empty.greeting')}
+            </p>
+
+            {/* Civic HUD — the trust strip's successor: two honestly-sourced
+                status chips instead of one sentence. Neither value is
+                fabricated telemetry: the language-engine chip reflects the
+                real active UI locale, and the verified-sources chip restates
+                the same structural, always-true claim the old trust strip
+                made (real gov.my sources only) — just styled as an
+                instrument reading, not dressed up with a fake number. No
+                "live latency" chip: there's no request in flight yet on an
+                empty state, and a static placeholder number would be exactly
+                the kind of fabricated live data this surface must not show. */}
+            <div className="flex flex-wrap items-center justify-center gap-2 font-mono text-[10px] tabular-nums tracking-wide">
+              <div
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                  isDark ? 'border-nk-official/30 bg-nk-official/10 text-nk-official' : 'border-nk-official/25 bg-nk-official/10 text-nk-official-dim'
+                }`}
+              >
+                <span className="chat-chip-dot w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" aria-hidden />
+                <span className="locale-nowrap">
+                  {t('chat.hud.language_engine')} · {locale.toUpperCase()}
                 </span>
-              ))}
+              </div>
+              <div
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${
+                  isDark ? 'border-nk-heritage/30 bg-nk-heritage/10 text-nk-heritage' : 'border-nk-heritage/25 bg-nk-heritage/10 text-nk-heritage-dim'
+                }`}
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 flex-shrink-0" aria-hidden>
+                  <path fillRule="evenodd" d="M9.661 2.237a.531.531 0 0 1 .678 0 11.947 11.947 0 0 0 7.078 2.749.5.5 0 0 1 .479.425c.069.52.104 1.05.104 1.589 0 5.362-3.29 9.95-7.96 11.878a.514.514 0 0 1-.4 0C5.29 17.05 2 12.463 2 7.1c0-.539.035-1.07.104-1.589a.5.5 0 0 1 .48-.425 11.947 11.947 0 0 0 7.077-2.75Zm4.196 5.954a.75.75 0 0 0-1.214-.882l-3.236 4.53L7.53 9.963a.75.75 0 0 0-1.06 1.06l2.5 2.5a.75.75 0 0 0 1.137-.089l3.75-5.25Z" clipRule="evenodd" />
+                </svg>
+                <span className="locale-nowrap">{t('chat.hud.verified_sources')}</span>
+              </div>
             </div>
           </motion.div>
         )}
@@ -354,19 +526,66 @@ function ChatPageInner() {
               suggestions={msg.suggestions ?? []}
               onSuggestionSelect={handleChipSelect}
               agencyContact={msg.agencyContact}
+              isError={msg.isError}
             />
           ),
         )}
         <div ref={bottomRef} />
+        </div>
       </div>
 
-      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 flex flex-col gap-2 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label={t('chat.jump_to_latest')}
+          className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 shadow-md transition-colors ${
+            isDark
+              ? 'bg-[#141929] text-zinc-200 border border-white/10 hover:bg-white/10'
+              : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+            <path fillRule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v10.638l3.96-4.158a.75.75 0 1 1 1.08 1.04l-5.25 5.5a.75.75 0 0 1-1.08 0l-5.25-5.5a.75.75 0 1 1 1.08-1.04l3.96 4.158V3.75A.75.75 0 0 1 10 3Z" clipRule="evenodd" />
+          </svg>
+          {t('chat.jump_to_latest')}
+        </button>
+      )}
+      </div>
+
+      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
+        {/* Suggestions sit directly above the input they fill in — the
+            control and its target adjacent, and out of the conversation
+            area so the identity block above can be the full centred
+            moment. */}
         {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
+        )}
+        {queuedQuery && (
+          <div
+            className={`flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 ${
+              isDark ? 'bg-white/5 text-zinc-300' : 'bg-zinc-100 text-zinc-600'
+            }`}
+          >
+            <span className="font-semibold flex-shrink-0 locale-nowrap">{t('chat.queued')}:</span>
+            <span className="truncate flex-1">{queuedQuery}</span>
+            <button
+              type="button"
+              onClick={() => setQueuedQuery(null)}
+              aria-label={t('auth.error.dismiss')}
+              className={`flex-shrink-0 p-0.5 rounded transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-zinc-200'}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          </div>
         )}
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
+          onStop={handleStop}
           detectedLanguage={detectedLang}
           inject={injectedQuery}
           conversationChars={conversationChars}
@@ -375,6 +594,17 @@ function ChatPageInner() {
         <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
           {t('chat.keyboard_hint')}
         </p>
+        {/* The not-official-government-advice disclaimer previously appeared
+            only on landing, /about and shared-answer permalinks — i.e.
+            everywhere EXCEPT the surface where someone actually asks a tax
+            or immigration question. Persistent (not hidden on mobile, not
+            dismissible) because it's the compliance-relevant line, and
+            reusing landing.hero.disclaimer_note so the wording can't drift
+            between surfaces. */}
+        <p className={`text-center text-[10px] leading-snug locale-text-balance ${hintClass}`}>
+          {t('landing.hero.disclaimer_note')}
+        </p>
+        </div>
       </div>
       </div>
     </div>

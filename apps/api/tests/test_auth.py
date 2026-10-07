@@ -61,6 +61,11 @@ def test_history_missing_token_returns_401(client):
 def test_jwt_decode_mock_valid(monkeypatch):
     monkeypatch.setattr(
         auth_mod.jwt,
+        "get_unverified_header",
+        lambda token: {"alg": "HS256"},
+    )
+    monkeypatch.setattr(
+        auth_mod.jwt,
         "decode",
         lambda token, key, algorithms=None, audience=None, options=None: {"sub": "mock-user"},
     )
@@ -70,6 +75,41 @@ def test_jwt_decode_mock_valid(monkeypatch):
 
     ctx = asyncio.run(run())
     assert ctx.user_id == "mock-user"
+    assert ctx.is_anonymous is False
+
+
+def test_jwt_decode_es256_via_jwks(monkeypatch):
+    """Current Supabase projects sign with an asymmetric key (ES256) served
+    from the project's JWKS endpoint rather than a shared HS256 secret —
+    _decode_supabase_jwt must branch on the token's own `alg` header and
+    verify against the matching key material, not always assume HS256."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    token = jwt.encode(
+        {
+            "sub": "es256-user",
+            "aud": settings.supabase_jwt_aud,
+            "exp": int(time.time()) + 3600,
+        },
+        private_key,
+        algorithm="ES256",
+        headers={"kid": "test-kid"},
+    )
+
+    fake_signing_key = MagicMock()
+    fake_signing_key.key = private_key.public_key()
+    monkeypatch.setattr(
+        auth_mod._jwks_client,
+        "get_signing_key_from_jwt",
+        lambda tok: fake_signing_key,
+    )
+
+    async def run():
+        return await auth_mod.get_current_user(token=token)
+
+    ctx = asyncio.run(run())
+    assert ctx.user_id == "es256-user"
     assert ctx.is_anonymous is False
 
 

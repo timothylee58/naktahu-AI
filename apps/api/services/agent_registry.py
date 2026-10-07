@@ -70,9 +70,59 @@ def _fallback_registry() -> dict[str, AgentDefinition]:
             plan_required="free",
             credit_cost=0,
         ),
-        "grant-finder": AgentDefinition(
-            name="grant-finder",
-            description="Government grant matching for SMEs and students.",
+        "eligibility-agent": AgentDefinition(
+            name="eligibility-agent",
+            description="Multi-turn business grant-eligibility matching with scoring, near-miss detection, and stacking analysis.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
+        "sme-compliance-navigator": AgentDefinition(
+            name="sme-compliance-navigator",
+            description="PatuhiKu — cross-references LHDN, EPF/SOCSO/EIS, and SSM compliance obligations for a specific SME.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=1,
+        ),
+        "welfare-eligibility-agent": AgentDefinition(
+            name="welfare-eligibility-agent",
+            description="Matches a household profile against cost-of-living / social assistance schemes (Ihsan MADANI and similar). Free civic tool.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
+        "grant-draft-generator": AgentDefinition(
+            name="grant-draft-generator",
+            description=(
+                "Grant application draft: executive summary, use-of-funds narrative, "
+                "financial projection skeleton, and required-document checklist for a "
+                "selected grant + business profile. Export as PDF or Word (.docx)."
+            ),
+            input_schema={
+                "programme_name": {"type": "string", "required": True},
+                "business_profile": {"type": "object", "required": True},
+                "export_format": {"type": "string", "enum": ["pdf", "docx"], "default": "pdf"},
+            },
+            plan_required="free",
+            credit_cost=3,
+        ),
+        "retrenchment-navigator": AgentDefinition(
+            name="retrenchment-navigator",
+            description="Guided retrenchment options: EIS claim eligibility, statutory termination benefits, and next-steps checklist.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
+        "property-concierge": AgentDefinition(
+            name="property-concierge",
+            description="Guided buyer/renter intake: lead-tier qualification, property RAG citations (tenancy/strata/land title), and a shareable brief.",
+            input_schema={},
+            plan_required="free",
+            credit_cost=0,
+        ),
+        "scam-check-agent": AgentDefinition(
+            name="scam-check-agent",
+            description="ScamShield — checks a pasted SMS/link/phone number claiming to be from a government agency or bank against a curated list of verified official domains. Free civic tool.",
             input_schema={},
             plan_required="free",
             credit_cost=0,
@@ -120,10 +170,14 @@ def plan_satisfies(user_plan: str, required: str) -> bool:
     return _PLAN_RANK.get(user_plan, 0) >= _PLAN_RANK.get(required, 0)
 
 
+_BUSINESS_UNLIMITED_AGENTS = frozenset({"compliance-drafter", "grant-draft-generator"})
+
+
 def is_credit_exempt(user_plan: str, agent_name: str, *, role: Optional[str] = None) -> bool:
-    """Business plan gets unlimited Compliance Drafter; admins are fully exempt."""
+    """Business plan gets unlimited Compliance Drafter + Grant Draft Generator;
+    admins are fully exempt."""
     from services.auth import is_admin_role
 
     if is_admin_role(role):
         return True
-    return user_plan == "business" and agent_name == "compliance-drafter"
+    return user_plan == "business" and agent_name in _BUSINESS_UNLIMITED_AGENTS

@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { Citation, SSEMetadata } from '@/lib/types';
+import { API_BASE } from '@/lib/api-base';
+import { readSavedPostcode } from '@/lib/postcode';
 
 export interface UseSSEStreamParams {
   sessionId?: string;
@@ -18,6 +20,10 @@ export interface UseSSEStreamReturn {
   error: string | null;
   startStream: (query: string, language?: string) => void;
   reset: () => void;
+  /** Aborts the in-flight stream. Tokens received so far are kept as the
+   * final message (unlike reset(), which also clears state) — the caller's
+   * "done" handling (isStreaming flips false) finalises the partial answer. */
+  stop: () => void;
 }
 
 async function* readSSELines(
@@ -54,11 +60,6 @@ async function* readSSELines(
   }
 }
 
-const API_BASE =
-  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : '';
-
 export function useSSEStream({
   sessionId,
   language: defaultLanguage = 'ms',
@@ -81,6 +82,10 @@ export function useSSEStream({
     setSuggestions([]);
     setIsStreaming(false);
     setError(null);
+  }, []);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
   }, []);
 
   const startStream = useCallback(
@@ -113,6 +118,8 @@ export function useSSEStream({
               language: lang,
               domain: 'general',
               session_id: sessionId,
+              // Lets "who is my MP?" resolve via the saved postcode.
+              postcode: readSavedPostcode(),
             }),
             signal: controller.signal,
           });
@@ -186,5 +193,5 @@ export function useSSEStream({
     [defaultLanguage, sessionId, accessToken],
   );
 
-  return { tokens, citations, metadata, suggestions, isStreaming, error, startStream, reset };
+  return { tokens, citations, metadata, suggestions, isStreaming, error, startStream, reset, stop };
 }

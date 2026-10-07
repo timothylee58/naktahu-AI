@@ -43,7 +43,7 @@ export function ThinkingIndicator() {
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            className="block w-1.5 h-1.5 rounded-full bg-blue-400"
+            className="block w-1.5 h-1.5 rounded-full bg-nk-official"
             animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2, ease: 'easeInOut' }}
           />

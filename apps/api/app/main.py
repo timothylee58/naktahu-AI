@@ -18,20 +18,23 @@ from app.core.telemetry import configure_telemetry
 from app.core.weave_tracing import init_weave
 from app.middleware.request_id import RequestIDMiddleware
 from app.routers.agents import router as agents_router
+from app.routers.eligibility import router as eligibility_router
+from app.routers.investor import router as investor_router
 from app.routers.health import router as health_router
 from app.routers.query import router as query_router
 from app.routers.session import router as session_router
 from app.routers.transcribe import router as transcribe_router
 from core.config import settings
+from middleware.prometheus_middleware import PrometheusMiddleware
 from middleware.rate_limit import anonymous_limiter
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.user_context import UserContextMiddleware
-from routers import billing, feedback, history, share
+from routers import billing, calendar as calendar_router, feedback, history, leads, parliament, product_feedback, property_listings, referrals, share, translate as translate_router, warung_watch
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
+from app.routers.metrics import router as metrics_router
 from app.routers.observability import router as observability_router
 from app.orchestration.adapters import ALL_ADAPTERS
-from app.orchestration.context_bus import ContextBus
 from app.orchestration.registry import load_enhanced_registry, register_adapter
 from app.routers.orchestrate import router as orchestrate_router
 from app.routers.orchestration import router as orchestration_router
@@ -79,7 +82,6 @@ async def lifespan(application: FastAPI):  # type: ignore[type-arg]
             log.info("startup_session_cleanup", deleted=cleanup_result.deleted_count)
     # ── Orchestration layer bootstrap ──────────────────────────────────────
     load_enhanced_registry(application.state.supabase)
-    application.state.context_bus = ContextBus(application.state.redis)
     for adapter_cls in ALL_ADAPTERS:
         register_adapter(adapter_cls())
     log.info("orchestration_ready", adapters=len(ALL_ADAPTERS))
@@ -99,9 +101,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# naktahu.my is the primary domain; naktahu.netlify.app stays in the
+# default so the old URL keeps working until it's deliberately retired —
+# see main.py's matching comment (Trap #1: this default must stay
+# identical in both mains).
 _cors_origins_raw = os.environ.get(
     "CORS_ORIGINS",
-    "http://localhost:3000,https://naktahu.netlify.app",
+    "http://localhost:3000,https://naktahu.my,https://www.naktahu.my,https://naktahu.netlify.app",
 )
 _cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
 
@@ -120,6 +126,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(UserContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(PrometheusMiddleware)
 
 app.include_router(health_router)
 app.include_router(query_router)
@@ -128,10 +135,21 @@ app.include_router(transcribe_router)
 app.include_router(agents_router)
 app.include_router(history.router)
 app.include_router(feedback.router)
+app.include_router(translate_router.router)
 app.include_router(billing.router)
+app.include_router(calendar_router.router)
+app.include_router(referrals.router)
 app.include_router(share.router)
+app.include_router(parliament.router)
+app.include_router(leads.router)
+app.include_router(product_feedback.router)
+app.include_router(property_listings.router)
+app.include_router(warung_watch.router)
+app.include_router(eligibility_router)
+app.include_router(investor_router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
+app.include_router(metrics_router)
 app.include_router(observability_router)
 app.include_router(orchestration_router)
 app.include_router(orchestrate_router)

@@ -8,6 +8,7 @@ import structlog
 import weave
 
 from app.agents.personal_data import detect_personal_data_agency
+from app.core.prometheus_metrics import retrieval_score
 from app.models.state import AgentState, Citation
 from app.services.vector_store import ChunkResult
 
@@ -62,6 +63,47 @@ def _days_since_effective(chunk: ChunkResult) -> int | None:
         return None
     days = (date.today() - ref_dt).days
     return days if days > 0 else None
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _is_pending(chunk: ChunkResult) -> bool:
+    """Announced but not yet in force: effective_date is after today.
+
+    Such a chunk is not evidence for today's rule — it describes the NEXT
+    rule. Without this check, prefer-newest ranked it first and the answer
+    stated a future rule as the current one.
+    """
+    start = _parse_date(chunk.effective_date)
+    return start is not None and start > date.today()
+
+
+def _is_expired(chunk: ChunkResult) -> bool:
+    """The rule's validity window has closed (effective_until before today)."""
+    end = _parse_date(chunk.effective_until)
+    return end is not None and end < date.today()
+
+
+_MAX_PENDING_CHANGES = 3
+
+
+def _pending_change(chunk: ChunkResult) -> dict:
+    return {
+        "chunk_id": chunk.id,
+        "source_title": chunk.source_title,
+        "ministry": chunk.ministry,
+        "source_url": chunk.source_url,
+        "effective_date": chunk.effective_date,
+        "announced_date": chunk.announced_date,
+        "content": chunk.content,
+    }
 
 
 def _stale_threshold(domain: str | None) -> int:
@@ -147,6 +189,10 @@ async def analyst_node(state: AgentState) -> dict:
       2. Chunks whose ``effective_date`` passed more than the domain staleness
          window ago are recorded in ``stale_warnings`` and down-weighted, and the
          answer is flagged so the synthesiser date-stamps and hedges it.
+    Validity windows (migration 052) are applied between the two: chunks whose
+    ``effective_until`` has passed are dropped, and chunks whose
+    ``effective_date`` is still in the future are returned as
+    ``pending_changes`` rather than scored as today's rule.
     """
     query = state.get("query", "")
     domain = state.get("domain")
@@ -155,10 +201,25 @@ async def analyst_node(state: AgentState) -> dict:
 
     # 1. Hard-reject superseded chunks (never cite a chunk a newer one replaces).
     #    Build a new list rather than mutating the input while iterating.
-    chunks = [c for c in retrieved if c.superseded_by is None]
-    superseded_count = len(retrieved) - len(chunks)
+    live = [c for c in retrieved if c.superseded_by is None]
+    superseded_count = len(retrieved) - len(live)
     if superseded_count:
         log.info("analyst_dropped_superseded", count=superseded_count)
+
+    # 1b. Validity window. Expired rules (effective_until passed) are dropped
+    #     like superseded ones. Pending rules (effective_date in the future)
+    #     are not evidence for today's answer: they are set aside as
+    #     pending_changes so the synthesiser states the current rule AND the
+    #     announced change, instead of presenting the future rule as current.
+    expired = [c for c in live if _is_expired(c)]
+    pending = sorted(
+        (c for c in live if _is_pending(c) and not _is_expired(c)),
+        key=lambda c: c.effective_date or "",
+    )
+    chunks = [c for c in live if not _is_expired(c) and not _is_pending(c)]
+    pending_changes = [_pending_change(c) for c in pending[:_MAX_PENDING_CHANGES]]
+    if expired or pending:
+        log.info("analyst_validity_window", expired=len(expired), pending=len(pending))
 
     # 2. Record effective-date staleness for the surviving chunks.
     stale_warnings: list[dict] = []
@@ -176,15 +237,17 @@ async def analyst_node(state: AgentState) -> dict:
     if not chunks:
         # Either nothing was retrieved, or everything retrieved was superseded.
         log.warning("analyst_no_usable_chunks", superseded_count=superseded_count)
+        retrieval_score.observe(0.0)
         return {
             "retrieved_chunks": chunks,
             "citations": [],
             "confidence_score": 0.0,
             "needs_clarification": True,
-            # All-superseded is itself a staleness signal worth surfacing.
-            "stale_warning": superseded_count > 0,
+            # All-superseded/expired is itself a staleness signal worth surfacing.
+            "stale_warning": superseded_count > 0 or bool(expired),
             "answer_as_of": None,
             "stale_warnings": stale_warnings,
+            "pending_changes": pending_changes,
             "agency_contact": agency_contact,
         }
 
@@ -200,6 +263,7 @@ async def analyst_node(state: AgentState) -> dict:
 
     top3 = scored[:3]
     confidence = sum(s for s, _, _ in top3) / len(top3)
+    retrieval_score.observe(confidence)
 
     citations: list[Citation] = [
         Citation(
@@ -208,6 +272,12 @@ async def analyst_node(state: AgentState) -> dict:
             url=chunk.source_url,
             confidence=score,
             stale_disclaimer=_is_stale(chunk, domain),
+            # Same value the staleness verdict above is computed from, so
+            # the date a user sees and the "may be outdated" flag can never
+            # disagree. None when the chunk has no date — the UI renders
+            # nothing rather than inventing one.
+            effective_date=_staleness_ref(chunk),
+            retrieved_at=chunk.retrieved_at,
         )
         for score, _, chunk in top3
         if chunk.source_url  # omit fabricated / empty URLs per CLAUDE.md
@@ -243,6 +313,8 @@ async def analyst_node(state: AgentState) -> dict:
         answer_as_of=answer_as_of,
         stale_warnings=len(stale_warnings),
         superseded_dropped=superseded_count,
+        expired_dropped=len(expired),
+        pending_changes=len(pending_changes),
         agency_contact=agency_contact["agency"] if agency_contact else None,
     )
     return {
@@ -255,5 +327,6 @@ async def analyst_node(state: AgentState) -> dict:
         "stale_warning": stale_warning,
         "answer_as_of": answer_as_of,
         "stale_warnings": stale_warnings,
+        "pending_changes": pending_changes,
         "agency_contact": agency_contact,
     }

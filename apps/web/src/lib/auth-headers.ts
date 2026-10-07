@@ -1,6 +1,12 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
-const REFRESH_BUFFER_SEC = 60;
+// Wide buffer so proactive refresh fires well before expiry rather than
+// relying on the reactive 401 retry below — some browsers (e.g. Opera)
+// don't fully implement Navigator LockManager, which gotrue-js uses for
+// cross-tab refresh coordination; when that lock silently fails, a
+// refreshSession() call made right at the edge of expiry can miss the
+// window entirely, so a large buffer gives it more chances to succeed.
+const REFRESH_BUFFER_SEC = 300;
 
 function sessionAccessToken(session: Session | null | undefined): string | null {
   return session?.access_token ?? null;
@@ -48,8 +54,17 @@ export async function fetchWithAuth(
   if (res.status !== 401) return res;
 
   const { data, error } = await supabase.auth.refreshSession();
-  const retryToken = sessionAccessToken(data.session);
-  if (error || !retryToken) return res;
+  let retryToken = sessionAccessToken(data.session);
+
+  // refreshSession() can fail on browsers with a non-compliant Navigator
+  // LockManager (gotrue-js uses it to coordinate cross-tab refresh) even
+  // though a valid session still exists — fall back to a plain getSession()
+  // read, which doesn't take that lock, before giving up.
+  if (error || !retryToken) {
+    const fallback = await supabase.auth.getSession();
+    retryToken = sessionAccessToken(fallback.data.session);
+  }
+  if (!retryToken) return res;
 
   const retryHeaders = {
     ...mergedHeaders,

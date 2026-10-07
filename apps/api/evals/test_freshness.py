@@ -118,3 +118,93 @@ async def test_fresh_corpus_is_not_flagged() -> None:
 
     assert result["stale_warning"] is False
     assert not any(c["stale_disclaimer"] for c in result["citations"])
+
+
+# ── Validity windows (migration 052) ─────────────────────────────────────────
+# The November scenario: the current tax rule runs until 31 Dec, and a new
+# policy announced in November takes effect 1 Jan. Both are in the corpus.
+_YESTERDAY = (date.today() - timedelta(days=1)).isoformat()
+_LAST_YEAR = (date.today() - timedelta(days=120)).isoformat()
+_ANNOUNCED = (date.today() - timedelta(days=10)).isoformat()
+_NEXT_MONTH = (date.today() + timedelta(days=30)).isoformat()
+_IN_WINDOW_END = (date.today() + timedelta(days=29)).isoformat()
+
+
+def _window_chunk(
+    chunk_id: str,
+    content: str,
+    effective_date: str,
+    effective_until: str | None = None,
+    announced_date: str | None = None,
+) -> ChunkResult:
+    return ChunkResult(
+        id=chunk_id,
+        content=content,
+        source_title="LHDN Individual Tax Relief",
+        source_url=f"https://www.hasil.gov.my/{chunk_id}",
+        ministry="LHDN",
+        language="en",
+        similarity=0.9,
+        effective_date=effective_date,
+        effective_until=effective_until,
+        announced_date=announced_date,
+    )
+
+
+def _november_corpus() -> list[ChunkResult]:
+    return [
+        _window_chunk("relief-current-a", "Lifestyle tax relief is RM2,500.", _LAST_YEAR, _IN_WINDOW_END),
+        _window_chunk("relief-current-b", "Lifestyle relief cap RM2,500 for this year of assessment.", _LAST_YEAR, _IN_WINDOW_END),
+        _window_chunk("relief-next", "Lifestyle tax relief rises to RM3,000.", _NEXT_MONTH, None, _ANNOUNCED),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_announced_change_is_not_stated_as_current_rule() -> None:
+    """Before 052, prefer-newest ranked the not-yet-effective rule first, so the
+    answer stated next year's figure as today's. The current rule must drive
+    the answer and citations."""
+    result = await analyst_node({"query": "lifestyle tax relief", "domain": "tax", "retrieved_chunks": _november_corpus()})
+
+    cited = [c["url"] for c in result["citations"]]
+    assert cited and all("relief-current" in u for u in cited), cited
+    assert [c.id for c in result["retrieved_chunks"]] == ["relief-current-a", "relief-current-b"]
+    assert result["needs_clarification"] is False
+    assert result["stale_warning"] is False
+
+
+@pytest.mark.asyncio
+async def test_announced_change_is_surfaced_with_its_dates() -> None:
+    result = await analyst_node({"query": "lifestyle tax relief", "domain": "tax", "retrieved_chunks": _november_corpus()})
+
+    [change] = result["pending_changes"]
+    assert change["chunk_id"] == "relief-next"
+    assert change["effective_date"] == _NEXT_MONTH
+    assert change["announced_date"] == _ANNOUNCED
+
+
+@pytest.mark.asyncio
+async def test_expired_rule_is_never_cited() -> None:
+    """After 31 Dec the old rule's window has closed: drop it, answer from the new one."""
+    corpus = [
+        _window_chunk("relief-old", "Lifestyle tax relief is RM2,500.", _LAST_YEAR, _YESTERDAY),
+        _window_chunk("relief-new-a", "Lifestyle tax relief is RM3,000.", _YESTERDAY),
+        _window_chunk("relief-new-b", "Lifestyle relief cap RM3,000.", _YESTERDAY),
+    ]
+    result = await analyst_node({"query": "lifestyle tax relief", "domain": "tax", "retrieved_chunks": corpus})
+
+    assert "https://www.hasil.gov.my/relief-old" not in [c["url"] for c in result["citations"]]
+    assert "relief-old" not in [c.id for c in result["retrieved_chunks"]]
+    assert result["pending_changes"] == []
+
+
+@pytest.mark.asyncio
+async def test_only_announced_change_in_corpus_is_not_presented_as_current() -> None:
+    """The current rule was never ingested: no current evidence, so the answer
+    must not go out as confident; the upcoming change is still passed on."""
+    corpus = [_window_chunk("relief-next", "Lifestyle tax relief rises to RM3,000.", _NEXT_MONTH, None, _ANNOUNCED)]
+    result = await analyst_node({"query": "lifestyle tax relief", "domain": "tax", "retrieved_chunks": corpus})
+
+    assert result["citations"] == []
+    assert result["needs_clarification"] is True
+    assert [c["chunk_id"] for c in result["pending_changes"]] == ["relief-next"]

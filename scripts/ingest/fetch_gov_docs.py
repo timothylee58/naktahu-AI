@@ -18,39 +18,6 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import NamedTuple
 
-# ── Authoritative domain → URL map (used by ingestion tooling) ───────────────
-DOMAIN_SOURCES: dict[str, list[str]] = {
-    "tax": [
-        "https://www.hasil.gov.my/en/individual/individual-faq/",
-        "https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-relief/",
-        "https://www.lhdn.gov.my/en/penalty-and-offences/",
-    ],
-    "epf": [
-        "https://www.kwsp.gov.my/en/member/withdrawal",
-        "https://www.kwsp.gov.my/en/employer/contribution/contribution-rate",
-        "https://www.kwsp.gov.my/en/member/about-epf/epf-account-restructuring",
-    ],
-    "business": [
-        "https://www.ssm.com.my/Pages/Quick_Reference/Business_Registration.aspx",
-        "https://www.hasil.gov.my/en/e-invoice/",
-        "https://mysst.customs.gov.my/",
-    ],
-    "education": [
-        "https://www.ptptn.gov.my/",
-        "https://www.jpa.gov.my/en/perkhidmatan/biasiswa",
-        "https://www.moe.gov.my/en/dasar/",
-    ],
-    "healthcare": [
-        "https://www.moh.gov.my/index.php/pages/view/43",
-        "https://portal.moh.gov.my/",
-    ],
-    "immigration": [
-        "https://www.imi.gov.my/index.php/en/main-services/visa",
-        "https://www.imi.gov.my/index.php/en/main-services/long-term-pass",
-        "https://www.mm2h.gov.my/",
-    ],
-}
-
 # Chunk size per domain — tax tables and healthcare advisories chunk smaller
 DOMAIN_CHUNK_SIZES: dict[str, int] = {
     "tax": 256,
@@ -284,6 +251,89 @@ SOURCES: list[Source] = [
         url="https://www.hasil.gov.my/en/company/",
         ministry="Lembaga Hasil Dalam Negeri Malaysia",
         selectors=["main", "article", ".content-area", "#content", "body"],
+    ),
+
+    # ─────────────────────────────────────────────────────────────────
+    # DOMAIN: business — grant bodies (tagged "business", not a new
+    # "grants" domain — grant_finder already queries domain=business/
+    # government/finance; a new domain would need a migration + router_node
+    # + ingest_feed.py change for no retrieval benefit today).
+    #
+    # These are the programme-listing pages only — each links out to
+    # individual scheme pages. Per-programme structured facts (amount,
+    # deadline, eligibility) go in the grant_programmes table (migration
+    # 019), not scraped from these listing pages, since that requires a
+    # human/sourced pass per programme rather than a generic selector.
+    # ─────────────────────────────────────────────────────────────────
+    Source(
+        domain="business",
+        slug="mosti_grants",
+        url="https://www.mosti.gov.my/en/funding-and-grants/",
+        ministry="Kementerian Sains, Teknologi dan Inovasi",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="matrade_export_grants",
+        url="https://www.matrade.gov.my/en/for-exporters/services/market-access-grant-mag",
+        ministry="Malaysia External Trade Development Corporation",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="mdec_digital_grants_programmes",
+        url="https://mdec.my/programmes/",
+        ministry="Malaysia Digital Economy Corporation",
+        selectors=["main", ".content", "article", ".programme-list", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="tekun_financing",
+        url="https://www.tekun.gov.my/en/financing/",
+        ministry="TEKUN Nasional",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="mara_business_financing",
+        url="https://www.mara.gov.my/en/business/financing/",
+        ministry="Majlis Amanah Rakyat",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="bnm_sme_financing",
+        url="https://www.bnm.gov.my/sme-financing",
+        ministry="Bank Negara Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="cradle_cip",
+        url="https://cradle.com.my/cradle-investment-programme/",
+        ministry="Cradle Fund Sdn Bhd",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="miti_industry4wrd",
+        url="https://www.miti.gov.my/index.php/pages/view/industry4wrd",
+        ministry="Kementerian Pelaburan, Perdagangan dan Industri",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="myipo_grants",
+        url="https://www.myipo.gov.my/en/incentive-schemes/",
+        ministry="Perbadanan Harta Intelek Malaysia",
+        selectors=["main", ".content", "article", "#main-content", "body"],
+    ),
+    Source(
+        domain="business",
+        slug="ptp_smart_selangor",
+        url="https://www.smecorp.gov.my/index.php/en/programmes/2015-12-21-08-36-53/financial-assistance",
+        ministry="Perbadanan Perusahaan Kecil dan Sederhana Malaysia",
+        selectors=["main", ".itemFullText", ".content", "article", "body"],
     ),
 
     # ─────────────────────────────────────────────────────────────────

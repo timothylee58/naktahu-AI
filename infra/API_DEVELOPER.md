@@ -35,7 +35,7 @@ Developer dashboard (JWT auth):
 ## Widget embed
 
 ```html
-<script src="https://naktahu.netlify.app/widget.js"
+<script src="https://naktahu.my/widget.js"
   data-api-key="nkt_live_..."
   data-domain="tax"
   data-lang="bm"

@@ -34,8 +34,8 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import sys
+import unicodedata
 import uuid
 from pathlib import Path
 
@@ -48,6 +48,17 @@ try:  # works both as `python scripts/ingest/chunk_and_embed.py` and `-m`
     from scripts.ingest.metadata import extract_effective_date, parse_header
 except ImportError:  # pragma: no cover - script run with scripts/ingest on sys.path
     from metadata import extract_effective_date, parse_header
+
+# apps/api root — reuse the same injection scan the query path and
+# ingest_feed.py apply, so a poisoned grant-programme page can't smuggle
+# an indirect prompt injection into document_chunks any more than a
+# poisoned RSS entry or CSV row can. No ingestion path is exempt
+# (CLAUDE.md hard rule) — this pipeline had no scan at all before this.
+_API_ROOT = Path(__file__).resolve().parents[2] / "apps" / "api"
+if str(_API_ROOT) not in sys.path:
+    sys.path.insert(0, str(_API_ROOT))
+
+from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 
 load_dotenv(Path(__file__).parent.parent.parent / "apps" / "api" / ".env")
 
@@ -75,6 +86,18 @@ EMBED_BATCH = 50
 
 def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def scan_for_injection(text: str) -> str | None:
+    """Same pattern list applied to user queries, CSV ingestion, and RSS feed
+    ingestion — a poisoned government/grant page can't smuggle an indirect
+    prompt injection into document_chunks any more than any other ingestion
+    path can. Returns the matched pattern string, or None if clean."""
+    folded = _fold_confusables(unicodedata.normalize("NFKC", text))
+    for pattern in INJECTION_PATTERNS:
+        if pattern.search(folded):
+            return pattern.pattern
+    return None
 
 
 def detect_language(text: str) -> str:
@@ -133,6 +156,10 @@ def chunk_file(path: Path, domain_filter: str | None) -> list[dict]:
     for chunk in splitter.split_text(body):
         chunk = chunk.strip()
         if len(chunk) < 80:
+            continue
+        matched = scan_for_injection(chunk)
+        if matched:
+            print(f"  [SKIP] injection pattern matched ({matched!r}): {chunk[:80]!r}...")
             continue
         # Prefer a date parsed from the chunk's own text (e.g. "Budget 2024",
         # "berkuat kuasa 1 Mei 2024", "w.e.f. 01/05/2024") — more precise than

@@ -1,12 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from 'framer-motion';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
-import { LandingFeatures } from './LandingFeatures';
+import { LandingFeatureShowcase } from './LandingFeatureShowcase';
+import { AgencyTrustGrid } from './AgencyTrustGrid';
+import { PostcodePersonalizer } from './PostcodePersonalizer';
+import { HeroBrandReveal } from './HeroBrandReveal';
+import { AgentSpotlight } from './AgentSpotlight';
+import { ComparisonSection } from './ComparisonSection';
+import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
 import { useI18n } from '@/lib/i18n';
 import {
   LANDING_TAGLINE_KEYS,
@@ -15,7 +32,36 @@ import {
 } from '@/lib/landing-taglines';
 import { useTheme } from '@/lib/theme';
 
-const DOMAINS = [
+// How long the header-morph + content fade plays before the actual route
+// change fires — must match LandingHeader's spring feel closely enough
+// that the router.push doesn't cut the animation off mid-flight, but not
+// so long that the CTA feels laggy.
+const CHAT_MORPH_MS = 420;
+
+// Lighter beat than CHAT_MORPH_MS: this path has no header→sidebar shape
+// morph to wait out (that treatment stays specific to the hero's own
+// "Mula Bertanya" CTA, since only /chat has a real sidebar shape to morph
+// into) — just enough time for the loading screen to read as intentional
+// before the route actually changes underneath it.
+const NAV_TRANSITION_MS = 380;
+
+// Interactive hero chips — each is a real, functioning shortcut: domain
+// chips prefill /chat with a representative query for that domain (see
+// app/chat/page.tsx's ?q= handling), and the Warung Watch chip links
+// straight to its own page rather than into chat, since it isn't a RAG
+// domain.
+// Trimmed to a representative spread (gov/finance, business, personal) —
+// the full 10-domain list is already one scroll away in "Knowledge
+// Domains" below; the hero chips are a taste, not the whole menu.
+const DOMAIN_CHIPS = [
+  { key: 'tax', queryKey: 'landing.chip.tax.query' },
+  { key: 'business', queryKey: 'landing.chip.business.query' },
+  { key: 'immigration', queryKey: 'landing.chip.immigration.query' },
+] as const;
+
+// Full domain badge list shown further down the page ("Knowledge Domains")
+// — static, not clickable, distinct from the interactive hero chips above.
+const ALL_DOMAINS = [
   { key: 'tax' },
   { key: 'epf' },
   { key: 'business' },
@@ -36,6 +82,7 @@ const fadeUp = {
 export function LandingClient() {
   const { t } = useI18n();
   const { theme } = useTheme();
+  const router = useRouter();
   // Start from a stable key so SSR and the first client render match, then pick
   // a random tagline after mount. Calling Math.random() in the initial render
   // (server vs client) caused a hydration mismatch (React #418).
@@ -46,25 +93,136 @@ export function LandingClient() {
   const tagline = t(taglineKey);
   const isDark = theme === 'dark';
 
+  // framer's useReducedMotion() is false on the server and updates
+  // post-mount on the client — safe here because every value it gates
+  // below only ever changes a `style` transform amount or whether an
+  // event listener is attached, never which DOM nodes render, so there's
+  // nothing for a server/client markup diff to catch (same reasoning
+  // ChatInput/PromptChips/ChatAmbientMesh already document for their own
+  // client-only season/motion checks elsewhere in this codebase).
+  const reduceMotion = useReducedMotion();
+
+  // ── Scroll parallax: two ambient glow blobs drift at different speeds
+  // as the hero scrolls out of view. Scoped to the hero section itself
+  // (not the whole page's scroll range) via `target`, so the effect is
+  // "hero leaving the viewport", not "how far down the whole page you are".
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: heroScroll } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  });
+  // Background blob (larger, sits further back visually) drifts less;
+  // foreground blob (smaller, heritage accent) drifts more — the classic
+  // depth cue where the nearer layer appears to move faster.
+  const glowBgY = useTransform(heroScroll, [0, 1], reduceMotion ? [0, 0] : [0, 60]);
+  const glowFgY = useTransform(heroScroll, [0, 1], reduceMotion ? [0, 0] : [0, 160]);
+
+  // ── Mouse tilt: raw pointer offset from the hero's center (-0.5..0.5 on
+  // each axis), sprung for a natural settle instead of snapping 1:1 to the
+  // cursor — springs are interruptible and velocity-aware (apple-design
+  // guidance already applied elsewhere in this codebase), which matters
+  // here since the pointer can reverse direction at any instant.
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+  const springX = useSpring(pointerX, { stiffness: 150, damping: 20, mass: 0.5 });
+  const springY = useSpring(pointerY, { stiffness: 150, damping: 20, mass: 0.5 });
+  const tiltRotateX = useTransform(springY, [-0.5, 0.5], reduceMotion ? [0, 0] : [6, -6]);
+  const tiltRotateY = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [-6, 6]);
+  const glowBgX = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [-16, 16]);
+  const glowFgX = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [24, -24]);
+
+  const handleHeroMouseMove = (e: ReactMouseEvent<HTMLElement>) => {
+    if (reduceMotion) return; // never attach real work behind a no-op listener
+    const rect = e.currentTarget.getBoundingClientRect();
+    pointerX.set((e.clientX - rect.left) / rect.width - 0.5);
+    pointerY.set((e.clientY - rect.top) / rect.height - 0.5);
+  };
+  const handleHeroMouseLeave = () => {
+    pointerX.set(0);
+    pointerY.set(0);
+  };
+
+  // ── Header → sidebar chat-morph. reduceMotion skips straight to
+  // navigation — a shape-morphing header is exactly the kind of large
+  // moving-object transition apple-design's reduced-motion guidance
+  // (already applied elsewhere this session) says to replace, not tone
+  // down.
+  const [isEnteringChat, setIsEnteringChat] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
+  const enterChat = (href: string) => {
+    if (reduceMotion) {
+      router.push(href);
+      return;
+    }
+    setIsEnteringChat(true);
+    setShowLoadingScreen(true);
+    window.setTimeout(() => router.push(href), CHAT_MORPH_MS);
+  };
+
+  // The hero search bar is a real input: whatever the visitor types is
+  // carried into /chat via ?q= (the same prefill the domain chips use), and
+  // an empty submit just opens chat. Start Asking is the bar's submit button.
+  const [heroQuery, setHeroQuery] = useState('');
+  const [heroFocused, setHeroFocused] = useState(false);
+  const handleHeroSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const q = heroQuery.trim();
+    enterChat(q ? `/chat?q=${encodeURIComponent(q)}` : '/chat');
+  };
+
+  // Every OTHER real navigation this page offers (header nav links, domain
+  // chips, the Warung Watch chip, the "Explore Agents" secondary CTA) gets
+  // the same loading-screen treatment as the hero CTA, minus the
+  // /chat-specific header-morph — the opaque full-screen loader already
+  // covers the header entirely, so there's nothing to gain from also
+  // running that shape animation underneath it for a destination that
+  // isn't /chat.
+  const handleNavClick = (href: string, e: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (reduceMotion) {
+      router.push(href);
+      return;
+    }
+    setShowLoadingScreen(true);
+    window.setTimeout(() => router.push(href), NAV_TRANSITION_MS);
+  };
+
   const pageClass = isDark
-    ? 'min-h-screen bg-[#0A0F1E] text-white'
-    : 'min-h-screen bg-zinc-50 text-zinc-900';
+    ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
+    : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
-  const mutedText = isDark ? 'text-zinc-400' : 'text-zinc-600';
+  const mutedText = isDark ? 'text-zinc-300' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-[#2563EB]/50'
-    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-[#2563EB]/40';
+    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-nk-official/50'
+    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-nk-official/40';
   const domainPillClass = isDark
-    ? 'border-[#2563EB]/40 text-[#2563EB] bg-[#2563EB]/10'
-    : 'border-blue-200 text-blue-700 bg-blue-50';
+    ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
+    : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
   const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
+  const heroHighlightColor = '#60A5FA';
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
-      <div
+      {/* The one real navigation this page triggers (hero "Mula Bertanya" →
+          /chat) gets a full-screen transition treatment instead of a blank
+          frame while the route change lands — see PageLoadingScreen's own
+          docstring for why this isn't attached to every button on the
+          page (toggles/modals don't navigate anywhere). */}
+      <PageLoadingScreen show={showLoadingScreen} />
+
+      {/* Two-tone ambient glow (official blue + heritage terracotta) instead
+          of one flat blue blob — a small step toward the section-to-section
+          "color storytelling" explored from the Fixa/V7 references: still a
+          single quiet moment behind the hero (not a saturated per-section
+          repaint, which would fight this product's restrained register),
+          but it now carries both of NakTahu's identity accents instead of
+          only the functional blue. */}
+      <motion.div
         aria-hidden
+        style={{ y: glowBgY, x: glowBgX }}
         className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
           isDark ? 'opacity-100' : 'opacity-70'
         }`}
@@ -76,65 +234,128 @@ export function LandingClient() {
               : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
           }`}
         />
-      </div>
+      </motion.div>
+      {/* Foreground blob on its own transform, independent of the background
+          one above — a different scroll speed and a larger mouse nudge is
+          what reads as "in front of" the other blob. */}
+      <motion.div
+        aria-hidden
+        style={{ y: glowFgY, x: glowFgX }}
+        className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
+          isDark ? 'opacity-100' : 'opacity-70'
+        }`}
+      >
+        <div
+          className={`absolute left-[68%] top-[-60px] h-[360px] w-[520px] -translate-x-1/2 rounded-full blur-3xl ${
+            isDark
+              ? 'bg-[radial-gradient(closest-side,rgba(224,141,91,0.14),transparent)]'
+              : 'bg-[radial-gradient(closest-side,rgba(156,74,42,0.07),transparent)]'
+          }`}
+        />
+      </motion.div>
 
-      <LandingHeader />
+      <LandingHeader collapsing={isEnteringChat} onNavClick={handleNavClick} />
+
+      {/* Everything below the header fades+blurs+scales out while the
+          header morphs into the sidebar shape, then router.push fires —
+          the same "materialize/dematerialize a whole surface" treatment
+          apple-design's materials guidance describes for a big reposition,
+          not a plain instant navigation. */}
+      <motion.div
+        animate={
+          isEnteringChat
+            ? { opacity: 0, scale: 0.98, filter: 'blur(8px)' }
+            : { opacity: 1, scale: 1, filter: 'blur(0px)' }
+        }
+        transition={{ duration: CHAT_MORPH_MS / 1000, ease: 'easeOut' }}
+        style={{ pointerEvents: isEnteringChat ? 'none' : undefined }}
+      >
       <AuthErrorBanner />
 
-      <section className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full">
+      <section
+        ref={heroRef}
+        onMouseMove={handleHeroMouseMove}
+        onMouseLeave={handleHeroMouseLeave}
+        style={{ perspective: 800 }}
+        className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full"
+      >
+        {/* Springed 3D tilt on the whole content group — `contents` keeps
+            each child's own fadeUp entrance untouched, this just adds the
+            tilt transform as an ancestor. */}
+        <motion.div
+          style={{ rotateX: tiltRotateX, rotateY: tiltRotateY }}
+          className="contents"
+        >
+        {/* Hero opener — the brand mark assembling once on load, then three
+            citation-chip motifs. Plays immediately on mount (own internal
+            stagger), ahead of the fadeUp-staggered content below. */}
+        <HeroBrandReveal />
+
         <motion.div
           custom={0}
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-[#2563EB] uppercase border border-[#2563EB]/30 rounded-full px-4 py-1.5 locale-nowrap"
+          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-nk-official uppercase border border-nk-official/30 rounded-full px-4 py-1.5 locale-nowrap"
         >
           🇲🇾 {t('landing.badge')}
         </motion.div>
 
-        <motion.h1
+        <motion.div
           custom={1}
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance"
+          className="contents"
         >
+        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
           {(() => {
             const headline = t('landing.hero.headline');
             const highlight = t('landing.hero.headline.highlight');
-            const idx = headline.indexOf(highlight);
-            if (idx === -1) return headline;
-            return (
-              <>
-                {headline.slice(0, idx)}
-                <span className="text-[#2563EB]">{highlight}</span>
-                {headline.slice(idx + highlight.length)}
-              </>
-            );
+            // A literal \n in the headline string forces a line break at that
+            // point (only the zh copy uses this, for "为您解答关于 / “马来西亚”
+            // 政策问题" — an explicit two-line format, not just natural wrap).
+            // BM/EN headlines have no \n, so this is a no-op single-line render
+            // for them, identical to before.
+            return headline.split('\n').map((line, i) => {
+              const idx = line.indexOf(highlight);
+              return (
+                <Fragment key={i}>
+                  {i > 0 && <br />}
+                  {idx === -1 ? (
+                    line
+                  ) : (
+                    <>
+                      {line.slice(0, idx)}
+                      <span style={{ color: heroHighlightColor }} className="font-extrabold">{highlight}</span>
+                      {line.slice(idx + highlight.length)}
+                    </>
+                  )}
+                </Fragment>
+              );
+            });
           })()}
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          custom={2}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className={`text-base sm:text-lg max-w-xl leading-relaxed locale-text-balance ${mutedText}`}
-        >
+        <p className={`text-base sm:text-lg max-w-xl leading-relaxed locale-text-balance ${mutedText}`}>
           {tagline}
-        </motion.p>
+        </p>
+        </motion.div>
 
-        <motion.div
+        <motion.form
           custom={3}
           variants={fadeUp}
           initial="hidden"
           animate="show"
-          className={`w-full max-w-xl border rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
+          role="search"
+          onSubmit={handleHeroSubmit}
+          className={`w-full max-w-xl border rounded-2xl pl-4 sm:pl-5 pr-1.5 py-1.5 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
+            aria-hidden
             className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
           >
             <path
@@ -143,26 +364,41 @@ export function LandingClient() {
               clipRule="evenodd"
             />
           </svg>
-          <TypewriterQueryWrapper isDark={isDark} />
-        </motion.div>
-
-        <motion.div
-          custom={4}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="flex flex-col items-center gap-3"
-        >
-          <Link
-            href="/chat"
-            className="inline-flex items-center gap-2 bg-[#2563EB] hover:bg-blue-500 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-white font-semibold px-6 sm:px-8 py-3 sm:py-3.5 rounded-full text-sm sm:text-base shadow-lg shadow-blue-900/30 locale-nowrap"
+          <div className="relative flex-1 min-w-0 text-left">
+            <Input
+              type="text"
+              value={heroQuery}
+              onChange={(e) => setHeroQuery(e.target.value)}
+              onFocus={() => setHeroFocused(true)}
+              onBlur={() => setHeroFocused(false)}
+              maxLength={500}
+              enterKeyHint="search"
+              aria-label={t('landing.hero.search_label')}
+              className={`border-0 px-0 py-2 text-sm sm:text-base rounded-none focus:ring-0 ${
+                isDark ? 'text-white' : 'text-zinc-900'
+              }`}
+            />
+            {/* The rotating example queries are the idle placeholder: shown
+                only while the field is empty and unfocused, so they never sit
+                on top of what the visitor is typing. */}
+            {!heroQuery && !heroFocused && (
+              <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap">
+                <TypewriterQueryWrapper isDark={isDark} />
+              </div>
+            )}
+          </div>
+          <Button
+            type="submit"
+            aria-label={t('landing.hero.cta')}
+            className="relative flex-shrink-0 inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim active:scale-[0.97] transition-all duration-150 text-white font-semibold h-10 sm:h-11 px-3 sm:px-5 rounded-xl text-sm shadow-md shadow-blue-900/30 locale-nowrap group"
           >
-            {t('landing.hero.cta')}
+            <span className="hidden sm:inline">{t('landing.hero.cta')}</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
-              className="w-5 h-5"
+              aria-hidden
+              className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-0.5"
             >
               <path
                 fillRule="evenodd"
@@ -170,13 +406,102 @@ export function LandingClient() {
                 clipRule="evenodd"
               />
             </svg>
+          </Button>
+        </motion.form>
+
+        {/* Trust disclaimer — moved from above the headline (where it
+            competed with it for first-glance attention) to a quiet
+            footnote right under the input, where a first-time visitor
+            actually needs it: the moment before they type. */}
+        <motion.p
+          custom={4}
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className={`text-xs max-w-md -mt-2 locale-text-balance ${mutedText}`}
+        >
+          {t('landing.hero.disclaimer_note')}
+        </motion.p>
+
+        <motion.div
+          custom={5}
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className="flex flex-wrap justify-center gap-2 max-w-xl"
+        >
+          {DOMAIN_CHIPS.map((chip) => {
+            const href = `/chat?q=${encodeURIComponent(t(chip.queryKey))}`;
+            return (
+              <Link
+                key={chip.key}
+                href={href}
+                onClick={(e) => handleNavClick(href, e)}
+                className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+              >
+                {t(`domain.${chip.key}`)}
+              </Link>
+            );
+          })}
+          <Link
+            href="/warung-watch"
+            onClick={(e) => handleNavClick('/warung-watch', e)}
+            className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+          >
+            {t('nav.warung_watch')}
           </Link>
+        </motion.div>
+
+        <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="w-full max-w-xl">
+          <PostcodePersonalizer
+            className={`flex flex-wrap items-center justify-center gap-2 ${mutedText}`}
+            inputClassName={`w-56 text-center border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors ${domainPillClass}`}
+          />
+        </motion.div>
+
+        <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show">
+          {/* Start Asking now lives inside the search bar, so Explore AI
+              Agents is the hero's one standalone action: a real secondary
+              button (glass pill, icon, arrow that leads on hover) instead of
+              a bare text link that read as a footnote. */}
           <Link
             href="/agents"
-            className="text-sm hover:text-[#2563EB] transition-colors locale-nowrap"
+            onClick={(e) => handleNavClick('/agents', e)}
+            className={`group inline-flex items-center gap-3 rounded-full border pl-2 pr-4 py-2 text-sm font-medium backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 locale-nowrap ${
+              isDark
+                ? 'border-white/15 bg-white/[0.04] text-zinc-100 hover:border-nk-official/50 hover:bg-white/[0.07] hover:shadow-[0_8px_30px_rgba(37,99,235,0.18)]'
+                : 'border-zinc-200 bg-white/70 text-zinc-800 hover:border-nk-official/40 hover:shadow-[0_8px_24px_rgba(37,99,235,0.12)]'
+            }`}
           >
-            {t('landing.hero.secondary_cta')}
+            <span
+              aria-hidden
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-nk-official/15 text-nk-official"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path d="M10 1.5a.75.75 0 0 1 .71.51l1.07 3.2a2 2 0 0 0 1.26 1.26l3.2 1.07a.75.75 0 0 1 0 1.42l-3.2 1.07a2 2 0 0 0-1.26 1.26l-1.07 3.2a.75.75 0 0 1-1.42 0l-1.07-3.2a2 2 0 0 0-1.26-1.26l-3.2-1.07a.75.75 0 0 1 0-1.42l3.2-1.07a2 2 0 0 0 1.26-1.26l1.07-3.2A.75.75 0 0 1 10 1.5ZM15.5 13a.5.5 0 0 1 .47.33l.4 1.2a1 1 0 0 0 .63.63l1.2.4a.5.5 0 0 1 0 .94l-1.2.4a1 1 0 0 0-.63.63l-.4 1.2a.5.5 0 0 1-.94 0l-.4-1.2a1 1 0 0 0-.63-.63l-1.2-.4a.5.5 0 0 1 0-.94l1.2-.4a1 1 0 0 0 .63-.63l.4-1.2A.5.5 0 0 1 15.5 13Z" />
+              </svg>
+            </span>
+            <span className="flex flex-col items-start leading-tight">
+              <span>{t('landing.hero.secondary_cta')}</span>
+              <span className={`hidden sm:block text-[11px] font-normal ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                {t('landing.hero.secondary_cta_hint')}
+              </span>
+            </span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden
+              className="w-4 h-4 opacity-60 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
+                clipRule="evenodd"
+              />
+            </svg>
           </Link>
+        </motion.div>
         </motion.div>
       </section>
 
@@ -187,10 +512,93 @@ export function LandingClient() {
         transition={{ duration: 0.6 }}
         className={`px-4 sm:px-6 py-16 sm:py-20 border-t ${borderClass} max-w-6xl mx-auto w-full`}
       >
-        <h2 className={`text-center text-xl sm:text-2xl font-bold mb-10 sm:mb-12 locale-text-balance ${sectionTitle}`}>
+        <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-10 sm:mb-12 locale-text-balance ${sectionTitle}`}>
           {t('landing.features.title')}
         </h2>
-        <LandingFeatures isDark={isDark} />
+        <LandingFeatureShowcase isDark={isDark} />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
+          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
+            {t('landing.preview.title')}
+          </h2>
+          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.preview.desc')}</p>
+        </div>
+        <InteractiveAnswerPreview isDark={isDark} />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
+          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
+            {t('landing.trust.title')}
+          </h2>
+          {/* Same inline-bold-highlight technique as the hero headline above
+              (indexOf a marked substring, wrap it in a heavier span) — V7's
+              "bold the keywords that matter, inline" pattern applied to the
+              one sentence on this page making the sourcing claim, instead of
+              only saying it via the chip grid below. */}
+          <p className={`text-sm locale-text-balance ${mutedText}`}>
+            {(() => {
+              const desc = t('landing.trust.desc');
+              const highlight = t('landing.trust.desc.highlight');
+              const idx = desc.indexOf(highlight);
+              if (idx === -1) return desc;
+              return (
+                <>
+                  {desc.slice(0, idx)}
+                  <span className={`font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>{highlight}</span>
+                  {desc.slice(idx + highlight.length)}
+                </>
+              );
+            })()}
+          </p>
+        </div>
+        <AgencyTrustGrid isDark={isDark} />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
+          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
+            {t('landing.spotlight.title')}
+          </h2>
+          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.spotlight.desc')}</p>
+        </div>
+        <AgentSpotlight isDark={isDark} />
+        <p className={`mt-6 text-center text-xs max-w-2xl mx-auto locale-text-balance ${mutedText}`}>
+          {t('landing.spotlight.disclaimer')}
+        </p>
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 0.6 }}
+        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+      >
+        <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-8 sm:mb-10 locale-text-balance ${sectionTitle}`}>
+          {t('landing.compare.title')}
+        </h2>
+        <ComparisonSection isDark={isDark} />
       </motion.section>
 
       <motion.section
@@ -200,11 +608,11 @@ export function LandingClient() {
         transition={{ duration: 0.5 }}
         className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} flex flex-col items-center gap-6 max-w-6xl mx-auto w-full`}
       >
-        <h2 className={`text-xl sm:text-2xl font-bold locale-text-balance ${sectionTitle}`}>
+        <h2 className={`text-xl sm:text-2xl font-bold font-display locale-text-balance ${sectionTitle}`}>
           {t('landing.domains.title')}
         </h2>
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-2xl">
-          {DOMAINS.map((d, i) => (
+          {ALL_DOMAINS.map((d, i) => (
             <motion.span
               key={d.key}
               initial={{ opacity: 0, scale: 0.9 }}
@@ -228,7 +636,7 @@ export function LandingClient() {
         <div className="flex flex-col items-center sm:items-end gap-1 text-center sm:text-right">
           <div className="flex items-center gap-3">
             <a
-              href="https://github.com"
+              href="https://github.com/timothylee58/naktahu-AI"
               target="_blank"
               rel="noopener noreferrer"
               className={`transition-colors locale-nowrap ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}
@@ -247,6 +655,7 @@ export function LandingClient() {
           </span>
         </div>
       </footer>
+      </motion.div>
     </div>
   );
 }

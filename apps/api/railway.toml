@@ -1,8 +1,25 @@
 # Railway service configuration — lives in apps/api/ (service root directory)
 # Docs: https://docs.railway.app/reference/config-as-code
+#
+# Root cause of the earlier "couldn't locate the dockerfile" failures,
+# found by screenshotting the actual dashboard: Settings -> Source ->
+# Root Directory was a typo, "/app/api" (missing the "s" in "apps"), not
+# "/apps/api". A nonexistent Root Directory made Railway silently fall
+# back to the full repo root as build context every time, which is why
+# the unpacked-archive size in the build log kept reading ~3 MB (the whole
+# monorepo) no matter what dockerfilePath value was tried here.
+#
+# With Root Directory corrected to /apps/api in the dashboard, this path
+# is relative to THAT root — so it's just "Dockerfile", matching where the
+# file actually sits (apps/api/Dockerfile) one level below Root Directory.
+# If this ever regresses, check the dashboard Root Directory field first
+# before touching this value again — the build-log archive size (~1 MB
+# for apps/api alone vs ~3 MB for the full repo) tells you immediately
+# whether Root Directory is resolving correctly.
 
 [build]
-  builder = "DOCKERFILE"
+  builder        = "DOCKERFILE"
+  dockerfilePath = "Dockerfile"
 
 [deploy]
   healthcheckPath         = "/health"

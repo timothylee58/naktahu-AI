@@ -18,3 +18,24 @@
 {"query": "What is the minimum wage policy currently in effect in Malaysia?", "expected_topic": "finance", "min_confidence": 0.6}
 {"query": "What government assistance programs exist for persons with disabilities (OKU) in Malaysia?", "expected_topic": "government", "min_confidence": 0.6}
 {"query": "What are the requirements for UPSR/PT3 replacement assessments in the Malaysian school system?", "expected_topic": "education", "min_confidence": 0.6}
+{"query": "How do I check the status of a land title search (semakan hakmilik) in Malaysia?", "expected_topic": "property", "min_confidence": 0.6}
+{"query": "What are the maintenance and sinking fund obligations for strata property owners under the Strata Management Act 2013?", "expected_topic": "property", "min_confidence": 0.6}
+{"query": "What are my rights if my employer terminates me without proper notice in Malaysia?", "expected_topic": "legal", "min_confidence": 0.6}
+{"query": "How do I claim EIS unemployment benefits after being retrenched?", "expected_topic": "legal", "min_confidence": 0.6}
+{"query": "What are the requirements to renew my SSM business registration?", "expected_topic": "business", "min_confidence": 0.6}
+{"query": "What is Pioneer Status tax exemption and how long does it last in Malaysia?", "expected_topic": "tax", "min_confidence": 0.6}
+{"query": "What qualifying capital expenditure is covered under Investment Tax Allowance (ITA)?", "expected_topic": "tax", "min_confidence": 0.6}
+{"query": "What is Reinvestment Allowance and which companies qualify for it?", "expected_topic": "tax", "min_confidence": 0.6}
+{"query": "How do I apply for an arts or heritage grant from the Ministry of Tourism, Arts and Culture?", "expected_topic": "culture", "min_confidence": 0.6}
+{"query": "How is a building gazetted as a national heritage site in Malaysia?", "expected_topic": "culture", "min_confidence": 0.6}
+{"query": "How can I access Dewan Rakyat Hansard debate records?", "expected_topic": "parliament", "min_confidence": 0.6}
+{"query": "What are the stages a bill goes through in the Malaysian Parliament?", "expected_topic": "parliament", "min_confidence": 0.6}
+{"query": "How do I make an EIS unemployment benefit claim after being retrenched?", "expected_topic": "legal", "min_confidence": 0.6}
+{"query": "What is the minimum contribution rate for SOCSO employers?", "expected_topic": "epf", "min_confidence": 0.6}
+{"query": "How do I renew my Malaysian passport and what does it cost?", "expected_topic": "immigration", "min_confidence": 0.6}
+{"query": "How do I register at a government clinic under the MySejahtera system?", "expected_topic": "healthcare", "min_confidence": 0.6}
+{"query": "When is the SPM 2026 examination timetable and when does it start?", "expected_topic": "education", "min_confidence": 0.6}
+{"query": "Which subjects are compulsory for SPM under the Malaysia Education Blueprint 2026-2035?", "expected_topic": "education", "min_confidence": 0.6}
+{"query": "What government cost-of-living assistance schemes am I eligible for as a low-income household?", "expected_topic": "welfare", "min_confidence": 0.6}
+{"query": "Who is my Member of Parliament and how do I find out?", "expected_topic": "parliament", "min_confidence": 0.6}
+{"query": "Is this LHDN tax refund SMS link real or a scam?", "expected_topic": "scam_check", "min_confidence": 0.6}

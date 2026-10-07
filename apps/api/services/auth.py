@@ -4,18 +4,38 @@ from typing import Optional
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from jwt import PyJWKClient
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError, PyJWKClientError
 
 from core.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/ignored", auto_error=False)
 
+# Supabase projects created after their JWT-signing-keys migration issue
+# asymmetric tokens (ES256) verified via this JWKS endpoint, rather than a
+# shared HS256 secret. `jwt.decode` needs to know up front which key/algorithm
+# to use, so we peek at the token's own unverified header (`alg`) and only
+# then decode+verify with the matching key material. PyJWKClient caches
+# fetched keys internally (cache_keys=True), so this doesn't re-fetch the
+# JWKS on every request.
+_jwks_client = PyJWKClient(
+    f"{settings.supabase_url}/auth/v1/.well-known/jwks.json", cache_keys=True
+)
+
 # Supabase Auth includes app_metadata in the JWT automatically once set via
 # the admin API (services/billing.py, on checkout.session.completed). No
 # separate plan/subscriptions table needed — the JWT claim is the source of
 # truth, refreshed client-side after checkout completes.
-VALID_PLANS = {"free", "student", "pro", "business"}
+VALID_PLANS = {"free", "student", "pro", "business", "investor"}
 ADMIN_ROLES = frozenset({"primary_admin", "secondary_admin"})
+
+# Parallel entitlements — capability flags that are NOT rungs on the plan
+# ladder (see middleware/plan_gate._PLAN_RANK). An entitlement is granted
+# either by app_metadata.entitlements (a list of strings) or implicitly by
+# holding the same-named plan. "investor" is the first: a VC firm on the
+# investor plan is a different market segment from a business-plan SME, so
+# neither inherits the other's features by ordinal comparison.
+VALID_ENTITLEMENTS = frozenset({"investor"})
 
 
 @dataclass(frozen=True)
@@ -25,6 +45,7 @@ class UserContext:
     plan: str = "free"
     email: Optional[str] = None
     role: Optional[str] = None
+    entitlements: tuple[str, ...] = ()
 
 
 def effective_plan(plan: str, role: Optional[str]) -> str:
@@ -40,15 +61,32 @@ def is_admin_role(role: Optional[str]) -> bool:
 
 def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
     try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret,
-            algorithms=["HS256"],
-            audience=settings.supabase_jwt_aud,
-        )
+        alg = jwt.get_unverified_header(token).get("alg")
+    except InvalidTokenError:
+        return None
+
+    try:
+        if alg == "HS256":
+            # Legacy Supabase projects (shared secret, pre-JWT-signing-keys).
+            payload = jwt.decode(
+                token,
+                settings.jwt_secret,
+                algorithms=["HS256"],
+                audience=settings.supabase_jwt_aud,
+            )
+        else:
+            # Current Supabase projects sign with an asymmetric key (ES256)
+            # published at the project's JWKS endpoint, keyed by `kid`.
+            signing_key = _jwks_client.get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["ES256", "RS256"],
+                audience=settings.supabase_jwt_aud,
+            )
     except ExpiredSignatureError:
         return None
-    except InvalidTokenError:
+    except (InvalidTokenError, PyJWKClientError):
         return None
     sub = payload.get("sub")
     if not sub or not isinstance(sub, str):
@@ -65,13 +103,34 @@ def _decode_supabase_jwt(token: str) -> Optional[UserContext]:
         if isinstance(raw_role, str) and raw_role in ADMIN_ROLES:
             role = raw_role
 
+    # Entitlements are resolved from the RAW plan, before effective_plan()
+    # collapses admins to "business" — otherwise an admin on the investor
+    # plan would silently lose the investor entitlement.
+    granted: set[str] = set()
+    if plan in VALID_ENTITLEMENTS:
+        granted.add(plan)
+    if isinstance(app_metadata, dict):
+        raw_entitlements = app_metadata.get("entitlements")
+        if isinstance(raw_entitlements, list):
+            granted.update(
+                e for e in raw_entitlements
+                if isinstance(e, str) and e in VALID_ENTITLEMENTS
+            )
+
     plan = effective_plan(plan, role)
 
     email = payload.get("email")
     if not isinstance(email, str):
         email = None
 
-    return UserContext(user_id=sub, is_anonymous=False, plan=plan, email=email, role=role)
+    return UserContext(
+        user_id=sub,
+        is_anonymous=False,
+        plan=plan,
+        email=email,
+        role=role,
+        entitlements=tuple(sorted(granted)),
+    )
 
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> UserContext:

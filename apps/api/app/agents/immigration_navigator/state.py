@@ -24,3 +24,18 @@ class ImmigrationState(TypedDict, total=False):
     _rag_findings: list[dict[str, Any]]
     status: str
     tool_calls: list[dict[str, Any]]
+
+    # ── Named e-service reference-generation track (MDAC/ePLKS/MM2H/
+    # foreign-worker/passport/PVIP) — see nodes.py's SERVICE_* maps and
+    # module docstring for why this generates a copy-paste reference
+    # rather than submitting anything.
+    service_type: Optional[str]
+    service_fields: dict[str, str]
+    prefilled_reference: list[dict[str, str]]
+    portal_url: str
+    portal_note: str
+
+    # ── SPO (Sistem Pertanyaan Online) enquiry-drafting track.
+    enquiry_category: str
+    enquiry_subcategory: str
+    enquiry_draft: str

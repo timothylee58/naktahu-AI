@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    # uid pinned explicitly (not auto-generated) so the dashboard JSON in
+    # ../dashboards/naktahu-overview.json can reference it by a fixed
+    # string ("prometheus") instead of a uid that would only exist after
+    # Grafana generates it — the dashboard would otherwise show "datasource
+    # not found" on first provisioning boot.
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # Private Railway networking — same project, no public exposure needed.
+    url: http://prometheus.railway.internal:9090
+    isDefault: true
+    editable: false

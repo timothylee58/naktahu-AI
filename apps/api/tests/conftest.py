@@ -96,14 +96,18 @@ def reset_shared_state(monkeypatch):
 # AUTH & API KEY FIXTURES: Declarative header generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-@pytest.fixture
-def make_auth_headers():
-    """Factory: build a Bearer JWT header for any user and plan.
-
-    Example:
-        def test_x(client, make_auth_headers):
-            headers = make_auth_headers(user_id="u1", plan="free")
-    """
+def _make_auth_headers(user_id: str = "test-user-1", plan: str = "pro") -> dict[str, str]:
+    token = jwt.encode(
+        {
+            "sub": user_id,
+            "aud": settings.supabase_jwt_aud,
+            "app_metadata": {"plan": plan},
+            "exp": int(time.time()) + 3600,
+        },
+        settings.jwt_secret,
+        algorithm="HS256",
+    )
+    return {"Authorization": f"Bearer {token}"}
 
     def _make(user_id: str = "test-user-1", plan: str = "pro") -> dict[str, str]:
         token = jwt.encode(
@@ -118,18 +122,38 @@ def make_auth_headers():
         )
         return {"Authorization": f"Bearer {token}"}
 
-    return _make
+@pytest.fixture
+def auth_headers() -> dict[str, str]:
+    """Generate valid JWT for authenticated testing (default: pro plan).
+
+    Returns a plain dict, not a factory — use auth_headers_free/_student/_business
+    for other plans rather than trying to call this fixture with arguments
+    (pytest injects the fixture's return value, not the function itself).
+
+    Example:
+        def test_history_requires_auth(client, auth_headers):
+            resp = client.get("/api/v1/history", headers=auth_headers)
+            assert resp.status_code == 200
+    """
+    return _make_auth_headers(user_id="test-user-1", plan="pro")
 
 
 @pytest.fixture
-def auth_headers(make_auth_headers) -> dict[str, str]:
-    """Bearer header for a default pro-plan user."""
-    return make_auth_headers()
+def auth_headers_free() -> dict[str, str]:
+    """Shorthand: Free plan user."""
+    return _make_auth_headers(user_id="test-free-user", plan="free")
 
 
 @pytest.fixture
-def auth_headers_free(make_auth_headers) -> dict[str, str]:
-    return make_auth_headers(user_id="test-free-user", plan="free")
+def auth_headers_student() -> dict[str, str]:
+    """Shorthand: Student plan user."""
+    return _make_auth_headers(user_id="test-student-user", plan="student")
+
+
+@pytest.fixture
+def auth_headers_business() -> dict[str, str]:
+    """Shorthand: Business plan user."""
+    return _make_auth_headers(user_id="test-biz-user", plan="business")
 
 
 @pytest.fixture
@@ -138,8 +162,22 @@ def auth_headers_student(make_auth_headers) -> dict[str, str]:
 
 
 @pytest.fixture
-def auth_headers_business(make_auth_headers) -> dict[str, str]:
-    return make_auth_headers(user_id="test-biz-user", plan="business")
+def api_key_headers(api_key: str = "nkt_live_test_abc123xyz789") -> dict[str, str]:
+    """Generate API key headers for Developer/Public API testing.
+
+    Args:
+        api_key: Raw API key (default: test key, nkt_live_ prefix per
+            services/api_key_service.py's API_KEY_RAW_PREFIX)
+
+    Returns:
+        dict with "X-NakTahu-Key: {key}" header — the real header name
+        middleware/api_key_auth.py checks, not X-API-Key.
+
+    Example:
+        def test_public_query_requires_key(client, api_key_headers):
+            resp = client.post("/api/v1/public/query", json={"query": "..."}, headers=api_key_headers)
+    """
+    return {"X-NakTahu-Key": api_key}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

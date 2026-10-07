@@ -61,3 +61,4 @@ yarn-error.log*
 apps/web/next-env.d.ts
 next-env.d.ts
 .next/
+.impeccable/

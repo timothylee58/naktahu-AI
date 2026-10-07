@@ -42,36 +42,25 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
   # ── Deploy FastAPI + Redis to Railway ────────────────────────────────────
-  deploy-api:
-    name: Deploy API → Railway
-    runs-on: ubuntu-latest
-    needs: deploy-web
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        working-directory: apps/api
-        run: railway up --service naktahu-api --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # RAILWAY_TOKEN — from Railway dashboard → Account Settings → Tokens
-
-  # ── Deadline Monitor cron (02:00 MYT daily) ───────────────────────────────
-  deploy-deadline-cron:
-    name: Deploy cron → Railway
-    runs-on: ubuntu-latest
-    needs: deploy-api
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy Deadline Monitor cron
-        working-directory: apps/cron-deadline-monitor
-        run: railway up --service naktahu-deadline-cron --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  # There is deliberately no job here. Railway's own GitHub integration
+  # (Settings -> Source -> "Auto deploys when pushed to GitHub", connected
+  # to timothylee58/naktahu-AI, branch main) already deploys this service
+  # on every push — that path clones from GitHub server-side and resolves
+  # the Dockerfile relative to the dashboard's Root Directory (/apps/api).
+  #
+  # A `railway up` CLI step used to run here as well, uploading a snapshot
+  # from `working-directory: apps/api`. That is a SEPARATE, incompatible
+  # context-resolution mechanism: the CLI-uploaded snapshot is already
+  # scoped to apps/api's contents, and Railway then applies the dashboard
+  # Root Directory (/apps/api) a second time on top of that snapshot,
+  # permanently double-nesting the path no matter what dockerfilePath is
+  # set to in apps/api/railway.toml. This is what caused the "railway up"
+  # deploy history entries to fail even after the native auto-deploy for
+  # the exact same commit succeeded (see apps/api/railway.toml's comment
+  # for the full incident history — a Root Directory typo, "/app/api" vs
+  # "/apps/api", was chased across three PRs before this redundant/
+  # conflicting CLI step turned out to be the remaining failure mode).
+  #
+  # Do not re-add a `railway up` CLI step unless the native GitHub
+  # integration is disabled first — running both together will always
+  # produce one broken deploy attempt per push, race condition or not.

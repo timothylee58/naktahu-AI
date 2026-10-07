@@ -50,9 +50,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Immutable hashed build assets and pre-cached statics: cache-first.
+  // Also catches non-'navigate' page-path requests — Next.js App Router
+  // link-prefetches aren't navigations, so they land here too. Without a
+  // .catch(), a network blip during a prefetch rejects fetch() with no
+  // handler, surfacing as an uncaught FetchEvent rejection in the console
+  // (confirmed: exactly this on /agents/grant-finder). Response.error()
+  // still reports the failure to the caller, just without the unhandled
+  // rejection.
   event.respondWith(
     caches.match(event.request).then(
-      (cached) => cached ?? fetch(event.request),
+      (cached) => cached ?? fetch(event.request).catch(() => Response.error()),
     ),
   );
 });

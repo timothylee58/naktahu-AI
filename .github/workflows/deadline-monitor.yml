@@ -1,0 +1,51 @@
+name: Deadline Monitor
+
+# Nightly Deadline Monitor — 02:00 MYT (18:00 UTC).
+#
+# Runs the monitor directly on a GitHub runner rather than as a Railway cron
+# service. The Railway route cost five PRs (#127, #134, #135, #136 and their
+# retries) without ever succeeding: the service was never reliably visible to
+# RAILWAY_TOKEN, every service-name guess missed, and the dashboard edits
+# intended for a new cron service landed on the live API service's Root
+# Directory instead — briefly pointing production at the wrong Dockerfile.
+# Running it here removes the whole class of problem: no Railway service to
+# create, no service-ID/token-scoping puzzle, and no path by which a cron
+# change can touch the API service.
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  # Manual trigger for testing and for re-running a missed night — GitHub's
+  # scheduler can skip runs under load, and there is no Railway-side retry
+  # behind this any more.
+  workflow_dispatch:
+
+jobs:
+  run-deadline-monitor:
+    name: Run Deadline Monitor
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Run Deadline Monitor
+        run: python scripts/agents/deadline_monitor.py
+        env:
+          # Service-role key: server-side only, never exposed to the frontend.
+          # The script writes to deadline_schedule / deadline_alert_sends,
+          # which are RLS-protected against the anon key.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}

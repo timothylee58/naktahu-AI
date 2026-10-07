@@ -27,6 +27,12 @@ export function canAccessHistory(user: User | null | undefined): boolean {
   return (PLAN_RANK[effectivePlan(user)] ?? 0) >= PLAN_RANK.pro;
 }
 
+/** Paid Developer API plans (starter/growth/etc.) require Pro+ — mirrors the
+ * app's own history gate. The "free" API plan stays open to everyone. */
+export function canAccessPaidDeveloperPlans(user: User | null | undefined): boolean {
+  return (PLAN_RANK[effectivePlan(user)] ?? 0) >= PLAN_RANK.pro;
+}
+
 export function planBadgeLabel(user: User | null | undefined): string {
   const role = userRole(user);
   if (role === 'primary_admin') return 'primary admin';

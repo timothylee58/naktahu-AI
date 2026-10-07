@@ -9,11 +9,12 @@ from pydantic import BaseModel, Field
 
 from app.agents.checkpointer import get_checkpointer
 from app.services.agent_runner import (
+    AGENT_CONFIRM_HANDLERS,
     AGENT_CONTINUE_HANDLERS,
     AGENT_START_HANDLERS,
     AGENT_STATUS_HANDLERS,
     CREDIT_ON_COMPLETE_AGENTS,
-    confirm_compliance_drafter,
+    export_health_triage,
     get_compliance_status,
 )
 from middleware.plan_gate import require_plan
@@ -36,12 +37,44 @@ class AgentStartRequest(BaseModel):
     domains: list[str] = Field(default_factory=lambda: ["tax", "business", "epf"])
     # study-agent
     subject: str = "sejarah"
-    paper_text: str = ""
-    document_base64: str = ""
-    # grant-finder
+    level: Literal["spm", "stpm", "a-level"] = "spm"
+    mode: Literal["explain", "quiz"] = "explain"
+    paper_text: str = Field(default="", max_length=20_000)
+    document_base64: str = Field(default="", max_length=15_000_000)
+    image_base64: str = Field(default="", max_length=15_000_000)
+    image_mime_type: str = "image/jpeg"
+    # eligibility-agent (business_type/message/language shared with other agents above)
     sector: str = ""
-    business_stage: str = "early"
-    funding_need: str = ""
+    annual_revenue_myr: Optional[float] = None
+    is_bumiputera: Optional[bool] = None
+    registered_months: Optional[int] = None
+    # grant-draft-generator
+    programme_name: str = ""
+    business_profile: dict[str, Any] = Field(default_factory=dict)
+    export_format: Literal["pdf", "docx"] = "pdf"
+    # welfare-eligibility-agent — bounds are sanity limits (a household of
+    # 50 dependents is a data-entry error, not a real household), not
+    # income-eligibility thresholds themselves (those live in each scheme's
+    # eligibility_rules, not here)
+    birth_year: Optional[int] = Field(default=None, ge=1900, le=2020)
+    gender: Optional[Literal["male", "female"]] = None
+    state: str = ""
+    ethnic_group: Optional[Literal["malay", "chinese", "indian", "bumiputera_sabah_sarawak", "other"]] = None
+    marital_status: Optional[Literal["single", "married", "divorced", "widowed"]] = None
+    individual_monthly_income_myr: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+    household_monthly_income_myr: Optional[float] = Field(default=None, ge=0, le=1_000_000)
+    dependents_children: Optional[int] = Field(default=None, ge=0, le=30)
+    dependents_elderly: Optional[int] = Field(default=None, ge=0, le=30)
+    dependents_oku: Optional[int] = Field(default=None, ge=0, le=30)
+    dependents_chronic_ill: Optional[int] = Field(default=None, ge=0, le=30)
+    employment_status: Optional[Literal["employed", "self_employed", "unemployed", "retired", "student"]] = None
+    education_level: Optional[Literal["none", "primary", "secondary", "spm", "diploma", "degree", "postgrad"]] = None
+    is_oku: Optional[bool] = None
+    housing_ownership: Optional[Literal["own", "rented", "family_owned", "no_fixed_housing"]] = None
+    # scam-check-agent — raw pasted SMS/message/URL, bounded generously
+    # since scam SMS are usually short but the surrounding forwarded
+    # context (a WhatsApp thread, an email) can be longer.
+    input_text: str = Field(default="", max_length=5000)
 
 
 class AgentContinueRequest(BaseModel):
@@ -55,6 +88,9 @@ class AgentContinueRequest(BaseModel):
 
 class AgentConfirmRequest(BaseModel):
     session_id: str
+    # grant-draft-generator only — user-edited draft text applied before the
+    # PDF/DOCX is generated. Other confirm handlers accept and ignore it.
+    edits: Optional[dict[str, Any]] = None
 
 
 def _require_agent_access(agent_name: str, user: UserContext) -> Any:
@@ -158,9 +194,21 @@ async def agent_continue(
         "payload": body.model_dump(exclude_none=True),
         "checkpointer": cp,
     }
-    if agent_name in ("compliance-drafter", "immigration-navigator"):
+    # Only compliance-drafter's continue handler accepts user_id — the rest
+    # derive it from checkpointed state instead (see agent_runner.py).
+    # Passing it here raised TypeError on every second-and-later turn
+    # (Cursor Bugbot finding, verified by reading the handler signatures
+    # directly).
+    if agent_name == "compliance-drafter":
         kwargs["user_id"] = user.user_id
-    if agent_name == "immigration-navigator":
+    if agent_name in (
+        "immigration-navigator",
+        "retrenchment-navigator",
+        "property-concierge",
+        "study-agent",
+        "eligibility-agent",
+        "compliance-drafter",
+    ):
         kwargs["supabase_client"] = sb
 
     result = await handler(**kwargs)
@@ -182,7 +230,8 @@ async def agent_confirm(
     user: Annotated[UserContext, Depends(get_current_user)],
 ) -> dict[str, Any]:
     agent = _require_agent_access(agent_name, user)
-    if agent_name != "compliance-drafter":
+    handler = AGENT_CONFIRM_HANDLERS.get(agent_name)
+    if not handler:
         raise HTTPException(status_code=501, detail=f"Agent '{agent_name}' does not support confirm.")
 
     sb = getattr(request.app.state, "supabase", None)
@@ -191,12 +240,13 @@ async def agent_confirm(
         if remaining < agent.credit_cost:
             raise HTTPException(status_code=402, detail="Insufficient agent credits.")
 
-    result = await confirm_compliance_drafter(
+    result = await handler(
         session_id=body.session_id,
         user_id=user.user_id,
         user_email=user.email,
         supabase_client=sb,
         checkpointer=_checkpointer(request),
+        edits=body.edits,
     )
     if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
         remaining = await deduct_credits(sb, user.user_id, agent.credit_cost)
@@ -233,6 +283,64 @@ async def compliance_preview(
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"session_id": session_id, "report": status.get("report_json") or status.get("output")}
+
+
+@router.post("/health-triage/{session_id}/export")
+async def export_health_triage_pdf(
+    session_id: str,
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """On-demand PDF export of a completed Health Triage session. Health
+    Triage's graph has no HITL confirm step (unlike compliance-drafter/
+    grant-draft-generator, which generate their PDF as part of the graph
+    flow itself) — export here is a separate call after the fact instead,
+    so this doesn't re-run the graph or the LLM, just formats state that's
+    already there."""
+    _require_agent_access("health-triage", user)
+    sb = getattr(request.app.state, "supabase", None)
+    if not sb:
+        raise HTTPException(status_code=503, detail="Export is temporarily unavailable.")
+    try:
+        return await export_health_triage(
+            session_id=session_id,
+            checkpointer=_checkpointer(request),
+            supabase_client=sb,
+            user_id=user.user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{agent_name}/documents")
+async def list_agent_documents(
+    agent_name: str,
+    request: Request,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Recent generated files for this user + agent (grant-draft-generator,
+    compliance-drafter) — backs a draft-history list in the frontend.
+    Reads generated_documents, which _persist_document already writes to;
+    no new table. Signed URLs may have expired by the time this is read,
+    so the frontend must check url_expires_at before offering re-download."""
+    _require_agent_access(agent_name, user)
+    sb = getattr(request.app.state, "supabase", None)
+    if not sb:
+        raise HTTPException(status_code=503, detail="Document history is temporarily unavailable.")
+    try:
+        res = (
+            sb.table("generated_documents")
+            .select("id,storage_path,signed_url,url_expires_at,created_at")
+            .eq("user_id", user.user_id)
+            .eq("agent_type", agent_name)
+            .order("created_at", desc=True)
+            .limit(10)
+            .execute()
+        )
+        return res.data or []
+    except Exception as exc:
+        log.warning("agent_documents_fetch_failed", agent=agent_name, error=str(exc))
+        return []
 
 
 @router.get("/deadline-monitor/deadlines")

@@ -11,7 +11,7 @@ from app.agents.checkpointer import reset_checkpointer_for_tests
 from app.agents.compliance_drafter.graph import build_compliance_drafter_graph
 from app.agents.research_synthesiser.graph import build_research_synthesiser_graph
 from app.routers import agents as agents_router
-from services.agent_registry import AgentDefinition, load_agent_registry
+from services.agent_registry import load_agent_registry
 
 
 @pytest.fixture(autouse=True)

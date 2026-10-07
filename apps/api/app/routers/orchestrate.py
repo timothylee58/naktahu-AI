@@ -32,9 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.middleware.sanitise import sanitise_query
-from app.orchestration.context import OrchestratorContext
-from app.orchestration.context_bus import ContextBus
-from app.orchestration.orchestrator.executor_node import _build_agent_context, _execute_single_task
+from app.orchestration.orchestrator.executor_node import _execute_single_task
 from app.orchestration.orchestrator.merger_node import (
     _aggregate_suggestions,
     _compute_overall_confidence,
@@ -48,9 +46,7 @@ from app.orchestration.orchestrator.state import (
     OrchestratorState,
     SubTaskState,
 )
-from app.orchestration.registry import get_adapter, plan_satisfies
-from middleware.rate_limit import apply_query_rate_limit
-from services.auth import UserContext, get_current_user, get_optional_user
+from services.auth import UserContext, get_optional_user
 
 log = structlog.get_logger(__name__)
 
@@ -76,7 +72,6 @@ async def _stream_orchestration(
     language: str,
     domain: str,
     user: Optional[UserContext],
-    context_bus: Optional[ContextBus],
 ) -> AsyncGenerator[str, None]:
     """Async generator that yields SSE events as orchestration progresses.
 
@@ -216,16 +211,6 @@ async def _stream_orchestration(
 
     state["agent_results"] = all_results
 
-    # Publish to context bus if available
-    if context_bus and context_bus.available:
-        for r in all_results:
-            if r.get("status") == "completed":
-                await context_bus.publish_agent_output(
-                    correlation_id,
-                    r.get("agent_name", ""),
-                    r.get("structured_output", {}),
-                )
-
     # ── Stage 4: Synthesis / Merge ─────────────────────────────────────────
     yield _sse_event("synthesis", {"status": "started", "agents_completed": len(all_results)})
 
@@ -273,10 +258,6 @@ async def _stream_orchestration(
 
     yield _sse_event("done", {"session_id": session_id})
 
-    # Cleanup context bus
-    if context_bus and context_bus.available:
-        await context_bus.clear(correlation_id)
-
 
 @router.post("/orchestrate")
 async def orchestrate_query(
@@ -302,11 +283,8 @@ async def orchestrate_query(
     language = body.language or "en"
     domain = body.domain or "government"
 
-    # Get context bus from app state
-    context_bus: Optional[ContextBus] = getattr(request.app.state, "context_bus", None)
-
     return StreamingResponse(
-        _stream_orchestration(query, language, domain, user, context_bus),
+        _stream_orchestration(query, language, domain, user),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

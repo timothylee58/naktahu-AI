@@ -1,0 +1,20 @@
+-- Fix Supabase security advisor finding: public.hansard_segments was
+-- created (migration 025) with Postgres's default SECURITY DEFINER view
+-- behavior — it executes with the view *creator's* privileges rather than
+-- the querying role's, so it can bypass Row Level Security policies on its
+-- base tables (mp_profiles) even though it lives in `public` and is
+-- reachable through the Supabase API/PostgREST surface like any other view.
+--
+-- hansard_segments is not queried anywhere in application code (grep
+-- confirms no backend or frontend reference) — it's a DB-side convenience
+-- view over document_chunks (domain = 'hansard', currently always empty
+-- per migration 025's own comment — 'hansard' is still rejected by the
+-- valid_domain constraint) joined to mp_profiles. Both base relations are
+-- public government data with no per-row restriction: mp_profiles has an
+-- explicit "public read" RLS policy for anon/authenticated (migration 025),
+-- and document_chunks has no RLS enabled at all, so this is a pure
+-- least-privilege hardening — SECURITY INVOKER cannot expose any row
+-- SECURITY DEFINER doesn't already expose today.
+--
+-- Paste this file into the Supabase SQL editor. Not applied automatically.
+ALTER VIEW public.hansard_segments SET (security_invoker = true);

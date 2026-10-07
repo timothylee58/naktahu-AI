@@ -1,6 +1,7 @@
 """Orchestrate product-agent graph runs, checkpoints, and audit logging."""
 from __future__ import annotations
 
+import html
 import time
 import uuid
 from typing import Any, Callable, Optional
@@ -11,17 +12,23 @@ from langgraph.types import Command
 
 from app.agents.compliance_drafter.graph import get_compliance_drafter_graph
 from app.agents.compliance_drafter.state import ComplianceDrafterState
-from app.agents.grant_finder.graph import get_grant_finder_graph
+from app.agents.eligibility_agent.graph import get_eligibility_agent_graph
+from app.agents.grant_draft_generator.graph import get_grant_draft_generator_graph
+from app.agents.grant_draft_generator.nodes import compile_node as _grant_draft_compile_node
+from app.agents.grant_draft_generator.state import GrantDraftState
 from app.agents.health_triage.graph import get_health_triage_graph
 from app.agents.immigration_navigator.graph import get_immigration_navigator_graph
+from app.agents.property_concierge.graph import get_property_concierge_graph
 from app.agents.research_synthesiser.graph import get_research_synthesiser_graph
+from app.agents.retrenchment_navigator.graph import get_retrenchment_navigator_graph
+from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigator_graph
+from app.agents.runtime import thread_config as _thread_config
+from app.agents.scam_check_agent.graph import get_scam_check_agent_graph
 from app.agents.study_agent.graph import get_study_agent_graph
+from app.agents.welfare_eligibility_agent.graph import get_welfare_eligibility_agent_graph
 
 log = structlog.get_logger(__name__)
 
-
-def _thread_config(session_id: str) -> dict[str, Any]:
-    return {"configurable": {"thread_id": session_id}}
 
 
 def _base_response(session_id: str, values: dict[str, Any], *, awaiting: tuple = ()) -> dict[str, Any]:
@@ -35,7 +42,7 @@ def _base_response(session_id: str, values: dict[str, Any], *, awaiting: tuple =
 
 
 def _public_output(values: dict[str, Any]) -> dict[str, Any]:
-    skip = {"_supabase", "_user_email", "_rag_findings", "document_base64", "paper_text"}
+    skip = {"_supabase", "_user_email", "_rag_findings", "document_base64", "image_base64", "paper_text"}
     return {k: v for k, v in values.items() if not k.startswith("_") and k not in skip}
 
 
@@ -73,12 +80,14 @@ async def _run_graph(
     inputs: dict[str, Any],
     *,
     resume: bool = False,
+    supabase: Any = None,
 ) -> tuple[dict[str, Any], tuple]:
+    config = _thread_config(session_id, supabase=supabase)
     t0 = time.monotonic()
     if resume:
-        await graph.ainvoke(Command(resume=True), config=_thread_config(session_id))
+        await graph.ainvoke(Command(resume=True), config=config)
     else:
-        await graph.ainvoke(inputs, config=_thread_config(session_id))
+        await graph.ainvoke(inputs, config=config)
     latency_ms = round((time.monotonic() - t0) * 1000)
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
@@ -109,10 +118,9 @@ async def start_compliance_drafter(
         "language": payload.get("language", "bm"),
         "turns_count": 0,
         "tool_calls": [],
-        "_supabase": supabase_client,
         "_user_email": user_email,
     }
-    values, awaiting = await _run_graph(graph, session_id, inputs)
+    values, awaiting = await _run_graph(graph, session_id, inputs, supabase=supabase_client)
     _log_run(supabase_client, user_id, "compliance-drafter", session_id, payload, values, values.get("latency_ms", 0), "awaiting_hitl" if awaiting else "completed")
     resp = _base_response(session_id, values, awaiting=awaiting)
     resp["awaiting_hitl"] = bool(awaiting)
@@ -126,7 +134,14 @@ async def continue_compliance_drafter(
     user_id: str,
     payload: dict[str, Any],
     checkpointer: Any,
+    supabase_client: Any = None,
 ) -> dict[str, Any]:
+    # Confirmed cubic finding: this graph interrupt_before=["generate_pdf"]
+    # (compliance_drafter/graph.py), so a continue call against a thread
+    # already paused at that boundary resumes straight into generate_pdf_node
+    # — which needs the client. supabase_client wasn't even an accepted
+    # param here before, so that path always ran with no client. Threaded
+    # through the same way confirm_compliance_drafter already does.
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
     update: dict[str, Any] = {}
     for key in ("context", "business_type", "domains"):
@@ -135,7 +150,7 @@ async def continue_compliance_drafter(
     if update:
         await graph.aupdate_state(_thread_config(session_id), update)
     t0 = time.monotonic()
-    await graph.ainvoke(None, config=_thread_config(session_id))
+    await graph.ainvoke(None, config=_thread_config(session_id, supabase=supabase_client))
     latency_ms = round((time.monotonic() - t0) * 1000)
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
@@ -153,10 +168,11 @@ async def confirm_compliance_drafter(
     user_email: Optional[str],
     supabase_client: Any,
     checkpointer: Any,
+    edits: Optional[dict[str, Any]] = None,  # unused — compliance-drafter has no editable-draft UI
 ) -> dict[str, Any]:
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"_supabase": supabase_client, "_user_email": user_email})
-    values, _ = await _run_graph(graph, session_id, {}, resume=True)
+    await graph.aupdate_state(_thread_config(session_id), {"_user_email": user_email})
+    values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
     _log_run(supabase_client, user_id, "compliance-drafter", session_id, {"confirm": True}, values, values.get("latency_ms", 0), "completed")
     if supabase_client and values.get("pdf_storage_path"):
         _persist_document(supabase_client, user_id, "compliance-drafter", values)
@@ -195,6 +211,112 @@ def _persist_document(supabase_client: Any, user_id: str, agent_type: str, value
         log.warning("generated_document_persist_failed", error=str(exc))
 
 
+# ── Grant Draft Generator ────────────────────────────────────────────────────
+# Single-shot intake (programme_name + business_profile arrive together in
+# the start payload), same billing-on-confirm HITL shape as compliance-drafter:
+# credits are deducted only after the user approves the draft preview (see
+# confirm_grant_draft_generator + agents.py's generalised /confirm dispatch).
+
+
+async def start_grant_draft_generator(
+    *,
+    user_id: str,
+    payload: dict[str, Any],
+    supabase_client: Any,
+    checkpointer: Any,
+) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    inputs: GrantDraftState = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "programme_name": payload.get("programme_name", ""),
+        "business_profile": payload.get("business_profile") or {},
+        "language": payload.get("language", "bm"),
+        "export_format": payload.get("export_format", "pdf"),
+        "turns_count": 0,
+        "tool_calls": [],
+    }
+    values, awaiting = await _run_graph(graph, session_id, inputs, supabase=supabase_client)
+    status = "error" if values.get("error") else ("awaiting_hitl" if awaiting else "completed")
+    _log_run(supabase_client, user_id, "grant-draft-generator", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values, awaiting=awaiting)
+    resp["status"] = status
+    resp["awaiting_hitl"] = bool(awaiting) and not values.get("error")
+    resp["report_json"] = values.get("report_json")
+    if values.get("error"):
+        resp["error"] = values["error"]
+    return resp
+
+
+_EDITABLE_GRANT_DRAFT_FIELDS = {"executive_summary", "use_of_funds_narrative"}
+
+
+async def confirm_grant_draft_generator(
+    *,
+    session_id: str,
+    user_id: str,
+    user_email: Optional[str],
+    supabase_client: Any,
+    checkpointer: Any,
+    edits: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    state_update: dict[str, Any] = {"_user_email": user_email}
+    if edits:
+        # compile_node already ran before the interrupt and baked the
+        # ORIGINAL executive_summary/use_of_funds_narrative into report_html
+        # — just overwriting those two fields wouldn't change the generated
+        # PDF/DOCX. Re-run compile_node against the edited state so
+        # report_html/report_json reflect the user's edits before resuming.
+        clean_edits = {k: v for k, v in edits.items() if k in _EDITABLE_GRANT_DRAFT_FIELDS and isinstance(v, str)}
+        if clean_edits:
+            snapshot = await graph.aget_state(_thread_config(session_id))
+            current = dict(snapshot.values) if snapshot and snapshot.values else {}
+            current.update(clean_edits)
+            # compile_node is a pure state -> report builder (mirrors
+            # compliance_drafter's compile_node) and takes no config — it
+            # never touches Supabase. Confirmed real Cursor/cubic finding:
+            # passing one here raised TypeError (2 args, 1 accepted) on
+            # every edited-draft confirm.
+            recompiled = await _grant_draft_compile_node(current)
+            state_update.update(clean_edits)
+            state_update.update(recompiled)
+    await graph.aupdate_state(_thread_config(session_id), state_update)
+    values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
+    status = "error" if values.get("error") else "completed"
+    _log_run(supabase_client, user_id, "grant-draft-generator", session_id, {"confirm": True}, values, values.get("latency_ms", 0), status)
+    if supabase_client and (values.get("pdf_storage_path") or values.get("docx_storage_path")):
+        _persist_document(supabase_client, user_id, "grant-draft-generator", {
+            "pdf_storage_path": values.get("pdf_storage_path") or values.get("docx_storage_path"),
+            "signed_url": values.get("signed_url"),
+            "url_expires_at": values.get("url_expires_at"),
+        })
+    resp = _base_response(session_id, values)
+    resp["status"] = status
+    resp["signed_url"] = values.get("signed_url")
+    resp["url_expires_at"] = values.get("url_expires_at")
+    resp["email_sent"] = values.get("email_sent", False)
+    if values.get("error"):
+        resp["error"] = values["error"]
+    return resp
+
+
+async def get_grant_draft_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
+    graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        return {"session_id": session_id, "status": "not_found"}
+    values = dict(snapshot.values)
+    awaiting = snapshot.next
+    return {
+        "session_id": session_id,
+        "status": "awaiting_hitl" if awaiting else values.get("status", "completed"),
+        "report_json": values.get("report_json"),
+        "output": _public_output(values),
+    }
+
+
 # ── Study Agent ───────────────────────────────────────────────────────────────
 
 
@@ -204,21 +326,28 @@ async def start_study_agent(*, user_id: str, payload: dict[str, Any], supabase_c
     inputs = {
         "session_id": session_id,
         "user_id": user_id,
+        "level": payload.get("level", "spm"),
         "subject": payload.get("subject", "sejarah"),
+        "mode": payload.get("mode", "explain"),
         "paper_text": payload.get("paper_text", ""),
         "document_base64": payload.get("document_base64", ""),
+        "image_base64": payload.get("image_base64", ""),
+        "image_mime_type": payload.get("image_mime_type", ""),
         "message": payload.get("message", ""),
         "language": payload.get("language", "bm"),
         "turns_count": 0,
         "tool_calls": [],
     }
     values, _ = await _run_graph(graph, session_id, inputs)
-    _log_run(supabase_client, user_id, "study-agent", session_id, payload, values, values.get("latency_ms", 0), "completed")
+    logged_payload = {k: v for k, v in payload.items() if k not in ("document_base64", "image_base64")}
+    _log_run(supabase_client, user_id, "study-agent", session_id, logged_payload, values, values.get("latency_ms", 0), "completed")
     return _base_response(session_id, values)
 
 
-async def continue_study_agent(*, session_id: str, payload: dict[str, Any], checkpointer: Any) -> dict[str, Any]:
-    from app.agents.study_agent.nodes import explain_node, track_topics_node
+async def continue_study_agent(
+    *, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any
+) -> dict[str, Any]:
+    from app.agents.study_agent.nodes import explain_node, grade_quiz_answer_node, track_topics_node
 
     graph = get_study_agent_graph(checkpointer=checkpointer)
     snapshot = await graph.aget_state(_thread_config(session_id))
@@ -230,10 +359,23 @@ async def continue_study_agent(*, session_id: str, payload: dict[str, Any], chec
         state["active_question_index"] = payload["question_index"]
     state["turns_count"] = int(state.get("turns_count") or 0) + 1
     t0 = time.monotonic()
-    state.update(await explain_node(state))
+    if state.get("mode") == "quiz" and state.get("quiz"):
+        state.update(await grade_quiz_answer_node(state))
+    else:
+        state.update(await explain_node(state))
     state.update(await track_topics_node(state))
     await graph.aupdate_state(_thread_config(session_id), state)
     state["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    # Confirmed Cursor Bugbot finding: this never logged a row on continue
+    # turns at all — only start_study_agent did — so a History link to a
+    # multi-turn study session always resumed to turn-1's stale
+    # explanations, no matter how many follow-up questions were asked
+    # since. Same user_id-from-checkpointed-state pattern
+    # continue_immigration_navigator/continue_retrenchment_navigator
+    # already use, since this handler's signature (like theirs) doesn't
+    # take user_id directly.
+    user_id = state.get("user_id") or ""
+    _log_run(supabase_client, user_id, "study-agent", session_id, payload, state, state.get("latency_ms", 0), "completed")
     return _base_response(session_id, state)
 
 
@@ -270,9 +412,19 @@ async def start_immigration_navigator(*, user_id: str, payload: dict[str, Any], 
 
 async def continue_immigration_navigator(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
     graph = get_immigration_navigator_graph(checkpointer=checkpointer)
-    await graph.aupdate_state(_thread_config(session_id), {"message": payload.get("message", "")})
     t0 = time.monotonic()
-    await graph.ainvoke(None, config=_thread_config(session_id))
+    # This graph has no interrupt() call — every turn runs START->...->END, it
+    # never pauses mid-graph. ainvoke(None, config) only resumes a graph that
+    # is paused at an interrupt; called against a graph that already reached
+    # END (which every "needs_input" turn does, since route_after_intake
+    # sends incomplete intake straight to END), it is a no-op — verified
+    # empirically, zero node events fire — so turn 2 onward silently returned
+    # turn 1's stale state forever. Passing the new message as real input
+    # instead makes ainvoke actually restart the graph from START with the
+    # existing checkpointed state as its base (found via a Cursor Bugbot
+    # review of the same pattern in retrenchment_navigator; this function had
+    # the identical bug already, unrelated to that PR).
+    await graph.ainvoke({"message": payload.get("message", "")}, config=_thread_config(session_id))
     snapshot = await graph.aget_state(_thread_config(session_id))
     values = dict(snapshot.values) if snapshot else {}
     values["latency_ms"] = round((time.monotonic() - t0) * 1000)
@@ -287,6 +439,107 @@ async def continue_immigration_navigator(*, session_id: str, payload: dict[str, 
 
 async def get_immigration_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
     graph = get_immigration_navigator_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        return {"session_id": session_id, "status": "not_found"}
+    values = dict(snapshot.values)
+    return {"session_id": session_id, "status": values.get("status", "completed"), "output": _public_output(values)}
+
+
+async def start_retrenchment_navigator(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "message": payload.get("message", ""),
+        "language": payload.get("language", "bm"),
+        "turns_count": 0,
+        "tool_calls": [],
+    }
+    values, _ = await _run_graph(graph, session_id, inputs)
+    status = values.get("status", "completed")
+    _log_run(supabase_client, user_id, "retrenchment-navigator", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def continue_retrenchment_navigator(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
+    t0 = time.monotonic()
+    # See continue_immigration_navigator's comment — same graph shape (no
+    # interrupt(), incomplete intake goes straight to END), same fix: pass
+    # the new message as real input so ainvoke actually restarts the graph
+    # from START instead of no-op'ing against an already-terminal thread.
+    await graph.ainvoke({"message": payload.get("message", "")}, config=_thread_config(session_id))
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    values = dict(snapshot.values) if snapshot else {}
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    status = values.get("status", "completed")
+    user_id = values.get("user_id") or ""
+    _log_run(supabase_client, user_id, "retrenchment-navigator", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def get_retrenchment_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
+    graph = get_retrenchment_navigator_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        return {"session_id": session_id, "status": "not_found"}
+    values = dict(snapshot.values)
+    return {"session_id": session_id, "status": values.get("status", "completed"), "output": _public_output(values)}
+
+
+# ── Property Concierge ────────────────────────────────────────────────────────
+
+
+async def start_property_concierge(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_property_concierge_graph(checkpointer=checkpointer)
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "message": payload.get("message", ""),
+        "language": payload.get("language", "bm"),
+        "turns_count": 0,
+        "tool_calls": [],
+    }
+    values, _ = await _run_graph(graph, session_id, inputs)
+    status = values.get("status", "completed")
+    _log_run(supabase_client, user_id, "property-concierge", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def continue_property_concierge(*, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    graph = get_property_concierge_graph(checkpointer=checkpointer)
+    t0 = time.monotonic()
+    # Same fix as continue_immigration_navigator/continue_retrenchment_navigator
+    # — this graph has no interrupt(), so the new message must be passed as
+    # real input to actually restart the graph from START against the
+    # existing checkpointed state, not a no-op ainvoke(None, ...).
+    await graph.ainvoke({"message": payload.get("message", "")}, config=_thread_config(session_id))
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    values = dict(snapshot.values) if snapshot else {}
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    status = values.get("status", "completed")
+    user_id = values.get("user_id") or ""
+    _log_run(supabase_client, user_id, "property-concierge", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values)
+    if status == "needs_input":
+        resp["next_prompt"] = values.get("next_prompt")
+    return resp
+
+
+async def get_property_concierge_status(session_id: str, checkpointer: Any) -> dict[str, Any]:
+    graph = get_property_concierge_graph(checkpointer=checkpointer)
     snapshot = await graph.aget_state(_thread_config(session_id))
     if not snapshot or not snapshot.values:
         return {"session_id": session_id, "status": "not_found"}
@@ -320,25 +573,188 @@ async def get_health_status(session_id: str, checkpointer: Any) -> dict[str, Any
     return {"session_id": session_id, "status": "completed", "output": _public_output(dict(snapshot.values))}
 
 
-# ── Grant Finder ──────────────────────────────────────────────────────────────
+def _render_health_triage_html(values: dict[str, Any]) -> str:
+    """Render a completed Health Triage session's state to a printable HTML
+    summary — same generate_pdf() tool compliance_drafter/grant_draft_generator
+    already use, applied to a session that's already fully answered (this
+    graph has no HITL confirm step, unlike those two), so this doesn't
+    re-run the graph or the LLM, just formats what's already there.
+    User-supplied free text (symptoms, from the intake message) is
+    html.escape()'d before interpolation — a real, if low-severity, gap in
+    the pattern this mirrors (compliance_drafter/grant_draft_generator's
+    own HTML building doesn't escape either), worth not repeating here."""
+    symptoms = ", ".join(html.escape(s) for s in (values.get("symptoms") or []))
+    severity = html.escape(str(values.get("severity") or ""))
+    recommendation = html.escape(str(values.get("facility_recommendation") or ""))
+    disclaimer = html.escape(str(values.get("disclaimer") or ""))
+
+    facility_items = "".join(
+        f"<li><strong>{html.escape(str(f.get('name', '')))}</strong>: {html.escape(str(f.get('action', '')))}</li>"
+        for f in (values.get("facilities") or [])
+    )
+    # Requires both title AND a real source url before rendering — matching
+    # CLAUDE.md's citation rule (only real gov.my-family URLs, never a
+    # citation-shaped entry with no verified source behind it). facility_node
+    # already filters citations to those with source_url before they reach
+    # state, but this is defense-in-depth against any future caller of this
+    # renderer that doesn't pre-filter — confirmed CodeRabbit finding.
+    citation_items = "".join(
+        f'<li><a href="{html.escape(str(c["url"]), quote=True)}">{html.escape(str(c.get("title", "")))}</a>'
+        f' ({html.escape(str(c.get("ministry", "")))})</li>'
+        for c in (values.get("citations") or [])
+        if c.get("title") and c.get("url")
+    )
+
+    return (
+        "<html><body>"
+        "<h1>Health Triage Summary</h1>"
+        f"<p><strong>Symptoms reported:</strong> {symptoms or '—'}</p>"
+        f"<p><strong>Severity:</strong> {severity}</p>"
+        f"<h2>Recommendation</h2><p>{recommendation}</p>"
+        f"<h2>Suggested Facilities</h2><ul>{facility_items}</ul>"
+        + (f"<h2>Sources</h2><ul>{citation_items}</ul>" if citation_items else "")
+        + f"<p><em>{disclaimer}</em></p>"
+        "</body></html>"
+    )
 
 
-async def start_grant_finder(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+async def export_health_triage(
+    *, session_id: str, checkpointer: Any, supabase_client: Any, user_id: str
+) -> dict[str, Any]:
+    """On-demand PDF export of a completed Health Triage session — no
+    graph re-run, no new LLM call, just formats already-generated state.
+    Raises ValueError (mapped to 404 by the router) when the session
+    doesn't exist, hasn't finished yet, or doesn't belong to the
+    requesting user — confirmed Cursor/CodeRabbit finding: session_id is
+    a checkpointer thread_id with no ownership check of its own, so any
+    authenticated user who obtained (or guessed) another user's session_id
+    could otherwise export that user's symptoms/facility recommendation.
+    Checked against the state's own user_id (set by start_health_triage's
+    inputs, not user-suppliable on this export call) rather than a
+    separate DB lookup — cheaper, and doesn't depend on agent_runs having
+    a row for this session."""
+    graph = get_health_triage_graph(checkpointer=checkpointer)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    if not snapshot or not snapshot.values:
+        raise ValueError("session not found")
+    values = dict(snapshot.values)
+    if values.get("user_id") != user_id:
+        # Same 404 as "doesn't exist" — an export attempt against someone
+        # else's session must not reveal (via a distinct 403) that the
+        # session_id is valid at all.
+        raise ValueError("session not found")
+    if not values.get("facility_recommendation"):
+        raise ValueError("session not yet completed")
+
+    from app.agents.tools import generate_pdf as gen_pdf
+
+    html_report = _render_health_triage_html(values)
+    path, url, expires = await gen_pdf(
+        html_report,
+        user_id=user_id,
+        agent_type="health-triage",
+        supabase_client=supabase_client,
+    )
+    result = {"pdf_storage_path": path, "signed_url": url, "url_expires_at": expires or None}
+    if supabase_client and path:
+        # Same generated_documents row shape compliance-drafter/grant-draft-
+        # generator write — the existing GET /agents/{agent_name}/documents
+        # endpoint reads this table generically by agent_type, so health-
+        # triage exports show up in that history list automatically, no
+        # endpoint change needed there.
+        _persist_document(supabase_client, user_id, "health-triage", result)
+    return result
+
+
+# ── Eligibility Agent ────────────────────────────────────────────────────────
+# Multi-turn: intake spans several turns before the graph reaches grant_rag +
+# analyst, so this agent needs both a start and a continue handler (unlike
+# the single-shot grant-finder it replaces).
+
+
+async def start_eligibility_agent(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
     session_id = str(uuid.uuid4())
-    graph = get_grant_finder_graph(checkpointer=checkpointer)
+    graph = get_eligibility_agent_graph(checkpointer=checkpointer)
+    business_profile: dict[str, Any] = {}
+    for key in ("business_type", "sector", "annual_revenue_myr", "is_bumiputera", "registered_months"):
+        if payload.get(key) is not None:
+            business_profile[key] = payload[key]
     inputs = {
         "session_id": session_id,
         "user_id": user_id,
-        "sector": payload.get("sector", ""),
-        "business_stage": payload.get("business_stage", ""),
-        "funding_need": payload.get("funding_need", ""),
-        "message": payload.get("message", ""),
         "language": payload.get("language", "bm"),
-        "tool_calls": [],
+        "current_turn": 0,
+        "messages": [],
+        "latest_user_input": payload.get("message", ""),
+        "business_profile": business_profile or None,
+        "intake_complete": False,
+        "needs_more_info": True,
+        "needs_clarification": False,
     }
-    values, _ = await _run_graph(graph, session_id, inputs)
-    _log_run(supabase_client, user_id, "grant-finder", session_id, payload, values, values.get("latency_ms", 0), "completed")
-    return _base_response(session_id, values)
+    values, awaiting = await _run_graph(graph, session_id, inputs, supabase=supabase_client)
+    status = "completed" if values.get("intake_complete") else "awaiting_hitl"
+    _log_run(supabase_client, user_id, "eligibility-agent", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values, awaiting=awaiting)
+    resp["status"] = status
+    resp["awaiting_hitl"] = not values.get("intake_complete", False)
+    resp["output"] = {
+        "next_question": values.get("next_question"),
+        "matched_grants": values.get("matched_grants", []),
+        "near_miss_grants": values.get("near_miss_grants", []),
+        "stacking_matrix": values.get("stacking_matrix"),
+    }
+    return resp
+
+
+async def continue_eligibility_agent(
+    *, session_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any
+) -> dict[str, Any]:
+    # Adjacent pre-existing bug found while fixing the Cursor Bugbot finding
+    # below (not something this change introduced) — flagging per CLAUDE.md
+    # §8 rather than silently patching: this graph's own _route_after_intake
+    # sends incomplete intake straight to END with no interrupt() call, the
+    # exact same shape as the bug already found and fixed in
+    # continue_immigration_navigator/continue_retrenchment_navigator (see
+    # those functions' comments). `ainvoke(None, config)` only resumes a
+    # graph paused at an interrupt; called against an already-terminal
+    # thread (which every "needs more info" turn is, since there's no
+    # interrupt to pause at) it's a no-op — turn 2 onward silently returned
+    # turn 1's stale state forever, not just for the /history resume
+    # feature but for every live multi-turn Grant Finder conversation.
+    # Fixed the same way those two were: pass the new message as real
+    # ainvoke input so the graph actually restarts from START with the
+    # existing checkpointed state as its base.
+    graph = get_eligibility_agent_graph(checkpointer=checkpointer)
+    t0 = time.monotonic()
+    # The completing turn runs grant_rag + analyst, both of which need the
+    # client — so it goes in this turn's config too, not just start's.
+    await graph.ainvoke(
+        {"latest_user_input": payload.get("message", "")},
+        config=_thread_config(session_id, supabase=supabase_client),
+    )
+    latency_ms = round((time.monotonic() - t0) * 1000)
+    snapshot = await graph.aget_state(_thread_config(session_id))
+    values = dict(snapshot.values) if snapshot else {}
+    values["latency_ms"] = latency_ms
+    awaiting = snapshot.next if snapshot else ()
+    status = "completed" if values.get("intake_complete") else "awaiting_hitl"
+    # Confirmed Cursor Bugbot finding: this never logged a row on continue
+    # turns at all — only start_eligibility_agent did — so a History link
+    # to a multi-turn Grant Finder session always resumed to turn-1's
+    # awaiting_hitl status and first-turn output, no matter how far the
+    # conversation actually progressed.
+    user_id = values.get("user_id") or ""
+    _log_run(supabase_client, user_id, "eligibility-agent", session_id, payload, values, values.get("latency_ms", 0), status)
+    resp = _base_response(session_id, values, awaiting=awaiting)
+    resp["status"] = status
+    resp["awaiting_hitl"] = not values.get("intake_complete", False)
+    resp["output"] = {
+        "next_question": values.get("next_question"),
+        "matched_grants": values.get("matched_grants", []),
+        "near_miss_grants": values.get("near_miss_grants", []),
+        "stacking_matrix": values.get("stacking_matrix"),
+    }
+    return resp
 
 
 # ── Research Synthesiser ──────────────────────────────────────────────────────
@@ -362,6 +778,122 @@ async def start_research_synthesiser(*, user_id: str, payload: dict[str, Any], s
         "output": _public_output(values),
         "citations": values.get("merged_citations") or values.get("citations") or [],
         "detected_domains": values.get("detected_domains") or [],
+        "summary": values.get("summary") or "",
+    }
+
+
+# ── SME Compliance Navigator (PatuhiKu) ─────────────────────────────────────
+
+
+async def start_sme_compliance_navigator(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    session_id = str(uuid.uuid4())
+    graph = get_sme_compliance_navigator_graph()
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "business_profile": payload.get("business_profile", ""),
+        "language": payload.get("language", "bm"),
+        "domain_results": [],
+    }
+    t0 = time.monotonic()
+    values = await graph.ainvoke(inputs)
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    _log_run(supabase_client, user_id, "sme-compliance-navigator", session_id, payload, values, values.get("latency_ms", 0), "completed")
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "output": _public_output(values),
+        "checklist": values.get("checklist") or [],
+        "stale_warnings": values.get("stale_warnings") or [],
+        "triggered_domains": values.get("triggered_domains") or [],
+    }
+
+
+# ── Welfare Eligibility Agent ────────────────────────────────────────────────
+
+
+async def start_welfare_eligibility_agent(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    """Single-shot: one complete WelfareProfile in, matched madani_scheme
+    rows + an LLM explanation out. No checkpointer needed — same single-shot
+    shape as sme_compliance_navigator, not eligibility_agent's multi-turn
+    intake. match_node needs supabase (queries madani_scheme directly), so
+    unlike sme_compliance_navigator's bare ainvoke(), this threads a config
+    the same way eligibility_agent's grant_rag_node does.
+
+    Deliberately does NOT call _log_run(). Every other agent here logs its
+    full input_payload to agent_runs — for this agent that payload is a
+    demographic/income/disability profile, and privacy/page.tsx's §2.4
+    explicitly promises this data is processed in memory for one request
+    and never written to our database. _log_run(payload=...) would
+    silently break that promise the same way it would for every other
+    agent (it wasn't designed with a sensitive-payload case in mind).
+    No agent_runs row means no History entry and no resume-from-history
+    for this agent — an intentional consequence of actually being
+    stateless, not an oversight.
+    """
+    session_id = str(uuid.uuid4())
+    graph = get_welfare_eligibility_agent_graph()
+    profile_fields = (
+        "birth_year", "gender", "state", "ethnic_group", "marital_status",
+        "individual_monthly_income_myr", "household_monthly_income_myr",
+        "dependents_children", "dependents_elderly", "dependents_oku", "dependents_chronic_ill",
+        "employment_status", "education_level", "is_oku", "housing_ownership",
+    )
+    profile = {k: payload[k] for k in profile_fields if payload.get(k) is not None}
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "language": payload.get("language", "bm"),
+        "profile": profile,
+    }
+    config = _thread_config(session_id, supabase=supabase_client)
+    t0 = time.monotonic()
+    values = await graph.ainvoke(inputs, config=config)
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "output": _public_output(values),
+        "matched_schemes": values.get("matched_schemes") or [],
+        "no_schemes_loaded": values.get("no_schemes_loaded", False),
+        "summary": values.get("summary", ""),
+    }
+
+
+async def start_scam_check_agent(*, user_id: str, payload: dict[str, Any], supabase_client: Any, checkpointer: Any) -> dict[str, Any]:
+    """Single-shot: one pasted SMS/link/phone number in, a deterministic
+    verified/impersonation-risk/unverified check node result explained by
+    the LLM out. No checkpointer needed — same single-shot shape as
+    welfare_eligibility_agent. check_node needs supabase (queries
+    official_gov_domains), so this threads a config the same way.
+
+    Deliberately does NOT call _log_run(). The pasted input can contain
+    phone numbers or account-adjacent details a user is asking about
+    precisely because they're worried it's sensitive — same privacy
+    reasoning as welfare_eligibility_agent not persisting its profile
+    payload (see that function's docstring). No agent_runs row means no
+    History entry for this agent, matching that same intentional tradeoff.
+    """
+    session_id = str(uuid.uuid4())
+    graph = get_scam_check_agent_graph()
+    inputs = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "language": payload.get("language", "bm"),
+        "input_text": payload.get("input_text", ""),
+    }
+    config = _thread_config(session_id, supabase=supabase_client)
+    t0 = time.monotonic()
+    values = await graph.ainvoke(inputs, config=config)
+    values["latency_ms"] = round((time.monotonic() - t0) * 1000)
+    return {
+        "session_id": session_id,
+        "status": "completed",
+        "output": _public_output(values),
+        "checks": values.get("checks") or [],
+        "overall_verdict": values.get("overall_verdict", "no_url_found"),
+        "text_red_flags": values.get("text_red_flags") or [],
+        "summary": values.get("summary", ""),
     }
 
 
@@ -369,17 +901,26 @@ async def start_research_synthesiser(*, user_id: str, payload: dict[str, Any], s
 
 AGENT_START_HANDLERS: dict[str, Callable[..., Any]] = {
     "compliance-drafter": start_compliance_drafter,
+    "sme-compliance-navigator": start_sme_compliance_navigator,
     "study-agent": start_study_agent,
     "immigration-navigator": start_immigration_navigator,
     "health-triage": start_health_triage,
-    "grant-finder": start_grant_finder,
+    "eligibility-agent": start_eligibility_agent,
     "research-synthesiser": start_research_synthesiser,
+    "grant-draft-generator": start_grant_draft_generator,
+    "retrenchment-navigator": start_retrenchment_navigator,
+    "welfare-eligibility-agent": start_welfare_eligibility_agent,
+    "property-concierge": start_property_concierge,
+    "scam-check-agent": start_scam_check_agent,
 }
 
 AGENT_CONTINUE_HANDLERS: dict[str, Callable[..., Any]] = {
     "compliance-drafter": continue_compliance_drafter,
     "study-agent": continue_study_agent,
     "immigration-navigator": continue_immigration_navigator,
+    "eligibility-agent": continue_eligibility_agent,
+    "retrenchment-navigator": continue_retrenchment_navigator,
+    "property-concierge": continue_property_concierge,
 }
 
 AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
@@ -387,6 +928,19 @@ AGENT_STATUS_HANDLERS: dict[str, Callable[..., Any]] = {
     "study-agent": get_study_status,
     "immigration-navigator": get_immigration_status,
     "health-triage": get_health_status,
+    "grant-draft-generator": get_grant_draft_status,
+    "retrenchment-navigator": get_retrenchment_status,
+    "property-concierge": get_property_concierge_status,
+}
+
+# agent_name -> confirm handler. Every entry here is dispatched generically
+# by agents.py's /confirm endpoint (billing happens here, after HITL preview
+# approval — never at start). Keep the kwargs shape (session_id, user_id,
+# user_email, supabase_client, checkpointer) identical across entries so the
+# router can call them uniformly.
+AGENT_CONFIRM_HANDLERS: dict[str, Callable[..., Any]] = {
+    "compliance-drafter": confirm_compliance_drafter,
+    "grant-draft-generator": confirm_grant_draft_generator,
 }
 
 CREDIT_ON_COMPLETE_AGENTS = frozenset({"immigration-navigator"})

@@ -1,11 +1,12 @@
 """POST /api/v1/query — SSE streaming endpoint."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
 import uuid
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Awaitable, Callable, Optional
 
 import structlog
 import weave
@@ -33,6 +34,10 @@ class QueryRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=1000)
     session_id: Optional[str] = Field(default=None, max_length=128)
     language: Optional[Language] = None
+    # The visitor's saved postcode (from the landing page), so "who is my
+    # MP?" can be answered via postcode_constituencies (migration 054)
+    # without the user retyping it. Only digits ever reach the pipeline.
+    postcode: Optional[str] = Field(default=None, pattern=r"^\d{5}$")
 
     @field_validator("session_id")
     @classmethod
@@ -71,13 +76,28 @@ async def _run_pipeline(
     session_id: str,
     user_id: Optional[str],
     domain: Optional[str] = None,
+    on_token: Optional[Callable[[str], Awaitable[None]]] = None,
+    postcode: Optional[str] = None,
 ) -> dict:
     """Execute the full LangGraph pipeline and return a structured result dict.
 
     This is the root Weave trace for every query. All agent nodes decorated
     with @weave.op automatically nest as child spans under this call.
 
-    Returns a dict consumed by _sse_generator to stream SSE events.
+    Returns a dict consumed by callers that want the buffered full answer
+    (the JSON /api/v1/public/query response — see routers/api_v1_public.py's
+    _execute_query, which genuinely needs the complete string, not a
+    stream). SSE callers (_sse_generator below, and
+    routers/api_v1_public.py's /query/stream) instead pass `on_token`, which
+    fires as each token arrives from synthesiser_node's real-time
+    LangGraph custom-stream channel — this is what actually makes /query
+    stream token-by-token to the client instead of buffering the whole
+    answer here and replaying it in one burst once the graph is done
+    (that was the previous behaviour: tokens were only ever appended to a
+    list and returned after the `async for` below fully completed, so
+    every SSE consumer paid the full pipeline latency — router
+    classification + embed + hybrid search + rerank + the ENTIRE synthesis
+    generation — before seeing a single byte).
     """
     inputs: AgentState = {
         "query": query,
@@ -92,6 +112,8 @@ async def _run_pipeline(
     }
     if domain:
         inputs["domain"] = domain
+    if postcode:
+        inputs["user_postcode"] = postcode
 
     tokens: list[str] = []
     final_state: AgentState = {}  # type: ignore[assignment]
@@ -101,7 +123,10 @@ async def _run_pipeline(
         inputs, stream_mode=["updates", "custom"]
     ):
         if mode == "custom":
-            tokens.append(str(data))
+            token = str(data)
+            tokens.append(token)
+            if on_token is not None:
+                await on_token(token)
         elif mode == "updates":
             if isinstance(data, dict):
                 for _node, update in data.items():
@@ -129,20 +154,75 @@ async def _run_pipeline(
     }
 
 
+async def _stream_pipeline(
+    query: str,
+    session_id: str,
+    user_id: Optional[str],
+    domain: Optional[str] = None,
+    postcode: Optional[str] = None,
+) -> AsyncGenerator[tuple[str, Any], None]:
+    """Runs _run_pipeline in the background and yields ("token", str) events
+    the moment each one arrives, followed by exactly one final
+    ("result", dict) event once the graph completes — the same dict
+    _run_pipeline itself returns (tokens/final_state/metrics).
+
+    Bridges via an asyncio.Queue + background task rather than turning
+    _run_pipeline itself into an async generator: _run_pipeline stays a
+    plain @weave.op()-decorated coroutine (unclear/unverified whether
+    Weave's tracing wrapper here behaves correctly on an async generator —
+    no existing decorated generator anywhere in this codebase to confirm
+    against), so this is a producer/consumer bridge around the coroutine
+    instead, not a rewrite of it. Shared by both SSE consumers
+    (_sse_generator below and routers/api_v1_public.py's
+    /query/stream) so the bridging logic exists in exactly one place.
+    """
+    queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+
+    async def on_token(token: str) -> None:
+        await queue.put(("token", token))
+
+    async def produce() -> None:
+        try:
+            result = await _run_pipeline(
+                query, session_id, user_id, domain=domain, on_token=on_token, postcode=postcode
+            )
+            await queue.put(("result", result))
+        except Exception as exc:  # noqa: BLE001 — re-raised to the consumer below, not swallowed
+            await queue.put(("error", exc))
+
+    task = asyncio.create_task(produce())
+    try:
+        while True:
+            kind, payload = await queue.get()
+            if kind == "error":
+                raise payload
+            yield kind, payload
+            if kind == "result":
+                return
+    finally:
+        if not task.done():
+            task.cancel()
+
+
 async def _sse_generator(
     query: str,
     session_id: str,
     user_ctx: Optional[UserContext],
     request: Request,
     language_hint: Optional[str],
+    postcode: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     try:
-        result = await _run_pipeline(query, session_id, user_ctx.user_id if user_ctx else None)
-        tokens = result["tokens"]
-        final_state = result["final_state"]
-
-        for token in tokens:
-            yield _sse("token", {"text": token})
+        tokens: list[str] = []
+        final_state: dict = {}
+        async for kind, payload in _stream_pipeline(
+            query, session_id, user_ctx.user_id if user_ctx else None, postcode=postcode
+        ):
+            if kind == "token":
+                tokens.append(payload)
+                yield _sse("token", {"text": payload})
+            else:  # kind == "result"
+                final_state = payload["final_state"]
 
         for citation in final_state.get("citations", []):
             yield _sse("citation", dict(citation))
@@ -182,6 +262,9 @@ async def _sse_generator(
                     domain=str(final_state.get("domain") or "general"),
                     response_text=full_text,
                     citations=list(final_state.get("citations") or []),
+                    confidence=final_state.get("confidence_score"),
+                    suggestions=list(final_state.get("suggestions") or []),
+                    agency_contact=final_state.get("agency_contact"),
                 )
             except Exception as exc:
                 log.warning("history_persist_failed", error=str(exc), user_id=user_ctx.user_id)
@@ -220,7 +303,7 @@ async def query_endpoint(
     log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
 
     return StreamingResponse(
-        _sse_generator(clean_query, session_id, user_ctx, request, body.language),
+        _sse_generator(clean_query, session_id, user_ctx, request, body.language, body.postcode),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

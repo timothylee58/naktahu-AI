@@ -53,7 +53,7 @@ The pipeline is a LangGraph `StateGraph` with four nodes executed in sequence. S
 
 Classifies the query into:
 - **language:** `bm` (Bahasa Malaysia), `en` (English), or `zh` (Chinese/Mandarin)
-- **domain:** `government`, `education`, `legal`, `finance`, `healthcare`, `epf`, `tax`, `business`, `immigration`, or `culture`
+- **domain:** `government`, `education`, `legal`, `finance`, `healthcare`, `epf`, `tax`, `business`, `immigration`, `culture`, `parliament`, or `property`
 
 Uses the ILMU chat model with structured JSON output. A deterministic CJK Unicode range check runs after the LLM call and overrides the language result when Chinese characters are detected, preventing misclassification of Chinese queries as BM.
 
@@ -74,7 +74,7 @@ Scores the relevance of each retrieved chunk (0.0–1.0) and sets `confidence_sc
 
 Streams the final answer via `AsyncGenerator`:
 - **Primary LLM:** ILMU API (OpenAI-compatible)
-- **Fallback LLM:** Anthropic `claude-sonnet-4-20250514`
+- **Fallback LLM:** Anthropic `claude-sonnet-5` (`llm_client.FALLBACK_MODEL`)
 
 A language-specific instruction is prepended to the system prompt to enforce response language matching the query language. If both LLMs fail, a localized degraded message is returned instead of a hard error.
 

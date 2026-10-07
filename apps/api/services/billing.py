@@ -42,6 +42,11 @@ _PLAN_ITEMS: dict[str, tuple[str, str]] = {
     "pro_individu": ("stripe_price_pro_individu", "pro"),
     "pro_perniagaan": ("stripe_price_pro_perniagaan", "business"),
     "student": ("stripe_price_student", "student"),
+    # Annual variants — same resulting plan claim as monthly, different
+    # Stripe Price (see core/config.py for the discount rationale).
+    "pro_individu_annual": ("stripe_price_pro_individu_annual", "pro"),
+    "pro_perniagaan_annual": ("stripe_price_pro_perniagaan_annual", "business"),
+    "student_annual": ("stripe_price_student_annual", "student"),
 }
 
 # item -> (Stripe price env attr, credit count)
@@ -243,7 +248,7 @@ async def process_checkout_completed(supabase_client: Client, session_data: dict
 
     if item in _PLAN_ITEMS:
         _price_attr, plan = _PLAN_ITEMS[item]
-        await _set_plan(supabase_client, user_id, plan)
+        await set_plan(supabase_client, user_id, plan)
         logger.info("stripe_plan_updated", user_id=user_id, plan=plan, item=item)
     elif item in _CREDIT_ITEMS:
         _price_attr, credits = _CREDIT_ITEMS[item]
@@ -253,7 +258,7 @@ async def process_checkout_completed(supabase_client: Client, session_data: dict
         logger.warning("stripe_webhook_unknown_item", item=item, user_id=user_id)
 
 
-async def _set_plan(supabase_client: Client, user_id: str, plan: str) -> None:
+async def set_plan(supabase_client: Client, user_id: str, plan: str) -> None:
     def _update() -> None:
         supabase_client.auth.admin.update_user_by_id(user_id, {"app_metadata": {"plan": plan}})
 

@@ -7,7 +7,7 @@ via Redis TTL.
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import structlog
 

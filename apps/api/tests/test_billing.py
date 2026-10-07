@@ -104,6 +104,28 @@ def test_checkout_creates_session_and_returns_url(client, monkeypatch):
     assert kwargs["metadata"] == {"user_id": "checkout-user", "item": "pro_individu"}
 
 
+def test_checkout_creates_session_for_annual_item(client, monkeypatch):
+    """Annual variants are a separate Stripe Price, not a monthly price with
+    a discount applied at checkout — same plan claim, different item key."""
+    c, *_ = client
+    monkeypatch.setattr(settings, "stripe_price_pro_individu_annual", "price_pro_individu_annual_test")
+    fake_session = MagicMock()
+    fake_session.url = "https://checkout.stripe.com/test-session-annual"
+    create_mock = MagicMock(return_value=fake_session)
+    monkeypatch.setattr(stripe.checkout.Session, "create", create_mock)
+
+    res = c.post(
+        "/api/v1/billing/checkout",
+        json={"item": "pro_individu_annual"},
+        headers=_auth_header(sub="checkout-user", email="checkout-user@example.com"),
+    )
+    assert res.status_code == 200, res.text
+    kwargs = create_mock.call_args.kwargs
+    assert kwargs["mode"] == "subscription"
+    assert kwargs["line_items"] == [{"price": "price_pro_individu_annual_test", "quantity": 1}]
+    assert kwargs["metadata"] == {"user_id": "checkout-user", "item": "pro_individu_annual"}
+
+
 def test_checkout_omits_email_when_jwt_has_none(client, monkeypatch):
     c, *_ = client
     fake_session = MagicMock()

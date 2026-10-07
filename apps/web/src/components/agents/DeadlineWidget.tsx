@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { API_BASE } from '@/lib/api-base';
 
 interface DeadlineEntry {
   id: string;
@@ -29,7 +30,7 @@ export function DeadlineWidget({ accessToken, variant = 'light' }: DeadlineWidge
   const { data: deadlines = [], isLoading } = useSWR<DeadlineEntry[]>(
     accessToken ? 'deadline-widget' : null,
     () =>
-      fetch('/api/v1/agents/deadline-monitor/deadlines', {
+      fetch(`${API_BASE}/api/v1/agents/deadline-monitor/deadlines`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       }).then((r) => {
         if (!r.ok) throw new Error('deadlines');
@@ -68,7 +69,7 @@ export function DeadlineWidget({ accessToken, variant = 'light' }: DeadlineWidge
               href={d.source_url}
               target="_blank"
               rel="noreferrer"
-              className={isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-800 hover:text-blue-700'}
+              className={isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-800 hover:text-nk-official-dim'}
             >
               {d.deadline_name}
             </a>

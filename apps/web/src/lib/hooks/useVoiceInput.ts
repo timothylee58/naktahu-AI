@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { API_BASE } from '@/lib/api-base';
 
 export interface UseVoiceInputParams {
   language?: string;
@@ -141,7 +142,7 @@ export function useVoiceInput({
     if (blob.size === 0) return;
     try {
       const audio_base64 = await blobToBase64(blob);
-      const res = await fetch('/api/v1/transcribe', {
+      const res = await fetch(`${API_BASE}/api/v1/transcribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audio_base64, language: toApiLanguage(language) }),

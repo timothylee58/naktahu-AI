@@ -1,7 +1,7 @@
 """AgentState TypedDict and Citation model for the LangGraph pipeline."""
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Optional, TypedDict
+from typing import Any, Literal, NotRequired, Optional, TypedDict
 
 from app.services.vector_store import ChunkResult
 
@@ -12,6 +12,23 @@ class Citation(TypedDict):
     url: str
     confidence: float
     stale_disclaimer: bool  # True when expiry_aware chunk is >90 days old
+    # ISO date (YYYY-MM-DD) the cited rule/figure takes effect, or the
+    # source's own date for expiry_aware chunks — see analyst_node's
+    # _staleness_ref, which is the same value the staleness verdict is
+    # computed from. None when the chunk carries no date at all.
+    #
+    # This is deliberately surfaced to the UI: a bare "may be outdated"
+    # flag tells a user something is wrong but not whether it matters —
+    # "as of Jan 2024" on a tax figure lets them judge for themselves.
+    # Never synthesise a date here; None must render as no date, not as
+    # today's date or an ingestion timestamp.
+    effective_date: NotRequired[str | None]
+    # ISO timestamp NakTahu last ingested/verified this specific source, from
+    # document_chunks.created_at (migration 048). NOT the same thing as
+    # effective_date above — this says "we checked this source on {date}",
+    # not "this rule took effect on {date}". Both can be shown together.
+    # None when the chunk predates the RPC returning this column.
+    retrieved_at: NotRequired[str | None]
 
 
 class AgentState(TypedDict, total=False):
@@ -47,8 +64,48 @@ class AgentState(TypedDict, total=False):
     # effective_date, days_since_effective) for chunks whose effective_date has
     # passed by more than the staleness window.
     stale_warnings: list[dict[str, Any]]
+    # Announced-but-not-yet-effective rules (effective_date in the future),
+    # set aside by analyst_node so they are never stated as the current rule.
+    # Each: chunk_id, source_title, ministry, source_url, effective_date,
+    # announced_date, content. The synthesiser mentions them as upcoming.
+    pending_changes: list[dict[str, Any]]
+    # The visitor's saved 5-digit postcode, sent by the chat client. Lets
+    # parliament_query_node answer "who is my MP?" via postcode_constituencies.
+    user_postcode: Optional[str]
     # Set when the query asks about the user's own case-specific record
     # (e.g. "what's my EPF balance") rather than a general rules question —
     # NakTahu has no access to any user's records, so this carries the real
     # agency contact to show instead of attempting an answer.
     agency_contact: Optional[dict[str, str]]
+    # Warung Watch — set by router_node when the query is asking about a
+    # named place's live crowd status ("Is Pelita packed right now?")
+    # rather than a knowledge-base question. When true, graph.py routes
+    # straight to warung_watch_node instead of rag/analyst/synthesiser —
+    # this is live, ephemeral crowd data, not something the RAG pipeline's
+    # confidence-gated document citations model applies to.
+    is_live_status_query: bool
+    place_name: Optional[str]
+    # Parliament structured-lookup short-circuit — set by router_node when
+    # a domain='parliament' query is asking about a specific bill's vote
+    # record or a specific MP/constituency, rather than general Hansard
+    # debate content ("what did parliament debate about tax reform" stays
+    # on the normal RAG path, since that's chunk-retrieval-shaped, not a
+    # structured lookup). When true, graph.py routes straight to
+    # parliament_query_node instead of rag/analyst/synthesiser — this is a
+    # direct read from mp_profiles/mp_votes/parliament_bills (already a
+    # Postgres property graph — FK edges mp_votes.mp_id/bill_id — per
+    # migration 025), not something the confidence-gated citation model
+    # applies to.
+    is_structured_parliament_query: bool
+    parliament_bill_number: Optional[str]
+    parliament_mp_query: Optional[str]
+    # Speculative query-embedding task, started by router_node in parallel
+    # with its own classification LLM call (see cache.has_query_been_seen's
+    # docstring for why this is only ever fired when it's guaranteed not to
+    # be wasted work) and consumed by rag_node instead of computing its own
+    # embedding from scratch on a cache miss. An asyncio.Task, not
+    # JSON-serializable — safe ONLY because this pipeline runs stateless
+    # (checkpointer=None, app/agents/graph.py's `pipeline`) and never
+    # persists AgentState anywhere; a checkpointed graph must never carry
+    # this field.
+    _speculative_embedding_task: NotRequired[Any]

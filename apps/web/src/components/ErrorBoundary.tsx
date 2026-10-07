@@ -45,7 +45,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-          <h1 className="text-2xl font-semibold">Sesuatu telah berlaku</h1>
+          <h1 className="font-display text-2xl font-semibold">Sesuatu telah berlaku</h1>
           <p className="text-muted-foreground max-w-sm">
             Something went wrong. Our team has been notified. You can try again
             or report what happened.

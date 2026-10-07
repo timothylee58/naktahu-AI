@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
@@ -15,6 +15,8 @@ export default function AboutPage() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const reduceMotion = useReducedMotion();
+  const sealLabel = locale === 'zh' ? '已验证 · LHDN.gov.my' : locale === 'en' ? 'Verified · LHDN.gov.my' : 'Disahkan · LHDN.gov.my';
 
   const content = {
     ms: {
@@ -148,82 +150,170 @@ export default function AboutPage() {
   const c = locale === 'zh' ? content.zh : locale === 'en' ? content.en : content.ms;
 
   return (
-    <div className={`flex flex-col min-h-screen font-sans ${isDark ? 'bg-[#0A0F1E] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
+    <div className={`flex flex-col h-full font-sans ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50 text-zinc-900'}`}>
       <LandingHeader />
 
-      <div className="flex flex-col flex-1 min-w-0 max-w-4xl mx-auto w-full px-4 sm:px-6">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 max-w-4xl mx-auto w-full px-4 sm:px-6">
 
-        <main className="flex-1 overflow-y-auto px-6 py-12 max-w-4xl mx-auto w-full">
+        <main className="flex-1 min-h-0 overflow-y-auto px-6 py-12 max-w-4xl mx-auto w-full">
           <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-12">
             <header className="text-center space-y-3">
-              <h1 className="text-4xl font-bold tracking-tight">{c.title}</h1>
-              <p className="text-lg text-zinc-400">{c.subtitle}</p>
+              <h1 className="font-display text-4xl font-bold tracking-tight">{c.title}</h1>
+              <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{c.subtitle}</p>
             </header>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-blue-400">{c.mission.title}</h2>
-              <p className="text-zinc-300 leading-relaxed">{c.mission.desc}</p>
-            </section>
+            <motion.section
+              className="space-y-4"
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.mission.title}</h2>
+              <p className={`leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>{c.mission.desc}</p>
+            </motion.section>
 
             <section className="space-y-6">
-              <h2 className="text-2xl font-bold text-blue-400">{c.how.title}</h2>
-              <div className="grid md:grid-cols-3 gap-6">
-                {c.how.steps.map((step, i) => (
-                  <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-2">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg">
-                      {i + 1}
-                    </div>
-                    <h3 className="font-semibold text-white">{step.title}</h3>
-                    <p className="text-sm text-zinc-400">{step.desc}</p>
-                  </div>
-                ))}
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.how.title}</h2>
+              <div className="relative">
+                {/* Connecting line — draws left-to-right as the row scrolls into view.
+                    Desktop only (the grid is single-column below md, where a horizontal
+                    line between stacked cards wouldn't read as a sequence). */}
+                <motion.div
+                  aria-hidden
+                  initial={reduceMotion ? false : { scaleX: 0 }}
+                  whileInView={{ scaleX: 1 }}
+                  viewport={{ once: true, amount: 0.6 }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  style={{ transformOrigin: 'left' }}
+                  className={`hidden md:block absolute top-5 left-[16.66%] right-[16.66%] h-px ${
+                    isDark ? 'bg-nk-official/30' : 'bg-nk-official/30'
+                  }`}
+                />
+                <div className="grid md:grid-cols-3 gap-6">
+                  {c.how.steps.map((step, i) => (
+                    <motion.div
+                      key={i}
+                      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.5 }}
+                      transition={{ duration: 0.45, delay: reduceMotion ? 0 : i * 0.15, ease: 'easeOut' }}
+                      className={`relative rounded-xl p-6 space-y-2 border ${
+                        isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200 shadow-sm'
+                      }`}
+                    >
+                      <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                        isDark ? 'bg-nk-official/20 text-nk-official' : 'bg-nk-official/20 text-nk-official-dim'
+                      }`}>
+                        {i + 1}
+                      </div>
+                      <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{step.title}</h3>
+                      <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{step.desc}</p>
+                      {i === c.how.steps.length - 1 && (
+                        // Makes the "we cite official sources" claim visible at the
+                        // exact moment a reader would otherwise just read it as a
+                        // sentence — the one deliberate flourish on this page.
+                        // Decorative only: no meaning conveyed by color alone.
+                        <motion.span
+                          initial={reduceMotion ? false : { opacity: 0, scale: 0.85 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
+                          viewport={{ once: true, amount: 0.6 }}
+                          // No spring/bounce — this seal backs a trust claim (official
+                          // sourcing), and this product's whole pitch is "calm and
+                          // precise, not playful." Short ease-out only.
+                          transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : 0.35 }}
+                          // Inset within the card's own bounds (not
+                          // overflowing past its top/right edge) — as the
+                          // rightmost card in the 3-col grid, a negative
+                          // offset here pushed the badge into the page's
+                          // right-edge scroll-progress rail, and painted
+                          // over the horizontal line connecting the three
+                          // step circles (this card's segment of that line
+                          // was rendering underneath the badge, breaking
+                          // the connecting-line effect only for step 3).
+                          className={`absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm ${
+                            isDark ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                          }`}
+                        >
+                          {sealLabel}
+                        </motion.span>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             </section>
 
+            {/* Trust signal — a distinct green-tinted card treatment with checkmarks,
+                so it reads visually as "these are the sources backing every answer"
+                rather than looking like the (differently-styled) engineering list
+                below it. */}
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-blue-400">{c.sources.title}</h2>
-              <p className="text-zinc-300">{c.sources.desc}</p>
-              <ul className="grid md:grid-cols-2 gap-3">
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.sources.title}</h2>
+              <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.sources.desc}</p>
+              <ul className={`grid md:grid-cols-2 gap-3 rounded-xl border p-4 ${
+                isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50/60 border-emerald-200'
+              }`}>
                 {c.sources.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-zinc-300">
-                    <svg className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <motion.li
+                    key={i}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : i * 0.04 }}
+                    className={`flex items-start gap-2 ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`}
+                  >
+                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                     {item}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             </section>
 
+            {/* Engineering-credibility list — a distinct slate/monospace treatment
+                so it doesn't visually blend with the trust-signal card above it. */}
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold text-blue-400">{c.tech.title}</h2>
-              <p className="text-zinc-300">{c.tech.desc}</p>
-              <ul className="space-y-2">
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>{c.tech.title}</h2>
+              <p className={isDark ? 'text-zinc-300' : 'text-zinc-600'}>{c.tech.desc}</p>
+              <ul className={`space-y-2 rounded-xl border p-4 ${
+                isDark ? 'bg-white/[0.03] border-white/10' : 'bg-zinc-50 border-zinc-200'
+              }`}>
                 {c.tech.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-zinc-300">
-                    <svg className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                  <motion.li
+                    key={i}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.6 }}
+                    transition={{ duration: 0.25, ease: 'easeOut', delay: reduceMotion ? 0 : i * 0.04 }}
+                    className={`flex items-start gap-2 font-mono text-sm ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}
+                  >
+                    <svg className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                      <path fillRule="evenodd" d="M6.28 5.22a.75.75 0 010 1.06L2.56 10l3.72 3.72a.75.75 0 01-1.06 1.06L.97 10.53a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0zm7.44 0a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 010-1.06z" clipRule="evenodd" />
                     </svg>
                     {item}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             </section>
 
-            <section className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 space-y-3">
+            <section className={`rounded-xl p-6 space-y-3 border ${
+              isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'
+            }`}>
               <div className="flex items-center gap-2">
-                <svg className="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                <svg className={`w-6 h-6 ${isDark ? 'text-amber-400' : 'text-amber-500'}`} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                 </svg>
-                <h2 className="text-xl font-bold text-amber-300">{c.disclaimer.title}</h2>
+                <h2 className={`text-xl font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{c.disclaimer.title}</h2>
               </div>
-              <p className="text-zinc-300 leading-relaxed">{c.disclaimer.desc}</p>
+              <p className={`leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>{c.disclaimer.desc}</p>
             </section>
 
             <div className="flex justify-center pt-6">
               <Link
                 href="/chat"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
+                className="inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim transition-colors text-white font-semibold px-8 py-3.5 rounded-full shadow-lg shadow-blue-900/40"
               >
                 {t('landing.hero.cta')}
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -234,11 +324,13 @@ export default function AboutPage() {
           </motion.div>
         </main>
 
-        <footer className="border-t border-white/10 px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
+        <footer className={`border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm ${
+          isDark ? 'border-white/10 text-zinc-500' : 'border-zinc-200 text-zinc-500'
+        }`}>
           <span className="locale-nowrap">&copy; 2026 NakTahu AI</span>
           <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-white transition-colors">{t('nav.home')}</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">{t('footer.privacy')}</Link>
+            <Link href="/" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('nav.home')}</Link>
+            <Link href="/privacy" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('footer.privacy')}</Link>
           </div>
         </footer>
       </div>

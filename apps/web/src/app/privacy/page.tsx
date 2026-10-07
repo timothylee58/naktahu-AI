@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm px-8 py-10 flex flex-col gap-8">
           {/* Title */}
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900">Privacy Policy</h1>
+            <h1 className="font-display text-2xl font-bold text-zinc-900">Privacy Policy</h1>
             <p className="text-sm text-zinc-500 mt-1">Effective date: {EFFECTIVE_DATE}</p>
           </div>
 
@@ -66,7 +66,37 @@ export default function PrivacyPage() {
                 <li>We do not collect payment information.</li>
                 <li>We do not collect device fingerprints or persistent tracking cookies.</li>
                 <li>We do not store the full AI-generated responses server-side — only a short summary for history display.</li>
+                <li>We do not store the household/eligibility details you enter into the Welfare Eligibility Agent (Check Assistance) — see 2.4 below.</li>
               </ul>
+            </Subsection>
+            <Subsection title="2.4 Welfare Eligibility Agent — stateless processing">
+              <p>
+                The Welfare Eligibility Agent (&ldquo;Check Assistance&rdquo;) asks for demographic, household, and
+                status information to match you against cost-of-living assistance schemes. This information —
+                birth year, income, dependents, employment/education/housing status, and similar fields — is
+                processed <strong>in memory for the single request that generates your result, and is not written
+                to our database</strong>. Once your result is returned, that information is discarded; we retain
+                no record of the specific answers you gave. This mirrors the stateless-intake approach used by
+                Malaysia&rsquo;s own Ihsan MADANI portal for the same category of information.
+              </p>
+            </Subsection>
+            <Subsection title="2.5 Calendar sync (Deadline Monitor)">
+              <p>
+                If you connect a Google or Microsoft calendar to Deadline Monitor, we store an{' '}
+                <strong>encrypted refresh token</strong> for that account so we can add and update deadline
+                events on your behalf. We request write access to your calendar events only —{' '}
+                <strong>we do not read your existing calendar events, meetings, or availability</strong>. On
+                Google this is enforced by the narrower <code>calendar.events</code> permission; Microsoft
+                Graph offers no write-only equivalent, so its permission is technically read-and-write even
+                though we never read.
+              </p>
+              <p>
+                The only data we write is the deadline name, its due date, and a link to the official source
+                — all of which already come from public government sources, not from you. Disconnecting a
+                calendar deletes the stored token immediately (and revokes it at Google&rsquo;s end, where
+                revocation is supported); events already added remain in your calendar for you to keep or
+                delete.
+              </p>
             </Subsection>
           </Section>
 
@@ -81,7 +111,7 @@ export default function PrivacyPage() {
 
           <Section title="4. Data Storage and Retention">
             <ul>
-              <li><strong>Authentication data</strong> is stored by <a href="https://supabase.com/privacy" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Supabase</a> (hosted on AWS ap-southeast-1).</li>
+              <li><strong>Authentication data</strong> is stored by <a href="https://supabase.com/privacy" className="text-nk-official-dim hover:underline" target="_blank" rel="noopener noreferrer">Supabase</a> (hosted on AWS ap-southeast-1).</li>
               <li><strong>Query history</strong> is stored in Redis with a 30-day rolling TTL. History is automatically deleted after 30 days of inactivity.</li>
               <li><strong>Account deletion</strong> — you may request deletion of your account and all associated data by emailing us. We will process requests within 14 days.</li>
             </ul>
@@ -148,7 +178,7 @@ export default function PrivacyPage() {
           <Section title="10. Contact">
             <p>
               For privacy questions or data requests, contact us at:{' '}
-              <a href="mailto:privacy@naktahu.my" className="text-blue-600 hover:underline">
+              <a href="mailto:privacy@naktahu.my" className="text-nk-official-dim hover:underline">
                 privacy@naktahu.my
               </a>
             </p>

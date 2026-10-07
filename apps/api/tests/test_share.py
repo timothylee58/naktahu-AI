@@ -1,5 +1,5 @@
 import time
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
@@ -162,3 +162,51 @@ def test_post_share_rate_limit_31st_anonymous_returns_429(client):
         assert r.status_code == 201, r.text
     blocked = c.post("/api/v1/share", json=_body(query="q-blocked"))
     assert blocked.status_code == 429
+
+
+# ── Share caption (AI-drafted, human-posts-it) ──────────────────────────────
+
+def test_post_share_caption_happy_path_no_auth_required(client):
+    c, *_ = client
+    with patch("routers.share.draft_share_caption", new=AsyncMock(return_value="Did you know EPF lets you withdraw at 55? Check the source yourself.")):
+        res = c.post(
+            "/api/v1/share/caption",
+            json={"query": "When can I withdraw EPF?", "answer": "You can withdraw part of your EPF at age 55.", "language": "en"},
+        )
+    assert res.status_code == 200, res.text
+    assert "EPF" in res.json()["caption"]
+
+
+def test_post_share_caption_normalises_ms_to_bm(client):
+    c, *_ = client
+    with patch("routers.share.draft_share_caption", new=AsyncMock(return_value="Caption")) as mock_draft:
+        res = c.post(
+            "/api/v1/share/caption",
+            json={"query": "q", "answer": "a", "language": "ms"},
+        )
+    assert res.status_code == 200
+    mock_draft.assert_awaited_once_with("q", "a", "bm")
+
+
+def test_post_share_caption_422_on_empty_answer(client):
+    c, *_ = client
+    res = c.post("/api/v1/share/caption", json={"query": "q", "answer": "", "language": "en"})
+    assert res.status_code == 422
+
+
+def test_post_share_caption_502_when_drafting_fails(client):
+    c, *_ = client
+    with patch("routers.share.draft_share_caption", new=AsyncMock(return_value="")):
+        res = c.post("/api/v1/share/caption", json={"query": "q", "answer": "a", "language": "en"})
+    assert res.status_code == 502
+
+
+def test_post_share_caption_works_without_supabase(client):
+    c, sb, _ = client
+    api_main.app.state.supabase = None
+    try:
+        with patch("routers.share.draft_share_caption", new=AsyncMock(return_value="Caption")):
+            res = c.post("/api/v1/share/caption", json={"query": "q", "answer": "a", "language": "en"})
+        assert res.status_code == 200
+    finally:
+        api_main.app.state.supabase = sb

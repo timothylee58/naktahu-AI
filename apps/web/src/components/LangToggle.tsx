@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Globe, ChevronDown } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { UILocale } from '@/lib/types';
 
@@ -16,9 +17,15 @@ interface LangToggleProps {
   variant?: 'dark' | 'light';
   /** sidebar = full-width trigger in left panel */
   layout?: 'inline' | 'sidebar';
+  /** Inline-layout dropdown anchor. 'right' (default) matches the header
+   * usage, where the button sits at the right edge of its row. Pass
+   * 'left' when the button instead sits near a container's left edge
+   * (e.g. packed into a compact sidebar footer row) — right-anchoring
+   * there pushes the dropdown's left edge off-screen. */
+  align?: 'left' | 'right';
 }
 
-export function LangToggle({ variant = 'dark', layout = 'inline' }: LangToggleProps) {
+export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right' }: LangToggleProps) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -52,7 +59,9 @@ export function LangToggle({ variant = 'dark', layout = 'inline' }: LangTogglePr
 
   const dropdownPosition = isSidebar
     ? 'absolute left-0 right-0 bottom-full mb-2'
-    : 'absolute right-0 mt-2 w-44';
+    : align === 'left'
+      ? 'absolute left-0 mt-2 w-44'
+      : 'absolute right-0 mt-2 w-44';
 
   const optionHover =
     variant === 'light'
@@ -61,8 +70,8 @@ export function LangToggle({ variant = 'dark', layout = 'inline' }: LangTogglePr
 
   const activeClass =
     variant === 'light'
-      ? 'text-blue-600 font-bold'
-      : 'text-blue-400 font-bold';
+      ? 'text-nk-official-dim font-bold'
+      : 'text-nk-official font-bold';
 
   return (
     <div ref={ref} className={`relative ${isSidebar ? 'w-full' : ''}`}>
@@ -73,15 +82,14 @@ export function LangToggle({ variant = 'dark', layout = 'inline' }: LangTogglePr
         aria-expanded={open}
         className={`flex items-center gap-1.5 border text-xs font-semibold transition-colors locale-nowrap ${isSidebar ? '' : 'rounded-full px-3 py-1.5'} ${buttonBase}`}
       >
-        {/* Globe icon */}
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 opacity-60 flex-shrink-0">
-          <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm-1.465-9.398-.803.321A3.501 3.501 0 0 0 6.5 12.35V13h-.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 .75-.75v-1.288a2 2 0 0 1 1.17-1.814l.803-.321a4.5 4.5 0 0 0 .777-.395c.26-.174.62-.174.88 0 .222.148.46.271.712.366l.803.32a2 2 0 0 1 1.17 1.815v.288a.75.75 0 0 0 1.5 0v-.288a3.5 3.5 0 0 0-2.047-3.177l-.803-.32a3 3 0 0 1-.322-.15 1.8 1.8 0 0 0-1.756 0 3.003 3.003 0 0 1-.322.15l-.802.32ZM10 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" clipRule="evenodd" />
-        </svg>
+        <Globe size={18} strokeWidth={1.75} className="flex-shrink-0 opacity-70" />
         <span className={isSidebar ? 'flex-1 text-left text-sm' : ''}>{isSidebar ? t('lang.label') : current.label}</span>
         <span className={isSidebar ? 'text-xs opacity-70' : ''}>{isSidebar ? current.label : null}</span>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3 h-3 opacity-50 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}>
-          <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-        </svg>
+        <ChevronDown
+          size={14}
+          strokeWidth={1.75}
+          className={`opacity-50 transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`}
+        />
       </motion.button>
 
       <AnimatePresence>

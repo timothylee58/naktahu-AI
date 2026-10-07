@@ -5,20 +5,16 @@ import base64
 import binascii
 import io
 import json
-import os
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import structlog
 
 from app.services.llm_client import (
     ILMU_CHAT_MODEL,
-    ILMU_EMBEDDING_MODEL,
     ilmu_client,
-    openai_client,
-    OPENAI_EMBEDDING_MODEL,
 )
 from app.services.vector_store import ChunkResult, hybrid_search
 from core.config import settings
@@ -27,14 +23,16 @@ log = structlog.get_logger(__name__)
 
 
 async def _embed(query: str) -> list[float]:
-    try:
-        resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
-        return resp.data[0].embedding
-    except Exception as exc:
-        if openai_client is None:
-            raise RuntimeError("No embedding provider available") from exc
-        resp = await openai_client.embeddings.create(input=query, model=OPENAI_EMBEDDING_MODEL)
-        return resp.data[0].embedding
+    """Embed with the corpus model via the single shared definition.
+
+    Delegates to rag_node._embed (ILMU gateway first, OpenAI direct fallback,
+    same model either way) instead of keeping a second copy here — a second
+    copy is how this file previously drifted from the corpus's model.
+    Imported lazily to avoid a module-level agents<->tools import cycle.
+    """
+    from app.agents.rag_node import _embed as corpus_embed
+
+    return await corpus_embed(query)
 
 
 async def query_rag(
@@ -46,13 +44,13 @@ async def query_rag(
 ) -> list[dict[str, Any]]:
     """Hybrid-search a domain and return serialisable chunk dicts."""
     embedding = await _embed(query)
-    chunks: list[ChunkResult] = await hybrid_search(
-        query_embedding=embedding,
-        query_text=query,
-        domain=domain,
-        language=language,
-        top_k=top_k,
-    )
+    # Positional/keyword names match vector_store.hybrid_search's real
+    # signature (query, embedding, domain, limit). This call previously passed
+    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
+    # every call — silently disabling knowledge search for every vertical
+    # agent that uses query_rag_findings. hybrid_search has no language
+    # filter; `language` is kept in this function's signature for callers.
+    chunks: list[ChunkResult] = await hybrid_search(query, embedding, domain=domain, limit=top_k)
     return [
         {
             "id": c.id,
@@ -140,6 +138,188 @@ async def llm_complete(
         return ""
 
 
+async def ocr_extract_text(
+    image_base64: str,
+    *,
+    mime_type: str = "image/jpeg",
+    language: str = "bm",
+) -> str:
+    """Extract exam-paper text from a photographed page via a vision-capable
+    chat completion. ILMU primary, Anthropic (the same FALLBACK_MODEL already
+    used by the synthesiser on failure/low confidence) as fallback — this
+    mirrors llm_complete's/embeddings' existing provider-fallback shape
+    rather than introducing a new one. Returns "" on total failure so callers
+    degrade the same way extract_pdf_text already does (Trap #4-style: never
+    crash on a missing/failed provider)."""
+    data_url = f"data:{mime_type};base64,{image_base64}"
+    system = (
+        "You transcribe photographed exam past-papers into plain text. "
+        "Preserve question numbering exactly as printed. Do not answer the "
+        "questions or add commentary — output only the transcribed text."
+    )
+    try:
+        resp = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Transcribe this exam paper page."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+            max_tokens=2000,
+            temperature=0.0,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        if text:
+            return text
+    except Exception as exc:
+        log.warning("ocr_ilmu_failed", error=str(exc))
+
+    try:
+        from app.services.llm_client import FALLBACK_MODEL, anthropic_client
+
+        resp = await anthropic_client.messages.create(
+            model=FALLBACK_MODEL,
+            max_tokens=2000,
+            system=system,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": mime_type, "data": image_base64},
+                        },
+                        {"type": "text", "text": "Transcribe this exam paper page."},
+                    ],
+                }
+            ],
+        )
+        parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+        return "".join(parts).strip()
+    except Exception as exc:
+        log.warning("ocr_anthropic_fallback_failed", error=str(exc))
+        return ""
+
+
+async def ocr_extract_listing_fields(
+    image_base64: str,
+    *,
+    mime_type: str = "image/jpeg",
+    language: str = "bm",
+) -> dict[str, Any]:
+    """Extract structured property-listing fields from a photographed or
+    screenshotted listing (e.g. a PropertyGuru/iProperty/Mudah screenshot,
+    or a photo of a physical "For Sale" signboard) via a vision-capable
+    chat completion. Same ILMU-primary/Anthropic-fallback shape as
+    ocr_extract_text above — this is a second, structured-output sibling
+    of it, not a replacement.
+
+    Returns a dict with only the keys ListingSubmitRequest accepts
+    (title/price_myr/location/property_type/bedrooms), any subset of which
+    may be missing/None if the model couldn't read them. Returns {} on
+    total failure — callers must treat this as "nothing extracted, user
+    fills the form manually" (Trap #4-style: never crash on a failed
+    provider), never as a submitted listing: this only prefills the
+    existing submission form (services.property_submissions.submit_listing)
+    for the user to review and confirm, exactly like the URL-paste path —
+    OCR does not submit anything on its own."""
+    data_url = f"data:{mime_type};base64,{image_base64}"
+    lang_note = "Respond in Bahasa Malaysia values where the source text is Malay, otherwise English." if language == "bm" else "Respond in English."
+    system = (
+        "You read a photographed or screenshotted Malaysian property listing "
+        "(from a listing site, a signboard, or a printed flyer) and extract "
+        "structured fields. Return ONLY a JSON object with these keys: "
+        'title (string or null), price_myr (number or null, MYR only — '
+        "convert if another currency is shown, or null if unclear), "
+        "location (string or null — area/town, not a full address), "
+        'property_type (one of "condo", "apartment", "landed", "other", or null), '
+        "bedrooms (integer or null). "
+        "Do not invent a value that is not visibly present in the image — use "
+        f"null for anything you cannot actually read. {lang_note}"
+    )
+    raw = ""
+    try:
+        resp = await ilmu_client.chat.completions.create(
+            model=ILMU_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract the listing fields from this image."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+            max_tokens=300,
+            temperature=0.0,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+    except Exception as exc:
+        log.warning("listing_ocr_ilmu_failed", error=str(exc))
+
+    if not raw:
+        try:
+            from app.services.llm_client import FALLBACK_MODEL, anthropic_client
+
+            resp = await anthropic_client.messages.create(
+                model=FALLBACK_MODEL,
+                max_tokens=300,
+                system=system,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {"type": "base64", "media_type": mime_type, "data": image_base64},
+                            },
+                            {"type": "text", "text": "Extract the listing fields from this image."},
+                        ],
+                    }
+                ],
+            )
+            parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
+            raw = "".join(parts).strip()
+        except Exception as exc:
+            log.warning("listing_ocr_anthropic_fallback_failed", error=str(exc))
+            return {}
+
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except (ValueError, IndexError):
+        log.warning("listing_ocr_unparseable_response")
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+
+    _VALID_TYPES = {"condo", "apartment", "landed", "other"}
+    out: dict[str, Any] = {}
+    title = parsed.get("title")
+    if isinstance(title, str) and title.strip():
+        out["title"] = title.strip()[:200]
+    price = parsed.get("price_myr")
+    if isinstance(price, (int, float)) and price >= 0:
+        out["price_myr"] = float(price)
+    location = parsed.get("location")
+    if isinstance(location, str) and location.strip():
+        out["location"] = location.strip()[:120]
+    ptype = parsed.get("property_type")
+    if isinstance(ptype, str) and ptype in _VALID_TYPES:
+        out["property_type"] = ptype
+    bedrooms = parsed.get("bedrooms")
+    if isinstance(bedrooms, int) and 0 <= bedrooms <= 50:
+        out["bedrooms"] = bedrooms
+    return out
+
+
 async def generate_pdf(
     html: str,
     *,
@@ -181,6 +361,106 @@ async def generate_pdf(
         return storage_path, "", ""
 
 
+async def generate_docx(
+    report_json: dict[str, Any],
+    *,
+    user_id: str,
+    agent_type: str = "grant-draft-generator",
+    supabase_client: Any = None,
+) -> tuple[str, str, str]:
+    """Render a structured report to a real Word document (headings per
+    section, not HTML dumped into a text run), upload to Supabase Storage.
+    Returns (path, signed_url, expires_at). Same storage/signed-URL pattern
+    as generate_pdf, namespaced by agent_type."""
+    docx_bytes: bytes
+    try:
+        from docx import Document  # type: ignore[import-untyped]
+
+        doc = Document()
+        doc.add_heading(
+            f"Grant Application Draft — {report_json.get('programme_name', '')}", level=0
+        )
+        disclaimer = report_json.get("disclaimer", "")
+        if disclaimer:
+            p = doc.add_paragraph()
+            run = p.add_run(disclaimer)
+            run.italic = True
+
+        doc.add_heading("Executive Summary", level=1)
+        doc.add_paragraph(report_json.get("executive_summary", ""))
+
+        doc.add_heading("Use of Funds", level=1)
+        doc.add_paragraph(report_json.get("use_of_funds_narrative", ""))
+
+        doc.add_heading("Financial Projection Skeleton", level=1)
+        skeleton = report_json.get("financial_projection_skeleton") or {}
+        skeleton_disclaimer = skeleton.get("disclaimer", "")
+        if skeleton_disclaimer:
+            p = doc.add_paragraph()
+            run = p.add_run(skeleton_disclaimer)
+            run.italic = True
+            run.bold = True
+
+        doc.add_heading("Revenue Projection (template)", level=2)
+        for row in skeleton.get("revenue_projection", []):
+            doc.add_paragraph(f"{row.get('period')}: RM_____ ({row.get('notes', '')})", style="List Bullet")
+
+        doc.add_heading("Cost Breakdown (template)", level=2)
+        for row in skeleton.get("cost_breakdown", []):
+            doc.add_paragraph(f"{row.get('category')}: RM_____", style="List Bullet")
+
+        doc.add_heading("Funding Allocation (template)", level=2)
+        for row in skeleton.get("funding_allocation", []):
+            doc.add_paragraph(f"{row.get('use_of_funds')}: RM_____", style="List Bullet")
+
+        doc.add_heading("Required Document Checklist", level=1)
+        for item in report_json.get("document_checklist", []) or []:
+            required = "Required" if item.get("required") else "Optional"
+            doc.add_paragraph(
+                f"{item.get('item')} ({required}): {item.get('description')}",
+                style="List Bullet",
+            )
+
+        if disclaimer:
+            doc.add_paragraph()
+            p = doc.add_paragraph()
+            run = p.add_run(disclaimer)
+            run.italic = True
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        docx_bytes = buf.getvalue()
+    except Exception as exc:
+        log.warning("python_docx_unavailable", error=str(exc))
+        docx_bytes = str(report_json).encode("utf-8")
+
+    storage_path = f"agents/{agent_type}/{user_id}/{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.docx"
+    bucket = settings.supabase_storage_bucket
+
+    if not supabase_client:
+        return storage_path, "", ""
+
+    try:
+        supabase_client.storage.from_(bucket).upload(
+            storage_path,
+            docx_bytes,
+            {
+                "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "upsert": "true",
+            },
+        )
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        signed = supabase_client.storage.from_(bucket).create_signed_url(
+            storage_path,
+            86_400,
+        )
+        url = signed.get("signedURL") or signed.get("signedUrl") or ""
+        return storage_path, url, expires_at.isoformat()
+    except Exception as exc:
+        log.warning("docx_upload_failed", error=str(exc))
+        return storage_path, "", ""
+
+
 async def send_email(
     *,
     to: str,
@@ -204,3 +484,24 @@ async def send_email(
             log.warning("send_email_failed", status=resp.status_code)
             return False
     return True
+
+
+async def grant_compatibility_check(
+    programme_names: list[str],
+    supabase: Any,
+    *,
+    language: str = "en",
+) -> dict[str, Any]:
+    """Grant stacking compatibility matrix (stackable / partial_overlap /
+    conflict / unknown) for a set of programmes a founder plans to apply for
+    simultaneously.
+
+    Thin delegation to app.agents.eligibility_agent.compatibility so this
+    module stays the single import surface for agent-callable tools. Imported
+    lazily to keep tools.py free of an eligibility-agent import cycle.
+    """
+    from app.agents.eligibility_agent.compatibility import (
+        grant_compatibility_check as _check,
+    )
+
+    return await _check(programme_names, supabase, language=language)

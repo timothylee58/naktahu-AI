@@ -1,6 +1,7 @@
 """Async Redis helpers for query caching and session history."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from typing import Any, Optional
@@ -39,6 +40,41 @@ async def set_cached_result(key: str, value: Any, ttl: int = 3600) -> None:
         await _get_client().setex(key, ttl, json.dumps(value))
     except Exception as exc:
         log.warning("cache_set_error", key=key, error=str(exc))
+
+
+def _seen_key(query: str) -> str:
+    # Deliberately domain/language-agnostic (unlike rag_node._cache_key,
+    # which includes both) — this answers "has this exact query text ever
+    # been cached under ANY domain/language", not "is this specific
+    # domain+language combo cached". See router_node's use of this: an
+    # absent marker guarantees the real, domain-scoped cache lookup will
+    # also miss (the marker is only ever set alongside a real cache
+    # write), which is what makes it safe to fire a speculative embedding
+    # call whenever the marker is absent — it's never wasted.
+    return "cache:seen:" + hashlib.sha256(query.lower().strip().encode()).hexdigest()
+
+
+async def mark_query_seen(query: str, ttl: int = 3600) -> None:
+    """Records that `query` has been cached (under whatever domain/language
+    it was classified as this time) — see _seen_key's docstring. Same TTL
+    as the real cache entry, so the marker never outlives what it's
+    describing."""
+    try:
+        await _get_client().setex(_seen_key(query), ttl, "1")
+    except Exception as exc:
+        log.warning("cache_mark_seen_error", error=str(exc))
+
+
+async def has_query_been_seen(query: str) -> bool:
+    """True only if `query` has been cached before, under any
+    domain/language. Fails closed to False on a Redis error — the
+    speculative-embed caller degrades to "don't speculate" rather than
+    risk treating a check failure as a green light."""
+    try:
+        return bool(await _get_client().exists(_seen_key(query)))
+    except Exception as exc:
+        log.warning("cache_has_seen_error", error=str(exc))
+        return False
 
 
 async def get_session_history(user_id: str) -> list[dict]:

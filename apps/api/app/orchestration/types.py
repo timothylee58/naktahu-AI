@@ -35,6 +35,7 @@ class AgentCapability(str, Enum):
     # Domain knowledge
     tax_knowledge = "tax_knowledge"
     epf_knowledge = "epf_knowledge"
+    payroll_knowledge = "payroll_knowledge"
     business_knowledge = "business_knowledge"
     immigration_knowledge = "immigration_knowledge"
     education_knowledge = "education_knowledge"
@@ -43,6 +44,8 @@ class AgentCapability(str, Enum):
     government_knowledge = "government_knowledge"
     finance_knowledge = "finance_knowledge"
     culture_knowledge = "culture_knowledge"
+    property_knowledge = "property_knowledge"
+    welfare_knowledge = "welfare_knowledge"
 
     # Functional capabilities
     pdf_generation = "pdf_generation"
@@ -51,9 +54,11 @@ class AgentCapability(str, Enum):
     document_processing = "document_processing"
     deadline_tracking = "deadline_tracking"
     grant_matching = "grant_matching"
+    welfare_matching = "welfare_matching"
     symptom_triage = "symptom_triage"
     study_assistance = "study_assistance"
     compliance_analysis = "compliance_analysis"
+    scam_detection = "scam_detection"
 
     # Interaction patterns
     streaming = "streaming"
@@ -70,6 +75,10 @@ class Citation(BaseModel):
     url: str = ""
     confidence: float = 0.0
     stale_disclaimer: bool = False
+    # ISO date the cited rule/figure takes effect. Mirrors the same field on
+    # app.models.state.Citation so a citation crossing the orchestration
+    # boundary keeps its date instead of degrading to a bare staleness bool.
+    effective_date: Optional[str] = None
 
 
 class AgentResult(BaseModel):

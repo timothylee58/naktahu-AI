@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { fetchUserCredits } from '@/lib/credits';
 import { effectivePlan, planBadgeLabel } from '@/lib/auth-plan';
 import { useI18n } from '@/lib/i18n';
+import { API_BASE } from '@/lib/api-base';
+import { suggestForQuery } from '@/lib/agent-suggestions';
+import { SuggestionCard } from '@/components/agents/SuggestionCard';
 
 type Tab = 'options' | 'email';
 
@@ -44,6 +48,13 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
   const [credits, setCredits] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Sidebar-layout only: the compact profile card (email/plan/credits) is
+  // now the single entry point into the profile experience — clicking it
+  // opens a popover with Smart Suggestions + a link to the full /profile
+  // page, replacing the separate always-visible "Profile" nav link and
+  // sidebar suggestions teaser that used to sit above/below it.
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [suggestQuery, setSuggestQuery] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -76,8 +87,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
         const anonId = localStorage.getItem(ANON_SESSION_KEY);
         if (anonId) {
           try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
-            await fetch(`${apiBase}/api/v1/session/migrate`, {
+            await fetch(`${API_BASE}/api/v1/session/migrate`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -188,9 +198,96 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
           : null;
 
     if (isSidebar) {
+      const isDark = variant === 'dark';
+      const suggestions = suggestQuery.trim() ? suggestForQuery(suggestQuery) : [];
+      // Show a plan pill only when it's meaningfully different from the
+      // default (free) tier — a "FREE" badge on every single account tells
+      // a user nothing they don't already know. Uses the plain plan tier
+      // ("Business"), not the internal role wording ("Primary Admin") that
+      // planBadgeLabel() surfaces elsewhere (e.g. /profile, where the role
+      // detail IS meaningful) — this compact card shouldn't leak internal
+      // role categorization into what should read as a normal account view.
+      const compactPlan = plan !== 'free' ? plan.charAt(0).toUpperCase() + plan.slice(1) : null;
+
       return (
-        <div className="w-full flex flex-col gap-2">
-          <div className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 border ${variant === 'dark' ? 'border-white/10 bg-white/5' : 'border-zinc-200 bg-zinc-50'}`}>
+        <div className="w-full flex flex-col gap-2 relative">
+          <AnimatePresence>
+            {profileOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className={`absolute bottom-full left-0 right-0 mb-2 rounded-2xl border shadow-xl z-50 overflow-hidden p-3 flex flex-col gap-3 ${
+                    isDark ? 'border-white/10 bg-[#0F1626]' : 'border-zinc-200 bg-white'
+                  }`}
+                >
+                  <div>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-nk-official' : 'text-nk-official-dim'}`}>
+                      {t('profile.suggestions_title')}
+                    </p>
+                    <input
+                      type="text"
+                      value={suggestQuery}
+                      onChange={(e) => setSuggestQuery(e.target.value)}
+                      placeholder={t('profile.suggestions_placeholder')}
+                      className={`w-full text-xs rounded-lg px-2.5 py-1.5 border bg-transparent focus:outline-none ${
+                        isDark ? 'border-white/10 placeholder:text-zinc-500 text-zinc-200' : 'border-zinc-200 placeholder:text-zinc-400 text-zinc-800'
+                      }`}
+                    />
+                    {suggestions.length > 0 && (
+                      <div className="mt-2 flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                        {suggestions.map((s, i) => (
+                          <SuggestionCard key={i} suggestion={s} onNavigate={() => setProfileOpen(false)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    href="/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className={`text-xs font-semibold text-center rounded-lg px-3 py-2 transition-colors ${
+                      isDark ? 'bg-nk-official/15 text-nk-official hover:bg-nk-official-dim/25' : 'bg-nk-official/10 text-nk-official-dim hover:bg-nk-official/20'
+                    }`}
+                  >
+                    {t('profile.view_full')}
+                  </Link>
+                  <Link
+                    href="/billing"
+                    onClick={() => setProfileOpen(false)}
+                    className={`text-xs font-medium text-center rounded-lg px-3 py-2 transition-colors border ${
+                      isDark ? 'text-zinc-300 hover:bg-white/10 border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border-zinc-200'
+                    }`}
+                  >
+                    {t('nav.billing')}
+                  </Link>
+                  {/* Sign out lives in this popover instead of as a
+                      persistent full-width row below the avatar card — the
+                      footer was eating too much vertical space that query
+                      history needed; this is a rare action, not one that
+                      deserves permanent real estate. */}
+                  <button
+                    onClick={signOut}
+                    className={`text-xs font-medium text-center rounded-lg px-3 py-2 transition-colors ${
+                      isDark ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                  >
+                    {t('header.sign_out')}
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          <button
+            type="button"
+            onClick={() => setProfileOpen((o) => !o)}
+            className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 border text-left transition-colors ${
+              isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'
+            }`}
+          >
             <div className="flex items-center gap-2 min-w-0">
               {user.user_metadata?.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -201,7 +298,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-nk-official flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                   {(user.email ?? 'U')[0].toUpperCase()}
                 </div>
               )}
@@ -209,22 +306,20 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 {user.email}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${variant === 'dark' ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
-                {planBadgeLabel(user)}
-              </span>
-              {creditsLabel && (
-                <span className={`text-[10px] font-medium ${variant === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                  {creditsLabel}
-                </span>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={signOut}
-            className={`w-full text-sm font-medium rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${variant === 'dark' ? 'text-zinc-300 hover:bg-white/10 border border-white/10' : 'text-zinc-700 hover:bg-zinc-100 border border-zinc-200'}`}
-          >
-            {t('header.sign_out')}
+            {(compactPlan || creditsLabel) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {compactPlan && (
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${variant === 'dark' ? 'bg-nk-official/20 text-nk-official' : 'bg-nk-official/10 text-nk-official-dim'}`}>
+                    {compactPlan}
+                  </span>
+                )}
+                {creditsLabel && (
+                  <span className={`text-[10px] font-medium ${variant === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                    {creditsLabel}
+                  </span>
+                )}
+              </div>
+            )}
           </button>
         </div>
       );
@@ -245,7 +340,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-7 h-7 rounded-full bg-nk-official flex items-center justify-center text-white text-xs font-bold">
               {(user.email ?? 'U')[0].toUpperCase()}
             </div>
           )}
@@ -267,7 +362,7 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                 <div className="px-4 py-3 border-b border-zinc-100">
                   <p className="text-xs font-medium text-zinc-500 truncate">{user.email}</p>
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-nk-official/10 text-nk-official-dim rounded-full px-2 py-0.5">
                       {planBadgeLabel(user)}
                     </span>
                     {creditsLabel && (
@@ -299,16 +394,16 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
     isSidebar
       ? `w-full text-sm font-semibold rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
           variant === 'dark'
-            ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/30'
-            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20'
+            ? 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/30'
+            : 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/20'
         }`
-      : 'text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-4 py-2 transition-colors shadow-sm shadow-blue-900/20';
+      : 'text-sm font-semibold bg-nk-official hover:bg-nk-official-dim text-white rounded-full px-4 py-2 transition-colors shadow-sm shadow-blue-900/20';
 
   const registerButtonClass =
     `w-full text-sm font-semibold rounded-xl px-4 py-2.5 transition-colors locale-nowrap ${
       variant === 'dark'
-        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/30'
-        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-900/20'
+        ? 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/30'
+        : 'bg-nk-official hover:bg-nk-official-dim text-white shadow-sm shadow-blue-900/20'
     }`;
 
   const loginButtonClass =
@@ -472,10 +567,10 @@ export function AuthButton({ variant = 'light', layout = 'compact' }: AuthButton
                       <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && signInWithEmail()}
                         placeholder={t('auth.email.placeholder')}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-nk-official focus:border-transparent"
                         autoFocus />
                       <button onClick={signInWithEmail} disabled={!email || signingIn !== null}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
+                        className="w-full bg-nk-official hover:bg-nk-official-dim text-white font-semibold text-sm rounded-xl px-4 py-2.5 transition-colors disabled:opacity-50">
                         {signingIn === 'email' ? t('auth.email.sending') : t('auth.email.send')}
                       </button>
                       <button onClick={() => setTab('options')} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors text-center py-1">

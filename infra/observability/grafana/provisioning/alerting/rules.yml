@@ -1,0 +1,115 @@
+# Grafana unified-alerting file provisioning (no separate Alertmanager
+# service — Grafana OSS's built-in alerting evaluates and routes these
+# itself). Each rule fires the instant its condition holds; nothing here
+# NOTIFIES anyone until a contact point is set up in Grafana's Alerting UI
+# (Alerting -> Contact points) with a real destination — see
+# ../../README.md's "not yet wired to notify anyone" section for why that
+# step needs the user (SMTP creds or a webhook URL this repo has neither
+# of) and can't be provisioned here.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: naktahu-alerts
+    folder: NakTahu
+    interval: 1m
+    rules:
+      # ILMU degraded: Claude fallback running more than ~1 request every
+      # 10s sustained for 5 minutes. Threshold picked conservatively for
+      # this project's current low traffic (tens of requests/day) — revisit
+      # once real volume data exists.
+      - uid: naktahu-provider-fallback-high
+        title: ILMU fallback rate high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: rate(naktahu_provider_fallback_total[5m])
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              expr: ""
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0.1] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last, params: [] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Claude fallback is running >0.1 req/s over 5m — ILMU is likely degraded. Check ILMU_API_KEY / ILMU_BASE_URL health before assuming normal fallback traffic."
+
+      # Any breaker open (1) or half-open (2) means requests to that
+      # provider are being short-circuited right now.
+      - uid: naktahu-circuit-breaker-open
+        title: Circuit breaker open
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: max(naktahu_circuit_breaker_state)
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              expr: ""
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last, params: [] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A circuit breaker has been open or half-open for 2+ minutes — a provider is failing enough that calls are being rejected without attempt."
+
+      # 0.6 is not an arbitrary number — it's analyst_node's own
+      # needs_clarification threshold (CLAUDE.md hard rule: confidence < 0.6
+      # sets needs_clarification). This alert fires exactly when that
+      # degraded-experience gate is being hit at volume, not before.
+      - uid: naktahu-retrieval-confidence-degraded
+        title: Retrieval confidence degraded
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.5, sum(rate(naktahu_retrieval_score_bucket[15m])) by (le))
+              instant: true
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              expr: ""
+              refId: C
+              conditions:
+                - evaluator: { type: lt, params: [0.6] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last, params: [] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Median retrieval confidence has been below 0.6 for 10+ minutes — matches analyst_node's needs_clarification gate, so real users are hitting the degraded-confidence path at volume."

@@ -24,6 +24,7 @@ def _make_chunk(
     source_date: str | None = None,
     effective_date: str | None = None,
     superseded_by: str | None = None,
+    retrieved_at: str | None = None,
     chunk_id: str = "test-id",
 ) -> ChunkResult:
     return ChunkResult(
@@ -38,6 +39,7 @@ def _make_chunk(
         source_date=source_date,
         effective_date=effective_date,
         superseded_by=superseded_by,
+        retrieved_at=retrieved_at,
     )
 
 
@@ -56,6 +58,69 @@ async def test_analyst_scores_gov_url() -> None:
     citations = result["citations"]
     # gov.my chunk should be first
     assert citations[0]["url"] == "https://www.hasil.gov.my"
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_carries_retrieved_at() -> None:
+    """retrieved_at (when the source was ingested) is threaded from the
+    ChunkResult into the built Citation unchanged, and stays independent of
+    effective_date (when the cited rule takes effect) — the two must never
+    be conflated."""
+    chunk = _make_chunk(
+        effective_date="2024-01-01",
+        retrieved_at="2026-08-30T12:00:00+00:00",
+    )
+
+    result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    citation = result["citations"][0]
+    assert citation["retrieved_at"] == "2026-08-30T12:00:00+00:00"
+    assert citation["effective_date"] == "2024-01-01"
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_retrieved_at_none_when_absent() -> None:
+    """A chunk from before migration 048 (no retrieved_at from the RPC)
+    must render as no date, not a fabricated one."""
+    chunk = _make_chunk(retrieved_at=None)
+
+    result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    assert result["citations"][0]["retrieved_at"] is None
+
+
+def _retrieval_score_count() -> float:
+    """The Histogram's _count sample, found by name suffix rather than a
+    fixed samples[] index — bucket-sample ordering/count is an
+    implementation detail of prometheus_client's Histogram.collect()."""
+    from app.core.prometheus_metrics import retrieval_score
+
+    for sample in retrieval_score.collect()[0].samples:
+        if sample.name.endswith("_count"):
+            return sample.value
+    raise AssertionError("no _count sample found on naktahu_retrieval_score")
+
+
+@pytest.mark.asyncio
+async def test_analyst_observes_retrieval_score_on_scored_path() -> None:
+    chunk = _make_chunk()
+    before = _retrieval_score_count()
+
+    await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    assert _retrieval_score_count() == before + 1
+
+
+@pytest.mark.asyncio
+async def test_analyst_observes_zero_retrieval_score_when_no_usable_chunks() -> None:
+    """A query where every chunk is superseded/missing must still observe a
+    (zero) retrieval score — a silent gap here would make the metric miss
+    exactly the failure mode it exists to surface."""
+    before = _retrieval_score_count()
+
+    await analyst_node({"query": "q", "retrieved_chunks": []})
+
+    assert _retrieval_score_count() == before + 1
 
 
 @pytest.mark.asyncio
@@ -496,3 +561,65 @@ async def test_analyst_no_agency_contact_for_general_rules_question() -> None:
     })
 
     assert result["agency_contact"] is None
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_carries_effective_date() -> None:
+    """The date the UI shows must be the same value the staleness verdict is
+    computed from — a citation reading "in effect from X" while flagged stale
+    against some other date would be worse than showing no date at all."""
+    chunk = _make_chunk(
+        source_url="https://www.hasil.gov.my/a",
+        content="cukai pendapatan individu kadar 2024",
+        effective_date="2024-03-01",
+        chunk_id="a",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["citations"]
+    assert result["citations"][0]["effective_date"] == "2024-03-01"
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_effective_date_none_when_chunk_undated() -> None:
+    """Undated chunks must yield None, never a substituted "today" — the UI
+    contract is that a missing date renders nothing rather than implying the
+    government source is current."""
+    chunk = _make_chunk(
+        source_url="https://www.hasil.gov.my/a",
+        content="cukai pendapatan individu",
+        chunk_id="a",
+    )
+    result = await analyst_node({
+        "query": "cukai pendapatan",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["citations"]
+    assert result["citations"][0]["effective_date"] is None
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_effective_date_falls_back_to_source_date() -> None:
+    """expiry_aware chunks with no effective_date fall back to source_date —
+    mirrors _staleness_ref, so date and staleness flag stay consistent."""
+    chunk = _make_chunk(
+        source_url="https://www.kwsp.gov.my/a",
+        content="epf withdrawal cap",
+        expiry_aware=True,
+        source_date=_STALE_DATE,
+        chunk_id="a",
+    )
+    result = await analyst_node({
+        "query": "epf withdrawal cap",
+        "retrieved_chunks": [chunk],
+    })
+
+    assert result["citations"]
+    citation = result["citations"][0]
+    assert citation["effective_date"] == _STALE_DATE
+    # The pair must agree: flagged stale AND dated with the date that made it so.
+    assert citation["stale_disclaimer"] is True

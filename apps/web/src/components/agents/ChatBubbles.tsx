@@ -30,12 +30,12 @@ export function ChatBubbles({ messages, className }: ChatBubblesProps) {
             className={cn(
               'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
               msg.role === 'user'
-                ? 'rounded-br-md bg-blue-600 text-white'
-                : 'rounded-bl-md border border-zinc-200 bg-zinc-50 text-zinc-800',
+                ? 'rounded-br-md bg-nk-official text-white'
+                : 'rounded-bl-md border border-zinc-200 bg-zinc-50 text-zinc-800 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100',
             )}
           >
             {msg.role === 'bot' && (
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                 NakTahu
               </span>
             )}
@@ -63,7 +63,7 @@ export function QuickReplies({ options, onSelect, className }: QuickRepliesProps
           key={opt}
           type="button"
           onClick={() => onSelect(opt)}
-          className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300"
+          className="rounded-full border border-nk-official/30 bg-nk-official/10 px-3 py-1.5 text-xs font-medium text-nk-official-dim transition-colors hover:bg-nk-official/20 dark:border-nk-official/30 dark:bg-nk-official/10 dark:text-nk-official"
         >
           {opt}
         </button>
