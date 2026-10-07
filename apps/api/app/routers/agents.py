@@ -30,11 +30,11 @@ router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 class AgentStartRequest(BaseModel):
     language: Literal["bm", "en", "zh"] = "bm"
     message: str = ""
-    context: str = ""
+    context: str = Field(default="", max_length=5000)
     query: Optional[str] = None
     # compliance-drafter
-    business_type: str = "sole_proprietor"
-    domains: list[str] = Field(default_factory=lambda: ["tax", "business", "epf"])
+    business_type: str = Field(default="sole_proprietor", max_length=100)
+    domains: list[str] = Field(default_factory=lambda: ["tax", "business", "epf"], max_length=10)
     # study-agent
     subject: str = "sejarah"
     level: Literal["spm", "stpm", "a-level"] = "spm"
@@ -80,9 +80,9 @@ class AgentStartRequest(BaseModel):
 class AgentContinueRequest(BaseModel):
     session_id: str
     message: Optional[str] = None
-    context: Optional[str] = None
-    business_type: Optional[str] = None
-    domains: Optional[list[str]] = None
+    context: Optional[str] = Field(default=None, max_length=5000)
+    business_type: Optional[str] = Field(default=None, max_length=100)
+    domains: Optional[list[str]] = Field(default=None, max_length=10)
     question_index: Optional[int] = None
 
 
