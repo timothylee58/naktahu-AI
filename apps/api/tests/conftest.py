@@ -157,11 +157,6 @@ def auth_headers_business() -> dict[str, str]:
 
 
 @pytest.fixture
-def auth_headers_student(make_auth_headers) -> dict[str, str]:
-    return make_auth_headers(user_id="test-student-user", plan="student")
-
-
-@pytest.fixture
 def api_key_headers(api_key: str = "nkt_live_test_abc123xyz789") -> dict[str, str]:
     """Generate API key headers for Developer/Public API testing.
 
