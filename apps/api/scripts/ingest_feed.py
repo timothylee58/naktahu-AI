@@ -77,7 +77,7 @@ if str(_API_ROOT) not in sys.path:
 # two providers of the SAME model (ILMU gateway, then OpenAI direct) and raises
 # if neither works — a failed embed skips the row, never writes an incompatible
 # vector into document_chunks. See llm_client.py's embeddings section.
-from app.agents.analyst_node import _STRICT_DOMAINS  # noqa: E402
+from app.agents.freshness import STRICT_DOMAINS  # noqa: E402
 from app.agents.rag_node import _embed  # noqa: E402
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
@@ -503,7 +503,7 @@ def queue_supersede_candidates(
     Best-effort: a failure here (e.g. migration 053 not applied) is logged and
     never fails the ingestion run.
     """
-    if domain not in _STRICT_DOMAINS or not effective_date or not new_id:
+    if domain not in STRICT_DOMAINS or not effective_date or not new_id:
         return 0
     try:
         res = supabase.rpc("hybrid_search", {

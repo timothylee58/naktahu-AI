@@ -6,12 +6,13 @@ import binascii
 import io
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 import structlog
 
+from app.agents.freshness import is_stale, parse_date, partition_by_freshness, staleness_ref
 from app.services.llm_client import (
     ILMU_CHAT_MODEL,
     ilmu_client,
@@ -35,6 +36,22 @@ async def _embed(query: str) -> list[float]:
     return await corpus_embed(query)
 
 
+async def search_chunks(query: str, domain: str, *, top_k: int = 5) -> list[ChunkResult]:
+    """Hybrid-search a domain and return the raw ``ChunkResult`` rows.
+
+    Callers that need the freshness helpers (``app.agents.freshness``) work on
+    these objects; ``query_rag`` is the serialisable dict view of the same call.
+    """
+    embedding = await _embed(query)
+    # Positional/keyword names match vector_store.hybrid_search's real
+    # signature (query, embedding, domain, limit). This call previously passed
+    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
+    # every call — silently disabling knowledge search for every vertical
+    # agent that uses query_rag_findings. hybrid_search has no language
+    # filter; `language` is kept in query_rag's signature for callers.
+    return await hybrid_search(query, embedding, domain=domain, limit=top_k)
+
+
 async def query_rag(
     query: str,
     domain: str,
@@ -42,15 +59,15 @@ async def query_rag(
     language: str = "bm",
     top_k: int = 5,
 ) -> list[dict[str, Any]]:
-    """Hybrid-search a domain and return serialisable chunk dicts."""
-    embedding = await _embed(query)
-    # Positional/keyword names match vector_store.hybrid_search's real
-    # signature (query, embedding, domain, limit). This call previously passed
-    # query_embedding=/query_text=/language=/top_k=, which raised TypeError on
-    # every call — silently disabling knowledge search for every vertical
-    # agent that uses query_rag_findings. hybrid_search has no language
-    # filter; `language` is kept in this function's signature for callers.
-    chunks: list[ChunkResult] = await hybrid_search(query, embedding, domain=domain, limit=top_k)
+    """Hybrid-search a domain and return serialisable chunk dicts.
+
+    The freshness fields (effective_date, effective_until, announced_date,
+    superseded_by, expiry_aware, source_date, retrieved_at) are included
+    additively. Nothing is filtered here: callers that must not present
+    superseded, expired or not-yet-in-force rules as current use
+    ``query_rag_freshness`` instead.
+    """
+    chunks = await search_chunks(query, domain, top_k=top_k)
     return [
         {
             "id": c.id,
@@ -59,6 +76,13 @@ async def query_rag(
             "source_url": c.source_url,
             "ministry": c.ministry,
             "similarity": c.similarity,
+            "effective_date": c.effective_date,
+            "effective_until": c.effective_until,
+            "announced_date": c.announced_date,
+            "superseded_by": c.superseded_by,
+            "expiry_aware": c.expiry_aware,
+            "source_date": c.source_date,
+            "retrieved_at": c.retrieved_at,
         }
         for c in chunks
     ]
@@ -84,6 +108,68 @@ async def query_rag_findings(
 ) -> list[dict[str, Any]]:
     chunks = await query_rag(query, domain, language=language)
     return _chunks_to_findings(chunks, domain)
+
+
+# Compliance reports list obligations, so they search wider than the 3 findings
+# a Q&A-style agent keeps: superseded and expired rows are dropped *after*
+# retrieval and must not leave a section short of the current rules.
+_FRESHNESS_TOP_K = 8
+_MAX_CURRENT_FINDINGS = 3
+_MAX_ANNOUNCED_FINDINGS = 3
+
+
+def _dated_finding(chunk: ChunkResult, domain: str, *, stale: bool = False) -> dict[str, Any]:
+    """JSON-serialisable finding carrying its dates (no ChunkResult in state)."""
+    return {
+        "domain": domain,
+        "summary": chunk.content[:400],
+        "source_title": chunk.source_title,
+        "source_url": chunk.source_url,
+        "similarity": chunk.similarity,
+        "effective_date": chunk.effective_date,
+        "effective_until": chunk.effective_until,
+        "announced_date": chunk.announced_date,
+        "retrieved_at": chunk.retrieved_at,
+        "stale": stale,
+        # The date the staleness verdict was computed from, so the date a
+        # reader sees and the "may be outdated" flag cannot disagree.
+        "stale_ref_date": staleness_ref(chunk) if stale else None,
+    }
+
+
+async def query_rag_freshness(
+    query: str,
+    domain: str,
+    language: str = "bm",
+) -> dict[str, Any]:
+    """Search a domain and split the hits by validity, for report builders.
+
+    Returns ``{"current", "announced", "dropped"}``:
+
+    - ``current``: in force today (not superseded, not expired, not future-dated),
+      each flagged ``stale`` when its date is older than the domain's window.
+    - ``announced``: ``effective_date`` in the future, not expired, not
+      superseded. Never to be presented as a current obligation.
+    - ``dropped``: ``{"superseded": n, "expired": n}``, counts of rows left out.
+
+    ``language`` is accepted for parity with ``query_rag_findings`` (the search
+    has no language filter). Chunks with no dates are treated as current and
+    never flagged: absence of a date is not evidence of staleness.
+    """
+    chunks = await search_chunks(query, domain, top_k=_FRESHNESS_TOP_K)
+    part = partition_by_freshness(chunks)
+    current = [
+        _dated_finding(c, domain, stale=is_stale(c, domain))
+        for c in part.current[:_MAX_CURRENT_FINDINGS]
+    ]
+    # Soonest to take effect first; sorted() is stable, so ties keep relevance order.
+    announced_chunks = sorted(part.announced, key=lambda c: parse_date(c.effective_date) or date.max)
+    announced = [_dated_finding(c, domain) for c in announced_chunks[:_MAX_ANNOUNCED_FINDINGS]]
+    return {
+        "current": current,
+        "announced": announced,
+        "dropped": {"superseded": len(part.superseded), "expired": len(part.expired)},
+    }
 
 
 def extract_pdf_text(document_base64: str) -> str:
@@ -320,6 +406,51 @@ async def ocr_extract_listing_fields(
     return out
 
 
+# State ``error`` value (and API error code) for "no real PDF could be produced".
+PDF_GENERATION_ERROR = "pdf_generation_failed"
+
+
+class PdfGenerationError(RuntimeError):
+    """Raised by on-demand exports when generate_pdf could not produce a PDF."""
+
+
+class _RefuseAllFetcher:
+    """WeasyPrint ``url_fetcher`` that refuses every resource.
+
+    Report HTML is built from LLM output and user-supplied text, so stray
+    markup (``<img src="http://169.254.169.254/...">``, ``<link href="file:///etc/passwd">``,
+    CSS ``@import``) must never make the server fetch anything while
+    rendering. Every report is self-contained, so the right policy is to
+    refuse all URLs rather than allow-list a few schemes.
+
+    It is a callable object, not a bare function, because recent WeasyPrint
+    releases (checked on 70.0) read ``url_fetcher._fail_on_errors`` when a
+    fetch raises, while older ones just call ``url_fetcher(url)`` and expect an
+    exception on refusal. Raising from ``__call__`` with
+    ``_fail_on_errors = False`` makes WeasyPrint log a warning and skip the
+    resource in both (rendering was checked on 63.0, 68.0 and 70.0).
+    """
+
+    _fail_on_errors = False
+
+    def __call__(self, url: str, *args: Any, **kwargs: Any) -> Any:
+        scheme = url.split(":", 1)[0].lower() if ":" in url else "relative"
+        log.warning("pdf_resource_fetch_refused", scheme=scheme)
+        raise ValueError("external resource fetching is disabled for PDF rendering")
+
+
+def _render_pdf_bytes(html: str) -> bytes:
+    """Render HTML to PDF bytes with WeasyPrint. Raises on any failure.
+
+    ImportError covers a missing package; OSError covers the package being
+    installed but its native libraries (pango, harfbuzz, fontconfig) being
+    absent, which WeasyPrint reports at import time.
+    """
+    from weasyprint import HTML  # type: ignore[import-untyped]
+
+    return HTML(string=html, url_fetcher=_RefuseAllFetcher()).write_pdf()
+
+
 async def generate_pdf(
     html: str,
     *,
@@ -327,26 +458,38 @@ async def generate_pdf(
     agent_type: str = "compliance-drafter",
     supabase_client: Any = None,
 ) -> tuple[str, str, str]:
-    """Render HTML to PDF, upload to Supabase Storage. Returns (path, signed_url, expires_at)."""
-    pdf_bytes: bytes
-    try:
-        from weasyprint import HTML  # type: ignore[import-untyped]
+    """Render HTML to PDF, upload to Supabase Storage. Returns (path, signed_url, expires_at).
 
-        pdf_bytes = HTML(string=html).write_pdf()
+    Returns ``("", "", "")`` and uploads nothing whenever a real PDF cannot be
+    produced (WeasyPrint missing, native libraries missing, render error, or
+    output that is not a PDF) or the upload/sign step fails. Callers must
+    treat an empty signed_url as failure — never hand users a file that is
+    not a PDF.
+    """
+    try:
+        pdf_bytes = _render_pdf_bytes(html)
+    except (ImportError, OSError) as exc:
+        log.error("pdf_weasyprint_unavailable", error=str(exc), error_type=type(exc).__name__)
+        return "", "", ""
     except Exception as exc:
-        log.warning("weasyprint_unavailable", error=str(exc))
-        pdf_bytes = html.encode("utf-8")
+        log.error("pdf_render_failed", error=str(exc), error_type=type(exc).__name__)
+        return "", "", ""
+
+    if not isinstance(pdf_bytes, (bytes, bytearray)) or not pdf_bytes.startswith(b"%PDF"):
+        log.error("pdf_render_not_pdf", size=len(pdf_bytes) if pdf_bytes else 0)
+        return "", "", ""
 
     storage_path = f"agents/{agent_type}/{user_id}/{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.pdf"
     bucket = settings.supabase_storage_bucket
 
     if not supabase_client:
-        return storage_path, "", ""
+        log.error("pdf_storage_unavailable", reason="supabase client missing")
+        return "", "", ""
 
     try:
         supabase_client.storage.from_(bucket).upload(
             storage_path,
-            pdf_bytes,
+            bytes(pdf_bytes),
             {"content-type": "application/pdf", "upsert": "true"},
         )
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
@@ -355,10 +498,13 @@ async def generate_pdf(
             86_400,
         )
         url = signed.get("signedURL") or signed.get("signedUrl") or ""
+        if not url:
+            log.error("pdf_signed_url_missing", path=storage_path)
+            return "", "", ""
         return storage_path, url, expires_at.isoformat()
     except Exception as exc:
-        log.warning("pdf_upload_failed", error=str(exc))
-        return storage_path, "", ""
+        log.error("pdf_upload_failed", error=str(exc))
+        return "", "", ""
 
 
 async def generate_docx(

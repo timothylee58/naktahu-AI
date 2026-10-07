@@ -15,6 +15,15 @@ class ComplianceDrafterState(TypedDict, total=False):
     tax_findings: list[dict[str, Any]]
     business_findings: list[dict[str, Any]]
     epf_findings: list[dict[str, Any]]
+    # Announced but not yet in force (effective_date in the future). Kept apart
+    # from the *_findings above, which hold only what is in force today.
+    tax_announced: list[dict[str, Any]]
+    business_announced: list[dict[str, Any]]
+    epf_announced: list[dict[str, Any]]
+    # {"superseded": n, "expired": n}: rows left out of a section's findings.
+    tax_dropped: dict[str, int]
+    business_dropped: dict[str, int]
+    epf_dropped: dict[str, int]
     report_sections: list[dict[str, Any]]
     report_html: str
     report_json: dict[str, Any]

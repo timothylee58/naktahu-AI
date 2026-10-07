@@ -2,11 +2,17 @@
 from __future__ import annotations
 
 import re
-from datetime import date
 
 import structlog
 import weave
 
+from app.agents.freshness import (
+    days_since_effective,
+    is_stale,
+    partition_by_freshness,
+    pending_change,
+    staleness_ref,
+)
 from app.agents.personal_data import detect_personal_data_agency
 from app.core.prometheus_metrics import retrieval_score
 from app.models.state import AgentState, Citation
@@ -20,14 +26,8 @@ _GOV_DOMAIN_RE = re.compile(
 )
 
 _CLARIFICATION_THRESHOLD = 0.6
-# Domain-aware staleness windows. Kept in sync with the temporal_accuracy eval
-# metric (scripts/evals/temporal_scorer.py) so runtime flagging and the deploy
-# gate agree: policy domains that change often get a tighter window. Using
-# effective_date semantics, a flat short window (e.g. 90d) would over-flag a
-# rule that only just took effect, so windows are months/a year, not days.
-_STRICT_DOMAINS = frozenset({"tax", "epf", "immigration"})
-_STRICT_STALE_DAYS = 180
-_DEFAULT_STALE_DAYS = 365
+# Staleness windows and the current/announced/expired/superseded rules live in
+# app.agents.freshness, shared with the Compliance Drafter report builder.
 # Recency penalty applied to a stale chunk's relevance/authority score. Enough
 # to let a fresher chunk outrank a stale one on the same topic (prefer-newest)
 # and to pull confidence down when the only supporting evidence is stale,
@@ -37,77 +37,11 @@ _MIN_SUPPORTING_CHUNK_SCORE = 0.3
 _MIN_SUPPORTING_CHUNKS = 2
 
 
-def _staleness_ref(chunk: ChunkResult) -> str | None:
-    """The date used to judge staleness.
-
-    Prefers ``effective_date`` (when the rule/figure actually takes effect —
-    the meaningful signal). Falls back to ``source_date`` only for chunks
-    explicitly marked ``expiry_aware``.
-    """
-    if chunk.effective_date:
-        return chunk.effective_date
-    if chunk.expiry_aware and chunk.source_date:
-        return chunk.source_date
-    return None
-
-
-def _days_since_effective(chunk: ChunkResult) -> int | None:
-    """Whole days since the chunk's effective/source date, or None if unknown
-    or not yet in effect (future/today dates are never stale)."""
-    ref = _staleness_ref(chunk)
-    if not ref:
-        return None
-    try:
-        ref_dt = date.fromisoformat(ref)
-    except ValueError:
-        return None
-    days = (date.today() - ref_dt).days
-    return days if days > 0 else None
-
-
-def _parse_date(value: str | None) -> date | None:
-    if not value:
-        return None
-    try:
-        return date.fromisoformat(str(value)[:10])
-    except ValueError:
-        return None
-
-
-def _is_pending(chunk: ChunkResult) -> bool:
-    """Announced but not yet in force: effective_date is after today.
-
-    Such a chunk is not evidence for today's rule — it describes the NEXT
-    rule. Without this check, prefer-newest ranked it first and the answer
-    stated a future rule as the current one.
-    """
-    start = _parse_date(chunk.effective_date)
-    return start is not None and start > date.today()
-
-
-def _is_expired(chunk: ChunkResult) -> bool:
-    """The rule's validity window has closed (effective_until before today)."""
-    end = _parse_date(chunk.effective_until)
-    return end is not None and end < date.today()
-
-
 _MAX_PENDING_CHANGES = 3
 # When there is no rule in force at all and the answer is built from announced
 # changes alone (e.g. "what did Budget 2027 announce for EPF?" asked before any
 # of it takes effect), those chunks ARE the evidence, so allow more of them.
 _MAX_PENDING_ANNOUNCED_ONLY = 5
-
-
-def _pending_change(chunk: ChunkResult) -> dict:
-    return {
-        "chunk_id": chunk.id,
-        "source_title": chunk.source_title,
-        "ministry": chunk.ministry,
-        "source_url": chunk.source_url,
-        "effective_date": chunk.effective_date,
-        "announced_date": chunk.announced_date,
-        "content": chunk.content,
-    }
 
 
 def _build_citation(chunk: ChunkResult, score: float, domain: str | None, *, pending: bool = False) -> Citation:
@@ -117,27 +51,18 @@ def _build_citation(chunk: ChunkResult, score: float, domain: str | None, *, pen
         url=chunk.source_url,
         confidence=score,
         # A rule that has not started cannot be stale.
-        stale_disclaimer=False if pending else _is_stale(chunk, domain),
+        stale_disclaimer=False if pending else is_stale(chunk, domain),
         # Same value the staleness verdict is computed from, so the date a
         # user sees and the "may be outdated" flag can never disagree. None
         # when the chunk has no date — the UI renders nothing rather than
         # inventing one.
-        effective_date=_staleness_ref(chunk),
+        effective_date=staleness_ref(chunk),
         retrieved_at=chunk.retrieved_at,
     )
     if pending:
         # Lets the UI say "takes effect {date}" instead of "in effect from".
         citation["not_yet_effective"] = True
     return citation
-
-
-def _stale_threshold(domain: str | None) -> int:
-    return _STRICT_STALE_DAYS if domain in _STRICT_DOMAINS else _DEFAULT_STALE_DAYS
-
-
-def _is_stale(chunk: ChunkResult, domain: str | None = None) -> bool:
-    days = _days_since_effective(chunk)
-    return days is not None and days > _stale_threshold(domain)
 
 
 def _adjusted_score(base: float, stale: bool) -> float:
@@ -226,8 +151,8 @@ async def analyst_node(state: AgentState) -> dict:
 
     # 1. Hard-reject superseded chunks (never cite a chunk a newer one replaces).
     #    Build a new list rather than mutating the input while iterating.
-    live = [c for c in retrieved if c.superseded_by is None]
-    superseded_count = len(retrieved) - len(live)
+    partition = partition_by_freshness(retrieved)
+    superseded_count = len(partition.superseded)
     if superseded_count:
         log.info("analyst_dropped_superseded", count=superseded_count)
 
@@ -236,32 +161,32 @@ async def analyst_node(state: AgentState) -> dict:
     #     are not evidence for today's answer: they are set aside as
     #     pending_changes so the synthesiser states the current rule AND the
     #     announced change, instead of presenting the future rule as current.
-    expired = [c for c in live if _is_expired(c)]
-    chunks = [c for c in live if not _is_expired(c) and not _is_pending(c)]
+    expired = partition.expired
+    chunks = partition.current
     # Most relevant announced change first (then soonest to take effect), so the
     # few that fit in the answer's context are the ones the question is about,
     # not merely the earliest-dated.
     pending_scored = sorted(
-        ((_score_chunk(c, query), c) for c in live if _is_pending(c) and not _is_expired(c)),
+        ((_score_chunk(c, query), c) for c in partition.announced),
         key=lambda t: (-t[0], t[1].effective_date or ""),
     )
     pending = [c for _, c in pending_scored]
     announced_only = not chunks and bool(pending)
     cap = _MAX_PENDING_ANNOUNCED_ONLY if announced_only else _MAX_PENDING_CHANGES
-    pending_changes = [_pending_change(c) for c in pending[:cap]]
+    pending_changes = [pending_change(c) for c in pending[:cap]]
     if expired or pending:
         log.info("analyst_validity_window", expired=len(expired), pending=len(pending), announced_only=announced_only)
 
     # 2. Record effective-date staleness for the surviving chunks.
     stale_warnings: list[dict] = []
     for chunk in chunks:
-        if not _is_stale(chunk, domain):
+        if not is_stale(chunk, domain):
             continue
-        days_old = _days_since_effective(chunk)
+        days_old = days_since_effective(chunk)
         stale_warnings.append({
             "chunk_id": chunk.id,
             "source_title": chunk.source_title,
-            "effective_date": _staleness_ref(chunk),
+            "effective_date": staleness_ref(chunk),
             "days_since_effective": days_old,
         })
 
@@ -290,7 +215,7 @@ async def analyst_node(state: AgentState) -> dict:
     # announced_only above); they are never stale, so no recency penalty applies.
     evidence = pending if announced_only else chunks
     scored: list[tuple[float, str, ChunkResult]] = [
-        (_adjusted_score(_score_chunk(chunk, query), _is_stale(chunk, domain)), _recency_key(chunk), chunk)
+        (_adjusted_score(_score_chunk(chunk, query), is_stale(chunk, domain)), _recency_key(chunk), chunk)
         for chunk in evidence
     ]
     scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
@@ -317,8 +242,8 @@ async def analyst_node(state: AgentState) -> dict:
     # is itself stale, the corpus has no current source for this query (e.g. the
     # new rule hasn't been ingested) — the synthesiser must date-stamp and hedge.
     top_chunk = top3[0][2]
-    stale_warning = _is_stale(top_chunk, domain)
-    answer_as_of = _staleness_ref(top_chunk) if stale_warning else None
+    stale_warning = is_stale(top_chunk, domain)
+    answer_as_of = staleness_ref(top_chunk) if stale_warning else None
 
     needs_clarification = confidence < _CLARIFICATION_THRESHOLD
 

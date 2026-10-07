@@ -183,7 +183,12 @@ function GrantDraftGeneratorPageInner() {
         session_id: sessionId,
         edits: { executive_summary: editedSummary, use_of_funds_narrative: editedFunds },
       });
-      setDownloadUrl((data.signed_url as string) ?? null);
+      const signedUrl = typeof data.signed_url === 'string' ? data.signed_url : '';
+      if (data.error || !signedUrl) {
+        setError(t('agents.error.pdf_failed'));
+        return;
+      }
+      setDownloadUrl(signedUrl);
       setStep('done');
       // Refresh the history list so the just-generated file shows up immediately.
       get('/api/v1/agents/grant-draft-generator/documents')

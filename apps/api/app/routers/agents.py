@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.agents.checkpointer import get_checkpointer
+from app.agents.tools import PdfGenerationError
 from app.services.agent_runner import (
     AGENT_CONFIRM_HANDLERS,
     AGENT_CONTINUE_HANDLERS,
@@ -248,7 +249,13 @@ async def agent_confirm(
         checkpointer=_checkpointer(request),
         edits=body.edits,
     )
-    if agent.credit_cost > 0 and not is_credit_exempt(user.plan, agent_name, role=user.role):
+    # A confirm that ended in an error (e.g. no PDF could be produced) delivered
+    # nothing, so it must not cost the user a credit.
+    if (
+        not result.get("error")
+        and agent.credit_cost > 0
+        and not is_credit_exempt(user.plan, agent_name, role=user.role)
+    ):
         remaining = await deduct_credits(sb, user.user_id, agent.credit_cost)
         if remaining < 0:
             log.warning("agent_confirm_credit_deduct_failed", user_id=user.user_id)
@@ -310,6 +317,9 @@ async def export_health_triage_pdf(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PdfGenerationError as exc:
+        log.error("health_triage_export_pdf_failed", session_id=session_id)
+        raise HTTPException(status_code=503, detail="PDF export is temporarily unavailable.") from exc
 
 
 @router.get("/{agent_name}/documents")
