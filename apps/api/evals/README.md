@@ -181,3 +181,25 @@ RUN_LIVE_EVALS=1 python -m pytest evals/ -v
 - Extend the JSONL fixtures over time as new jailbreak phrasings, domains,
   or civic topics are discovered — do not hardcode findings only in this
   README.
+
+### 5. `tax_accuracy.jsonl` — is the answer right, and is confidence honest?
+
+Unlike the suites above, this one checks the **answer text against a known-correct
+fact**. It exists because a wrong SME tax rate (a flat 24% plus an invented RM9,000
+company relief) was shown to a user with no clarification prompt.
+
+Each line: `id`, `query`, `key_status`, `must_contain_groups` (every group needs at
+least one of its phrases), `must_not_contain`, optional `expect_low_confidence`
+(out-of-corpus questions the pipeline should decline), and a `note`.
+
+`key_status` is `verified` or `verify_against_lhdn_pr_8_2025`. The second marks
+year-sensitive figures (the SME rate bands) that must be confirmed against LHDN
+before they are treated as ground truth. Extend the key from LHDN's own pages, never
+from memory or from the pipeline's own output.
+
+`test_tax_accuracy.py` always runs the key-shape checks and the scorer regression
+(the wrong answer a user saw must score wrong). With `RUN_LIVE_EVALS=1` and live keys
+it runs every case through the real pipeline and prints accuracy plus a
+confidence-calibration table; it fails if any answer is wrong at confidence >= 0.6,
+because the trust layer's job is to make that count zero. To grow it, add 30-50
+cases covering the questions your users actually ask.

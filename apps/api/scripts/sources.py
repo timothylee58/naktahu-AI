@@ -908,6 +908,59 @@ SOURCES: tuple[Source, ...] = (
             ".gov.my source, only as the accreditation body's own page."
         ),
     ),
+
+    # ── tax: LHDN company / SME income tax ──────────────────────────────────
+    # Why these exist: the tax corpus held only a hand-written individual-tax
+    # summary (YA2023, no dates), so "what is the SME corporate tax rate?" was
+    # answered from individual-tax chunks and came back wrong (a flat 24% with
+    # an invented RM9,000 company relief). These are LHDN's own pages for
+    # companies, so SME/company questions retrieve the actual rule.
+    # URLs came from a web search of LHDN's site, NOT a direct fetch: this
+    # sandbox cannot reach hasil.gov.my (DNS fails), so the first live run must
+    # confirm each returns 200 (`check_sources`) before anything is trusted.
+    # Chunks are stamped with the page's own text, never typed figures, and
+    # tax-domain ingestion queues supersede candidates against older tax chunks
+    # (python -m scripts.review_supersede --list).
+    Source(
+        name="lhdn-company-tax-rates",
+        url="https://www.hasil.gov.my/en/syarikat/kadar-cukai-syarikat/",
+        kind="html",
+        domain="tax",
+        ministry="Lembaga Hasil Dalam Negeri (LHDN)",
+        language="en",
+        notes="LHDN 'Tax Rate of Company' — resident company and SME income tax rates.",
+    ),
+    Source(
+        name="lhdn-sme-tax",
+        url="https://www.hasil.gov.my/en/syarikat/sme/",
+        kind="html",
+        domain="tax",
+        ministry="Lembaga Hasil Dalam Negeri (LHDN)",
+        language="en",
+        notes="LHDN SME page — who qualifies as an SME and how SME income is taxed.",
+    ),
+    Source(
+        name="lhdn-corporate-tax-overview",
+        url="https://www.hasil.gov.my/en/syarikat/cukai-korporat/",
+        kind="html",
+        domain="tax",
+        ministry="Lembaga Hasil Dalam Negeri (LHDN)",
+        language="en",
+        notes="LHDN corporate tax overview for companies (filing, payment, deadlines).",
+    ),
+    Source(
+        name="lhdn-pr-8-2025-micro-small-medium-companies",
+        url="https://www.hasil.gov.my/media/fo1ptejq/pr-8-2025-tax-treatment-for-micro-small-and-medium-companies.pdf",
+        kind="pdf",
+        domain="tax",
+        ministry="Lembaga Hasil Dalam Negeri (LHDN)",
+        language="en",
+        notes=(
+            "LHDN Public Ruling No. 8/2025 — tax treatment for micro, small and "
+            "medium companies; the authoritative definition of an SME and the "
+            "rates that apply to it."
+        ),
+    ),
 )
 
 # ── Belanjawan 2027 (Budget 2027) — tabled 9 October 2026 ───────────────
