@@ -162,15 +162,17 @@ async def continue_compliance_drafter(
     return resp
 
 
-async def _rewind_failed_pdf(graph: Any, session_id: str) -> None:
-    """Re-open a run whose PDF step failed so confirming again retries it.
+async def _rewind_failed_export(graph: Any, session_id: str) -> None:
+    """Re-open a run whose PDF/DOCX export failed so confirming again retries it.
 
-    generate_pdf_node records the failure and the graph then runs to END, so a
+    The export node records the failure and the graph then runs to END, so a
     second confirm would resume a finished thread and do nothing. Writing the
     state back "as" the compile node puts the thread at the same pause it had
-    before the first confirm (next node: generate_pdf, report already built),
-    so only the PDF step runs again — no new searches, the report the user
-    reviewed is unchanged. A thread in any other state is left alone.
+    before the first confirm (next node: generate_pdf / generate_export, report
+    already built), so only the export step runs again — no new searches, the
+    report the user reviewed is unchanged. A thread in any other state is left
+    alone. Compliance Drafter and Grant Draft Generator share this shape: both
+    have a "compile" node feeding an interrupt_before export node.
     """
     config = _thread_config(session_id)
     snapshot = await graph.aget_state(config)
@@ -202,7 +204,7 @@ async def confirm_compliance_drafter(
     edits: Optional[dict[str, Any]] = None,  # unused — compliance-drafter has no editable-draft UI
 ) -> dict[str, Any]:
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
-    await _rewind_failed_pdf(graph, session_id)
+    await _rewind_failed_export(graph, session_id)
     await graph.aupdate_state(_thread_config(session_id), {"_user_email": user_email})
     values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
     # generate_pdf_node sets `error` when no real PDF could be produced; log
@@ -300,6 +302,7 @@ async def confirm_grant_draft_generator(
     edits: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     graph = get_grant_draft_generator_graph(checkpointer=checkpointer)
+    await _rewind_failed_export(graph, session_id)
     state_update: dict[str, Any] = {"_user_email": user_email}
     if edits:
         # compile_node already ran before the interrupt and baked the

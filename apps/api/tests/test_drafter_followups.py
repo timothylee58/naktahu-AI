@@ -247,3 +247,58 @@ async def test_a_second_confirm_after_success_does_not_regenerate() -> None:
             )
 
     assert pdf.await_count == 1
+
+
+# ── the same retry for the Grant Draft Generator ──────────────────────────────
+
+
+async def _grant_fetch(_state: Any, _config: Any = None) -> dict[str, Any]:
+    return {"grant_record": {"programme_name": "SME Grant", "agency": "Agency"}}
+
+
+async def _grant_draft(_state: Any) -> dict[str, Any]:
+    return {"executive_summary": "summary", "use_of_funds_narrative": "funds", "document_checklist": []}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("export_format", ["pdf", "docx"])
+async def test_grant_confirm_again_after_a_failed_export_retries_only_the_export(export_format: str) -> None:
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from app.agents.grant_draft_generator import graph as grant_graph
+    from app.services import agent_runner
+
+    checkpointer = MemorySaver()
+    calls: list[str] = []
+
+    async def flaky_export(*_a: Any, **_k: Any) -> tuple[str, str, str]:
+        calls.append("export")
+        if len(calls) == 1:
+            return "", "", ""
+        return "agents/g/u1/1.file", "https://signed.example/g", "2030-01-01T00:00:00+00:00"
+
+    with (
+        patch.object(grant_graph, "fetch_grant_node", _grant_fetch),
+        patch.object(grant_graph, "draft_node", _grant_draft),
+        patch("app.agents.tools.generate_pdf", flaky_export),
+        patch("app.agents.tools.generate_docx", flaky_export),
+        patch("app.agents.tools.send_email", AsyncMock(return_value=True)),
+    ):
+        started = await agent_runner.start_grant_draft_generator(
+            user_id="u1",
+            payload={"programme_name": "SME Grant", "export_format": export_format},
+            supabase_client=None,
+            checkpointer=checkpointer,
+        )
+        sid = started["session_id"]
+        first = await agent_runner.confirm_grant_draft_generator(
+            session_id=sid, user_id="u1", user_email="a@b.c", supabase_client=None, checkpointer=checkpointer
+        )
+        second = await agent_runner.confirm_grant_draft_generator(
+            session_id=sid, user_id="u1", user_email="a@b.c", supabase_client=None, checkpointer=checkpointer
+        )
+
+    assert first["status"] == "error" and first["error"] == PDF_GENERATION_ERROR
+    assert second["status"] == "completed" and not second.get("error")
+    assert second["signed_url"] == "https://signed.example/g"
+    assert len(calls) == 2
