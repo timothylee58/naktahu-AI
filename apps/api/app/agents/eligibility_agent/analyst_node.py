@@ -45,7 +45,41 @@ _PASSTHROUGH_FIELDS = (
     "stackable_with",
     "conflicts_with",
     "notes_en",
+    "last_verified",
+    "source_url",
 )
+
+
+_MAX_DOCUMENTS = 20
+_MAX_DOC_NAME_CHARS = 200
+_DOC_NAME_KEYS = ("name_en", "name_bm", "name_zh")
+
+
+def _normalise_documents(raw: Any) -> list[dict[str, str]]:
+    """Validate the curated `required_documents` column before it reaches the UI.
+
+    Expected shape: a list of {"name_en", "name_bm", "name_zh"} objects (any
+    subset of the name keys). A bare string is accepted as an English name.
+    Anything malformed is dropped rather than raised: a bad curated row must
+    never take the grant card down, and an empty list means "not yet listed"
+    (the UI says so), never "no documents needed".
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw[:_MAX_DOCUMENTS]:
+        if isinstance(item, str):
+            item = {"name_en": item}
+        if not isinstance(item, dict):
+            continue
+        entry = {
+            key: str(item[key]).strip()[:_MAX_DOC_NAME_CHARS]
+            for key in _DOC_NAME_KEYS
+            if isinstance(item.get(key), str) and item[key].strip()
+        }
+        if entry:
+            out.append(entry)
+    return out
 
 
 def _score_grant(grant: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
@@ -157,6 +191,7 @@ def _score_grant(grant: dict[str, Any], profile: dict[str, Any]) -> dict[str, An
     )
 
     result: dict[str, Any] = {field: grant.get(field) for field in _PASSTHROUGH_FIELDS}
+    result["required_documents"] = _normalise_documents(grant.get("required_documents"))
     result.update({
         "deadline_is_rolling": rolling,
         "eligibility_score": score,

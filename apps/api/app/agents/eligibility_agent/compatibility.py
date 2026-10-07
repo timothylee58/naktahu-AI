@@ -152,6 +152,11 @@ def _legacy_verdict(
     return UNKNOWN, None
 
 
+def _msg(language: str, *, en: str, bm: str, zh: str) -> str:
+    """Pick the string for `language`; anything unrecognised falls back to English."""
+    return {"bm": bm, "zh": zh}.get(language, en)
+
+
 def _advice(
     language: str,
     conflict_count: int,
@@ -160,52 +165,57 @@ def _advice(
     unrecognised: list[str],
     degraded: bool,
 ) -> list[str]:
-    bm = language == "bm"
     out: list[str] = []
     if conflict_count:
-        out.append(
-            "Buang salah satu daripada setiap pasangan yang bercanggah sebelum memohon — "
-            "memohon kedua-duanya boleh membatalkan permohonan."
-            if bm else
-            "Drop one programme from each conflicting pair before applying — "
-            "submitting both can invalidate the application."
-        )
+        out.append(_msg(
+            language,
+            en="Drop one programme from each conflicting pair before applying — "
+               "submitting both can invalidate the application.",
+            bm="Buang salah satu daripada setiap pasangan yang bercanggah sebelum memohon — "
+               "memohon kedua-duanya boleh membatalkan permohonan.",
+            zh="申请前请从每对相互冲突的补助金中放弃其一——同时提交两者可能导致申请无效。",
+        ))
     if partial_count:
-        out.append(
-            "Bagi pasangan bertindih separa, asingkan kos projek: setiap invois "
-            "hanya boleh dituntut di bawah satu geran."
-            if bm else
-            "For partially overlapping pairs, split the project costs: each invoice "
-            "may only be claimed under one grant."
-        )
+        out.append(_msg(
+            language,
+            en="For partially overlapping pairs, split the project costs: each invoice "
+               "may only be claimed under one grant.",
+            bm="Bagi pasangan bertindih separa, asingkan kos projek: setiap invois "
+               "hanya boleh dituntut di bawah satu geran.",
+            zh="对于部分重叠的组合，请拆分项目成本：每张发票只能在一项补助金下申领。",
+        ))
     if unknown_count:
-        out.append(
-            "Sesetengah pasangan belum disahkan. Jangan andaikan ia boleh ditindan — "
-            "sahkan dengan agensi berkaitan sebelum memohon serentak."
-            if bm else
-            "Some pairs are unverified. Do not assume they stack — confirm with the "
-            "relevant agencies before applying simultaneously."
-        )
+        out.append(_msg(
+            language,
+            en="Some pairs are unverified. Do not assume they stack — confirm with the "
+               "relevant agencies before applying simultaneously.",
+            bm="Sesetengah pasangan belum disahkan. Jangan andaikan ia boleh ditindan — "
+               "sahkan dengan agensi berkaitan sebelum memohon serentak.",
+            zh="部分组合尚未核实。请勿假定它们可以叠加——同时申请前请向相关机构确认。",
+        ))
     if unrecognised:
-        out.append(
-            "Program berikut tiada dalam pangkalan data geran: " + ", ".join(unrecognised)
-            if bm else
-            "These programmes are not in the grant database: " + ", ".join(unrecognised)
-        )
+        out.append(_msg(
+            language,
+            en="These programmes are not in the grant database: ",
+            bm="Program berikut tiada dalam pangkalan data geran: ",
+            zh="以下项目不在补助金数据库中：",
+        ) + ", ".join(unrecognised))
     if degraded:
-        out.append(
-            "Jadual peraturan keserasian belum tersedia — keputusan ini berasaskan "
-            "data binari sahaja dan tidak dapat mengesan pertindihan separa."
-            if bm else
-            "The compatibility rules table is unavailable — this result is based on "
-            "binary data only and cannot detect partial overlaps."
-        )
+        out.append(_msg(
+            language,
+            en="The compatibility rules table is unavailable — this result is based on "
+               "binary data only and cannot detect partial overlaps.",
+            bm="Jadual peraturan keserasian belum tersedia — keputusan ini berasaskan "
+               "data binari sahaja dan tidak dapat mengesan pertindihan separa.",
+            zh="兼容性规则表暂不可用——此结果仅基于二元数据，无法检测部分重叠。",
+        ))
     if not out:
-        out.append(
-            "Semua pasangan boleh ditindan berdasarkan rekod semasa."
-            if bm else
-            "All pairs are stackable based on current records."
-        )
+        out.append(_msg(
+            language,
+            en="All pairs are stackable based on current records.",
+            bm="Semua pasangan boleh ditindan berdasarkan rekod semasa.",
+            zh="根据现有记录，所有组合均可叠加。",
+        ))
     return out
 
 
@@ -221,7 +231,7 @@ async def grant_compatibility_check(
     `grant_compatibility_rules` table (migration 021 unapplied) yields
     `degraded: true` and, where possible, legacy-array verdicts.
     """
-    language = "bm" if language in ("bm", "ms") else "en"
+    language = "bm" if language in ("bm", "ms") else ("zh" if language == "zh" else "en")
 
     # Canonicalise + de-duplicate while preserving caller order.
     names: list[str] = []
@@ -311,23 +321,25 @@ async def grant_compatibility_check(
 
 
 def _fallback_explanation(verdict: str, language: str) -> str:
-    bm = language == "bm"
     if verdict == CONFLICT:
-        return (
-            "Direkodkan sebagai tidak serasi dalam pangkalan data geran."
-            if bm else
-            "Recorded as incompatible in the grant database."
+        return _msg(
+            language,
+            en="Recorded as incompatible in the grant database.",
+            bm="Direkodkan sebagai tidak serasi dalam pangkalan data geran.",
+            zh="补助金数据库中记录为不兼容。",
         )
     if verdict == STACKABLE:
-        return (
-            "Direkodkan sebagai boleh ditindan dalam pangkalan data geran."
-            if bm else
-            "Recorded as stackable in the grant database."
+        return _msg(
+            language,
+            en="Recorded as stackable in the grant database.",
+            bm="Direkodkan sebagai boleh ditindan dalam pangkalan data geran.",
+            zh="补助金数据库中记录为可叠加。",
         )
-    return (
-        "Tiada peraturan keserasian yang disahkan untuk pasangan ini. Jangan andaikan "
-        "ia boleh ditindan — sahkan dengan agensi berkaitan."
-        if bm else
-        "No verified compatibility rule exists for this pair. Do not assume they stack — "
-        "confirm with the relevant agencies."
+    return _msg(
+        language,
+        en="No verified compatibility rule exists for this pair. Do not assume they stack — "
+           "confirm with the relevant agencies.",
+        bm="Tiada peraturan keserasian yang disahkan untuk pasangan ini. Jangan andaikan "
+           "ia boleh ditindan — sahkan dengan agensi berkaitan.",
+        zh="此组合尚无经核实的兼容性规则。请勿假定可以叠加——请向相关机构确认。",
     )

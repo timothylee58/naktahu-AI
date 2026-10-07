@@ -17,6 +17,7 @@ log = structlog.get_logger(__name__)
 _LANG_INSTRUCTION = {
     "bm": "PENTING: Jawab dalam Bahasa Malaysia sahaja.",
     "en": "IMPORTANT: Answer in English only.",
+    "zh": "重要：您必须只用简体中文回答。",
 }
 
 _SYSTEM_PROMPT = (
@@ -27,6 +28,28 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _verification_note(grant: dict[str, Any]) -> str:
+    """Tell the model what live verification found, so the summary never states
+    an unconfirmed deadline as fact (the model is told not to invent deadlines)."""
+    v = grant.get("verification") or {}
+    status = v.get("status")
+    if status == "confirmed":
+        return f" [deadline {v.get('found_deadline')} confirmed on the agency site]"
+    if status == "changed":
+        if not v.get("db_deadline"):
+            return (
+                f" [WARNING: the agency site states a deadline of {v.get('found_deadline')} but we "
+                "have no deadline on record - tell the user to check the agency site]"
+            )
+        return (
+            f" [WARNING: the agency site now says the deadline is {v.get('found_deadline')}, "
+            f"our records say {v.get('db_deadline')} - tell the user to check the agency site]"
+        )
+    if status == "closed":
+        return " [WARNING: the agency site says applications are closed - say so]"
+    return " [deadline not verified live - tell the user to confirm it with the agency]"
+
+
 def _build_prompt(state: EligibilityState) -> str:
     profile = state.get("business_profile") or {}
     matched = state.get("matched_grants") or []
@@ -35,7 +58,7 @@ def _build_prompt(state: EligibilityState) -> str:
 
     lines = [f"Business profile: {profile}", "", "Matched grants:"]
     for g in matched:
-        lines.append(f"- {g.get('programme_name')} ({g.get('agency')}): RM{g.get('amount_min_myr')}-{g.get('amount_max_myr')}")
+        lines.append(f"- {g.get('programme_name')} ({g.get('agency')}): RM{g.get('amount_min_myr')}-{g.get('amount_max_myr')}{_verification_note(g)}")
     if near_miss:
         lines.append("")
         lines.append("Near-miss grants (almost eligible):")

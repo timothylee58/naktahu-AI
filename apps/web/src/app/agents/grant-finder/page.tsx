@@ -25,6 +25,25 @@ function fmt(template: string, vars: Record<string, string | number>): string {
   return Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, String(v)), template);
 }
 
+type VerificationStatus = 'confirmed' | 'changed' | 'closed' | 'no_signal' | 'unavailable';
+
+const VERIFICATION_STATUSES: readonly string[] = ['confirmed', 'changed', 'closed', 'no_signal', 'unavailable'];
+
+interface Verification {
+  status: VerificationStatus;
+  checked_at: string | null;
+  found_deadline: string | null;
+  db_deadline: string | null;
+  source_url: string | null;
+  source_domain: string | null;
+}
+
+interface RequiredDoc {
+  name_en?: string;
+  name_bm?: string;
+  name_zh?: string;
+}
+
 interface Grant {
   programme_name: string;
   agency: string | null;
@@ -37,6 +56,49 @@ interface Grant {
   eligibility_score: number;
   eligibility_reasons: string[];
   ineligibility_reasons: string[];
+  last_verified: string | null;
+  verification: Verification | null;
+  required_documents: RequiredDoc[];
+}
+
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null;
+}
+
+function parseVerification(raw: unknown): Verification | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.status !== 'string' || !VERIFICATION_STATUSES.includes(r.status)) return null;
+  const url = str(r.source_url);
+  return {
+    status: r.status as VerificationStatus,
+    checked_at: str(r.checked_at),
+    found_deadline: str(r.found_deadline),
+    db_deadline: str(r.db_deadline),
+    // Only ever link http(s): the value comes over the network.
+    source_url: url && /^https?:\/\//i.test(url) ? url : null,
+    source_domain: str(r.source_domain),
+  };
+}
+
+function parseDocs(raw: unknown): RequiredDoc[] {
+  if (!Array.isArray(raw)) return [];
+  const docs: RequiredDoc[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const r = item as Record<string, unknown>;
+    const doc: RequiredDoc = {};
+    if (str(r.name_en)) doc.name_en = r.name_en as string;
+    if (str(r.name_bm)) doc.name_bm = r.name_bm as string;
+    if (str(r.name_zh)) doc.name_zh = r.name_zh as string;
+    if (doc.name_en || doc.name_bm || doc.name_zh) docs.push(doc);
+  }
+  return docs;
+}
+
+function docName(doc: RequiredDoc, locale: string): string {
+  const preferred = locale === 'ms' ? doc.name_bm : locale === 'zh' ? doc.name_zh : doc.name_en;
+  return preferred ?? doc.name_en ?? doc.name_bm ?? doc.name_zh ?? '';
 }
 
 function parseGrant(raw: unknown): Grant | null {
@@ -56,6 +118,9 @@ function parseGrant(raw: unknown): Grant | null {
     eligibility_score: typeof r.eligibility_score === 'number' ? r.eligibility_score : 0,
     eligibility_reasons: Array.isArray(r.eligibility_reasons) ? (r.eligibility_reasons as string[]) : [],
     ineligibility_reasons: Array.isArray(r.ineligibility_reasons) ? (r.ineligibility_reasons as string[]) : [],
+    last_verified: str(r.last_verified),
+    verification: parseVerification(r.verification),
+    required_documents: parseDocs(r.required_documents),
   };
 }
 
@@ -100,6 +165,84 @@ function draftLinkHref(programmeName: string, profile: ProfileForDraftLink): str
   return `/agents/grant-draft-generator?${params.toString()}`;
 }
 
+const STAMP_TONE: Record<VerificationStatus, string> = {
+  confirmed: 'text-emerald-700 dark:text-emerald-400',
+  changed: 'text-amber-700 dark:text-amber-400',
+  closed: 'text-red-700 dark:text-red-400',
+  no_signal: 'text-zinc-500 dark:text-zinc-400',
+  unavailable: 'text-zinc-500 dark:text-zinc-400',
+};
+
+function datePart(iso: string | null): string {
+  return iso ? iso.slice(0, 10) : '';
+}
+
+// A grant is only ever shown as verified when the backend says it checked the
+// agency's own site; "unavailable" is shown as unverified, never as a pass.
+function VerificationStamp({ grant }: { grant: Grant }) {
+  const { t } = useI18n();
+  const v = grant.verification;
+  const status: VerificationStatus = v?.status ?? 'unavailable';
+  let text: string;
+  if (status === 'confirmed') {
+    text = fmt(t('agents.grant-finder.verify.confirmed'), {
+      date: datePart(v?.checked_at ?? null),
+      domain: v?.source_domain ?? '',
+    });
+  } else if (status === 'changed' && !v?.db_deadline) {
+    text = fmt(t('agents.grant-finder.verify.new_deadline'), { found: v?.found_deadline ?? '' });
+  } else if (status === 'changed') {
+    text = fmt(t('agents.grant-finder.verify.changed'), {
+      found: v?.found_deadline ?? '',
+      recorded: v?.db_deadline ?? '',
+    });
+  } else if (status === 'closed') {
+    text = t('agents.grant-finder.verify.closed');
+  } else if (status === 'no_signal') {
+    text = fmt(t('agents.grant-finder.verify.no_signal'), { date: datePart(v?.checked_at ?? null) });
+  } else {
+    text = t('agents.grant-finder.verify.unavailable');
+  }
+  return (
+    <div className="mt-1.5 text-xs">
+      <p className={STAMP_TONE[status]}>
+        {text}
+        {v?.source_url && (
+          <>
+            {' · '}
+            <a href={v.source_url} target="_blank" rel="noreferrer" className="underline">
+              {t('agents.grant-finder.verify.source')}
+            </a>
+          </>
+        )}
+      </p>
+      {status === 'unavailable' && grant.last_verified && (
+        <p className="text-zinc-400 dark:text-zinc-500">
+          {fmt(t('agents.grant-finder.verify.last_record'), { date: grant.last_verified })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function DocumentList({ docs }: { docs: RequiredDoc[] }) {
+  const { t, locale } = useI18n();
+  return (
+    <div className="mt-2 text-xs">
+      <p className="font-semibold text-zinc-600 dark:text-zinc-300">{t('agents.grant-finder.docs.title')}</p>
+      {docs.length === 0 ? (
+        <p className="text-zinc-400 dark:text-zinc-500">{t('agents.grant-finder.docs.unlisted')}</p>
+      ) : (
+        <ul className="list-disc pl-4 text-zinc-600 dark:text-zinc-400">
+          {docs.map((d, i) => (
+            <li key={`${i}-${docName(d, locale)}`}>{docName(d, locale)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean; profile: ProfileForDraftLink }) {
   const { t } = useI18n();
   const amount = formatAmount(grant, t);
@@ -125,6 +268,8 @@ function GrantCard({ grant, dimmed, profile }: { grant: Grant; dimmed?: boolean;
         {amount && deadline ? ' · ' : ''}
         {deadline}
       </p>
+      {!dimmed && <VerificationStamp grant={grant} />}
+      {!dimmed && <DocumentList docs={grant.required_documents} />}
       {dimmed && grant.ineligibility_reasons.length > 0 && (
         <p className="text-xs text-amber-700 mt-2 dark:text-amber-400">{grant.ineligibility_reasons[0]}</p>
       )}

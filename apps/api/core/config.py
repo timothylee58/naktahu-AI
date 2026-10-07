@@ -85,6 +85,13 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("METRICS_AUTH_TOKEN", "metrics_auth_token"),
     )
+    # Tavily — live re-verification of grant deadlines against the agency's own
+    # site (app/agents/eligibility_agent/verification.py). Empty = verification
+    # is skipped and every grant is shown as unverified, never as confirmed.
+    tavily_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("TAVILY_API_KEY", "tavily_api_key"),
+    )
     resend_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("RESEND_API_KEY", "resend_api_key"),
