@@ -239,6 +239,7 @@ async def compile_node(state: ComplianceDrafterState) -> dict[str, Any]:
 
 
 async def generate_pdf_node(state: ComplianceDrafterState, config: RunnableConfig | None = None) -> dict[str, Any]:
+  from app.agents.tools import PDF_GENERATION_ERROR
   from app.agents.tools import generate_pdf as gen_pdf
 
   supabase = supabase_from_config(config)  # run-scoped, not checkpointed
@@ -249,11 +250,25 @@ async def generate_pdf_node(state: ComplianceDrafterState, config: RunnableConfi
   )
   tool_calls = list(state.get("tool_calls") or [])
   tool_calls.append({"tool": "generate_pdf", "path": path})
+  if not path or not url:
+      # generate_pdf returns ("", "", "") when it cannot produce and store a
+      # real PDF. Surface that instead of reporting a finished report with
+      # nothing to download; awaiting_hitl stays False so the run ends here.
+      log.error("compliance_drafter_pdf_failed", session_id=state.get("session_id"))
+      return {
+          "pdf_storage_path": "",
+          "signed_url": "",
+          "url_expires_at": None,
+          "awaiting_hitl": False,
+          "error": PDF_GENERATION_ERROR,
+          "tool_calls": tool_calls,
+      }
   return {
       "pdf_storage_path": path,
       "signed_url": url,
       "url_expires_at": expires or None,
       "awaiting_hitl": False,
+      "error": None,
       "tool_calls": tool_calls,
   }
 

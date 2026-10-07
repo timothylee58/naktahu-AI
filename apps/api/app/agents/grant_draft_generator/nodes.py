@@ -308,6 +308,7 @@ async def generate_export_node(state: GrantDraftState, config: RunnableConfig | 
             "tool_calls": tool_calls,
         }
 
+    from app.agents.tools import PDF_GENERATION_ERROR
     from app.agents.tools import generate_pdf as gen_pdf
 
     path, url, expires = await gen_pdf(
@@ -317,6 +318,18 @@ async def generate_export_node(state: GrantDraftState, config: RunnableConfig | 
         supabase_client=supabase,
     )
     tool_calls.append({"tool": "generate_pdf", "path": path})
+    if not path or not url:
+        # generate_pdf returns ("", "", "") when no real PDF could be made
+        # and stored; surface it (notify_node already skips email on error).
+        log.error("grant_draft_pdf_failed", session_id=state.get("session_id"))
+        return {
+            "pdf_storage_path": "",
+            "signed_url": "",
+            "url_expires_at": None,
+            "awaiting_hitl": False,
+            "error": PDF_GENERATION_ERROR,
+            "tool_calls": tool_calls,
+        }
     return {
         "pdf_storage_path": path,
         "signed_url": url,

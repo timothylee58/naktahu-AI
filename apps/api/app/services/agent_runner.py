@@ -25,6 +25,7 @@ from app.agents.sme_compliance_navigator.graph import get_sme_compliance_navigat
 from app.agents.runtime import thread_config as _thread_config
 from app.agents.scam_check_agent.graph import get_scam_check_agent_graph
 from app.agents.study_agent.graph import get_study_agent_graph
+from app.agents.tools import PdfGenerationError
 from app.agents.welfare_eligibility_agent.graph import get_welfare_eligibility_agent_graph
 
 log = structlog.get_logger(__name__)
@@ -173,13 +174,19 @@ async def confirm_compliance_drafter(
     graph = get_compliance_drafter_graph(checkpointer=checkpointer)
     await graph.aupdate_state(_thread_config(session_id), {"_user_email": user_email})
     values, _ = await _run_graph(graph, session_id, {}, resume=True, supabase=supabase_client)
-    _log_run(supabase_client, user_id, "compliance-drafter", session_id, {"confirm": True}, values, values.get("latency_ms", 0), "completed")
+    # generate_pdf_node sets `error` when no real PDF could be produced; log
+    # and report that honestly instead of calling the run "completed".
+    status = "error" if values.get("error") else "completed"
+    _log_run(supabase_client, user_id, "compliance-drafter", session_id, {"confirm": True}, values, values.get("latency_ms", 0), status)
     if supabase_client and values.get("pdf_storage_path"):
         _persist_document(supabase_client, user_id, "compliance-drafter", values)
     resp = _base_response(session_id, values)
+    resp["status"] = status
     resp["signed_url"] = values.get("signed_url")
     resp["url_expires_at"] = values.get("url_expires_at")
     resp["email_sent"] = values.get("email_sent", False)
+    if values.get("error"):
+        resp["error"] = values["error"]
     return resp
 
 
@@ -655,6 +662,10 @@ async def export_health_triage(
         agent_type="health-triage",
         supabase_client=supabase_client,
     )
+    if not path or not url:
+        # generate_pdf returns ("", "", "") when no real PDF could be made
+        # and stored. Raise rather than hand the client an empty download.
+        raise PdfGenerationError("pdf generation failed")
     result = {"pdf_storage_path": path, "signed_url": url, "url_expires_at": expires or None}
     if supabase_client and path:
         # Same generated_documents row shape compliance-drafter/grant-draft-

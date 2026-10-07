@@ -406,6 +406,51 @@ async def ocr_extract_listing_fields(
     return out
 
 
+# State ``error`` value (and API error code) for "no real PDF could be produced".
+PDF_GENERATION_ERROR = "pdf_generation_failed"
+
+
+class PdfGenerationError(RuntimeError):
+    """Raised by on-demand exports when generate_pdf could not produce a PDF."""
+
+
+class _RefuseAllFetcher:
+    """WeasyPrint ``url_fetcher`` that refuses every resource.
+
+    Report HTML is built from LLM output and user-supplied text, so stray
+    markup (``<img src="http://169.254.169.254/...">``, ``<link href="file:///etc/passwd">``,
+    CSS ``@import``) must never make the server fetch anything while
+    rendering. Every report is self-contained, so the right policy is to
+    refuse all URLs rather than allow-list a few schemes.
+
+    It is a callable object, not a bare function, because recent WeasyPrint
+    releases (checked on 70.0) read ``url_fetcher._fail_on_errors`` when a
+    fetch raises, while older ones just call ``url_fetcher(url)`` and expect an
+    exception on refusal. Raising from ``__call__`` with
+    ``_fail_on_errors = False`` makes WeasyPrint log a warning and skip the
+    resource in both (rendering was checked on 63.0, 68.0 and 70.0).
+    """
+
+    _fail_on_errors = False
+
+    def __call__(self, url: str, *args: Any, **kwargs: Any) -> Any:
+        scheme = url.split(":", 1)[0].lower() if ":" in url else "relative"
+        log.warning("pdf_resource_fetch_refused", scheme=scheme)
+        raise ValueError("external resource fetching is disabled for PDF rendering")
+
+
+def _render_pdf_bytes(html: str) -> bytes:
+    """Render HTML to PDF bytes with WeasyPrint. Raises on any failure.
+
+    ImportError covers a missing package; OSError covers the package being
+    installed but its native libraries (pango, harfbuzz, fontconfig) being
+    absent, which WeasyPrint reports at import time.
+    """
+    from weasyprint import HTML  # type: ignore[import-untyped]
+
+    return HTML(string=html, url_fetcher=_RefuseAllFetcher()).write_pdf()
+
+
 async def generate_pdf(
     html: str,
     *,
@@ -413,26 +458,38 @@ async def generate_pdf(
     agent_type: str = "compliance-drafter",
     supabase_client: Any = None,
 ) -> tuple[str, str, str]:
-    """Render HTML to PDF, upload to Supabase Storage. Returns (path, signed_url, expires_at)."""
-    pdf_bytes: bytes
-    try:
-        from weasyprint import HTML  # type: ignore[import-untyped]
+    """Render HTML to PDF, upload to Supabase Storage. Returns (path, signed_url, expires_at).
 
-        pdf_bytes = HTML(string=html).write_pdf()
+    Returns ``("", "", "")`` and uploads nothing whenever a real PDF cannot be
+    produced (WeasyPrint missing, native libraries missing, render error, or
+    output that is not a PDF) or the upload/sign step fails. Callers must
+    treat an empty signed_url as failure — never hand users a file that is
+    not a PDF.
+    """
+    try:
+        pdf_bytes = _render_pdf_bytes(html)
+    except (ImportError, OSError) as exc:
+        log.error("pdf_weasyprint_unavailable", error=str(exc), error_type=type(exc).__name__)
+        return "", "", ""
     except Exception as exc:
-        log.warning("weasyprint_unavailable", error=str(exc))
-        pdf_bytes = html.encode("utf-8")
+        log.error("pdf_render_failed", error=str(exc), error_type=type(exc).__name__)
+        return "", "", ""
+
+    if not isinstance(pdf_bytes, (bytes, bytearray)) or not pdf_bytes.startswith(b"%PDF"):
+        log.error("pdf_render_not_pdf", size=len(pdf_bytes) if pdf_bytes else 0)
+        return "", "", ""
 
     storage_path = f"agents/{agent_type}/{user_id}/{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.pdf"
     bucket = settings.supabase_storage_bucket
 
     if not supabase_client:
-        return storage_path, "", ""
+        log.error("pdf_storage_unavailable", reason="supabase client missing")
+        return "", "", ""
 
     try:
         supabase_client.storage.from_(bucket).upload(
             storage_path,
-            pdf_bytes,
+            bytes(pdf_bytes),
             {"content-type": "application/pdf", "upsert": "true"},
         )
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
@@ -441,10 +498,13 @@ async def generate_pdf(
             86_400,
         )
         url = signed.get("signedURL") or signed.get("signedUrl") or ""
+        if not url:
+            log.error("pdf_signed_url_missing", path=storage_path)
+            return "", "", ""
         return storage_path, url, expires_at.isoformat()
     except Exception as exc:
-        log.warning("pdf_upload_failed", error=str(exc))
-        return storage_path, "", ""
+        log.error("pdf_upload_failed", error=str(exc))
+        return "", "", ""
 
 
 async def generate_docx(

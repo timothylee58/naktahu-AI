@@ -558,6 +558,8 @@ const MS: Translations = {
   'agents.error.generic': 'Sesuatu tidak kena. Sila cuba lagi.',
   'agents.error.start_failed': 'Gagal menjana pratonton. Sila cuba lagi.',
   'agents.error.confirm_failed': 'Gagal menjana PDF. Sila cuba lagi.',
+  'agents.error.pdf_failed':
+    'PDF tidak dapat dijana buat masa ini. Tiada kredit ditolak. Sila cuba lagi kemudian atau mulakan laporan baharu.',
   'agents.processing': 'Memproses…',
   'agents.sector.technology': 'Teknologi',
   'agents.sector.ai': 'AI',
@@ -1599,6 +1601,8 @@ const EN: Translations = {
   'agents.error.generic': 'Something went wrong. Please try again.',
   'agents.error.start_failed': 'Failed to generate preview. Please try again.',
   'agents.error.confirm_failed': 'Failed to generate PDF. Please try again.',
+  'agents.error.pdf_failed':
+    'The PDF could not be generated right now. No credit was charged. Please try again later or start a new report.',
   'agents.processing': 'Processing…',
   'agents.sector.technology': 'Technology',
   'agents.sector.ai': 'AI',
@@ -2622,6 +2626,7 @@ const ZH: Translations = {
   'agents.error.generic': '出了点问题，请重试。',
   'agents.error.start_failed': '生成预览失败，请重试。',
   'agents.error.confirm_failed': '生成 PDF 失败，请重试。',
+  'agents.error.pdf_failed': '目前无法生成 PDF，未扣除点数。请稍后重试，或重新开始一份报告。',
   'agents.processing': '处理中…',
   'agents.sector.technology': '科技',
   'agents.sector.ai': 'AI',

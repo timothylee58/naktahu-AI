@@ -200,7 +200,14 @@ function ComplianceDrafterPageInner() {
       const data = await post('/api/v1/agents/compliance-drafter/confirm', {
         session_id: sessionId,
       });
-      setDownloadUrl((data.signed_url as string) ?? null);
+      const signedUrl = typeof data.signed_url === 'string' ? data.signed_url : '';
+      if (data.error || !signedUrl) {
+        // No real PDF was produced: say so instead of showing a "done" screen
+        // with nothing to download.
+        setError(t('agents.error.pdf_failed'));
+        return;
+      }
+      setDownloadUrl(signedUrl);
       setStep('done');
     } catch (e) {
       const message = e instanceof Error ? e.message : 'confirm-failed';
