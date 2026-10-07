@@ -39,7 +39,7 @@ if str(_API_ROOT) not in sys.path:
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 from scripts.ingest_parliament.party_names import normalise_party, unrecognised  # noqa: E402
-from scripts.ingest_parliament.party_overrides import apply_party_override  # noqa: E402
+from scripts.ingest_parliament.party_overrides import apply_party_override, canonical_seat_code  # noqa: E402
 
 log = structlog.get_logger(__name__)
 
@@ -72,6 +72,13 @@ def validate_record(record: dict) -> tuple[dict, str] | tuple[None, str]:
     constituency_code = record["constituency_code"].strip()
     if not _CONSTITUENCY_CODE_RE.match(constituency_code):
         return None, f"invalid_constituency_code:{constituency_code}"
+    # Store one canonical form ("P001", not "P.001") so a re-run with a scraper
+    # that keeps the period updates the existing row instead of adding a
+    # duplicate, and the seat still joins to postcode_constituencies.
+    # Parliamentary codes only: migration 025 documents "P130" for these but
+    # "N.28" for state seats, whose period is part of the form.
+    if constituency_code[:1].upper() == "P":
+        constituency_code = canonical_seat_code(constituency_code)
 
     free_text_fields = ("full_name", "constituency_name", "party", "state")
     for field in free_text_fields:
