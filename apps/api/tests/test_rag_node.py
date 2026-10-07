@@ -198,6 +198,57 @@ def test_cache_roundtrip_preserves_freshness_fields() -> None:
     assert restored.superseded_by == "new-chunk-id"
 
 
+def test_cache_round_trip_preserves_every_chunk_field() -> None:
+    """A Redis cache hit must hand analyst_node exactly what a live search would.
+    The serializer used to be a hand-written field list, and each field added
+    later (retrieved_at; effective_until/announced_date) was silently lost on a
+    cache hit, so an expired rule was cited from cache and "announced on" vanished.
+    Built from dataclasses.fields so a field added next year is covered too."""
+    import dataclasses
+
+    sample = {
+        "id": "c1", "content": "text", "source_title": "T", "source_url": "https://x.gov.my",
+        "ministry": "M", "language": "en", "similarity": 0.8, "expiry_aware": True,
+        "source_date": "2026-01-01", "effective_date": "2026-02-01", "superseded_by": "c2",
+        "retrieved_at": "2026-10-01T00:00:00+00:00", "effective_until": "2026-12-31",
+        "announced_date": "2026-10-09",
+    }
+    names = {f.name for f in dataclasses.fields(ChunkResult)}
+    assert names == set(sample), f"update this test's sample for new ChunkResult fields: {names ^ set(sample)}"
+
+    chunk = ChunkResult(**sample)
+    assert _deserialize_chunks(_serialize_chunks([chunk])) == [chunk]
+
+
+def test_validity_window_survives_the_cache_so_expiry_still_applies() -> None:
+    """End to end: a chunk whose window closed yesterday is dropped by
+    analyst_node whether it came from a live search or from Redis."""
+    import asyncio
+    from datetime import date, timedelta
+
+    from app.agents.analyst_node import analyst_node
+
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    expired = ChunkResult(
+        id="old", content="lifestyle relief rm2500", source_title="LHDN", source_url="https://www.hasil.gov.my/old",
+        ministry="LHDN", language="en", similarity=0.9, effective_date="2025-01-01", effective_until=yesterday,
+    )
+    from_cache = _deserialize_chunks(_serialize_chunks([expired]))
+    result = asyncio.run(analyst_node({"query": "lifestyle relief", "domain": "tax", "retrieved_chunks": from_cache}))
+
+    assert result["retrieved_chunks"] == []
+    assert not any(c["url"] == "https://www.hasil.gov.my/old" for c in result["citations"])
+
+
+def test_deserialize_ignores_fields_from_a_newer_build() -> None:
+    """During a rolling deploy an older instance may read an entry a newer one wrote."""
+    raw = [{
+        "id": "x", "content": "c", "source_title": "t", "source_url": "https://x.gov.my",
+        "ministry": "m", "language": "en", "similarity": 0.5, "some_future_field": 123,
+    }]
+    assert _deserialize_chunks(raw)[0].id == "x"
+
+
 def test_deserialize_tolerates_legacy_cache_entries() -> None:
     """Cache entries written before the freshness columns existed must still
     deserialize (with sane defaults) rather than raising KeyError."""

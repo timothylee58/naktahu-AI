@@ -1,6 +1,7 @@
 """rag_node — Redis cache + corpus embedding (ILMU gateway first, OpenAI fallback) + Supabase hybrid search."""
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 
 import structlog
@@ -36,47 +37,29 @@ def _cache_key(query: str, language: str, domain: str | None) -> str:
 
 
 def _serialize_chunks(chunks: list[ChunkResult]) -> list[dict]:
-    # Persist every ChunkResult field. Dropping the freshness columns here
-    # (effective_date/superseded_by/expiry_aware/source_date) silently disables
-    # analyst_node's staleness + superseded-chunk checks on every cache hit, so
-    # a superseded or stale chunk would be cited unchecked once cached.
-    return [
-        {
-            "id": c.id,
-            "content": c.content,
-            "source_title": c.source_title,
-            "source_url": c.source_url,
-            "ministry": c.ministry,
-            "language": c.language,
-            "similarity": c.similarity,
-            "expiry_aware": c.expiry_aware,
-            "source_date": c.source_date,
-            "effective_date": c.effective_date,
-            "superseded_by": c.superseded_by,
-        }
-        for c in chunks
-    ]
+    # Persist EVERY ChunkResult field, by construction. This was a hand-written
+    # field list, and each freshness column added later (retrieved_at, then the
+    # validity window effective_until/announced_date) was silently dropped on
+    # every cache hit: analyst_node would then skip its expiry check and cite an
+    # expired rule from cache, and lose "announced on {date}". asdict() cannot
+    # forget a field.
+    return [dataclasses.asdict(c) for c in chunks]
+
+
+_CHUNK_FIELDS = frozenset(f.name for f in dataclasses.fields(ChunkResult))
 
 
 def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
-    # .get() with defaults keeps older cache entries (written before the
-    # freshness columns existed) readable instead of raising KeyError.
-    return [
-        ChunkResult(
-            id=r["id"],
-            content=r["content"],
-            source_title=r["source_title"],
-            source_url=r["source_url"],
-            ministry=r["ministry"],
-            language=r["language"],
-            similarity=float(r["similarity"]),
-            expiry_aware=bool(r.get("expiry_aware", False)),
-            source_date=r.get("source_date"),
-            effective_date=r.get("effective_date"),
-            superseded_by=r.get("superseded_by"),
-        )
-        for r in raw
-    ]
+    # Entries written by an older build lack newer fields; ChunkResult's
+    # defaults fill them in. Keys this build doesn't know (written by a NEWER
+    # build during a rolling deploy) are ignored rather than raising.
+    chunks: list[ChunkResult] = []
+    for r in raw:
+        fields = {k: v for k, v in r.items() if k in _CHUNK_FIELDS}
+        fields["similarity"] = float(fields["similarity"])
+        fields["expiry_aware"] = bool(fields.get("expiry_aware", False))
+        chunks.append(ChunkResult(**fields))
+    return chunks
 
 
 def _checked(embedding: list[float], route: str) -> list[float]:
