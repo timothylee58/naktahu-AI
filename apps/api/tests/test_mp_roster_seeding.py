@@ -222,3 +222,40 @@ class TestPartyNormalisationInSeed:
         stats = seed(sb, [self._record("GRS")], dry_run=True)
         assert stats["validated"] == 1
         assert "mp_roster_unrecognised_parties" in capsys.readouterr().out
+
+
+class TestManualPartyOverrides:
+    def _record(self, code, name, party):
+        return {"full_name": name, "constituency_code": code, "constituency_name": "Testville",
+                "party": party, "state": "Test State", "mymp_id": "x"}
+
+    def test_override_fills_a_missing_party(self):
+        cleaned, _ = validate_record(self._record("P001", "Rushdan Bin Rusmi", None))
+        assert cleaned["party"] == "PAS"
+
+    def test_override_replaces_a_coalition_label_as_given(self):
+        cleaned, _ = validate_record(self._record("P184", "Suhaimi Bin Nasir", "Barisan Nasional"))
+        assert cleaned["party"] == "Barisan Nasional"
+        cleaned, _ = validate_record(self._record("P178", "Matbali Musah", "GRS"))
+        assert cleaned["party"] == "GRS"
+
+    def test_name_match_ignores_case_and_spacing(self):
+        cleaned, _ = validate_record(self._record("P132", "  aminuddin   BIN harun ", None))
+        assert cleaned["party"] == "PKR"
+
+    def test_override_is_skipped_when_a_different_mp_holds_the_seat(self):
+        """A by-election put someone else in P156: do not give them the old MP's party."""
+        cleaned, _ = validate_record(self._record("P156", "Someone Else", "PKR"))
+        assert cleaned["party"] == "PKR"
+        cleaned, _ = validate_record(self._record("P156", "Someone Else", None))
+        assert cleaned["party"] is None
+
+    def test_seats_without_an_override_are_untouched(self):
+        cleaned, _ = validate_record(self._record("P002", "Zakri Bin Hassan", "PPBM"))
+        assert cleaned["party"] == "BERSATU"
+
+    def test_every_override_records_who_it_was_checked_for(self):
+        from scripts.ingest_parliament import party_overrides as po
+
+        assert set(po.MANUAL_PARTY_OVERRIDES) == set(po._CHECKED_FOR)
+        assert len(po.MANUAL_PARTY_OVERRIDES) == 8
