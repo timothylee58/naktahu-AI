@@ -57,7 +57,7 @@ def check(client: Any, roles: dict[str, str]) -> int:
             resp = client.chat.completions.create(
                 model=model_id,
                 messages=[{"role": "user", "content": "Reply with the single word OK."}],
-                max_tokens=32,
+                max_tokens=256,   # room for a thinking phase before the one-word answer
                 **({"extra_body": extra} if (extra := _extra_body()) is not None else {}),   # same request shape as production
             )
             text = resp.choices[0].message.content or ""
