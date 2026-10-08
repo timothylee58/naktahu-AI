@@ -194,9 +194,13 @@ def _cache_key(programme: str, host: str, today: date) -> str:
 
 
 async def verify_grant(
-    grant: dict[str, Any], client: Any, *, today: Optional[date] = None
+    grant: dict[str, Any], client: Any, *, today: Optional[date] = None, use_cache: bool = True
 ) -> dict[str, Any]:
-    """Verify one grant. Always returns a record carrying `checked_at`."""
+    """Verify one grant. Always returns a record carrying `checked_at`.
+
+    ``use_cache=False`` is for the nightly refresh job (scripts/agents/
+    grant_refresh.py): it wants a fresh answer every run and runs without Redis.
+    """
     now = datetime.now(timezone.utc)
     today = today or now.date()
     stamp = {"checked_at": now.isoformat()}
@@ -208,9 +212,10 @@ async def verify_grant(
         return {"status": UNAVAILABLE, "reason": "no_agency_url", **stamp}
 
     key = _cache_key(programme, host, today)
-    cached = await get_cached_result(key)
-    if isinstance(cached, dict) and cached.get("status"):
-        return cached
+    if use_cache:
+        cached = await get_cached_result(key)
+        if isinstance(cached, dict) and cached.get("status"):
+            return cached
 
     try:
         results = await _search(client, grant, host)
@@ -219,12 +224,12 @@ async def verify_grant(
         return {"status": UNAVAILABLE, "reason": "search_failed", **stamp}
 
     record = {**assess_results(results, host, _parse_db_deadline(grant.get("application_deadline"))), **stamp}
-    if record["status"] != UNAVAILABLE:
+    if use_cache and record["status"] != UNAVAILABLE:
         await set_cached_result(key, record, ttl=_CACHE_TTL_S)
     return record
 
 
-def _make_client() -> Any:
+def make_client() -> Any:
     """Tavily's official async client, or None when unconfigured/not installed."""
     if not settings.tavily_api_key:
         return None
@@ -246,7 +251,7 @@ async def verify_grants(
     were checked. Input dicts are not mutated.
     """
     if client is None and use_default_client:
-        client = _make_client()
+        client = make_client()
     sem = asyncio.Semaphore(_CONCURRENCY)
 
     async def _one(index: int, grant: dict[str, Any]) -> dict[str, Any]:
