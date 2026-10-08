@@ -54,6 +54,65 @@ async def test_router_node_en_government() -> None:
 
 
 @pytest.mark.asyncio
+async def test_router_node_overrides_llm_when_it_mislabels_english_as_bm() -> None:
+    """The production bug: the classifier returned language="bm" for this
+    plain English query (router_classified log, 2026-10-08), so the
+    synthesiser answered in Bahasa Malaysia. The query's own words win."""
+    completion = _mock_completion('{"language": "bm", "domain": "welfare", "intent": "report lost MyKad"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "What should I do if I lose my MyKad?"})
+
+    assert result["language"] == "en"
+
+
+@pytest.mark.asyncio
+async def test_router_node_overrides_llm_when_it_mislabels_bm_as_en() -> None:
+    completion = _mock_completion('{"language": "en", "domain": "government", "intent": "replace MyKad"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "Bagaimana nak tukar MyKad yang hilang?"})
+
+    assert result["language"] == "bm"
+
+
+@pytest.mark.asyncio
+async def test_router_node_keeps_llm_language_when_query_is_ambiguous() -> None:
+    """Content words only (no function words to vote on): no override."""
+    completion = _mock_completion('{"language": "bm", "domain": "government", "intent": "mykad"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "MyKad"})
+
+    assert result["language"] == "bm"
+
+
+@pytest.mark.asyncio
+async def test_router_node_detects_bm_even_when_the_llm_call_fails() -> None:
+    """Previously any LLM failure meant language="en" no matter what the
+    user wrote, so a Malay question got an English answer."""
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(side_effect=RuntimeError("timeout"))
+        result = await router_node({"query": "Berapa kadar cukai pendapatan saya?"})
+
+    assert result["language"] == "bm"
+
+
+@pytest.mark.asyncio
+async def test_router_node_cjk_still_wins_over_everything() -> None:
+    completion = _mock_completion('{"language": "bm", "domain": "government", "intent": "mykad"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = AsyncMock(return_value=completion)
+        result = await router_node({"query": "如果我遗失了 MyKad 怎么办？ What should I do?"})
+
+    assert result["language"] == "zh"
+
+
+@pytest.mark.asyncio
 async def test_router_node_fires_speculative_embed_when_query_never_seen() -> None:
     """cache.has_query_been_seen()==False guarantees rag_node's real cache
     lookup will also miss (see cache.mark_query_seen's docstring) — so
