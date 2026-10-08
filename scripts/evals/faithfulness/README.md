@@ -20,7 +20,10 @@ the verdict logic, and the hand-off to the deploy gate.
 | `metrics.py` | AUROC, ECE, accuracy, and the **verdict**: `trustworthy` / `not_trustworthy` / `insufficient_data`. |
 | `scoring.py` | per-sample supported-claim ratio, averaged; **refuses** to emit a score if >10% of claims could not be judged. |
 | `pilot.py` | CLI: `calibrate` and `score`. |
-| `data/calibration_seed.jsonl` | 18 **synthetic** labelled claims (6 per language, fictional programmes). Plumbing only. |
+| `data/calibration_seed.jsonl` | 18 **synthetic** labelled claims (6 per language). Plumbing only. |
+| `data/calibration_synthetic.jsonl` + `build_synthetic_set.py` | 120 **synthetic** claims (5 fictional programmes x 8 x 3 languages), true by construction. A *floor* (a judge that fails it is out); never counts toward certification. The lexical baseline scores AUROC 0.42 on it. |
+| `validate.py` | checks a human-labelled file (schema, duplicates, `labeller`, label balance) and shows progress to 30 per language. |
+| `nebius/` | Dockerfile + entrypoint for a CPU runner job, and how to submit it. Not built or run on Nebius; see its README. |
 
 ## Running it
 
@@ -56,13 +59,14 @@ per-language gate is for.
 
 - **Real calibration data.** 90+ examples (30 each of bm/en/zh) labelled by a person from
   real pipeline answers, including hard negatives (wrong number, wrong entity, plausible
-  unsupported addition).
+  unsupported addition). Check progress with `pilot validate --cases <file>`. The 120-row
+  synthetic set is a floor, not a substitute: only `synthetic != true` rows count toward the verdict.
 - **An exporter** that runs the live pipeline over a question set and writes the
   `score` sample file. Nothing in the repo produces it today.
 - **Hosting.** The model card asks for a ≥80 GB GPU, a development build of vLLM and
   `--max-num-seqs 8`, and ships its own `serve_decide.py` (review that code before running
-  it). Packaging this as a Nebius job is not done: Nebius's job-submission syntax has not
-  been checked against its docs, so none is guessed here. There is deliberately **no
+  it). A runner image and entrypoint exist (`nebius/`) but have not been built, and the
+  `nebius ai job create` flags are marked unverified there. There is deliberately **no
   cron** for this pilot: GitHub-hosted runners have no GPU.
 - **A live smoke test** of `JevDecideJudge` against a real server. The request and
   response shapes come from the model card.
