@@ -11,7 +11,7 @@
 #   JEV_URL                base URL of the model server (required for JUDGE=jev)
 #   JEV_API_KEY            optional bearer token
 #   REAL_CASES             path to the human-labelled JSONL (default /data/real_cases.jsonl, optional)
-#   OUT_DIR                where to write report-<utc timestamp>.json (default /out)
+#   OUT_DIR                where to write report-<utc timestamp>-<pid>-<random>.json (default /out)
 #   FAIL_UNLESS_TRUSTWORTHY  "1" => exit 1 unless the verdict is trustworthy AND the synthetic floor passes
 set -euo pipefail
 
@@ -23,7 +23,7 @@ CASES=("$DATA/calibration_seed.jsonl" "$DATA/calibration_synthetic.jsonl")
 
 if [[ -f "$REAL_CASES" ]]; then
   echo "validating human-labelled set: $REAL_CASES" >&2
-  python3 -m scripts.evals.faithfulness.pilot validate --cases "$REAL_CASES" >&2   # exit 1 on a malformed set
+  python3 -m scripts.evals.faithfulness.pilot validate --cases "$REAL_CASES" >&2   # exit 2 unreadable/malformed input, 1 structural problems
   CASES+=("$REAL_CASES")
 else
   echo "no human-labelled set at $REAL_CASES: only the synthetic floor can run; the verdict will be insufficient_data" >&2

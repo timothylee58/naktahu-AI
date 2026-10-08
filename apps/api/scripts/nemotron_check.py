@@ -23,7 +23,7 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from app.agents.eligibility_agent.llm_split import strip_think  # noqa: E402
+from app.agents.eligibility_agent.llm_split import _extra_body, strip_think  # noqa: E402
 from core.config import settings  # noqa: E402
 
 
@@ -58,6 +58,7 @@ def check(client: Any, roles: dict[str, str]) -> int:
                 model=model_id,
                 messages=[{"role": "user", "content": "Reply with the single word OK."}],
                 max_tokens=32,
+                **({"extra_body": extra} if (extra := _extra_body()) is not None else {}),   # same request shape as production
             )
             text = resp.choices[0].message.content or ""
         except Exception as exc:
@@ -65,7 +66,7 @@ def check(client: Any, roles: dict[str, str]) -> int:
             status = 1
             continue
         if not strip_think(text).strip():
-            print(f"FAIL {role}: '{model_id}' returned no visible text (reasoning only, or empty); raise max_tokens or set NEMOTRON_EXTRA_BODY")
+            print(f"FAIL {role}: '{model_id}' returned no visible text (reasoning only, or empty); check NEMOTRON_EXTRA_BODY (applied to this call) for the model's thinking switch")
             status = 1
             continue
         note = " (output contains <think>: set NEMOTRON_EXTRA_BODY or rely on stripping)" if "<think>" in text else ""

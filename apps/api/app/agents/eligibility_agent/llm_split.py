@@ -33,6 +33,7 @@ from core.config import settings
 
 log = structlog.get_logger(__name__)
 
+_FAST_TIMEOUT_S = 30.0   # non-streaming extraction: fail fast so the ILMU fallback runs promptly
 _TIMEOUT_S = 60.0   # also bounds the gap before the first streamed chunk (thinking phase)
 _OPEN, _CLOSE = "<think>", "</think>"
 
@@ -139,6 +140,7 @@ async def fast_complete(system: str, user: str, *, max_tokens: int = 300) -> str
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             max_tokens=max_tokens,
             temperature=0.2,
+            timeout=_FAST_TIMEOUT_S,
             **kwargs,
         )
         return strip_think(resp.choices[0].message.content or "")

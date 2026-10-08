@@ -139,6 +139,7 @@ async def test_fast_complete_uses_the_fast_model_strips_thinking_and_never_raise
     with _enable(), patch.object(split, "_client", return_value=_fake_client(ok)):
         assert await split.fast_complete("s", "u") == '{"a": 1}'
     assert ok.await_args.kwargs["model"] == "fast-model"
+    assert ok.await_args.kwargs["timeout"] == split._FAST_TIMEOUT_S < split._TIMEOUT_S   # extraction fails fast
     bad = AsyncMock(side_effect=RuntimeError("down"))
     with _enable(), patch.object(split, "_client", return_value=_fake_client(bad)):
         assert await split.fast_complete("s", "u") == ""
@@ -345,6 +346,7 @@ async def test_a_partial_ilmu_answer_followed_by_anthropic_is_reported_as_both()
     async def anthropic(prompt: str, system_prompt: str):
         yield "rest"
 
-    with patch.object(syn, "_stream_ilmu", ilmu_then_boom), patch.object(syn, "_stream_anthropic", anthropic):
+    with _enable(eligibility_use_nemotron=False, nemotron_api_key=""), \
+         patch.object(syn, "_stream_ilmu", ilmu_then_boom), patch.object(syn, "_stream_anthropic", anthropic):
         events = await _collect(STATE)
     assert _provider(events) == "ilmu+anthropic"

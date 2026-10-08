@@ -6,3 +6,15 @@
 **/.env
 **/.env.local
 out/
+**/.env.*.local
+**/.pytest_cache
+**/.mypy_cache
+**/.coverage
+**/htmlcov
+**/*.py[cod]
+**/dist
+**/build
+**/.DS_Store
+**/.vercel
+**/*.tsbuildinfo
+**/*.log
