@@ -9,6 +9,7 @@ from typing import Any, AsyncGenerator
 
 import structlog
 
+from app.agents.eligibility_agent import llm_split
 from app.agents.eligibility_agent.state import EligibilityState
 from app.services.llm_client import FALLBACK_MODEL, ILMU_CHAT_MODEL, anthropic_client, ilmu_client
 
@@ -105,20 +106,38 @@ async def synthesiser_node(state: EligibilityState) -> AsyncGenerator[dict[str, 
     prompt = _build_prompt(state)
 
     buffer = ""
-    try:
-        async for token in _stream_ilmu(prompt, system_prompt):
-            buffer += token
-            yield {"type": "token", "text": token}
-    except Exception as exc:
-        log.warning("eligibility_ilmu_stream_failed_falling_back", error=str(exc))
+    provider = ""
+    # Nemotron reasoning model first, only when enabled for this agent. If it fails
+    # BEFORE any token, fall through to the existing chain. If it fails AFTER
+    # streaming started, keep the partial answer rather than append a second one.
+    if llm_split.reasoning_enabled():
         try:
-            async for token in _stream_anthropic(prompt, system_prompt):
+            async for token in llm_split.stream_reasoning(prompt, system_prompt):
                 buffer += token
+                provider = "nemotron"
                 yield {"type": "token", "text": token}
-        except Exception as exc2:
-            log.error("eligibility_synthesis_failed", error=str(exc2))
-            yield {"type": "error", "message": "Synthesis failed. Please try again."}
-            return
+        except Exception as exc:
+            log.warning("eligibility_nemotron_failed_falling_back", error=type(exc).__name__)
+
+    if not provider:
+        try:
+            async for token in _stream_ilmu(prompt, system_prompt):
+                buffer += token
+                provider = "ilmu"
+                yield {"type": "token", "text": token}
+            provider = provider or "ilmu"
+        except Exception as exc:
+            log.warning("eligibility_ilmu_stream_failed_falling_back", error=str(exc))
+            try:
+                async for token in _stream_anthropic(prompt, system_prompt):
+                    buffer += token
+                    provider = "anthropic"
+                    yield {"type": "token", "text": token}
+            except Exception as exc2:
+                log.error("eligibility_synthesis_failed", error=str(exc2))
+                yield {"type": "error", "message": "Synthesis failed. Please try again."}
+                return
+    log.info("eligibility_llm_provider", provider=provider)
 
     for g in state.get("matched_grants") or []:
         yield {"type": "grant", "data": g}
@@ -132,6 +151,7 @@ async def synthesiser_node(state: EligibilityState) -> AsyncGenerator[dict[str, 
         "data": {
             "matched_count": len(state.get("matched_grants") or []),
             "near_miss_count": len(state.get("near_miss_grants") or []),
+            "llm_provider": provider,
         },
     }
     yield {"type": "done"}

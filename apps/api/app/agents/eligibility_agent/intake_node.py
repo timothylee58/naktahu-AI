@@ -12,6 +12,7 @@ from typing import Any
 
 import structlog
 
+from app.agents.eligibility_agent import llm_split
 from app.agents.eligibility_agent.state import BusinessProfile, EligibilityState
 from app.agents.tools import llm_complete
 
@@ -74,12 +75,16 @@ def _missing_required(profile: dict[str, Any]) -> list[str]:
 
 async def _extract_profile_fields(text: str, language: str) -> dict[str, Any]:
     """Best-effort LLM extraction of business-profile fields from free text."""
-    raw = await llm_complete(
-        _EXTRACTION_SYSTEM_PROMPT,
-        text,
-        language=language,
-        max_tokens=300,
-    )
+    # Nemotron fast model first when enabled (returns "" on any failure), then the
+    # existing ILMU path, so behaviour with the flag off is exactly as before.
+    raw = await llm_split.fast_complete(_EXTRACTION_SYSTEM_PROMPT, text, max_tokens=300)
+    if not raw:
+        raw = await llm_complete(
+            _EXTRACTION_SYSTEM_PROMPT,
+            text,
+            language=language,
+            max_tokens=300,
+        )
     if not raw:
         return {}
     try:
