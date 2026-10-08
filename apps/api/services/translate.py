@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import structlog
 
+from app.services.language_detect import output_matches_language
 from app.services.llm_client import FALLBACK_MODEL, ILMU_CHAT_MODEL, anthropic_client, ilmu_client
 
 log = structlog.get_logger(__name__)
@@ -41,9 +42,16 @@ def _system_prompt(target_language: str) -> str:
 
 async def translate_text(text: str, target_language: str) -> str:
     """Returns the translated text, or "" on total failure (both providers
-    down) — same degrade-to-empty contract as ocr_extract_text, so the
-    caller (the translate router) can turn that into a clean 502 instead
-    of crashing."""
+    down, or neither produced text in the target language) — same
+    degrade-to-empty contract as ocr_extract_text, so the caller (the
+    translate router) can turn that into a clean 502 instead of crashing.
+
+    "Produced text" is checked, not assumed: the model has returned an
+    answer untranslated (Bahasa Malaysia handed back for a Chinese request)
+    with a 200, and the UI then labelled it "translated to Chinese". A reply
+    in the wrong language is treated like a failed call, so it falls through
+    to the fallback and finally to the 502 rather than being shown as fake
+    output."""
     system = _system_prompt(target_language)
     try:
         resp = await ilmu_client.chat.completions.create(
@@ -56,8 +64,10 @@ async def translate_text(text: str, target_language: str) -> str:
             temperature=0.0,
         )
         translated = (resp.choices[0].message.content or "").strip()
-        if translated:
+        if translated and output_matches_language(translated, target_language):
             return translated
+        if translated:
+            log.warning("translate_ilmu_wrong_language", target_language=target_language)
     except Exception as exc:
         log.warning("translate_ilmu_failed", error=str(exc), target_language=target_language)
 
@@ -69,7 +79,12 @@ async def translate_text(text: str, target_language: str) -> str:
             messages=[{"role": "user", "content": text}],
         )
         parts = [b.text for b in resp.content if getattr(b, "type", "") == "text"]
-        return "".join(parts).strip()
+        translated = "".join(parts).strip()
+        if translated and output_matches_language(translated, target_language):
+            return translated
+        if translated:
+            log.warning("translate_anthropic_wrong_language", target_language=target_language)
+        return ""
     except Exception as exc:
         log.warning("translate_anthropic_fallback_failed", error=str(exc), target_language=target_language)
         return ""
