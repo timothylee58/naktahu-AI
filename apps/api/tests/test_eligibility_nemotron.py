@@ -289,3 +289,34 @@ def test_check_reports_an_unreachable_endpoint_as_an_error_not_a_traceback(capsy
     with _enable():
         assert check.main(client) == 1
     assert "could not list models" in capsys.readouterr().out
+
+
+# ── Bugbot finding on PR #240: unusable fast-model output must fall back to ILMU ──
+
+@pytest.mark.parametrize(
+    "fast_reply",
+    [
+        "Sure! Here is the profile you asked for, but I could not find any fields.",  # chatter, no JSON
+        '{"sector": "tech", ',                                                         # malformed JSON
+        '["sector", "tech"]',                                                          # JSON, but not an object
+        "{}",                                                                          # parsed, but nothing extracted
+    ],
+)
+async def test_intake_falls_back_to_ilmu_when_the_fast_reply_yields_no_fields(fast_reply):
+    with patch.object(intake, "llm_complete", new=AsyncMock(return_value='{"sector": "fnb"}')) as ilmu, \
+         patch.object(split, "fast_complete", new=AsyncMock(return_value=fast_reply)):
+        assert await intake._extract_profile_fields("text", "en") == {"sector": "fnb"}
+    ilmu.assert_awaited_once()
+
+
+async def test_intake_keeps_the_fast_models_fields_when_they_parse():
+    with patch.object(intake, "llm_complete", new=AsyncMock(return_value='{"sector": "fnb"}')) as ilmu, \
+         patch.object(split, "fast_complete", new=AsyncMock(return_value='Here you go: {"sector": "tech"} done')):
+        assert await intake._extract_profile_fields("text", "en") == {"sector": "tech"}
+    ilmu.assert_not_awaited()
+
+
+async def test_intake_returns_nothing_when_both_providers_give_nothing_usable():
+    with patch.object(intake, "llm_complete", new=AsyncMock(return_value="no json here")), \
+         patch.object(split, "fast_complete", new=AsyncMock(return_value="also none")):
+        assert await intake._extract_profile_fields("text", "en") == {}
