@@ -71,6 +71,31 @@ async def test_no_chunks_at_all_short_circuits_to_canned_message() -> None:
 
 
 @pytest.mark.asyncio
+async def test_no_chunks_for_a_chinese_query_gets_the_chinese_message() -> None:
+    """The streaming path used to hold its own bm/en-only copy of the
+    message, so a zh query got English."""
+    from app.agents.clarification import clarification_message
+
+    async def fake_rag(state):
+        return {"retrieved_chunks": []}
+
+    async def fake_analyst(state):
+        return {"needs_clarification": True, "retrieved_chunks": []}
+
+    async def zh_router(state):
+        return {"domain": "tax", "language": "zh"}
+
+    with patch("app.agents.router_node.router_node", zh_router), \
+         patch("app.agents.guard_node.guard_node", _noop_guard), \
+         patch("app.agents.rag_node.rag_node", fake_rag), \
+         patch("app.agents.analyst_node.analyst_node", fake_analyst):
+        text = await _collect(OrchestratorContext(query="怎么办", language="zh"))
+
+    assert text == clarification_message("zh")
+    assert "抱歉" in text
+
+
+@pytest.mark.asyncio
 async def test_low_confidence_with_chunks_streams_hedged_answer_not_canned_message() -> None:
     """needs_clarification=True but SOME material was retrieved must stream
     through stream_synthesis (which hedges) rather than the canned message."""

@@ -5,7 +5,10 @@ plain unit tests rather than async/mocked ones.
 """
 from __future__ import annotations
 
-from app.agents.graph import _route_after_analyst
+import pytest
+
+from app.agents.clarification import clarification_message
+from app.agents.graph import _clarification_node, _route_after_analyst
 from app.services.vector_store import ChunkResult
 
 
@@ -46,3 +49,31 @@ def test_low_confidence_with_missing_chunks_key_routes_to_clarification() -> Non
     same as an empty list — state.get(...) default, not a KeyError."""
     state = {"needs_clarification": True}
     assert _route_after_analyst(state) == "clarification"
+
+
+# ── Clarification message (bm / en / zh) ─────────────────────────────────
+
+def test_chinese_query_gets_a_chinese_clarification_not_english() -> None:
+    """Regression: only bm and en existed, so zh fell through to English."""
+    msg = _clarification_node({"language": "zh"})["streaming_token_buffer"]
+    assert msg == clarification_message("zh")
+    assert "抱歉" in msg
+    assert "confident" not in msg
+
+
+@pytest.mark.parametrize(
+    ("language", "expected_fragment"),
+    [("bm", "Maaf"), ("en", "not confident enough"), ("zh", "抱歉")],
+)
+def test_clarification_message_per_language(language: str, expected_fragment: str) -> None:
+    assert expected_fragment in clarification_message(language)
+
+
+@pytest.mark.parametrize("language", [None, "", "fr", "ms"])
+def test_clarification_message_falls_back_to_english(language: str | None) -> None:
+    assert clarification_message(language) == clarification_message("en")
+
+
+def test_clarification_node_defaults_to_english_when_language_missing() -> None:
+    msg = _clarification_node({})["streaming_token_buffer"]
+    assert msg == clarification_message("en")

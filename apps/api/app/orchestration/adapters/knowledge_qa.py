@@ -131,6 +131,7 @@ class KnowledgeQAAdapter(AgentProtocol):
         # router and rag stages to have run). For the orchestrator's streaming
         # path, we run the non-streaming nodes first, then stream synthesis.
         from app.agents.analyst_node import analyst_node
+        from app.agents.clarification import clarification_message
         from app.agents.guard_node import guard_node
         from app.agents.rag_node import rag_node
         from app.agents.router_node import router_node
@@ -167,17 +168,7 @@ class KnowledgeQAAdapter(AgentProtocol):
         # _partial_confidence_instruction makes it hedge the answer and ask a
         # targeted follow-up instead of claiming full confidence.
         if state.get("needs_clarification") and not state.get("retrieved_chunks"):
-            lang = state.get("language", "en")
-            if lang == "bm":
-                yield (
-                    "Maaf, saya tidak pasti dengan jawapan untuk soalan anda. "
-                    "Boleh anda berikan lebih maklumat atau nyatakan soalan dengan lebih jelas?"
-                )
-            else:
-                yield (
-                    "I'm not confident enough to answer this question accurately. "
-                    "Could you please provide more context or rephrase your question?"
-                )
+            yield clarification_message(state.get("language"))
             return
 
         # Stream synthesis tokens

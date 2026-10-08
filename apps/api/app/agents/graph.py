@@ -41,6 +41,7 @@ from typing import Any, Optional
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.analyst_node import analyst_node
+from app.agents.clarification import clarification_message
 from app.agents.guard_node import guard_node
 from app.agents.parliament_query_node import parliament_query_node
 from app.agents.rag_node import rag_node
@@ -52,18 +53,7 @@ from app.models.state import AgentState
 
 def _clarification_node(state: AgentState) -> dict:
     """Emit a clarification prompt when analyst confidence is too low."""
-    lang = state.get("language", "en")
-    if lang == "bm":
-        msg = (
-            "Maaf, saya tidak pasti dengan jawapan untuk soalan anda. "
-            "Boleh anda berikan lebih maklumat atau nyatakan soalan dengan lebih jelas?"
-        )
-    else:
-        msg = (
-            "I'm not confident enough to answer this question accurately. "
-            "Could you please provide more context or rephrase your question?"
-        )
-    return {"streaming_token_buffer": msg}
+    return {"streaming_token_buffer": clarification_message(state.get("language"))}
 
 
 def _route_after_guard(state: AgentState) -> str:
