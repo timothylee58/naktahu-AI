@@ -10,6 +10,7 @@ import weave
 from app.models.state import AgentState
 from app.orchestration.circuit_breaker import CircuitOpenError, ilmu_breaker
 from app.services import cache as cache_svc
+from app.services.language_detect import detect_latin_language
 from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
 
 log = structlog.get_logger(__name__)
@@ -155,6 +156,15 @@ async def router_node(state: AgentState) -> dict:
     # ILMU may misclassify Mandarin queries as 'bm' since it's Malaysia-tuned
     if script_lang:
         language = script_lang
+    else:
+        # The query's own words win over the LLM: ILMU has labelled plain
+        # English questions "bm" (a MyKad question was then answered in
+        # Bahasa Malaysia). Only overrides when the function words are
+        # decisive; an ambiguous query keeps the LLM's label.
+        detected = detect_latin_language(query)
+        if detected and detected != language:
+            log.info("router_language_overridden", llm_language=language, detected=detected)
+            language = detected
 
     # Unset (not "government") when the classifier didn't return a usable
     # domain — "government" is a legitimate classification outcome for a

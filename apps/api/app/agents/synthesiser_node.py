@@ -144,6 +144,36 @@ def _pending_changes_instruction() -> str:
     )
 
 
+def _partial_confidence_instruction() -> str:
+    """Extra system-prompt guidance when analyst_node flagged needs_clarification
+    but still retrieved some relevant material (graph.py routes this case to
+    the synthesiser instead of the bare clarification node — see
+    _route_after_analyst).
+
+    Without this, the model would just answer as if fully confident, which is
+    exactly the over-claiming the confidence gate exists to prevent. The
+    alternative used to be a single canned "I'm not confident enough, please
+    rephrase" message that discarded the retrieved context entirely — useful
+    for literally nothing retrieved, but wasteful when the chunks *do* cover
+    the general rule and only the user's case-specific facts are missing
+    (e.g. a tax-eligibility question with unstated figures). This instruction
+    asks for the pattern that handles that case well: state the general rule
+    from what was retrieved, say plainly that it isn't enough to give a
+    definitive answer, and ask ONE specific, targeted follow-up question that
+    names exactly the missing fact(s) — not a generic "please provide more
+    context."
+    """
+    return (
+        "LOW CONFIDENCE: The retrieved sources only partially answer this query — "
+        "do not present a definitive, personalised conclusion. Instead: (1) clearly state "
+        "the general rule or information the sources do support, with citations; (2) say "
+        "plainly that a definitive answer for this specific case cannot be given yet; (3) end "
+        "with exactly one specific, targeted question naming the exact missing fact(s) needed "
+        "to resolve the case — never a generic 'please provide more context or rephrase your "
+        "question.'"
+    )
+
+
 def _build_context(state: AgentState) -> str:
     chunks: list[ChunkResult] = state.get("retrieved_chunks", [])
     query = state.get("query", "")
@@ -323,6 +353,11 @@ async def stream_synthesis(state: AgentState) -> AsyncGenerator[str, None]:
         system_prompt = f"{system_prompt}\n\n{_freshness_instruction(state.get('answer_as_of'))}"
     if state.get("pending_changes"):
         system_prompt = f"{system_prompt}\n\n{_pending_changes_instruction()}"
+    # needs_clarification here always implies retrieved_chunks is non-empty —
+    # graph.py's _route_after_analyst only sends the empty-chunks case to the
+    # bare clarification node, never here.
+    if state.get("needs_clarification"):
+        system_prompt = f"{system_prompt}\n\n{_partial_confidence_instruction()}"
     context = _build_context(state)
     emitted_any = False
     try:

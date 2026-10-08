@@ -245,7 +245,15 @@ async def _sse_generator(
             metadata["agency_contact"] = agency_contact
         yield _sse("metadata", metadata)
 
-        if final_state.get("needs_clarification") and final_state.get("streaming_token_buffer"):
+        # Only the bare clarification node returns text without streaming it.
+        # A low-confidence answer that went through the synthesiser has
+        # already been streamed live above, so re-emitting its buffer would
+        # show the answer twice.
+        if (
+            final_state.get("needs_clarification")
+            and final_state.get("streaming_token_buffer")
+            and not tokens
+        ):
             yield _sse("token", {"text": final_state["streaming_token_buffer"]})
 
         yield _sse("done", {})

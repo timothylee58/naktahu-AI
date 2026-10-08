@@ -75,6 +75,59 @@ async def test_translate_falls_back_to_anthropic_when_ilmu_returns_empty(monkeyp
     assert result == "fallback translation"
 
 
+_MALAY_ANSWER = "Jika anda kehilangan MyKad, buat laporan polis dan mohon gantian di JPN."
+
+
+@pytest.mark.asyncio
+async def test_translate_rejects_untranslated_ilmu_reply_and_uses_anthropic(monkeypatch):
+    """The production bug: a request to translate to Chinese came back from
+    ILMU as the original Bahasa Malaysia text, with a 200, and the UI labelled
+    it "translated". A wrong-language reply must be treated as a failure."""
+    monkeypatch.setattr(
+        "services.translate.ilmu_client.chat.completions.create",
+        AsyncMock(return_value=_mock_ilmu_response(_MALAY_ANSWER)),
+    )
+    chinese = "如果您遗失了 MyKad，请先报警，然后到 JPN 办事处申请补发。"
+    anthropic_mock = AsyncMock(return_value=_mock_anthropic_response(chinese))
+    monkeypatch.setattr("services.translate.anthropic_client.messages.create", anthropic_mock)
+
+    result = await translate_text(_MALAY_ANSWER, "zh")
+
+    assert result == chinese
+    anthropic_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_translate_returns_empty_when_both_providers_return_the_wrong_language(monkeypatch):
+    """Both replies untranslated: degrade to "" so the router answers 502
+    instead of showing the original text as a translation."""
+    monkeypatch.setattr(
+        "services.translate.ilmu_client.chat.completions.create",
+        AsyncMock(return_value=_mock_ilmu_response(_MALAY_ANSWER)),
+    )
+    monkeypatch.setattr(
+        "services.translate.anthropic_client.messages.create",
+        AsyncMock(return_value=_mock_anthropic_response(_MALAY_ANSWER)),
+    )
+
+    assert await translate_text(_MALAY_ANSWER, "zh") == ""
+
+
+@pytest.mark.asyncio
+async def test_translate_accepts_text_already_in_the_target_language(monkeypatch):
+    """"If the text is already in X, return it unchanged" is the prompt's own
+    instruction, so an unchanged reply in the target language is valid."""
+    monkeypatch.setattr(
+        "services.translate.ilmu_client.chat.completions.create",
+        AsyncMock(return_value=_mock_ilmu_response(_MALAY_ANSWER)),
+    )
+    anthropic_mock = AsyncMock()
+    monkeypatch.setattr("services.translate.anthropic_client.messages.create", anthropic_mock)
+
+    assert await translate_text(_MALAY_ANSWER, "bm") == _MALAY_ANSWER
+    anthropic_mock.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_translate_degrades_to_empty_string_when_both_providers_fail(monkeypatch):
     monkeypatch.setattr(
