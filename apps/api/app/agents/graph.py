@@ -2,12 +2,18 @@
 
 Execution order:
   START → router → guard → rag → analyst → synthesiser   (normal path)
-                       ↓     ↓                → clarification  (needs_clarification=True)
+                       ↓     ↓
               warung_watch,  END  (blocked query — refusal already streamed)
               parliament_query
                        ↓
                       END  (live "is X packed right now" query, or a structured
                             Parliament bill/MP lookup — answered directly)
+
+analyst → synthesiser also covers low confidence as long as SOME material was
+retrieved: synthesiser hedges the answer and asks a targeted follow-up instead
+of refusing outright (see synthesiser_node._partial_confidence_instruction).
+analyst → clarification is the narrower case — needs_clarification=True AND
+retrieved_chunks is empty, i.e. there is nothing at all to answer from.
 
 warung_watch and parliament_query both branch off AFTER guard, not directly
 off router — every query, including these short-circuit ones, still passes
@@ -80,7 +86,14 @@ def _route_after_guard(state: AgentState) -> str:
 
 
 def _route_after_analyst(state: AgentState) -> str:
-    if state.get("needs_clarification", False):
+    """Low confidence routes to the synthesiser (hedged answer + a targeted
+    clarifying question) whenever there is still SOME retrieved material to
+    answer from — only a query with literally nothing retrieved (e.g. too
+    vague/off-topic to search at all) falls through to the bare
+    clarification-prompt node. See synthesiser_node._partial_confidence_instruction
+    for what "hedged" means here; this split is what lets a low-confidence
+    answer still share the general rule instead of refusing outright."""
+    if state.get("needs_clarification", False) and not state.get("retrieved_chunks"):
         return "clarification"
     return "synthesiser"
 

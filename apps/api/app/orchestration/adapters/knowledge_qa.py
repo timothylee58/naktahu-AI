@@ -160,7 +160,13 @@ class KnowledgeQAAdapter(AgentProtocol):
         analyst_result = await analyst_node(state)
         state.update(analyst_result)
 
-        if state.get("needs_clarification"):
+        # Mirrors graph.py's _route_after_analyst: only short-circuit to the
+        # bare clarification message when there's truly nothing retrieved to
+        # answer from. When needs_clarification is set but some material WAS
+        # retrieved, stream_synthesis still runs — synthesiser_node's
+        # _partial_confidence_instruction makes it hedge the answer and ask a
+        # targeted follow-up instead of claiming full confidence.
+        if state.get("needs_clarification") and not state.get("retrieved_chunks"):
             lang = state.get("language", "en")
             if lang == "bm":
                 yield (

@@ -10,10 +10,12 @@ from app.agents import synthesiser_node as synthesiser_module
 from app.agents.router_node import _VALID_DOMAINS
 from app.agents.synthesiser_node import (
     _generate_suggestions,
+    _partial_confidence_instruction,
     _scan_output_for_red_flags,
     stream_synthesis,
     synthesiser_node,
 )
+from app.services.vector_store import ChunkResult
 
 _FALLBACK_EN = "I'm sorry, I'm unable to answer right now. Please try again later."
 
@@ -182,6 +184,64 @@ async def test_stream_synthesis_records_none_provider_when_both_fail() -> None:
     # Fallback was still attempted (ILMU produced nothing), it just also failed.
     assert provider_fallback_total._value.get() == fallback_before + 1
     assert rag_queries_total.labels(language="en", provider="none")._value.get() == none_before + 1
+
+
+def _sample_chunk() -> ChunkResult:
+    return ChunkResult(
+        id="c1",
+        content="Qualifying MSME rates are 15/17/24% under paragraph 2A of Schedule 1.",
+        source_title="Corporate Tax Rates 2026",
+        source_url="https://www.hasil.gov.my/corporate-tax-rates-2026",
+        ministry="LHDN",
+        language="en",
+        similarity=0.8,
+    )
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_with_chunks_hedges_instead_of_short_circuiting() -> None:
+    """needs_clarification=True with non-empty retrieved_chunks must still run
+    through stream_synthesis (not a bare canned message) and the system
+    prompt sent to the provider must carry the partial-confidence instruction
+    asking the model to hedge + ask one targeted follow-up."""
+    captured: dict[str, str] = {}
+
+    def fake_ilmu(context, system):
+        captured["system"] = system
+        captured["context"] = context
+        return _fake_stream(["General rule, then one targeted question."])
+
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu):
+        text = await _collect_synthesis({
+            "language": "en",
+            "query": "Does my company qualify for the SME tax rates?",
+            "retrieved_chunks": [_sample_chunk()],
+            "needs_clarification": True,
+        })
+
+    assert text == "General rule, then one targeted question."
+    assert _partial_confidence_instruction() in captured["system"]
+
+
+@pytest.mark.asyncio
+async def test_confident_answer_does_not_carry_partial_confidence_instruction() -> None:
+    """needs_clarification=False (the normal, confident path) must NOT receive
+    the hedging instruction — only the low-confidence branch should."""
+    captured: dict[str, str] = {}
+
+    def fake_ilmu(context, system):
+        captured["system"] = system
+        return _fake_stream(["A confident, direct answer."])
+
+    with patch.object(synthesiser_module, "_stream_ilmu", fake_ilmu):
+        await _collect_synthesis({
+            "language": "en",
+            "query": "What's the SME tax rate?",
+            "retrieved_chunks": [_sample_chunk()],
+            "needs_clarification": False,
+        })
+
+    assert _partial_confidence_instruction() not in captured["system"]
 
 
 @pytest.fixture(autouse=True)
