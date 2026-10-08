@@ -1,0 +1,95 @@
+name: Grant Refresh
+
+# Nightly re-check of every active grant in grant_database against its agency's
+# own site (Tavily), via apps/api/scripts/agents/grant_refresh.py. The Eligibility
+# Agent verifies a user's top matches live per query; this job covers the grants
+# nobody asked about, and tells a human when an agency has moved or closed a window.
+#
+# Same hosting decision as deadline-monitor.yml (a GitHub-hosted scheduled
+# workflow, NOT a Railway cron service — see that file's header for why), and the
+# same safety posture as ingest-sources.yml:
+#
+#   * Scheduled runs are DRY-RUN unless the repository variable
+#     GRANT_REFRESH_LIVE is set to 'true' (Settings > Secrets and variables >
+#     Actions > Variables). Merging this workflow therefore writes nothing to
+#     production by itself. Read a dry-run's step summary once, confirm it looks
+#     right, then set the variable.
+#   * Even live, the job writes exactly one column (last_verified) and only for
+#     grants whose deadline the agency page CONFIRMS. A changed or closed grant is
+#     reported in the step summary and as a warning annotation; the database is
+#     never edited by this job.
+#   * No TAVILY_API_KEY -> the job skips with a notice (exit 0). Every check
+#     failing (bad or exhausted key, outage) -> the job fails, so a dead job
+#     cannot sit green.
+#
+# Cost: one basic Tavily search per active grant per night.
+#
+# Required secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TAVILY_API_KEY.
+# 17:30 UTC = 01:30 MYT, an hour before deadline-monitor.yml (18:00 UTC), so the
+# deadline monitor never reads a half-finished refresh.
+
+on:
+  schedule:
+    - cron: "30 17 * * *"
+  workflow_dispatch:
+    inputs:
+      write_mode:
+        description: "dry-run (check and report only) or live (stamp last_verified on confirmed grants)"
+        type: choice
+        options:
+          - dry-run
+          - live
+        default: dry-run
+
+# A slow run must not overlap the next one.
+concurrency:
+  group: grant-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Re-verify grants against agency sites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Run grant refresh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # Service-role key: server-side only; grant_database writes are RLS-protected.
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          # dispatch input wins; scheduled runs are live only if the variable opts in.
+          WRITE_MODE: ${{ github.event.inputs.write_mode || (vars.GRANT_REFRESH_LIVE == 'true' && 'live' || 'dry-run') }}
+        run: |
+          LIVE_FLAG=""
+          if [ "$WRITE_MODE" = "live" ]; then
+            LIVE_FLAG="--live"
+          fi
+          echo "write mode: $WRITE_MODE"
+          python scripts/agents/grant_refresh.py $LIVE_FLAG --report-json "$RUNNER_TEMP/grant-refresh.json"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-refresh-report
+          path: ${{ runner.temp }}/grant-refresh.json
+          if-no-files-found: ignore
+          retention-days: 30

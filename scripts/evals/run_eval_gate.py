@@ -5,7 +5,7 @@ reproduced perfectly passes it while being factually wrong. This harness adds a
 second gate — average temporal_accuracy (chunk currency) — and records both to
 the ``eval_runs`` table so deploys can be gated and tracked over time.
 
-    if scores["faithfulness"] < 0.7:        # existing gate
+    if scores["faithfulness"] < 0.75:       # existing gate
         sys.exit(1)
     if scores["temporal_accuracy"] < 0.6:   # new freshness gate
         sys.exit(1)
@@ -14,7 +14,9 @@ temporal_accuracy is computed here (deterministic, offline) from a golden
 samples file. faithfulness is read from --faithfulness / FAITHFULNESS_SCORE /
 --scores-json (produced by a live RAGAS run, which needs LLM credentials); when
 it is not supplied, its gate is skipped unless --require-faithfulness is set, so
-credential-free CI still enforces the temporal gate.
+credential-free CI still enforces the temporal gate. NOTE: nothing in this repo
+computes that faithfulness score; it is supplied from outside (today, a CI
+secret). The run prints "NOT MEASURED" when it is absent.
 
 Usage:
     PYTHONPATH=. python -m scripts.evals.run_eval_gate \
@@ -36,7 +38,7 @@ from scripts.evals.temporal_scorer import (
     aggregate_temporal_accuracy,
 )
 
-FAITHFULNESS_GATE = 0.7
+FAITHFULNESS_GATE = 0.75
 
 # name -> minimum passing score
 GATES: dict[str, float] = {
@@ -194,8 +196,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     print("── eval gate ──")
     print(f"  samples:              {len(samples)}")
     print(f"  avg_temporal_accuracy {avg_temporal:.3f}  (gate ≥ {TEMPORAL_ACCURACY_GATE})")
-    fv = f"{faithfulness:.3f}" if faithfulness is not None else "n/a"
-    print(f"  faithfulness          {fv}  (gate ≥ {FAITHFULNESS_GATE})")
+    if faithfulness is None:
+        # Said loudly on purpose: a skipped gate must never read as a passed one.
+        print(f"  faithfulness          NOT MEASURED  (gate ≥ {FAITHFULNESS_GATE} did not run: no score supplied)")
+    else:
+        print(f"  faithfulness          {faithfulness:.3f}  (gate ≥ {FAITHFULNESS_GATE})")
     for name in skipped:
         print(f"  skipped gate: {name} (no score provided)")
 

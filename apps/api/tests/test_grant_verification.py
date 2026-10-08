@@ -223,7 +223,7 @@ async def test_verify_node_with_no_matches_changes_nothing():
 
 
 async def test_verify_node_replaces_matched_grants_with_verified_copies():
-    with patch.object(v, "_make_client", return_value=_client([_page("Deadline: 31 December 2026")])):
+    with patch.object(v, "make_client", return_value=_client([_page("Deadline: 31 December 2026")])):
         out = await v.verify_node({"matched_grants": [_grant()]})
     assert out["matched_grants"][0]["verification"]["status"] == v.CONFIRMED
 
