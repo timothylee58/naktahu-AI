@@ -29,6 +29,7 @@ from typing import Any, Optional
 from scripts.evals.faithfulness.judge import JudgeError, LexicalOverlapJudge, make_judge
 from scripts.evals.faithfulness.metrics import calibration_report
 from scripts.evals.faithfulness.scoring import ScoreRefused, score_samples
+from scripts.evals.faithfulness.validate import validate_cases
 
 
 def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
@@ -49,20 +50,35 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Faithfulness judge pilot")
     sub = parser.add_subparsers(dest="cmd", required=True)
     cal = sub.add_parser("calibrate")
-    cal.add_argument("--cases", required=True)
+    cal.add_argument("--cases", required=True, nargs="+", help="one or more JSONL files (synthetic and/or human-labelled)")
     cal.add_argument("--judge", choices=["jev", "lexical"], default="lexical")
     cal.add_argument("--report", default=None)
     cal.add_argument("--fail-unless-trustworthy", action="store_true")
+    val = sub.add_parser("validate", help="check a human-labelled calibration file")
+    val.add_argument("--cases", required=True, nargs="+")
+    val.add_argument("--require-complete", action="store_true", help="also fail unless every language has the 30 real rows needed")
     sc = sub.add_parser("score")
     sc.add_argument("--samples", required=True)
     sc.add_argument("--judge", choices=["jev", "lexical"], default="jev")
     sc.add_argument("--out", required=True)
     args = parser.parse_args(argv)
 
+    if args.cmd == "validate":
+        rows = [r for path in args.cases for r in load_jsonl(path)]
+        problems, progress = validate_cases(rows)
+        for line in problems:
+            print(f"PROBLEM: {line}")
+        print("real rows per language (have/need): " + ", ".join(f"{k} {v}" for k, v in progress.items()))
+        incomplete = any(int(v.split("/")[0]) < int(v.split("/")[1]) for v in progress.values())
+        if problems or (args.require_complete and incomplete):
+            return 1
+        print("OK" + (" (not yet enough real rows to certify a judge)" if incomplete else ""))
+        return 0
+
     try:
         judge = make_judge(args.judge)
         if args.cmd == "calibrate":
-            report = run_calibration(load_jsonl(args.cases), judge)
+            report = run_calibration([r for path in args.cases for r in load_jsonl(path)], judge)
             print(json.dumps(report, indent=2, ensure_ascii=False))
             if args.report:
                 Path(args.report).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
