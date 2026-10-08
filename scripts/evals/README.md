@@ -115,3 +115,11 @@ PYTHONPATH=. pytest scripts/evals/ -q
 See also `apps/api/evals/test_freshness.py`, which gates `analyst_node`'s
 runtime freshness behaviour (stale flagging, superseded hard-reject,
 prefer-newest) — the metric here is the dataset-level scorer for the same axis.
+
+## Faithfulness-judge pilot
+
+`faithfulness/` is a scaffold for the measurement the gate above is missing: a
+claim-level judge, a calibration harness that refuses to certify a judge on too
+little data, and a scorer that writes the `--scores-json` file this gate reads.
+See `faithfulness/README.md`. It has not been run against a real model.
+
