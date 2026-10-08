@@ -59,7 +59,7 @@ per-language gate is for.
 
 - **Real calibration data.** 90+ examples (30 each of bm/en/zh) labelled by a person from
   real pipeline answers, including hard negatives (wrong number, wrong entity, plausible
-  unsupported addition). Check progress with `pilot validate --cases <file>`. The 120-row
+  unsupported addition). Check progress with `python -m scripts.evals.faithfulness.pilot validate --cases <file>`. The 120-row
   synthetic set is a floor, not a substitute: only `synthetic != true` rows count toward the verdict.
 - **An exporter** that runs the live pipeline over a question set and writes the
   `score` sample file. Nothing in the repo produces it today.

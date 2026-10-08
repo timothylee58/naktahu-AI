@@ -235,7 +235,7 @@ async def test_the_full_chain_still_ends_at_anthropic():
 async def test_a_nemotron_answer_cut_short_is_kept_and_never_doubled_by_a_fallback():
     async def partial(prompt: str, system_prompt: str):
         yield "Half an answer"
-        # the real stream_reasoning swallows a mid-stream error and just ends
+        raise RuntimeError("stream broke")   # the synthesiser must keep the partial answer
 
     ilmu = MagicMock()
     with _enable(), patch.object(split, "stream_reasoning", partial), patch.object(syn, "_stream_ilmu", ilmu):

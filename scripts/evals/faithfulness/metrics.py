@@ -113,7 +113,7 @@ def calibration_report(
         floor_problems: list[str] = []
         if enough:
             if s_auroc is None or s_auroc < SYNTHETIC_FLOOR_AUROC:
-                floor_problems.append(f"synthetic AUROC {s_auroc} < {SYNTHETIC_FLOOR_AUROC}")
+                floor_problems.append((f"synthetic AUROC {s_auroc} < {SYNTHETIC_FLOOR_AUROC}" if s_auroc is not None else "synthetic AUROC undefined (one label only)"))
             floor_problems += [f"synthetic {l} accuracy {s_lang[l]['accuracy']:.2f} < {SYNTHETIC_FLOOR_ACCURACY}"
                                for l in LANGUAGES if (s_lang[l]["accuracy"] or 0) < SYNTHETIC_FLOOR_ACCURACY]
         report["synthetic"] = {
@@ -136,7 +136,7 @@ def calibration_report(
 
     problems: list[str] = []
     if report["real_auroc"] is None or report["real_auroc"] < AUROC_MIN:
-        problems.append(f"overall AUROC {report['real_auroc']} < {AUROC_MIN}")
+        problems.append((f"overall AUROC {report['real_auroc']} < {AUROC_MIN}" if report["real_auroc"] is not None else "overall AUROC undefined (all real rows share one label)"))
     if report["real_ece"] > ECE_MAX:
         problems.append(f"ECE {report['real_ece']:.3f} > {ECE_MAX}")
     for lang in LANGUAGES:

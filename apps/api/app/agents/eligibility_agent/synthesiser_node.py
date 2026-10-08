@@ -1,7 +1,9 @@
 """synthesiser_node — streams the final eligibility summary as SSE-shaped dict events.
 
 Provider order matches CLAUDE.md hard rule: ILMU primary, Anthropic
-(claude-sonnet-5, see llm_client.FALLBACK_MODEL) fallback for synthesis only.
+(claude-sonnet-5, see llm_client.FALLBACK_MODEL) fallback for synthesis only. The one exception is this agent alone: when
+ELIGIBILITY_USE_NEMOTRON is on (see llm_split), Nemotron streams first and ILMU/Anthropic
+are the fallbacks. Flag off, the order is exactly ILMU then Anthropic.
 """
 from __future__ import annotations
 

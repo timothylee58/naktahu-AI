@@ -420,3 +420,9 @@ def test_calibrate_cli_accepts_several_case_files(tmp_path, capsys):
     report = tmp_path / "r.json"
     assert main(["calibrate", "--cases", str(SEED), str(SYNTHETIC), "--judge", "lexical", "--report", str(report)]) == 0
     assert json.loads(report.read_text(encoding="utf-8"))["n"] == 138
+
+
+def test_single_class_real_set_reports_auroc_as_undefined_not_none():
+    rows = [{**_real(lang, i, 1)} for lang in metrics.LANGUAGES for i in range(metrics.MIN_PER_LANGUAGE)]
+    rep = metrics.calibration_report(rows, [0.9] * len(rows), baseline_scores=[0.5] * len(rows), judge="t")
+    assert any("undefined" in r for r in rep["reasons"]) and not any("None" in r for r in rep["reasons"])
