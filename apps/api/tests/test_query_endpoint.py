@@ -139,6 +139,71 @@ async def test_query_endpoint_rejects_unknown_language() -> None:
 
 
 @pytest.mark.asyncio
+async def test_low_confidence_synthesised_answer_is_not_emitted_twice() -> None:
+    """Cursor Bugbot finding on PR #238: a low-confidence answer that went
+    through the synthesiser is already streamed live as token events, and the
+    synthesiser also stores it in streaming_token_buffer. _sse_generator must
+    not re-emit that buffer or the client shows the answer twice."""
+    hedged = "General rule here. Which year of assessment?"
+
+    async def fake_astream(inputs, stream_mode):  # type: ignore[no-untyped-def]
+        yield ("custom", hedged)
+        yield (
+            "updates",
+            {
+                "synthesiser": {
+                    "streaming_token_buffer": hedged,
+                    "needs_clarification": True,
+                    "confidence_score": 0.4,
+                    "language": "en",
+                }
+            },
+        )
+
+    with patch("app.routers.query.pipeline") as mock_pipeline:
+        mock_pipeline.astream = fake_astream
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post(
+                "/api/v1/query",
+                json={"query": "Does my company qualify?", "session_id": "sess-hedge"},
+            )
+
+    texts = [e["data"]["text"] for e in _parse_sse(resp.text) if e.get("event") == "token"]
+    assert texts == [hedged]
+
+
+@pytest.mark.asyncio
+async def test_bare_clarification_message_is_still_emitted_as_a_token() -> None:
+    """The clarification node returns its message only via state (nothing is
+    streamed live), so _sse_generator must still deliver it as a token."""
+    canned = "I'm not confident enough to answer this question accurately."
+
+    async def fake_astream(inputs, stream_mode):  # type: ignore[no-untyped-def]
+        yield (
+            "updates",
+            {
+                "clarification": {
+                    "streaming_token_buffer": canned,
+                    "needs_clarification": True,
+                    "confidence_score": 0.0,
+                    "language": "en",
+                }
+            },
+        )
+
+    with patch("app.routers.query.pipeline") as mock_pipeline:
+        mock_pipeline.astream = fake_astream
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post(
+                "/api/v1/query",
+                json={"query": "asdf", "session_id": "sess-canned"},
+            )
+
+    texts = [e["data"]["text"] for e in _parse_sse(resp.text) if e.get("event") == "token"]
+    assert texts == [canned]
+
+
+@pytest.mark.asyncio
 async def test_query_endpoint_token_text_present() -> None:
     """Token events must carry a non-empty 'text' field."""
     with patch("app.routers.query.pipeline") as mock_pipeline:
