@@ -64,7 +64,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.cmd == "validate":
-        rows = [r for path in args.cases for r in load_jsonl(path)]
+        try:
+            rows = [r for path in args.cases for r in load_jsonl(path)]
+        except (OSError, ValueError) as exc:   # JSONDecodeError is a ValueError
+            print(f"ERROR: cannot read {args.cases}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
         problems, progress = validate_cases(rows)
         for line in problems:
             print(f"PROBLEM: {line}")
@@ -83,7 +87,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             if args.report:
                 Path(args.report).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"VERDICT: {report['verdict']}")
-            return 1 if args.fail_unless_trustworthy and report["verdict"] != "trustworthy" else 0
+            # Strict mode also honours the synthetic floor, so a judge that fails even the
+            # easy by-construction rows can never pass the build on real rows alone.
+            if args.fail_unless_trustworthy:
+                if report["verdict"] != "trustworthy":
+                    return 1
+                if report.get("synthetic", {}).get("floor") == "fail":
+                    print("ERROR: judge fails the synthetic floor: " + "; ".join(report["synthetic"].get("floor_reasons", [])), file=sys.stderr)
+                    return 1
+            return 0
         result = score_samples(load_jsonl(args.samples), judge)
         Path(args.out).write_text(json.dumps(result, indent=2), encoding="utf-8")
         print(json.dumps(result, indent=2))

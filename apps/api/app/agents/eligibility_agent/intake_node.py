@@ -69,6 +69,12 @@ is_pre_revenue (boolean).
 """
 
 
+_PROFILE_KEYS = (
+    "business_type", "registered_months", "sector", "sub_sector", "annual_revenue_myr",
+    "is_bumiputera", "employee_count", "has_md_status", "existing_grants", "is_pre_revenue",
+)
+
+
 def _missing_required(profile: dict[str, Any]) -> list[str]:
     return [f for f in _REQUIRED_FIELDS if profile.get(f) is None]
 
@@ -94,7 +100,7 @@ async def _extract_profile_fields(text: str, language: str) -> dict[str, Any]:
     # ILMU path rather than drop the turn. With the flag off this is exactly the
     # old behaviour.
     fields = _parse_fields(await llm_split.fast_complete(_EXTRACTION_SYSTEM_PROMPT, text, max_tokens=300))
-    if fields:
+    if any(fields.get(k) is not None for k in _PROFILE_KEYS):
         return fields
     raw = await llm_complete(
         _EXTRACTION_SYSTEM_PROMPT,

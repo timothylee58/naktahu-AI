@@ -33,7 +33,7 @@ from core.config import settings
 
 log = structlog.get_logger(__name__)
 
-_TIMEOUT_S = 30.0
+_TIMEOUT_S = 60.0   # also bounds the gap before the first streamed chunk (thinking phase)
 _OPEN, _CLOSE = "<think>", "</think>"
 
 

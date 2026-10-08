@@ -54,7 +54,8 @@ def _fake_client(create: AsyncMock) -> MagicMock:
 # ── gating ───────────────────────────────────────────────────────────────────
 
 def test_disabled_by_default_and_each_role_needs_its_own_model_id():
-    assert not split.fast_enabled() and not split.reasoning_enabled()
+    with _enable(eligibility_use_nemotron=False, nemotron_api_key=""):
+        assert not split.fast_enabled() and not split.reasoning_enabled()
     with _enable():
         assert split.fast_enabled() and split.reasoning_enabled()
     with _enable(nemotron_fast_model=""):
@@ -141,7 +142,8 @@ async def test_fast_complete_uses_the_fast_model_strips_thinking_and_never_raise
     bad = AsyncMock(side_effect=RuntimeError("down"))
     with _enable(), patch.object(split, "_client", return_value=_fake_client(bad)):
         assert await split.fast_complete("s", "u") == ""
-    assert await split.fast_complete("s", "u") == ""  # disabled -> "" without any client
+    with _enable(eligibility_use_nemotron=False, nemotron_api_key=""):
+        assert await split.fast_complete("s", "u") == ""  # disabled -> "" without any client
 
 
 # ── intake: fast model first, existing provider as fallback ──────────────────
@@ -300,6 +302,7 @@ def test_check_reports_an_unreachable_endpoint_as_an_error_not_a_traceback(capsy
         '{"sector": "tech", ',                                                         # malformed JSON
         '["sector", "tech"]',                                                          # JSON, but not an object
         "{}",                                                                          # parsed, but nothing extracted
+        '{"foo": 1, "sector": null}',                                                  # unknown keys / only nulls
     ],
 )
 async def test_intake_falls_back_to_ilmu_when_the_fast_reply_yields_no_fields(fast_reply):
@@ -320,3 +323,28 @@ async def test_intake_returns_nothing_when_both_providers_give_nothing_usable():
     with patch.object(intake, "llm_complete", new=AsyncMock(return_value="no json here")), \
          patch.object(split, "fast_complete", new=AsyncMock(return_value="also none")):
         assert await intake._extract_profile_fields("text", "en") == {}
+
+
+# ── cubic findings on PR #240 ────────────────────────────────────────────────
+
+def test_check_fails_when_the_model_returns_no_visible_text(capsys):
+    client = _models("fast-model", "reasoning-model")
+    client.chat.completions.create.return_value = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="<think>only thoughts</think>"))]
+    )
+    with _enable():
+        assert check.main(client) == 1
+    assert "no visible text" in capsys.readouterr().out
+
+
+async def test_a_partial_ilmu_answer_followed_by_anthropic_is_reported_as_both():
+    async def ilmu_then_boom(prompt: str, system_prompt: str):
+        yield "part "
+        raise RuntimeError("cut off")
+
+    async def anthropic(prompt: str, system_prompt: str):
+        yield "rest"
+
+    with patch.object(syn, "_stream_ilmu", ilmu_then_boom), patch.object(syn, "_stream_anthropic", anthropic):
+        events = await _collect(STATE)
+    assert _provider(events) == "ilmu+anthropic"

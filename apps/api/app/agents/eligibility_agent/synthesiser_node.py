@@ -131,7 +131,7 @@ async def synthesiser_node(state: EligibilityState) -> AsyncGenerator[dict[str, 
             try:
                 async for token in _stream_anthropic(prompt, system_prompt):
                     buffer += token
-                    provider = "anthropic"
+                    provider = f"{provider}+anthropic" if provider and "anthropic" not in provider else "anthropic"
                     yield {"type": "token", "text": token}
             except Exception as exc2:
                 log.error("eligibility_synthesis_failed", error=str(exc2))

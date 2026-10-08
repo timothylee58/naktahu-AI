@@ -7,6 +7,7 @@ from typing import Any, Sequence
 from scripts.evals.faithfulness.metrics import LANGUAGES, MIN_PER_LANGUAGE
 
 MAX_CONTEXT_CHARS = 24_000
+MAX_CLAIM_CHARS = 2_000
 BALANCE = (0.30, 0.70)   # share of supported (label 1) claims per language
 
 
@@ -19,6 +20,9 @@ def validate_cases(rows: Sequence[dict[str, Any]]) -> tuple[list[str], dict[str,
     pos_by_lang: Counter[str] = Counter()
 
     for n, r in enumerate(rows, 1):
+        if not isinstance(r, dict):
+            problems.append(f"row{n}: row must be a JSON object")
+            continue
         rid = str(r.get("id") or f"row{n}")
         if not r.get("id"):
             problems.append(f"{rid}: missing id")
@@ -32,13 +36,17 @@ def validate_cases(rows: Sequence[dict[str, Any]]) -> tuple[list[str], dict[str,
                 problems.append(f"{rid}: {field} must be non-empty text")
         if isinstance(r.get("context"), str) and len(r["context"]) > MAX_CONTEXT_CHARS:
             problems.append(f"{rid}: context longer than {MAX_CONTEXT_CHARS} chars")
-        if r.get("label") not in (0, 1):
-            problems.append(f"{rid}: label must be 0 or 1")
+        if isinstance(r.get("claim"), str) and len(r["claim"]) > MAX_CLAIM_CHARS:
+            problems.append(f"{rid}: claim longer than {MAX_CLAIM_CHARS} chars")
+        if type(r.get("label")) is not int or r["label"] not in (0, 1):
+            problems.append(f"{rid}: label must be the integer 0 or 1")
         pair = (str(r.get("context", "")).strip(), str(r.get("claim", "")).strip())
         if pair in seen_pairs:
             problems.append(f"{rid}: same context+claim appears twice")
         seen_pairs.add(pair)
-        if not r.get("synthetic"):
+        if "synthetic" in r and type(r["synthetic"]) is not bool:
+            problems.append(f"{rid}: synthetic must be true or false (a JSON boolean)")
+        if r.get("synthetic") is not True:
             if not str(r.get("labeller") or "").strip():
                 problems.append(f"{rid}: real rows need a 'labeller' (who judged it)")
             if r.get("language") in LANGUAGES:

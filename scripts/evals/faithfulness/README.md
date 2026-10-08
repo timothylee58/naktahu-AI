@@ -21,7 +21,7 @@ the verdict logic, and the hand-off to the deploy gate.
 | `scoring.py` | per-sample supported-claim ratio, averaged; **refuses** to emit a score if >10% of claims could not be judged. |
 | `pilot.py` | CLI: `calibrate` and `score`. |
 | `data/calibration_seed.jsonl` | 18 **synthetic** labelled claims (6 per language). Plumbing only. |
-| `data/calibration_synthetic.jsonl` + `build_synthetic_set.py` | 120 **synthetic** claims (5 fictional programmes x 8 x 3 languages), true by construction. A *floor* (a judge that fails it is out); never counts toward certification. The lexical baseline scores AUROC 0.42 on it. |
+| `data/calibration_synthetic.jsonl` + `build_synthetic_set.py` | 120 **synthetic** claims (5 fictional programmes x 8 x 3 languages), true by construction. A *floor* (a judge that fails it is out); never counts toward certification. The lexical baseline scores AUROC ≈0.40 on it (0.42 with the 18-row seed set included). Strict mode (`--fail-unless-trustworthy`) also fails a judge that fails this floor; the default report only records it. |
 | `validate.py` | checks a human-labelled file (schema, duplicates, `labeller`, label balance) and shows progress to 30 per language. |
 | `nebius/` | Dockerfile + entrypoint for a CPU runner job, and how to submit it. Not built or run on Nebius; see its README. |
 

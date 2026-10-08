@@ -338,12 +338,12 @@ def test_synthetic_file_is_the_generators_output_balanced_and_trilingual():
 
 def test_every_perturbed_claim_changes_a_fact_that_the_context_states():
     rows = load_jsonl(SYNTHETIC)
-    for r in (r for r in rows if r["label"] == 0 and r["id"].endswith(("n1", "n2"))):
+    for r in (r for r in rows if r["label"] == 0 and True):
         assert r["claim"] not in r["context"]
     # the x10 amount in each 'n1' claim never appears in its own context
     for r in (r for r in rows if r["id"].endswith("-n1")):
         figure = next(tok for tok in r["claim"].replace("，", " ").split() if tok.startswith("RM") or tok.endswith("万令吉") or tok.isdigit())
-        assert figure not in r["context"].replace(",", ",")
+        assert figure not in r["context"]
 
 
 # ── validating a human-labelled set ──────────────────────────────────────────
@@ -365,7 +365,11 @@ def test_validate_accepts_a_wellformed_real_set_and_reports_progress():
     "bad,needle",
     [
         ({"language": "fr"}, "language must be one of"),
-        ({"label": 2}, "label must be 0 or 1"),
+        ({"label": 2}, "label must be the integer 0 or 1"),
+        ({"label": True}, "label must be the integer 0 or 1"),    # JSON booleans are not labels
+        ({"label": 1.0}, "label must be the integer 0 or 1"),
+        ({"synthetic": "false"}, "synthetic must be true or false"),
+        ({"claim": "x" * 3_000}, "claim longer than"),
         ({"claim": "  "}, "claim must be non-empty"),
         ({"labeller": ""}, "need a 'labeller'"),
         ({"context": "x" * 30_000}, "longer than"),
@@ -376,6 +380,19 @@ def test_validate_flags_each_kind_of_bad_row(bad, needle):
     row.update(bad)  # `bad` overrides exactly one field
     rows = [row]
     assert any(needle in p for p in validate_cases(rows)[0])
+
+
+def test_validate_reports_a_non_object_row_instead_of_crashing():
+    problems, _ = validate_cases([["not", "an", "object"], 5, _real("bm", 0, 1)])
+    assert sum("must be a JSON object" in p for p in problems) == 2
+
+
+def test_validate_cli_reports_unreadable_input_without_a_traceback(tmp_path, capsys):
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text("{not json\n", encoding="utf-8")
+    assert main(["validate", "--cases", str(bad)]) == 2
+    assert main(["validate", "--cases", str(tmp_path / "missing.jsonl")]) == 2
+    assert "cannot read" in capsys.readouterr().err
 
 
 def test_validate_flags_duplicate_ids_duplicate_pairs_and_lopsided_labels():

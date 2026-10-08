@@ -26,7 +26,7 @@ Malay and Mandarin work.
 ### B. The runner image
 ```bash
 docker build -f scripts/evals/faithfulness/nebius/Dockerfile -t naktahu-faithfulness-pilot .
-docker run --rm -e JUDGE=lexical -v "$PWD/out:/out" naktahu-faithfulness-pilot   # smoke test, no model
+mkdir -p out && docker run --rm -e JUDGE=lexical -v "$PWD/out:/out" naktahu-faithfulness-pilot   # smoke test, no model
 ```
 Env: `JUDGE` (`jev` default | `lexical`), `JEV_URL`, `JEV_API_KEY` (optional),
 `REAL_CASES` (default `/data/real_cases.jsonl`, optional), `OUT_DIR` (default `/out`),
@@ -50,13 +50,14 @@ nebius ai job create \
   --platform <cpu platform> --preset <cpu preset> \
   --env JUDGE=jev --env JEV_URL=http://<model server>:8000 \
   --env FAIL_UNLESS_TRUSTWORTHY=0 \
-  --volume s3://<bucket>:/out:rw  `# report destination; add your labelled set at /data, read-only`
+  --volume s3://<bucket>:/out:rw \
+  --volume s3://<labelled-bucket>:/data:ro   `# must contain real_cases.jsonl; without it only the synthetic floor runs`
 ```
 Push the image to a registry the job can pull from first; that step is also yours.
 
 ## What you still have to supply
 1. **The human-labelled set.** `calibrate` can only certify a judge from real rows:
-   - Format: one JSON object per line: `{"id","language":"bm|en|zh","context","claim","label":1|0,"labeller":"<who>"}`.
+   - Format: one JSON object per line: e.g. `{"id":"case-001","language":"en","context":"...","claim":"...","label":1,"labeller":"<who>"}` (`language` is bm, en or zh; `label` is the integer 1 = supported, 0 = not).
    - Need >= 30 per language, 30-70% supported claims per language, hard negatives
      (wrong number, wrong entity, plausible but unsupported addition).
    - Take contexts and claims from real pipeline answers, not from this repo's templates.

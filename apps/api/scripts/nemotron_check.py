@@ -64,6 +64,10 @@ def check(client: Any, roles: dict[str, str]) -> int:
             print(f"FAIL {role}: '{model_id}' test call failed ({type(exc).__name__})")
             status = 1
             continue
+        if not strip_think(text).strip():
+            print(f"FAIL {role}: '{model_id}' returned no visible text (reasoning only, or empty); raise max_tokens or set NEMOTRON_EXTRA_BODY")
+            status = 1
+            continue
         note = " (output contains <think>: set NEMOTRON_EXTRA_BODY or rely on stripping)" if "<think>" in text else ""
         print(f"OK   {role}: '{model_id}' answered in {time.monotonic() - started:.1f}s: {strip_think(text)[:40]!r}{note}")
     return status

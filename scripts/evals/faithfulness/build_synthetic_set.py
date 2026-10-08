@@ -3,7 +3,7 @@
 Every label is true BY CONSTRUCTION (a supported claim restates a fact in the
 context; an unsupported one changes exactly one fact or states the wrong
 eligible entity), so no human opinion is involved. That makes the set a reliable
-FLOOR (a judge that fails even this is out) and a regression fixture. It is not
+FLOOR (a judge that fails even this is out: reported in the calibration report and enforced by --fail-unless-trustworthy, but it never makes a verdict 'trustworthy' by itself) and a regression fixture. It is not
 evidence a judge is good on real government answers: supported claims here are
 short paraphrases of three facts, and the context is a few sentences. Rows are
 tagged synthetic=true and metrics.calibration_report never counts them toward
