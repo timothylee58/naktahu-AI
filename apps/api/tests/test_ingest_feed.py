@@ -1090,6 +1090,3 @@ def test_cli_hands_the_registry_guards_to_main_async(monkeypatch):
     assert args.require_host_suffix == "mof.gov.my"
     assert args.identity_terms == ("2027",)
 
-
-async def _noop():
-    return None
