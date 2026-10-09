@@ -872,3 +872,224 @@ def test_budget_day_paragraph_is_stamped_routed_and_dated_correctly():
 
     assert route_domain(entry.content, "finance") == "tax"
     assert date_fields(entry, args) == {"effective_date": "2027-01-01", "announced_date": "2026-10-09"}
+
+
+# ── Budget 2027 provenance: official host + "is this really the 2027 file" ───
+
+import httpx  # noqa: E402
+
+from scripts.ingest_feed import OffDomainRedirect, fetch_feed, missing_identity_terms  # noqa: E402
+
+_REAL_HTTPX_CLIENT = httpx.Client
+_MOF_URL = "https://belanjawan.mof.gov.my/pdf/belanjawan2027/ucapan/bs27.pdf"
+
+
+def _serve(monkeypatch, routes: dict[str, httpx.Response]) -> None:
+    """Make fetch_feed's own httpx.Client talk to canned responses (no network)."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return routes[str(request.url)]
+
+    monkeypatch.setattr(
+        "scripts.ingest_feed.httpx.Client",
+        lambda **kw: _REAL_HTTPX_CLIENT(transport=httpx.MockTransport(handler), **kw),
+    )
+
+
+def test_fetch_feed_refuses_a_redirect_to_another_site(monkeypatch):
+    """The row would be stamped with the MOF url and ministry, so bytes from
+    elsewhere must never get that far."""
+    _serve(monkeypatch, {
+        _MOF_URL: httpx.Response(302, headers={"location": "https://cdn.example.com/bs27.pdf"}),
+        "https://cdn.example.com/bs27.pdf": httpx.Response(200, content=b"%PDF-from-elsewhere"),
+    })
+    with pytest.raises(OffDomainRedirect) as exc:
+        fetch_feed(_MOF_URL, allowed_host_suffix="mof.gov.my")
+    assert "cdn.example.com" in str(exc.value)
+
+
+def test_fetch_feed_refuses_an_offsite_hop_even_if_it_lands_back_on_mof(monkeypatch):
+    _serve(monkeypatch, {
+        _MOF_URL: httpx.Response(302, headers={"location": "https://tracker.example.net/r"}),
+        "https://tracker.example.net/r": httpx.Response(302, headers={"location": "https://www.mof.gov.my/x.pdf"}),
+        "https://www.mof.gov.my/x.pdf": httpx.Response(200, content=b"%PDF-ok"),
+    })
+    with pytest.raises(OffDomainRedirect):
+        fetch_feed(_MOF_URL, allowed_host_suffix="mof.gov.my")
+
+
+def test_fetch_feed_allows_a_redirect_within_mof(monkeypatch):
+    _serve(monkeypatch, {
+        _MOF_URL: httpx.Response(301, headers={"location": "https://www.mof.gov.my/pdf/bs27.pdf"}),
+        "https://www.mof.gov.my/pdf/bs27.pdf": httpx.Response(200, content=b"%PDF-1.4 real"),
+    })
+    assert fetch_feed(_MOF_URL, allowed_host_suffix="mof.gov.my") == b"%PDF-1.4 real"
+
+
+def test_fetch_feed_does_not_match_a_lookalike_suffix(monkeypatch):
+    """"evilmof.gov.my" ends with "mof.gov.my" as a string but is another site."""
+    _serve(monkeypatch, {
+        _MOF_URL: httpx.Response(302, headers={"location": "https://evilmof.gov.my/bs27.pdf"}),
+        "https://evilmof.gov.my/bs27.pdf": httpx.Response(200, content=b"%PDF"),
+    })
+    with pytest.raises(OffDomainRedirect):
+        fetch_feed(_MOF_URL, allowed_host_suffix="mof.gov.my")
+
+
+def test_fetch_feed_without_a_guard_behaves_as_before(monkeypatch):
+    _serve(monkeypatch, {
+        "https://a.example.com/x": httpx.Response(302, headers={"location": "https://b.example.org/y"}),
+        "https://b.example.org/y": httpx.Response(200, content=b"body"),
+    })
+    assert fetch_feed("https://a.example.com/x") == b"body"
+
+
+_FILLER = " The Government will continue to support households and businesses across the nation."
+_PDF_2027 = _make_pdf([
+    ["BUDGET 2027 SPEECH", "Tabled in the Dewan Rakyat on 9 October 2026." + _FILLER],
+    ["Cukai pendapatan and tax relief measures are extended." + _FILLER],
+])
+_PDF_STALE_2026 = _make_pdf([
+    ["BUDGET 2026 SPEECH", "Tabled in the Dewan Rakyat on 10 October 2025." + _FILLER],
+    ["Cukai pendapatan and tax relief measures are extended." + _FILLER],
+])
+
+
+def test_missing_identity_terms_reads_the_documents_own_text_not_its_title():
+    entries = parse_pdf(_PDF_STALE_2026, _MOF_URL, "belanjawan-2027-speech-en")
+    # The fallback title ("belanjawan-2027-...") contains the year by construction.
+    assert "2027" in entries[0].title
+    assert missing_identity_terms(entries, ("2027",)) == ["2027"]
+    assert missing_identity_terms(parse_pdf(_PDF_2027, _MOF_URL, "x"), ("2027",)) == []
+
+
+def test_missing_identity_terms_only_looks_at_the_first_pages():
+    late = _make_pdf([["Page one is a cover." + _FILLER]] * 3 + [["Budget 2027 appears only here." + _FILLER]])
+    assert missing_identity_terms(parse_pdf(late, _MOF_URL, "x"), ("2027",)) == ["2027"]
+
+
+def _pdf_args(**overrides):
+    base = dict(
+        feed_url=_MOF_URL, kind="pdf", domain="finance", route_domains=False,
+        ministry="MOF", language="en", limit=1000, dry_run=True,
+        source_title="belanjawan-2027-speech-en",
+        require_host_suffix="mof.gov.my", identity_terms=("2027",),
+    )
+    base.update(overrides)
+    return MagicMock(**base)
+
+
+@pytest.mark.asyncio
+async def test_main_async_aborts_when_the_pdf_is_not_the_2027_document(monkeypatch, capsys):
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_STALE_2026))
+    embed = AsyncMock(return_value=[0.0] * 1536)
+    monkeypatch.setattr("scripts.ingest_feed._embed", embed)
+    sb = _mock_supabase()
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
+
+    with pytest.raises(SystemExit) as exc:
+        await main_async(_pdf_args(dry_run=False))
+
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "does not look like the expected document" in err and "'2027'" in err
+    assert "BUDGET 2026 SPEECH" in err  # shows the reviewer what the file actually is
+    embed.assert_not_awaited()
+    sb.table.return_value.insert.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_main_async_aborts_on_a_pdf_with_no_extractable_text(monkeypatch, capsys):
+    """An image-only PDF used to end in a green "Nothing to ingest."."""
+    blank = _make_pdf([[]])
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=blank))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+    with pytest.raises(SystemExit):
+        await main_async(_pdf_args())
+    assert "(no extractable text)" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_main_async_proceeds_when_the_pdf_is_the_2027_document(monkeypatch, capsys):
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_2027))
+    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+    await main_async(_pdf_args())
+    assert "would be inserted" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_main_async_passes_the_host_guard_to_fetch_feed(monkeypatch):
+    fetch = MagicMock(return_value=_PDF_2027)
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", fetch)
+    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+    await main_async(_pdf_args())
+    fetch.assert_called_once_with(_MOF_URL, allowed_host_suffix="mof.gov.my")
+
+
+@pytest.mark.asyncio
+async def test_main_async_reports_an_offsite_redirect_as_a_failed_fetch(monkeypatch, capsys):
+    monkeypatch.setattr(
+        "scripts.ingest_feed.fetch_feed",
+        MagicMock(side_effect=OffDomainRedirect("redirected outside *.mof.gov.my (via cdn.example.com)")),
+    )
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+    with pytest.raises(SystemExit):
+        await main_async(_pdf_args())
+    assert "failed to fetch PDF" in capsys.readouterr().err
+
+
+# ── The dry-run summary must not report success after every embed failed ─────
+
+@pytest.mark.asyncio
+async def test_dry_run_summary_counts_embedding_failures_and_exits_nonzero(monkeypatch, capsys):
+    """Observed in CI: ten FAILED (embedding) lines, then "Dry-run complete —
+    10 entr(ies) would be inserted" and a green step."""
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_2027))
+    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(side_effect=RuntimeError("no embedding route")))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+
+    with pytest.raises(SystemExit) as exc:
+        await main_async(_pdf_args())
+
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert "FAILED (embedding)" in out
+    assert "0 entr(ies) would be inserted" in out and "failed" in out
+
+
+@pytest.mark.asyncio
+async def test_live_run_with_failed_inserts_exits_nonzero(monkeypatch, capsys):
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_2027))
+    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(side_effect=RuntimeError("no embedding route")))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+    with pytest.raises(SystemExit):
+        await main_async(_pdf_args(dry_run=False))
+    assert "0 inserted" in capsys.readouterr().out
+
+
+def test_every_budget_2027_source_is_pinned_to_mof_and_checks_its_identity():
+    for source in BUDGET_2027_SOURCES:
+        assert source.require_host_suffix == "mof.gov.my", source.name
+        assert source.identity_terms == ("2027",), source.name
+        assert source.url.startswith(f"https://belanjawan.{source.require_host_suffix}/"), source.name
+
+
+def test_cli_hands_the_registry_guards_to_main_async(monkeypatch):
+    source = dataclasses.replace(get_source("belanjawan-2027-speech-en"), available_from=None)
+    captured = {}
+    monkeypatch.setattr("scripts.ingest_feed.get_source", lambda name: source)
+    monkeypatch.setattr("scripts.ingest_feed.asyncio.run", lambda coro: (captured.setdefault("coro", coro), coro.close()))
+    monkeypatch.setattr(
+        "scripts.ingest_feed.main_async",
+        lambda args: captured.setdefault("args", args) and _noop(),
+    )
+    monkeypatch.setattr(sys, "argv", ["ingest_feed", "--source", "belanjawan-2027-speech-en", "--dry-run"])
+    ingest_main()
+    args = captured["args"]
+    assert args.require_host_suffix == "mof.gov.my"
+    assert args.identity_terms == ("2027",)
+
+
+async def _noop():
+    return None

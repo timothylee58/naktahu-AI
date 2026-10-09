@@ -69,6 +69,17 @@ class Source:
     # Budget speech that span finance, tax, welfare, education, etc.
     # `domain` stays the fallback for chunks no rule matches.
     route_domains: bool = False
+    # Provenance guards, enforced by ingest_feed for sources that opt in. The
+    # registry's url/ministry are what get stamped on every chunk, so without
+    # these a redirect or a stale file at the same path would still be filed
+    # as the official document.
+    # Every host the fetch passes through (redirects included) must be this
+    # domain or a subdomain of it, else the run aborts.
+    require_host_suffix: Optional[str] = None
+    # Each term must appear in the PDF's own text within its first pages (the
+    # title and fallback name are NOT searched: the source name itself says
+    # "2027"). Empty = no check.
+    identity_terms: tuple[str, ...] = ()
 
     def is_available(self, today: Optional[date] = None) -> bool:
         return self.available_from is None or (today or date.today()) >= self.available_from
@@ -984,6 +995,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         kind="pdf", domain="finance", ministry=_MOF, language="bm",
         notes="Ucapan Belanjawan 2027 — the original-language Budget speech.",
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2027",),
     ),
     Source(
         name="belanjawan-2027-speech-en",
@@ -991,6 +1003,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         kind="pdf", domain="finance", ministry=_MOF, language="en",
         notes="Budget 2027 speech — MOF's English translation of ub27.pdf.",
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2027",),
     ),
     Source(
         name="belanjawan-2027-fiscal-outlook-en",
@@ -998,6 +1011,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         kind="pdf", domain="finance", ministry=_MOF, language="en",
         notes="Fiscal Outlook 2027 — revenue, expenditure, Medium-Term Fiscal Framework.",
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2027",),
     ),
     Source(
         name="belanjawan-2027-tinjauan-fiskal-bm",
@@ -1005,6 +1019,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         kind="pdf", domain="finance", ministry=_MOF, language="bm",
         notes="Tinjauan Fiskal 2027 — BM edition of the Fiscal Outlook.",
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2027",),
     ),
     Source(
         name="belanjawan-2027-economic-outlook-en",
@@ -1012,6 +1027,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         kind="pdf", domain="finance", ministry=_MOF, language="en",
         notes="Economic Outlook 2027 — macro context behind the Budget's figures.",
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=False,
+        require_host_suffix="mof.gov.my", identity_terms=("2027",),
     ),
 )
 

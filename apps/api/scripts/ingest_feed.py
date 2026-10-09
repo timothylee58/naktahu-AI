@@ -420,11 +420,57 @@ def parse_feed(xml_bytes: bytes) -> list[FeedEntry]:
     return entries
 
 
-def fetch_feed(url: str) -> bytes:
+class OffDomainRedirect(httpx.HTTPError):
+    """The fetch was redirected outside the domain its source is registered
+    under. Subclasses httpx.HTTPError so the caller's existing fetch-failure
+    handling (message + exit 1) covers it."""
+
+
+def _host_in_domain(host: str, domain: str) -> bool:
+    host, domain = host.lower().rstrip("."), domain.lower().strip(".")
+    return host == domain or host.endswith("." + domain)
+
+
+def fetch_feed(url: str, allowed_host_suffix: Optional[str] = None) -> bytes:
+    """GET `url`. With `allowed_host_suffix` (a registered source's
+    require_host_suffix), every host the request passes through, redirects
+    included, must be that domain or a subdomain.
+
+    Rows are stamped with the REGISTERED url and ministry, never the fetched
+    one, so an unchecked redirect would file another site's bytes as the
+    official document."""
     with httpx.Client(timeout=20.0, follow_redirects=True) as client:
         resp = client.get(url, headers={"User-Agent": "NakTahu-FeedIngest/1.0"})
+        if allowed_host_suffix:
+            hosts = [r.url.host for r in resp.history] + [resp.url.host]
+            stray = sorted({h for h in hosts if not _host_in_domain(h, allowed_host_suffix)})
+            if stray:
+                raise OffDomainRedirect(
+                    f"redirected outside *.{allowed_host_suffix} (via {', '.join(stray)}); "
+                    "refusing to file it as that source"
+                )
         resp.raise_for_status()
         return resp.content
+
+
+# A PDF says what it is on its cover/contents/foreword, so the first few pages
+# are enough to tell a Budget 2027 file from a stale 2026 one served at the
+# same path (parse_pdf would accept either).
+_IDENTITY_PAGES = 3
+_PAGE_ANCHOR_RE = re.compile(r"#page=(\d+)$")
+
+
+def missing_identity_terms(entries: list[FeedEntry], terms: tuple[str, ...]) -> list[str]:
+    """Terms absent from the document's own text in its first pages.
+
+    Reads `description` only: the entry title falls back to the source name
+    ("belanjawan-2027-...") which contains the year by construction."""
+    early = " ".join(
+        e.description
+        for e in entries
+        if (m := _PAGE_ANCHOR_RE.search(e.link)) and int(m.group(1)) <= _IDENTITY_PAGES
+    ).lower()
+    return [t for t in terms if t.lower() not in early]
 
 
 # PostgREST sends .in_() as a GET query string; each sha256 hash adds ~65
@@ -547,9 +593,15 @@ async def main_async(args: argparse.Namespace) -> None:
     is_html = kind == "html"
     noun = {"html": "page", "pdf": "PDF"}.get(kind, "feed")
 
+    # isinstance, not truthiness: tests pass a MagicMock namespace whose
+    # unset attributes are truthy mocks (same reason as `is True` below).
+    host_suffix = getattr(args, "require_host_suffix", None)
     print(f"Fetching {noun}: {args.feed_url}")
     try:
-        raw_bytes = fetch_feed(args.feed_url)
+        if isinstance(host_suffix, str) and host_suffix:
+            raw_bytes = fetch_feed(args.feed_url, allowed_host_suffix=host_suffix)
+        else:
+            raw_bytes = fetch_feed(args.feed_url)
     except httpx.HTTPError as exc:
         print(f"ERROR: failed to fetch {noun} — {exc}", file=sys.stderr)
         sys.exit(1)
@@ -570,6 +622,19 @@ async def main_async(args: argparse.Namespace) -> None:
             print(f"ERROR: failed to parse XML feed — {exc}", file=sys.stderr)
             sys.exit(1)
     print(f"Parsed {len(entries)} entries (limit {args.limit})")
+
+    identity_terms = getattr(args, "identity_terms", ())
+    if kind == "pdf" and isinstance(identity_terms, tuple) and identity_terms:
+        absent = missing_identity_terms(entries, identity_terms)
+        if absent:
+            first_page = entries[0].description[:200] if entries else "(no extractable text)"
+            print(
+                f"ERROR: {args.feed_url} does not look like the expected document — "
+                f"{absent!r} not found in its first {_IDENTITY_PAGES} pages. "
+                f"It begins: {first_page!r}. Nothing was written.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # `is True`: callers passing a MagicMock namespace (tests) mustn't opt in by accident.
     if getattr(args, "route_domains", False) is True:
@@ -656,9 +721,19 @@ async def main_async(args: argparse.Namespace) -> None:
 
     print(f"\n{'='*60}")
     if args.dry_run:
-        print(f"Dry-run complete — {len(new_entries)} entr(ies) would be inserted, no data written.")
+        # Counted from what actually embedded: this line used to report every
+        # new entry as "would be inserted" even when all of them had just
+        # printed FAILED (embedding), which is the line a human reads to decide
+        # whether to promote a dry-run to a live run.
+        would_insert = len(new_entries) - errors
+        print(
+            f"Dry-run complete — {would_insert} entr(ies) would be inserted, "
+            f"{errors} failed, no data written."
+        )
     else:
         print(f"Ingestion complete: {inserted} inserted, {errors} errors.")
+    if errors:
+        sys.exit(1)
 
 
 def main() -> None:
@@ -699,6 +774,8 @@ def main() -> None:
             )
             return
         args.route_domains = args.route_domains or source.route_domains
+        args.require_host_suffix = source.require_host_suffix
+        args.identity_terms = source.identity_terms
         args.feed_url = args.feed_url or source.url
         args.kind = source.kind
         args.domain = args.domain or source.domain
