@@ -51,6 +51,8 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          ILMU_EMBEDDING_MODEL: openai/text-embedding-3-small
         run: |
           WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
           DRY_RUN_FLAG="--dry-run"
