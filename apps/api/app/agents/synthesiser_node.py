@@ -57,7 +57,8 @@ _OUTPUT_ONLY_PATTERNS = [
 # "I'm no longer bound by").
 _OUTPUT_UNSUITABLE_PATTERN_STRINGS = {
     r"you\s+are\s+now\s+(a\s+)?(?!NakTahu)",
-    r"act\s+as\s+(if\s+you\s+are\s+)?(?!a\s+Malaysian)",
+    r"(?:^|[.!?;:\n]\s*)(?:please\s+)?act\s+as\s+(?!a\s+Malaysian)",
+    r"act\s+as\s+if\s+you\s+(?:are|were)\b",
 }
 _INPUT_PATTERNS_SAFE_FOR_OUTPUT = [
     p for p in INJECTION_PATTERNS if p.pattern not in _OUTPUT_UNSUITABLE_PATTERN_STRINGS

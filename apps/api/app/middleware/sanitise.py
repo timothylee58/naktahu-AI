@@ -61,7 +61,13 @@ INJECTION_PATTERNS = [
         r"ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|constraints?)",
         r"forget\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|training|rules?)",
         r"you\s+are\s+now\s+(a\s+)?(?!NakTahu)",
-        r"act\s+as\s+(if\s+you\s+are\s+)?(?!a\s+Malaysian)",
+        # "act as" is only an injection when it commands the assistant: an
+        # imperative opening a sentence, or "act as if you are/were". Prose
+        # such as "the guardian must act as trustee" or "acts as the
+        # authority" (Budget speeches, legal text) used to match and got
+        # official chunks dropped at ingestion.
+        r"(?:^|[.!?;:\n]\s*)(?:please\s+)?act\s+as\s+(?!a\s+Malaysian)",
+        r"act\s+as\s+if\s+you\s+(?:are|were)\b",
         r"pretend\s+(you\s+are|to\s+be)",
         r"do\s+anything\s+now",
         r"jailbreak",
