@@ -92,6 +92,41 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("TAVILY_API_KEY", "tavily_api_key"),
     )
+    # Nemotron (NVIDIA) via an OpenAI-compatible endpoint (Nebius Token Factory),
+    # used ONLY by the Eligibility Agent and ONLY when the flag is on. It is tried
+    # first; any failure falls through to the existing ILMU -> Anthropic path, and
+    # every other agent is untouched. Model IDs are deliberately NOT defaulted:
+    # they differ between sources and change, so set them from the live catalog
+    # (scripts/nemotron_check.py lists it and test-calls each configured ID).
+    eligibility_use_nemotron: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ELIGIBILITY_USE_NEMOTRON", "eligibility_use_nemotron"),
+    )
+    nemotron_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEMOTRON_API_KEY", "NEBIUS_API_KEY", "nemotron_api_key"),
+    )
+    nemotron_base_url: str = Field(
+        default="https://api.tokenfactory.nebius.com/v1",
+        validation_alias=AliasChoices("NEMOTRON_BASE_URL", "nemotron_base_url"),
+    )
+    # Small, fast model: profile-field extraction at intake.
+    nemotron_fast_model: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEMOTRON_FAST_MODEL", "nemotron_fast_model"),
+    )
+    # Larger model: the streamed eligibility summary.
+    nemotron_reasoning_model: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEMOTRON_REASONING_MODEL", "nemotron_reasoning_model"),
+    )
+    # Optional JSON object passed as the request's extra_body, e.g. a chat-template
+    # switch that turns thinking off. Left empty because the right key depends on
+    # the model family; read the provider's docs for the model you chose.
+    nemotron_extra_body: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEMOTRON_EXTRA_BODY", "nemotron_extra_body"),
+    )
     resend_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("RESEND_API_KEY", "resend_api_key"),

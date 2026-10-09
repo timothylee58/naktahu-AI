@@ -277,3 +277,152 @@ def test_calibrate_cli_prints_the_verdict_and_can_fail_the_build(tmp_path, capsy
     assert "VERDICT: insufficient_data" in capsys.readouterr().out
     assert json.loads(report.read_text(encoding="utf-8"))["verdict"] == "insufficient_data"
     assert main(["calibrate", "--cases", str(SEED), "--judge", "lexical", "--fail-unless-trustworthy"]) == 1
+
+
+# ── real vs synthetic: only human-labelled rows can certify a judge ──────────
+
+from scripts.evals.faithfulness import build_synthetic_set  # noqa: E402
+from scripts.evals.faithfulness.validate import validate_cases  # noqa: E402
+
+SYNTHETIC = Path(__file__).parent / "data" / "calibration_synthetic.jsonl"
+
+
+def _oracle(rows: list[dict]) -> list[float]:
+    return [0.95 if r["label"] else 0.05 for r in rows]
+
+
+def test_120_perfectly_judged_synthetic_rows_still_cannot_certify_a_judge():
+    rows = load_jsonl(SYNTHETIC)
+    rep = metrics.calibration_report(rows, _oracle(rows), judge="oracle")
+    assert rep["verdict"] == "insufficient_data" and rep["n_real"] == 0
+    assert rep["synthetic"]["floor"] == "pass"          # but it does clear the floor
+
+
+def test_a_judge_that_fails_the_synthetic_floor_is_reported_as_such():
+    rows = load_jsonl(SYNTHETIC)
+    rep = metrics.calibration_report(rows, [0.5] * len(rows), judge="coin")
+    assert rep["synthetic"]["floor"] == "fail" and rep["synthetic"]["floor_reasons"]
+
+
+def test_the_floor_is_not_run_on_a_handful_of_synthetic_rows():
+    rows = load_jsonl(SEED)
+    assert metrics.calibration_report(rows, _oracle(rows))["synthetic"]["floor"] == "not_run"
+
+
+def test_real_rows_decide_the_verdict_while_synthetic_rows_are_ignored_by_it():
+    real = [{"language": lang, "label": i % 2, "labeller": "x"} for lang in metrics.LANGUAGES for i in range(40)]
+    synth = [{**r, "synthetic": True} for r in load_jsonl(SYNTHETIC)]
+    rows = real + synth
+    scores = _oracle(real) + [0.5] * len(synth)         # great on real, useless on synthetic
+    rep = metrics.calibration_report(rows, scores, judge="x")
+    assert rep["verdict"] == "trustworthy" and rep["n_real"] == 120
+    assert rep["synthetic"]["floor"] == "fail"           # reported separately, not mixed in
+
+
+def test_the_lexical_baseline_fails_the_synthetic_floor_so_the_set_does_discriminate():
+    rows = load_jsonl(SYNTHETIC)
+    rep = run_calibration(rows, LexicalOverlapJudge())
+    assert rep["synthetic"]["floor"] == "fail" and rep["synthetic"]["auroc"] < 0.6
+
+
+def test_synthetic_file_is_the_generators_output_balanced_and_trilingual():
+    rows = load_jsonl(SYNTHETIC)
+    assert rows == build_synthetic_set.build(), "run: python -m scripts.evals.faithfulness.build_synthetic_set"
+    assert len({r["id"] for r in rows}) == len(rows) == 120
+    assert all(r["synthetic"] is True for r in rows)
+    for lang in metrics.LANGUAGES:
+        labels = [r["label"] for r in rows if r["language"] == lang]
+        assert len(labels) == 40 and sum(labels) == 20
+    assert not validate_cases(rows)[0]                  # synthetic rows pass the validator too
+
+
+def test_every_perturbed_claim_changes_a_fact_that_the_context_states():
+    rows = load_jsonl(SYNTHETIC)
+    for r in (r for r in rows if r["label"] == 0 and True):
+        assert r["claim"] not in r["context"]
+    # the x10 amount in each 'n1' claim never appears in its own context
+    for r in (r for r in rows if r["id"].endswith("-n1")):
+        figure = next(tok for tok in r["claim"].replace("，", " ").split() if tok.startswith("RM") or tok.endswith("万令吉") or tok.isdigit())
+        assert figure not in r["context"]
+
+
+# ── validating a human-labelled set ──────────────────────────────────────────
+
+def _real(lang: str, i: int, label: int, **over) -> dict:
+    row = {"id": f"{lang}-{i}", "language": lang, "context": f"ctx {lang} {i}", "claim": f"claim {i}",
+           "label": label, "labeller": "tester"}
+    row.update(over)
+    return row
+
+
+def test_validate_accepts_a_wellformed_real_set_and_reports_progress():
+    rows = [_real("bm", i, i % 2) for i in range(12)]
+    problems, progress = validate_cases(rows)
+    assert problems == [] and progress == {"bm": "12/30", "en": "0/30", "zh": "0/30"}
+
+
+@pytest.mark.parametrize(
+    "bad,needle",
+    [
+        ({"language": "fr"}, "language must be one of"),
+        ({"label": 2}, "label must be the integer 0 or 1"),
+        ({"label": True}, "label must be the integer 0 or 1"),    # JSON booleans are not labels
+        ({"label": 1.0}, "label must be the integer 0 or 1"),
+        ({"synthetic": "false"}, "synthetic must be true or false"),
+        ({"claim": "x" * 3_000}, "claim longer than"),
+        ({"claim": "  "}, "claim must be non-empty"),
+        ({"labeller": ""}, "need a 'labeller'"),
+        ({"context": "x" * 30_000}, "longer than"),
+    ],
+)
+def test_validate_flags_each_kind_of_bad_row(bad, needle):
+    row = _real("bm", 0, 1)
+    row.update(bad)  # `bad` overrides exactly one field
+    rows = [row]
+    assert any(needle in p for p in validate_cases(rows)[0])
+
+
+def test_validate_reports_a_non_object_row_instead_of_crashing():
+    problems, _ = validate_cases([["not", "an", "object"], 5, _real("bm", 0, 1)])
+    assert sum("must be a JSON object" in p for p in problems) == 2
+
+
+def test_validate_cli_reports_unreadable_input_without_a_traceback(tmp_path, capsys):
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text("{not json\n", encoding="utf-8")
+    assert main(["validate", "--cases", str(bad)]) == 2
+    assert main(["validate", "--cases", str(tmp_path / "missing.jsonl")]) == 2
+    assert "cannot read" in capsys.readouterr().err
+
+
+def test_validate_flags_duplicate_ids_duplicate_pairs_and_lopsided_labels():
+    dup = [_real("bm", 0, 1), _real("bm", 0, 0, context="other")]
+    assert any("duplicate id" in p for p in validate_cases(dup)[0])
+    same = [_real("bm", 0, 1), {**_real("bm", 1, 1), "context": "ctx bm 0", "claim": "claim 0"}]
+    assert any("appears twice" in p for p in validate_cases(same)[0])
+    skewed = [_real("en", i, 1) for i in range(12)]
+    assert any("keep it between" in p for p in validate_cases(skewed)[0])
+
+
+def test_validate_cli_exit_codes(tmp_path, capsys):
+    ok = tmp_path / "ok.jsonl"
+    ok.write_text("\n".join(json.dumps(_real("bm", i, i % 2)) for i in range(12)), encoding="utf-8")
+    assert main(["validate", "--cases", str(ok)]) == 0
+    assert "not yet enough real rows" in capsys.readouterr().out
+    assert main(["validate", "--cases", str(ok), "--require-complete"]) == 1
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text(json.dumps(_real("bm", 0, 5)), encoding="utf-8")
+    assert main(["validate", "--cases", str(bad)]) == 1
+    assert "PROBLEM" in capsys.readouterr().out
+
+
+def test_calibrate_cli_accepts_several_case_files(tmp_path, capsys):
+    report = tmp_path / "r.json"
+    assert main(["calibrate", "--cases", str(SEED), str(SYNTHETIC), "--judge", "lexical", "--report", str(report)]) == 0
+    assert json.loads(report.read_text(encoding="utf-8"))["n"] == 138
+
+
+def test_single_class_real_set_reports_auroc_as_undefined_not_none():
+    rows = [{**_real(lang, i, 1)} for lang in metrics.LANGUAGES for i in range(metrics.MIN_PER_LANGUAGE)]
+    rep = metrics.calibration_report(rows, [0.9] * len(rows), baseline_scores=[0.5] * len(rows), judge="t")
+    assert any("undefined" in r for r in rep["reasons"]) and not any("None" in r for r in rep["reasons"])

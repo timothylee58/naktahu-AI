@@ -12,6 +12,7 @@ from typing import Any
 
 import structlog
 
+from app.agents.eligibility_agent import llm_split
 from app.agents.eligibility_agent.state import BusinessProfile, EligibilityState
 from app.agents.tools import llm_complete
 
@@ -68,20 +69,18 @@ is_pre_revenue (boolean).
 """
 
 
+_PROFILE_KEYS = (
+    "business_type", "registered_months", "sector", "sub_sector", "annual_revenue_myr",
+    "is_bumiputera", "employee_count", "has_md_status", "existing_grants", "is_pre_revenue",
+)
+
+
 def _missing_required(profile: dict[str, Any]) -> list[str]:
     return [f for f in _REQUIRED_FIELDS if profile.get(f) is None]
 
 
-async def _extract_profile_fields(text: str, language: str) -> dict[str, Any]:
-    """Best-effort LLM extraction of business-profile fields from free text."""
-    raw = await llm_complete(
-        _EXTRACTION_SYSTEM_PROMPT,
-        text,
-        language=language,
-        max_tokens=300,
-    )
-    if not raw:
-        return {}
+def _parse_fields(raw: str) -> dict[str, Any]:
+    """The first JSON object in an LLM reply, or {} if there is none we can use."""
     try:
         start = raw.find("{")
         end = raw.rfind("}") + 1
@@ -91,6 +90,25 @@ async def _extract_profile_fields(text: str, language: str) -> dict[str, Any]:
     except (json.JSONDecodeError, ValueError):
         pass
     return {}
+
+
+async def _extract_profile_fields(text: str, language: str) -> dict[str, Any]:
+    """Best-effort LLM extraction of business-profile fields from free text."""
+    # Nemotron fast model first when enabled. It returns "" on any failure, and a
+    # reply that yields no usable fields (chatter, malformed JSON, not an object,
+    # or an empty object) is treated the same way: fall through to the existing
+    # ILMU path rather than drop the turn. With the flag off this is exactly the
+    # old behaviour.
+    fields = _parse_fields(await llm_split.fast_complete(_EXTRACTION_SYSTEM_PROMPT, text, max_tokens=300))
+    if any(fields.get(k) is not None for k in _PROFILE_KEYS):
+        return fields
+    raw = await llm_complete(
+        _EXTRACTION_SYSTEM_PROMPT,
+        text,
+        language=language,
+        max_tokens=300,
+    )
+    return _parse_fields(raw) if raw else {}
 
 
 async def intake_node(state: EligibilityState) -> dict[str, Any]:
