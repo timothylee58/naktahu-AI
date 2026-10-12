@@ -55,6 +55,10 @@ ILMU_CHAT_MODEL: str = os.environ.get("ILMU_CHAT_MODEL", "ilmu-chat")
 # column. So _embed refuses the ILMU route unless ILMU_EMBEDDING_MODEL names the
 # same model as OPENAI_EMBEDDING_MODEL (see embedding_routes_share_a_model).
 #
+# Set ILMU_EMBEDDING_MODEL to an empty string to switch the ILMU route off (e.g.
+# when the gateway 404s on the corpus model): OpenAI direct is used with no
+# failed round-trip and no error log.
+#
 # Switching to a genuinely different model (e.g. ILMU-hosted bge-m3 or Gemini)
 # is a corpus migration — re-embed every row — never a runtime fallback.
 OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")

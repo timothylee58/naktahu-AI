@@ -52,7 +52,8 @@ jobs:
           ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ILMU_BASE_URL: https://api.ilmu.ai/v1
-          ILMU_EMBEDDING_MODEL: openai/text-embedding-3-small
+          # Empty = ILMU route off: the gateway 404s on the corpus model, so OpenAI direct is used.
+          ILMU_EMBEDDING_MODEL: ""
         run: |
           WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
           DRY_RUN_FLAG="--dry-run"
