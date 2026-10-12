@@ -19,6 +19,7 @@ import structlog
 
 from app.agents.eligibility_agent.state import EligibilityState
 from app.services.cache import get_cached_result, set_cached_result
+from app.services.embedding_profiles import active_profile
 
 log = structlog.get_logger(__name__)
 
@@ -78,6 +79,11 @@ async def grant_rag_node(state: EligibilityState, supabase: Any) -> dict[str, An
 
     chunks: list[dict[str, Any]] = []
     try:
+        if active_profile().name != "openai":
+            # match_document_chunks reads document_chunks.embedding only (not
+            # defined in repo migrations). A query vector from another profile
+            # must never be compared against it, so skip rather than search.
+            raise RuntimeError(f"match_document_chunks has no {active_profile().name} variant")
         embedding = await _embed_query(query)
         rpc_res = await supabase.rpc(
             "match_document_chunks",

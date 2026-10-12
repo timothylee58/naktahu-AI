@@ -146,8 +146,8 @@ def test_feed_entry_content_combines_title_and_description():
 @pytest.mark.asyncio
 async def test_main_async_dry_run_skips_poisoned_entry_and_embeds_clean_one(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_RSS_SAMPLE))
-    fake_embed = AsyncMock(return_value=[0.0] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.0] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
 
     args = MagicMock(
@@ -174,8 +174,8 @@ async def test_main_async_dry_run_skips_reembedding_already_ingested_entry(monke
     dry-run was re-embedding every entry from every source, forever,
     regardless of whether anything had changed since the last run)."""
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_RSS_SAMPLE))
-    fake_embed = AsyncMock(return_value=[0.0] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.0] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
 
     # Derived from the real parsed entry (via the actual parse_feed +
     # FeedEntry.content the code under test uses) rather than hand-typed —
@@ -210,8 +210,8 @@ async def test_main_async_dry_run_skips_reembedding_already_ingested_entry(monke
 @pytest.mark.asyncio
 async def test_main_async_real_run_inserts_only_new_entries(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_RSS_SAMPLE))
-    fake_embed = AsyncMock(return_value=[0.1] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.1] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
 
     table_mock = MagicMock()
     table_mock.select.return_value.in_.return_value.execute.return_value = MagicMock(data=[])
@@ -244,8 +244,8 @@ async def test_main_async_skips_already_ingested_entries(monkeypatch, capsys):
     import hashlib
 
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_RSS_SAMPLE))
-    fake_embed = AsyncMock(return_value=[0.1] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.1] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
 
     clean_content = "Dewan Rakyat sitting - 3 July 2026\n\nThe Dewan Rakyat debated the Finance Bill 2026."
     existing_hash = hashlib.sha256(clean_content.encode()).hexdigest()
@@ -340,8 +340,8 @@ def test_parse_html_page_produces_chunks_with_title_and_url():
 @pytest.mark.asyncio
 async def test_main_async_html_dry_run_embeds_chunks(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_HTML_SAMPLE))
-    fake_embed = AsyncMock(return_value=[0.0] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.0] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
 
     args = MagicMock(
@@ -365,8 +365,8 @@ async def test_main_async_html_dry_run_embeds_chunks(monkeypatch, capsys):
 @pytest.mark.asyncio
 async def test_main_async_html_skips_injection_page(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_HTML_INJECTION))
-    fake_embed = AsyncMock(return_value=[0.0] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.0] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
     # create_client is now called unconditionally at the top of main_async
     # (see the fix), before this test's early-return path (all entries
     # filtered by the injection scan) is ever reached — needs the mock too,
@@ -396,8 +396,8 @@ async def test_main_async_html_dedups_on_content_hash(monkeypatch, capsys):
     import hashlib
 
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_HTML_SAMPLE))
-    fake_embed = AsyncMock(return_value=[0.1] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", fake_embed)
+    fake_embed = AsyncMock(return_value={"embedding": [0.1] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", fake_embed)
 
     existing = {
         hashlib.sha256(e.content.encode()).hexdigest()
@@ -565,7 +565,7 @@ def _make_text(*parts: str) -> str:
 @pytest.mark.asyncio
 async def test_main_async_pdf_routes_domains_and_scans_every_chunk(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_BUDGET_PDF))
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(return_value={"embedding": [0.0] * 1536}))
     sb = _mock_supabase()
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
 
@@ -589,7 +589,7 @@ async def test_main_async_pdf_routes_domains_and_scans_every_chunk(monkeypatch, 
 @pytest.mark.asyncio
 async def test_main_async_pdf_without_routing_uses_run_domain(monkeypatch):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_BUDGET_PDF))
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(return_value={"embedding": [0.0] * 1536}))
     sb = _mock_supabase()
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
 
@@ -731,7 +731,7 @@ def test_date_fields_empty_for_undated_entry():
 async def test_main_async_writes_dates_on_row(monkeypatch):
     sb = _mock_supabase()
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_DATED_RSS))
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(return_value={"embedding": [0.0] * 1536}))
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
 
     args = MagicMock(feed_url="https://www.hasil.gov.my/rss", domain="finance", ministry="LHDN",
@@ -779,7 +779,7 @@ def test_queue_supersede_candidates_queues_older_similar_chunks():
         {"id": "far-1", "similarity": 0.40, "effective_date": "2025-01-01"},  # not similar
         {"id": "newer", "similarity": 0.95, "effective_date": "2027-06-01"},  # newer than the new one
     ])
-    queued = queue_supersede_candidates(sb, "new-1", "Lifestyle relief", [0.0] * 1536, "tax", "2027-01-01")
+    queued = queue_supersede_candidates(sb, "new-1", "Lifestyle relief", {"embedding": [0.0] * 1536}, "tax", "2027-01-01")
 
     assert queued == 2
     rows = sb.table.return_value.upsert.call_args.args[0]
@@ -794,7 +794,7 @@ def test_queue_supersede_candidates_queues_older_similar_chunks():
 )
 def test_queue_supersede_candidates_skips_non_strict_or_undated(domain, effective_date):
     sb = _neighbours_supabase([{"id": "old-1", "similarity": 0.99, "effective_date": None}])
-    assert queue_supersede_candidates(sb, "new-1", "t", [0.0], domain, effective_date) == 0
+    assert queue_supersede_candidates(sb, "new-1", "t", {"embedding": [0.0]}, domain, effective_date) == 0
     sb.rpc.assert_not_called()
 
 
@@ -981,8 +981,8 @@ def _pdf_args(**overrides):
 @pytest.mark.asyncio
 async def test_main_async_aborts_when_the_pdf_is_not_the_2027_document(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_STALE_2026))
-    embed = AsyncMock(return_value=[0.0] * 1536)
-    monkeypatch.setattr("scripts.ingest_feed._embed", embed)
+    embed = AsyncMock(return_value={"embedding": [0.0] * 1536})
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", embed)
     sb = _mock_supabase()
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: sb)
 
@@ -1011,7 +1011,7 @@ async def test_main_async_aborts_on_a_pdf_with_no_extractable_text(monkeypatch, 
 @pytest.mark.asyncio
 async def test_main_async_proceeds_when_the_pdf_is_the_2027_document(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_2027))
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(return_value={"embedding": [0.0] * 1536}))
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
     await main_async(_pdf_args())
     assert "would be inserted" in capsys.readouterr().out
@@ -1021,7 +1021,7 @@ async def test_main_async_proceeds_when_the_pdf_is_the_2027_document(monkeypatch
 async def test_main_async_passes_the_host_guard_to_fetch_feed(monkeypatch):
     fetch = MagicMock(return_value=_PDF_2027)
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", fetch)
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(return_value=[0.0] * 1536))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(return_value={"embedding": [0.0] * 1536}))
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
     await main_async(_pdf_args())
     fetch.assert_called_once_with(_MOF_URL, allowed_host_suffix="mof.gov.my")
@@ -1046,7 +1046,7 @@ async def test_dry_run_summary_counts_embedding_failures_and_exits_nonzero(monke
     """Observed in CI: ten FAILED (embedding) lines, then "Dry-run complete —
     10 entr(ies) would be inserted" and a green step."""
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_2027))
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(side_effect=RuntimeError("no embedding route")))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(side_effect=RuntimeError("no embedding route")))
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
 
     with pytest.raises(SystemExit) as exc:
@@ -1061,7 +1061,7 @@ async def test_dry_run_summary_counts_embedding_failures_and_exits_nonzero(monke
 @pytest.mark.asyncio
 async def test_live_run_with_failed_inserts_exits_nonzero(monkeypatch, capsys):
     monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_PDF_2027))
-    monkeypatch.setattr("scripts.ingest_feed._embed", AsyncMock(side_effect=RuntimeError("no embedding route")))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(side_effect=RuntimeError("no embedding route")))
     monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
     with pytest.raises(SystemExit):
         await main_async(_pdf_args(dry_run=False))

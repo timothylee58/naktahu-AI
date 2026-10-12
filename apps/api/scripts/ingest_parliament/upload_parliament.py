@@ -50,7 +50,7 @@ _API_ROOT = Path(__file__).resolve().parents[2]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from app.agents.rag_node import _embed  # noqa: E402 — the corpus embedding (ILMU gateway first, OpenAI fallback, one model)
+from app.agents.rag_node import embed_for_storage  # noqa: E402 — one vector per write profile (see embedding_profiles.py)
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from core.config import settings  # noqa: E402
 
@@ -64,7 +64,7 @@ LOOKUP_FILE = PROCESSED_DIR / "mp_name_lookup.json"
 CHUNK_SIZE = 512     # words (approximate token proxy — matches the pasted script's intent)
 CHUNK_OVERLAP = 64
 BATCH_SIZE = 50       # Supabase insert batch size
-EMBED_CONCURRENCY = 8  # concurrent _embed() calls (it takes one string at a time)
+EMBED_CONCURRENCY = 8  # concurrent embed_for_storage() calls (it takes one string at a time)
 
 
 def _chunk_text(text: str, max_words: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
@@ -93,15 +93,15 @@ def _scan_for_injection(content: str) -> Optional[str]:
     return None
 
 
-async def _embed_many(texts: list[str]) -> list[list[float]]:
-    """Embed a list of texts via the shared _embed(), bounded by a semaphore
-    since _embed() takes one string per call (no batch variant in this
-    codebase currently)."""
+async def _embed_many(texts: list[str]) -> list[dict[str, list[float]]]:
+    """Embed a list of texts via the shared embed_for_storage(), bounded by a
+    semaphore since it takes one string per call (no batch variant in this
+    codebase currently). Each result maps column name -> vector."""
     sem = asyncio.Semaphore(EMBED_CONCURRENCY)
 
-    async def _one(text: str) -> list[float]:
+    async def _one(text: str) -> dict[str, list[float]]:
         async with sem:
-            return await _embed(text)
+            return await embed_for_storage(text)
 
     return await asyncio.gather(*(_one(t) for t in texts))
 
@@ -218,7 +218,7 @@ async def upload_statements(
         embeddings = await _embed_many([t for t, _, _ in to_embed])
 
         chunk_inserts = []
-        for (text, meta, content_hash), embedding in zip(to_embed, embeddings):
+        for (text, meta, content_hash), vectors in zip(to_embed, embeddings):
             chunk_inserts.append({
                 "content": text,
                 "content_hash": content_hash,
@@ -227,7 +227,7 @@ async def upload_statements(
                 "source_title": f"Hansard DR {meta['sitting_date']} — {meta['mp_name']}",
                 "source_url": meta["source_url"],
                 "ministry": "Parlimen Malaysia",
-                "embedding": embedding,
+                **vectors,
                 "effective_date": meta["sitting_date"],
                 "expiry_aware": False,
             })

@@ -73,13 +73,15 @@ if str(_API_ROOT) not in sys.path:
 
 # Reuses the query path's embedder on purpose: rows written here are searched
 # by rag_node, so both sides must use the same model or the stored vectors and
-# the query vector end up in different spaces. _embed only ever routes between
-# two providers of the SAME model (ILMU gateway, then OpenAI direct) and raises
-# if neither works — a failed embed skips the row, never writes an incompatible
-# vector into document_chunks. See llm_client.py's embeddings section.
+# the query vector end up in different spaces. embed_for_storage() returns one
+# vector per EMBEDDING_WRITE_PROFILES profile, keyed by its column, and raises
+# if any profile cannot embed — a failed embed skips the row, never writes a
+# half-filled or incompatible vector into document_chunks. See
+# app/services/embedding_profiles.py and llm_client.py's embeddings section.
 from app.agents.freshness import STRICT_DOMAINS  # noqa: E402
-from app.agents.rag_node import _embed  # noqa: E402
+from app.agents.rag_node import embed_for_storage  # noqa: E402
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
+from app.services.embedding_profiles import active_profile, write_profiles  # noqa: E402
 from core.config import settings  # noqa: E402
 from scripts.effective_dates import extract_validity_window, parse_published  # noqa: E402
 from scripts.sources import SOURCES_BY_NAME, get_source  # noqa: E402
@@ -538,8 +540,19 @@ def _insert_chunk(supabase, row: dict) -> Optional[str]:
     return data[0].get("id") if data else None
 
 
+def _supersede_search_inputs(vectors: dict[str, list[float]]) -> tuple[str, list[float]]:
+    """(RPC name, query vector) for the neighbour search: the active read
+    profile's own vector when this chunk has one, else any stored profile's —
+    a vector may only be searched with the RPC that reads its column."""
+    profiles = [active_profile(), *write_profiles()]
+    for profile in profiles:
+        if profile.column in vectors:
+            return profile.chunks_rpc, vectors[profile.column]
+    raise ValueError("no stored vector matches a known embedding profile")
+
+
 def queue_supersede_candidates(
-    supabase, new_id: str, title: str, embedding: list[float], domain: str, effective_date: Optional[str]
+    supabase, new_id: str, title: str, vectors: dict[str, list[float]], domain: str, effective_date: Optional[str]
 ) -> int:
     """Queue older, very similar chunks in the same domain for human review.
 
@@ -552,7 +565,8 @@ def queue_supersede_candidates(
     if domain not in STRICT_DOMAINS or not effective_date or not new_id:
         return 0
     try:
-        res = supabase.rpc("hybrid_search", {
+        rpc_name, embedding = _supersede_search_inputs(vectors)
+        res = supabase.rpc(rpc_name, {
             "query_text": title,
             "query_embedding": embedding,
             "domain_filter": domain,
@@ -671,7 +685,7 @@ async def main_async(args: argparse.Namespace) -> None:
 
     # Read-only, runs in both modes now (see the comment on `supabase` above)
     # — this is the actual fix: an entry already embedded in a prior run
-    # (dry or live) is skipped here, before the token-costing _embed() call
+    # (dry or live) is skipped here, before the token-costing embed_for_storage() call
     # below, instead of every entry being re-embedded on every scheduled
     # dry-run regardless of whether anything changed.
     already = _existing_hashes(supabase, [h for _, h in candidates])
@@ -683,7 +697,7 @@ async def main_async(args: argparse.Namespace) -> None:
     errors = 0
     for entry, content_hash in new_entries:
         try:
-            embedding = await _embed(entry.content)
+            vectors = await embed_for_storage(entry.content)
         except Exception as exc:
             print(f"  FAILED (embedding) — {entry.title[:60]!r}: {exc}")
             errors += 1
@@ -703,7 +717,7 @@ async def main_async(args: argparse.Namespace) -> None:
             "source_title": entry.title,
             "source_url": entry.link or args.feed_url,
             "ministry": args.ministry,
-            "embedding": embedding,
+            **vectors,
             **dates,
         }
         try:
@@ -711,7 +725,7 @@ async def main_async(args: argparse.Namespace) -> None:
             inserted += 1
             print(f"  OK — {entry.title[:60]!r}")
             queued = queue_supersede_candidates(
-                supabase, new_id, entry.title, embedding, row["domain"], dates.get("effective_date")
+                supabase, new_id, entry.title, vectors, row["domain"], dates.get("effective_date")
             )
             if queued:
                 print(f"    queued {queued} possible superseded chunk(s) for review (scripts/review_supersede.py)")

@@ -59,6 +59,7 @@ _REPO_ROOT = _API_ROOT.parent.parent  # apps/api -> apps -> repo root (where `in
 
 from app.middleware.sanitise import INJECTION_PATTERNS, _fold_confusables  # noqa: E402
 from app.services.madani_eligibility_extraction import extract_eligibility_rules  # noqa: E402
+from app.services.embedding_profiles import write_profiles  # noqa: E402
 from app.services.madani_scheme_ingest import build_scheme_embedding_text, embed_scheme  # noqa: E402
 from core.config import settings  # noqa: E402
 
@@ -152,7 +153,10 @@ async def _build_row(record: dict[str, Any]) -> dict[str, Any]:
         "language": "bm",
     }
     embedding_text = build_scheme_embedding_text(scheme)
-    scheme["embedding"] = await embed_scheme(scheme) if embedding_text else None
+    if embedding_text:
+        scheme.update(await embed_scheme(scheme))
+    else:
+        scheme.update({p.column: None for p in write_profiles()})
     return scheme
 
 
