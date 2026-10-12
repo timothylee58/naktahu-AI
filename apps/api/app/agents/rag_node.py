@@ -74,7 +74,8 @@ async def _embed(query: str) -> list[float]:
     Tries ILMU's route to the model, then OpenAI direct. Falling back is safe
     only because both routes serve the SAME model — see llm_client.py. If
     ILMU_EMBEDDING_MODEL names a different model, the ILMU route is skipped
-    entirely rather than mixing vector spaces.
+    entirely rather than mixing vector spaces. If it is empty, the route is
+    disabled quietly and OpenAI direct is used straight away.
 
     Raises when no route works. That's the safe path and is already handled:
     rag_node returns retrieved_chunks=[], analyst_node sets needs_clarification,
@@ -84,7 +85,11 @@ async def _embed(query: str) -> list[float]:
     is the single definition of the corpus embedding for reads AND writes.
     """
     errors: list[str] = []
-    if embedding_routes_share_a_model(ILMU_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL):
+    if not ILMU_EMBEDDING_MODEL.strip():
+        # Deliberately switched off (the gateway does not serve the corpus
+        # model, so every attempt was a wasted 404 round-trip): not an error.
+        errors.append("ilmu: route disabled (ILMU_EMBEDDING_MODEL is empty)")
+    elif embedding_routes_share_a_model(ILMU_EMBEDDING_MODEL, OPENAI_EMBEDDING_MODEL):
         try:
             resp = await ilmu_client.embeddings.create(input=query, model=ILMU_EMBEDDING_MODEL)
             return _checked(resp.data[0].embedding, "ILMU")

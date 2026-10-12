@@ -489,6 +489,38 @@ async def test_embed_skips_ilmu_route_when_it_names_a_different_model() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("empty", ["", "   "])
+async def test_embed_empty_ilmu_model_disables_the_route_quietly(empty: str) -> None:
+    """An empty ILMU_EMBEDDING_MODEL means "don't try ILMU": no request, no
+    error log, straight to OpenAI direct with the corpus model."""
+    from app.agents.rag_node import _embed
+
+    ilmu, oa = MagicMock(), MagicMock()
+    ilmu.embeddings.create = AsyncMock(side_effect=AssertionError("ILMU must not be called"))
+    oa.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
+    p1, p2 = _routes(ilmu, oa)
+    with p1, p2, patch("app.agents.rag_node.ILMU_EMBEDDING_MODEL", empty), \
+            patch("app.agents.rag_node.log") as log:
+        assert await _embed("cukai") == _FAKE_EMBEDDING
+    ilmu.embeddings.create.assert_not_called()
+    assert oa.embeddings.create.await_args.kwargs["model"] == "text-embedding-3-small"
+    log.error.assert_not_called()
+    log.warning.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_embed_empty_ilmu_model_without_openai_key_raises() -> None:
+    from app.agents.rag_node import _embed
+
+    ilmu = MagicMock()
+    ilmu.embeddings.create = AsyncMock()
+    p1, p2 = _routes(ilmu, None)
+    with p1, p2, patch("app.agents.rag_node.ILMU_EMBEDDING_MODEL", ""), \
+            pytest.raises(RuntimeError, match="route disabled"):
+        await _embed("cukai")
+
+
+@pytest.mark.asyncio
 async def test_embed_rejects_wrong_dimension_from_either_route() -> None:
     from app.agents.rag_node import _embed
 
