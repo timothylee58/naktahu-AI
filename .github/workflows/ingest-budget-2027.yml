@@ -63,10 +63,24 @@ jobs:
           NAMES=$(python -c "from scripts.sources import BUDGET_2027_SOURCES; print(' '.join(s.name for s in BUDGET_2027_SOURCES))")
 
           status=0
+          recap="| source | exit | result |\n|---|---|---|\n"
           for name in $NAMES; do
             echo "::group::Ingesting $name ($WRITE_MODE)"
             # A speech is ~60 pages — well past the default 50-chunk limit.
-            python -m scripts.ingest_feed --source "$name" --limit 1000 $DRY_RUN_FLAG || status=1
+            # Output is captured so the per-chunk ILMU-fallback warnings (two
+            # lines per chunk) don't bury the one line that says why a source
+            # failed; the recap below is what the job log ends with.
+            if python -m scripts.ingest_feed --source "$name" --limit 1000 $DRY_RUN_FLAG > "$RUNNER_TEMP/$name.log" 2>&1; then
+              code=0
+            else
+              code=$?
+              status=1
+            fi
+            grep -v 'embed_ilmu_failed_falling_back_to_openai' "$RUNNER_TEMP/$name.log" | tail -n 40 || true
             echo "::endgroup::"
+            ilmu_fallbacks=$(grep -c 'embed_ilmu_failed_falling_back_to_openai' "$RUNNER_TEMP/$name.log" || true)
+            result=$(grep -E 'ERROR|Dry-run complete|inserted' "$RUNNER_TEMP/$name.log" | tail -n 1 | tr '|' '/' || true)
+            recap="${recap}| $name | $code | ${result:-no result line} (ILMU embed fallbacks: ${ilmu_fallbacks:-0}) |\n"
           done
+          printf "%b" "$recap" | tee -a "$GITHUB_STEP_SUMMARY"
           exit $status
