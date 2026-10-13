@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@govtechmy/myds-react": "^1.0.2",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.49.0",
     "class-variance-authority": "^0.7.1",

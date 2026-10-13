@@ -11,6 +11,7 @@ import {
   useSpring,
   useTransform,
 } from 'framer-motion';
+import { Callout, CalloutContent } from '@govtechmy/myds-react/callout';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
 import { Button } from '@/components/ui/button';
@@ -412,16 +413,18 @@ export function LandingClient() {
         {/* Trust disclaimer — moved from above the headline (where it
             competed with it for first-glance attention) to a quiet
             footnote right under the input, where a first-time visitor
-            actually needs it: the moment before they type. */}
-        <motion.p
-          custom={4}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className={`text-xs max-w-md -mt-2 locale-text-balance ${mutedText}`}
-        >
-          {t('landing.hero.disclaimer_note')}
-        </motion.p>
+            actually needs it: the moment before they type. A MYDS Callout
+            (role="alert", icon, proper semantic structure) instead of a
+            plain <p> — this is exactly the kind of "heads up, verify
+            this" notice the component is built for, and it gets that
+            structure for free instead of being hand-rolled. */}
+        <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="w-full max-w-md -mt-2">
+          <Callout variant="warning">
+            <CalloutContent className="text-xs locale-text-balance">
+              {t('landing.hero.disclaimer_note')}
+            </CalloutContent>
+          </Callout>
+        </motion.div>
 
         <motion.div
           custom={5}
@@ -583,9 +586,13 @@ export function LandingClient() {
           <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.spotlight.desc')}</p>
         </div>
         <AgentSpotlight isDark={isDark} />
-        <p className={`mt-6 text-center text-xs max-w-2xl mx-auto locale-text-balance ${mutedText}`}>
-          {t('landing.spotlight.disclaimer')}
-        </p>
+        <div className="mt-6 max-w-2xl mx-auto">
+          <Callout variant="warning">
+            <CalloutContent className="text-xs locale-text-balance">
+              {t('landing.spotlight.disclaimer')}
+            </CalloutContent>
+          </Callout>
+        </div>
       </motion.section>
 
       <motion.section

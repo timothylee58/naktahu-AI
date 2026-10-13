@@ -4,6 +4,15 @@
    (data-theme on <html>) instead of prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* @govtechmy/myds-react ships pre-built components (e.g. Callout) whose
+   classNames (bg-bg-primary-50, text-txt-primary, ...) live only inside
+   its compiled dist/ output, not this app's own source — and Tailwind
+   v4's automatic source detection skips node_modules by default, so
+   without this it would silently generate none of those utilities and
+   the component would render unstyled. See the --myds-* tokens below for
+   where those utilities actually come from. */
+@source "../../../../node_modules/@govtechmy/myds-react/dist";
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -78,6 +87,49 @@
      which never matched that stated warmth intent on the light side. A
      warm off-white/cream, same idea as --nk-bg but inverted for light mode. */
   --nk-bg-warm: #faf8f4;
+
+  /* ── MYDS-derived semantic tokens ────────────────────────────────────
+     Structure borrowed from the Malaysian Government Design System
+     (@govtechmy/myds-react — see its Callout component), NOT its colour
+     values: these names (--myds-bg-primary-50, --myds-txt-primary, ...)
+     exist only so MYDS's pre-built component classNames resolve to
+     naktahu's own palette instead of MYDS's gov-blue. Do not point
+     --myds-txt-primary at MYDS's own primary colour — this app
+     deliberately unified its blue onto --brand-blue elsewhere (see the
+     comment on --nk-official above); reusing MYDS's hue here would
+     reintroduce exactly the two-near-identical-blues drift that was
+     fixed there.
+
+     The translucent backgrounds are theme-invariant on purpose — the
+     existing hero/domain chips already use the same flat
+     rgba(59,91,255,0.08)-style tint in both light and dark (see
+     LandingClient's DOMAIN_CHIPS styling), so this follows that
+     established convention rather than introducing a new one. Only the
+     solid text colours need a light/dark pair for contrast, overridden
+     under [data-theme="dark"] below. */
+  --myds-bg-primary-50: rgba(59, 91, 255, 0.08);
+  --myds-txt-primary: var(--nk-official-dim); /* #2540c9 — matches the blue text already used on light surfaces elsewhere (AgencyTrustGrid et al.) */
+
+  /* "Warning" here means a general caution notice (e.g. "this isn't
+     official government advice, verify independently") — deliberately a
+     plain, unclaimed amber, NOT --nk-community's gold. --nk-community is
+     reserved for one specific meaning ("crowd-sourced", per the
+     documented two-accent system above); giving gold a second,
+     unrelated meaning here would break that legibility. */
+  --myds-bg-warning-50: rgba(217, 119, 6, 0.08);
+  --myds-txt-warning: #b45309; /* amber-700 — readable on light surfaces */
+
+  --myds-txt-black-900: #18181b; /* zinc-900 — matches the literal light-mode text colour used throughout the landing components */
+  --myds-txt-black-700: #52525b; /* zinc-600 */
+}
+
+/* Dark-mode pair for the solid text colours above — the translucent
+   backgrounds don't need an override (see comment above). */
+[data-theme="dark"] {
+  --myds-txt-primary: var(--nk-official); /* #3b5bff — matches the blue text already used on dark surfaces elsewhere */
+  --myds-txt-warning: #f59e0b; /* amber-500 — readable on dark surfaces */
+  --myds-txt-black-900: var(--nk-text);
+  --myds-txt-black-700: var(--nk-text-muted);
 }
 
 @theme inline {
@@ -101,6 +153,17 @@
   --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-amber: var(--brand-amber);
   --color-brand-ink: var(--brand-ink);
+
+  /* Names match exactly what @govtechmy/myds-react's compiled Callout
+     component emits (bg-bg-primary-50, text-txt-primary, ...) — see the
+     --myds-* token comment above for why the values point at naktahu's
+     own palette instead of MYDS's. */
+  --color-bg-primary-50: var(--myds-bg-primary-50);
+  --color-txt-primary: var(--myds-txt-primary);
+  --color-bg-warning-50: var(--myds-bg-warning-50);
+  --color-txt-warning: var(--myds-txt-warning);
+  --color-txt-black-900: var(--myds-txt-black-900);
+  --color-txt-black-700: var(--myds-txt-black-700);
 }
 
 body {
