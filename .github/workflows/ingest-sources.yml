@@ -34,6 +34,18 @@ on:
         description: "Single source name to ingest (blank = all registered sources)"
         type: string
         required: false
+      write_profiles:
+        description: >-
+          Embedding profile(s) to write (EMBEDDING_WRITE_PROFILES). openai = the original
+          column; ilmu_bge_m3 = ILMU-hosted bge-m3 (embedding_v2, no OpenAI key needed);
+          openai,ilmu_bge_m3 fills both. A row is searchable only under the profile the
+          API READS with (EMBEDDING_PROFILE on Railway), so write the profile(s) it reads.
+        type: choice
+        options:
+          - openai
+          - ilmu_bge_m3
+          - openai,ilmu_bge_m3
+        default: openai
 
 jobs:
   ingest:
@@ -70,6 +82,13 @@ jobs:
           # Embedding happens even in --dry-run (ingest_feed.py embeds before
           # deciding whether to write) — ILMU_API_KEY is required either way.
           ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          # The ILMU gateway no longer serves openai/text-embedding-3-small (404
+          # model_not_found), so the openai profile goes straight to OpenAI direct,
+          # exactly as reembed-corpus.yml does. The bge-m3 profile needs neither.
+          ILMU_EMBEDDING_MODEL: ""
+          EMBEDDING_WRITE_PROFILES: ${{ github.event.inputs.write_profiles || 'openai' }}
         run: |
           WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
           SINGLE_SOURCE="${{ github.event.inputs.source }}"
