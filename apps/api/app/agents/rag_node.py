@@ -17,6 +17,7 @@ from app.services.llm_client import (
     ilmu_client,
     openai_client,
 )
+from app.services.embedding_profiles import EmbeddingProfile, active_profile, write_profiles
 from app.services.reranker import rerank_chunks, rerank_enabled
 from app.services.vector_store import ChunkResult, hybrid_search, hybrid_search_madani_schemes
 
@@ -62,27 +63,20 @@ def _deserialize_chunks(raw: list[dict]) -> list[ChunkResult]:
     return chunks
 
 
-def _checked(embedding: list[float], route: str) -> list[float]:
-    if len(embedding) != EMBEDDING_DIMS:
-        raise ValueError(f"{route} embedding has {len(embedding)} dims, expected {EMBEDDING_DIMS}")
+def _checked(embedding: list[float], route: str, dims: int = EMBEDDING_DIMS) -> list[float]:
+    if len(embedding) != dims:
+        raise ValueError(f"{route} embedding has {len(embedding)} dims, expected {dims}")
     return embedding
 
 
-async def _embed(query: str) -> list[float]:
-    """Embed with the corpus's model (text-embedding-3-small), ILMU gateway first.
+async def _embed_openai_corpus(query: str) -> list[float]:
+    """The original corpus profile: text-embedding-3-small, ILMU gateway first.
 
     Tries ILMU's route to the model, then OpenAI direct. Falling back is safe
     only because both routes serve the SAME model — see llm_client.py. If
     ILMU_EMBEDDING_MODEL names a different model, the ILMU route is skipped
     entirely rather than mixing vector spaces. If it is empty, the route is
     disabled quietly and OpenAI direct is used straight away.
-
-    Raises when no route works. That's the safe path and is already handled:
-    rag_node returns retrieved_chunks=[], analyst_node sets needs_clarification,
-    and the user is asked to rephrase instead of shown sourced-looking noise.
-    Also imported by router_node (speculative embed), tools, grant_rag_node,
-    scripts/ingest_feed.py, madani_scheme_ingest and upload_parliament, so this
-    is the single definition of the corpus embedding for reads AND writes.
     """
     errors: list[str] = []
     if not ILMU_EMBEDDING_MODEL.strip():
@@ -105,6 +99,47 @@ async def _embed(query: str) -> list[float]:
         return _checked(resp.data[0].embedding, "OpenAI")
     errors.append("openai: OPENAI_API_KEY not set")
     raise RuntimeError("No embedding route available — " + "; ".join(errors))
+
+
+async def _embed_ilmu_native(text: str, profile: EmbeddingProfile) -> list[float]:
+    """An ILMU-hosted model (bge-m3). One route, deliberately no fallback.
+
+    There is no second provider serving the same weights, and any other model
+    would silently return meaningless similarity scores against this column, so
+    a failure raises. rag_node already handles that safely: no chunks, so
+    analyst_node asks the user to rephrase instead of citing noise.
+    """
+    resp = await ilmu_client.embeddings.create(input=text, model=profile.ilmu_model)
+    return _checked(resp.data[0].embedding, f"ILMU {profile.ilmu_model}", profile.dims)
+
+
+async def embed_with_profile(text: str, profile: EmbeddingProfile) -> list[float]:
+    if profile.name == "openai":
+        return await _embed_openai_corpus(text)
+    return await _embed_ilmu_native(text, profile)
+
+
+async def _embed(query: str) -> list[float]:
+    """Embed with the ACTIVE profile's model (EMBEDDING_PROFILE; default openai).
+
+    Single definition of the corpus embedding for reads — also imported by
+    router_node (speculative embed), tools and grant_rag_node. Raises when no
+    route works; rag_node returns retrieved_chunks=[], analyst_node sets
+    needs_clarification, and the user is asked to rephrase instead of shown
+    sourced-looking noise. Ingestion uses embed_for_storage() instead.
+    """
+    return await embed_with_profile(query, active_profile())
+
+
+async def embed_for_storage(text: str) -> dict[str, list[float]]:
+    """Vectors to store for one chunk, keyed by column name.
+
+    One entry per EMBEDDING_WRITE_PROFILES profile (default: just the original
+    ``embedding`` column). Every profile must succeed — a row with one column
+    filled and the other silently empty would be invisible to the other read
+    profile, so any failure raises and the caller counts the chunk as failed.
+    """
+    return {p.column: await embed_with_profile(text, p) for p in write_profiles()}
 
 
 @weave.op()

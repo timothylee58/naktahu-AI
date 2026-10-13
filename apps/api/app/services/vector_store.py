@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import structlog
 from supabase import AsyncClient, acreate_client
 
+from app.services.embedding_profiles import active_profile
 from app.services.malay_morph import build_keyword_tsquery
 
 logger = structlog.get_logger(__name__)
@@ -61,6 +62,9 @@ async def hybrid_search(
     (``keyword_query``, migration 051) so "memohon" matches "permohonan".
     """
     client = await _get_client()
+    # The RPC must match the profile that produced `embedding` (it reads that
+    # profile's column); see app/services/embedding_profiles.py.
+    rpc_name = active_profile().chunks_rpc
     params: dict = {
         "query_text": query,
         "query_embedding": embedding,
@@ -73,16 +77,16 @@ async def hybrid_search(
         params["keyword_query"] = keyword_query
 
     try:
-        resp = await client.rpc("hybrid_search", params).execute()
+        resp = await client.rpc(rpc_name, params).execute()
     except Exception as exc:
-        if "keyword_query" not in params:
+        if "keyword_query" not in params or rpc_name != "hybrid_search":
             raise
         # Migration 051 not applied yet: PostgREST has no hybrid_search
         # overload taking keyword_query. Retry with the pre-051 arguments
         # so retrieval degrades to the old keyword matching, not an error.
         logger.warning("hybrid_search_keyword_query_unsupported", error=str(exc))
         params.pop("keyword_query")
-        resp = await client.rpc("hybrid_search", params).execute()
+        resp = await client.rpc(rpc_name, params).execute()
 
     results: list[ChunkResult] = []
     for row in (resp.data or []):
@@ -145,7 +149,7 @@ async def hybrid_search_madani_schemes(
     if scope is not None:
         params["scope_filter"] = scope
 
-    resp = await client.rpc("hybrid_search_madani_schemes", params).execute()
+    resp = await client.rpc(active_profile().madani_rpc, params).execute()
 
     results: list[ChunkResult] = []
     for row in (resp.data or []):

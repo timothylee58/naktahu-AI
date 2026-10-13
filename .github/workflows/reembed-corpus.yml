@@ -1,0 +1,75 @@
+name: Re-embed corpus (ILMU bge-m3)
+
+# Fills document_chunks.embedding_v2 / madani_scheme.embedding_v2 (migration 056)
+# with ILMU-hosted bge-m3 vectors, side by side with the live OpenAI vectors.
+# Never writes the live `embedding` column. Manual only; run in this order:
+#   1. probe     — proves the model id, key and 1024-dim output. Writes nothing.
+#   2. backfill  — embeds rows missing embedding_v2 (resumable; re-run to finish).
+#   3. compare   — old-vs-new retrieval overlap + Belanjawan 2027 spot-check.
+# Then flip the API with EMBEDDING_WRITE_PROFILES / EMBEDDING_PROFILE on Railway
+# (see migration 056's header). Requires migration 056 applied first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe, backfill or compare"
+        type: choice
+        options:
+          - probe
+          - backfill
+          - compare
+        default: probe
+      table:
+        description: "backfill: which table"
+        type: choice
+        options:
+          - all
+          - document_chunks
+          - madani_scheme
+        default: all
+      limit:
+        description: "backfill: max rows per table (blank = all). Use a small number for a trial."
+        type: string
+        default: ""
+
+jobs:
+  reembed:
+    name: Re-embed (${{ github.event.inputs.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          # compare embeds queries with BOTH profiles; the OpenAI profile
+          # goes straight to OpenAI direct (the ILMU gateway 404s on it).
+          ILMU_EMBEDDING_MODEL: ""
+          MODE: ${{ github.event.inputs.mode }}
+          TABLE: ${{ github.event.inputs.table }}
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          args=(--mode "$MODE")
+          if [ "$MODE" = "backfill" ]; then
+            args+=(--table "$TABLE")
+            if [ -n "$LIMIT" ]; then args+=(--limit "$LIMIT"); fi
+          fi
+          python -m scripts.reembed_corpus "${args[@]}"

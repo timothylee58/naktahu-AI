@@ -62,7 +62,7 @@ async def test_build_row_maps_title_to_scheme_name_and_embeds():
     with patch(
         "scripts.ingest_madani.extract_eligibility_rules",
         new=AsyncMock(return_value=({"max_household_income_myr": 3000.0}, True)),
-    ), patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.1, 0.2])):
+    ), patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.1, 0.2]})):
         row = await _build_row(_scheme())
 
     assert row["scheme_name"] == "Skim Bantuan Pendapatan"
@@ -78,7 +78,7 @@ async def test_build_row_unconfident_extraction_stays_needs_review():
     with patch(
         "scripts.ingest_madani.extract_eligibility_rules",
         new=AsyncMock(return_value=({}, False)),
-    ), patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+    ), patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         row = await _build_row(_scheme())
 
     assert row["eligibility_rules"] == {}
@@ -90,7 +90,7 @@ async def test_build_row_missing_agency_falls_back_not_blank():
     with patch(
         "scripts.ingest_madani.extract_eligibility_rules",
         new=AsyncMock(return_value=({}, False)),
-    ), patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+    ), patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         row = await _build_row(_scheme(implementing_agency=None))
 
     assert row["implementing_agency"] == "Ihsan MADANI"
@@ -165,7 +165,7 @@ async def test_run_new_source_url_inserts():
     with patch("scripts.ingest_madani.scrape_via_subprocess", return_value=[_scheme()]), \
          patch("scripts.ingest_madani.create_client", return_value=sb), \
          patch("scripts.ingest_madani.extract_eligibility_rules", new=AsyncMock(return_value=({}, False))), \
-         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         exit_code = await run(None, dry_run=False, limit=None)
 
     assert exit_code == 0
@@ -189,7 +189,7 @@ async def test_run_existing_url_unchanged_description_skips_write():
     with patch("scripts.ingest_madani.scrape_via_subprocess", return_value=[_scheme()]), \
          patch("scripts.ingest_madani.create_client", return_value=sb), \
          patch("scripts.ingest_madani.extract_eligibility_rules", new=AsyncMock(return_value=({}, False))) as mock_extract, \
-         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         exit_code = await run(None, dry_run=False, limit=None)
 
     assert exit_code == 0
@@ -212,7 +212,7 @@ async def test_run_existing_url_changed_description_updates_in_place():
     with patch("scripts.ingest_madani.scrape_via_subprocess", return_value=[_scheme()]), \
          patch("scripts.ingest_madani.create_client", return_value=sb), \
          patch("scripts.ingest_madani.extract_eligibility_rules", new=AsyncMock(return_value=({"max_household_income_myr": 3000.0}, True))), \
-         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         exit_code = await run(None, dry_run=False, limit=None)
 
     assert exit_code == 0
@@ -241,7 +241,7 @@ async def test_run_missing_on_rescrape_deactivates_not_deletes():
     with patch("scripts.ingest_madani.scrape_via_subprocess", return_value=[_scheme()]), \
          patch("scripts.ingest_madani.create_client", return_value=sb), \
          patch("scripts.ingest_madani.extract_eligibility_rules", new=AsyncMock(return_value=({}, False))), \
-         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])), \
+         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})), \
          patch("builtins.print") as mock_print:
         exit_code = await run(None, dry_run=False, limit=None)
 
@@ -265,7 +265,7 @@ async def test_run_injection_hit_never_reaches_supabase_write():
     with patch("scripts.ingest_madani.scrape_via_subprocess", return_value=[poisoned]), \
          patch("scripts.ingest_madani.create_client", return_value=sb), \
          patch("scripts.ingest_madani.extract_eligibility_rules", new=AsyncMock(return_value=({}, False))), \
-         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         exit_code = await run(None, dry_run=False, limit=None)
 
     assert exit_code == 0
@@ -280,7 +280,7 @@ async def test_run_dry_run_never_writes():
     with patch("scripts.ingest_madani.scrape_via_subprocess", return_value=[_scheme()]), \
          patch("scripts.ingest_madani.create_client", return_value=sb), \
          patch("scripts.ingest_madani.extract_eligibility_rules", new=AsyncMock(return_value=({}, False))), \
-         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value=[0.0])):
+         patch("scripts.ingest_madani.embed_scheme", new=AsyncMock(return_value={"embedding": [0.0]})):
         exit_code = await run(None, dry_run=True, limit=None)
 
     assert exit_code == 0

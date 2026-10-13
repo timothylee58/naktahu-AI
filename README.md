@@ -222,7 +222,9 @@ Migrations under `infra/supabase/migrations/` are versioned SQL, applied manuall
 | `ILMU_API_KEY` | ILMU API key (primary LLM + embeddings) |
 | `ILMU_BASE_URL` | ILMU API base URL |
 | `ILMU_CHAT_MODEL` | ILMU chat model name |
-| `ILMU_EMBEDDING_MODEL` | ILMU embedding model name |
+| `ILMU_EMBEDDING_MODEL` | ILMU gateway route to the OpenAI corpus model; empty disables that route |
+| `EMBEDDING_PROFILE` | `openai` (default) or `ilmu_bge_m3` — which model/column/RPC serves search |
+| `EMBEDDING_WRITE_PROFILES` | Comma-separated profiles ingestion fills (default `openai`) |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — **server-only, never exposed to the frontend** |
 | `REDIS_URL` | Redis connection URL |

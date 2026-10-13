@@ -37,7 +37,7 @@ infra/supabase/migrations/   Numbered SQL migrations 001–016 (NOT auto-applied
 | Frontend | Next.js 15 App Router, TypeScript strict, Tailwind, shadcn/ui, Framer Motion |
 | Backend | Python 3.11+, FastAPI, LangGraph 0.2+, LangChain Core |
 | LLM | ILMU API (primary, OpenAI-compatible) + `claude-sonnet-5` (synthesis fallback ONLY — Anthropic retired `claude-sonnet-4-20250514`, confirmed via a live 404 in production 2026-09-23; see `llm_client.FALLBACK_MODEL`) |
-| Embeddings | OpenAI `text-embedding-3-small` (1536-dim — what `document_chunks` was built with), reached via ILMU's gateway first (`openai/text-embedding-3-small`), then OpenAI direct as fallback. Both routes MUST be the same model; always go through `app.agents.rag_node._embed` — see `llm_client.py` |
+| Embeddings | OpenAI `text-embedding-3-small` (1536-dim — what `document_chunks` was built with), reached via ILMU's gateway first (`openai/text-embedding-3-small`), then OpenAI direct as fallback. Both routes MUST be the same model; always go through `app.agents.rag_node._embed` — see `llm_client.py` **Embedding profiles** (`app/services/embedding_profiles.py`): `EMBEDDING_PROFILE` (read) / `EMBEDDING_WRITE_PROFILES` (write) pair each model with its own column and search RPC — `openai` → `embedding` / `hybrid_search`; `ilmu_bge_m3` (1024-dim, ILMU-hosted) → `embedding_v2` / `hybrid_search_v2` (migration 056, filled by `scripts/reembed_corpus.py`). Never search one model's query vector against the other's column; never fall back across profiles. |
 | Vector DB | Supabase pgvector — hybrid search (cosine 0.7 + BM25 0.3) over `document_chunks` |
 | Cache | Redis via redis-py asyncio |
 | Auth | Supabase Auth JWT validated in FastAPI; plan lives in JWT `app_metadata`, not a DB table |

@@ -36,11 +36,12 @@ def build_scheme_embedding_text(scheme: dict[str, Any]) -> str:
     return " ".join(p for p in parts if p)
 
 
-async def embed_scheme(scheme: dict[str, Any]) -> list[float]:
-    """Embed one scheme row's rendered text with rag_node._embed — the corpus
-    model (ILMU gateway first, OpenAI direct fallback, same model either way).
+async def embed_scheme(scheme: dict[str, Any]) -> dict[str, list[float]]:
+    """Embed one scheme row's rendered text for storage: one vector per
+    EMBEDDING_WRITE_PROFILES profile, keyed by madani_scheme column name
+    (see rag_node.embed_for_storage and app/services/embedding_profiles.py).
     """
-    from app.agents.rag_node import _embed
+    from app.agents.rag_node import embed_for_storage
 
     text = build_scheme_embedding_text(scheme)
-    return await _embed(text)
+    return await embed_for_storage(text)
