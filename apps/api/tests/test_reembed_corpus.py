@@ -272,3 +272,79 @@ async def test_compare_fails_when_the_new_profile_returns_nothing() -> None:
     with patch.object(rc, "_search", side_effect=fake_search), \
             patch.object(rc, "embed_with_profile", AsyncMock(return_value=[0.0])):
         assert await rc.compare(MagicMock(), ["q1"]) == 1
+
+
+# ── request packing and write resilience ─────────────────────────────────
+
+def test_pack_requests_respects_the_character_budget_and_item_cap() -> None:
+    items = [(str(i), "x" * 6000) for i in range(7)]  # 6000 chars each, budget 16000
+    groups = rc.pack_requests(items, max_items=32)
+    assert [len(g) for g in groups] == [2, 2, 2, 1]
+    assert all(sum(len(t) for _, t in g) <= rc.MAX_REQUEST_CHARS for g in groups)
+    assert [i for g in groups for i, _ in g] == [str(i) for i in range(7)]  # order kept
+
+    small = [(str(i), "ab") for i in range(5)]
+    assert [len(g) for g in rc.pack_requests(small, max_items=2)] == [2, 2, 1]
+
+
+def test_pack_requests_gives_an_oversize_text_its_own_request() -> None:
+    groups = rc.pack_requests([("a", "x" * 100), ("b", "y" * 50_000), ("c", "z" * 100)], max_items=32)
+    assert [[i for i, _ in g] for g in groups] == [["a"], ["b"], ["c"]]
+
+
+@pytest.mark.asyncio
+async def test_backfill_splits_a_page_so_no_request_exceeds_the_budget() -> None:
+    """Regression: 32 ordinary chunks in one request exceeded ILMU's 8192-token
+    per-request limit and returned a 400."""
+    rows = _chunks(8)
+    for r in rows:
+        r["content"] = "x" * 5000
+    sb = FakeSupabase({"document_chunks": rows})
+    embed = AsyncMock(side_effect=lambda texts, *a, **k: [_VEC for _ in texts])
+    with patch.object(rc, "embed_batch", embed):
+        stats = await rc.backfill_table(sb, "document_chunks", batch_size=32, limit=None, dry_run=False)
+    assert stats["embedded"] == 8 and stats["failed"] == 0
+    assert all(sum(len(t) for t in c.args[0]) <= rc.MAX_REQUEST_CHARS for c in embed.await_args_list)
+    assert embed.await_count == 3  # 3 + 3 + 2 rows
+
+
+class _FlakyTable(FakeTable):
+    fail_times: dict[str, int] = {}
+
+    def execute(self):
+        if self._update is not None and self._eq is not None:
+            left = self.fail_times.get(self._eq, 0)
+            if left > 0:
+                self.fail_times[self._eq] = left - 1
+                raise RuntimeError("Server disconnected")
+        return super().execute()
+
+
+class _FlakySupabase(FakeSupabase):
+    def table(self, name: str) -> FakeTable:
+        return _FlakyTable(self, name)
+
+
+@pytest.mark.asyncio
+async def test_a_dropped_connection_on_write_is_retried_not_fatal(monkeypatch) -> None:
+    monkeypatch.setattr(rc.asyncio, "sleep", AsyncMock())
+    rows = _chunks(2)
+    _FlakyTable.fail_times = {rows[0]["id"]: 2}  # fails twice, succeeds on the 3rd attempt
+    sb = _FlakySupabase({"document_chunks": rows})
+    with patch.object(rc, "embed_batch", AsyncMock(side_effect=lambda texts, *a, **k: [_VEC for _ in texts])):
+        stats = await rc.backfill_table(sb, "document_chunks", batch_size=8, limit=None, dry_run=False)
+    assert stats["embedded"] == 2 and stats["failed"] == 0
+    assert all(r["embedding_v2"] == _VEC for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_a_write_that_keeps_failing_is_counted_and_the_run_continues(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(rc.asyncio, "sleep", AsyncMock())
+    rows = _chunks(3)
+    _FlakyTable.fail_times = {rows[1]["id"]: 99}
+    sb = _FlakySupabase({"document_chunks": rows})
+    with patch.object(rc, "embed_batch", AsyncMock(side_effect=lambda texts, *a, **k: [_VEC for _ in texts])):
+        stats = await rc.backfill_table(sb, "document_chunks", batch_size=8, limit=None, dry_run=False)
+    assert stats["embedded"] == 2 and stats["failed"] == 1
+    assert rows[1]["embedding_v2"] is None and rows[0]["embedding_v2"] == _VEC and rows[2]["embedding_v2"] == _VEC
+    assert "WRITE FAILED" in capsys.readouterr().out

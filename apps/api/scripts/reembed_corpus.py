@@ -48,9 +48,15 @@ from core.config import settings  # noqa: E402
 TARGET = PROFILES["ilmu_bge_m3"]
 SOURCE = PROFILES["openai"]
 TABLES = ("document_chunks", "madani_scheme")
-# bge-m3 accepts ~8k tokens; chunks are far smaller, this only guards outliers.
-MAX_CHARS = 24_000
+# ILMU's bge-m3 limit is 8192 tokens PER REQUEST (summed over every input in a
+# batch), not per input: a batch of 32 ordinary chunks came back as a 400 at
+# ~10.5k tokens. Requests are packed to a character budget that stays well
+# under it even for dense text (~3 chars/token), and a single input is clipped
+# to the same budget.
+MAX_REQUEST_CHARS = 16_000
+MAX_CHARS = MAX_REQUEST_CHARS
 WRITE_CONCURRENCY = 8
+WRITE_ATTEMPTS = 4
 EVAL_FILES = ("keyword_recall.jsonl", "answer_quality.jsonl", "tax_accuracy.jsonl")
 # What Budget questions look like; printed (not scored) so a human can check
 # that the new model retrieves the 2027 documents.
@@ -130,20 +136,50 @@ def _count_missing(supabase, table: str) -> int:
     return int(res.count or 0)
 
 
-async def _write(supabase, table: str, updates: list[tuple[str, list[float]]]) -> int:
+def pack_requests(items: list[tuple[str, str]], max_items: int) -> list[list[tuple[str, str]]]:
+    """Group (id, text) pairs into requests under both the item and the
+    character budget, keeping order. An oversize text still gets its own
+    request (embed_batch clips it)."""
+    groups: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+    chars = 0
+    for item in items:
+        size = min(len(item[1]), MAX_CHARS)
+        if current and (len(current) >= max_items or chars + size > MAX_REQUEST_CHARS):
+            groups.append(current)
+            current, chars = [], 0
+        current.append(item)
+        chars += size
+    if current:
+        groups.append(current)
+    return groups
+
+
+async def _write(supabase, table: str, updates: list[tuple[str, list[float]]]) -> tuple[int, int]:
+    """Write vectors; a dropped connection is retried with backoff and a row
+    that still fails is counted, never allowed to abort the whole run."""
     sem = asyncio.Semaphore(WRITE_CONCURRENCY)
-    written = 0
+    written = failed = 0
 
     async def one(row_id: str, vec: list[float]) -> None:
-        nonlocal written
+        nonlocal written, failed
         async with sem:
-            await asyncio.to_thread(
-                lambda: supabase.table(table).update({TARGET.column: vec}).eq("id", row_id).execute()
-            )
-            written += 1
+            for attempt in range(1, WRITE_ATTEMPTS + 1):
+                try:
+                    await asyncio.to_thread(
+                        lambda: supabase.table(table).update({TARGET.column: vec}).eq("id", row_id).execute()
+                    )
+                    written += 1
+                    return
+                except Exception as exc:
+                    if attempt == WRITE_ATTEMPTS:
+                        failed += 1
+                        print(f"  WRITE FAILED id={row_id}: {type(exc).__name__}: {str(exc)[:160]}")
+                        return
+                    await asyncio.sleep(0.5 * 2 ** (attempt - 1))
 
     await asyncio.gather(*(one(i, v) for i, v in updates))
-    return written
+    return written, failed
 
 
 async def backfill_table(
@@ -183,20 +219,23 @@ async def backfill_table(
         if not todo:
             continue
 
-        updates: list[tuple[str, list[float]]] = []
-        try:
-            vectors = await embed_batch([t for _, t in todo])
-            updates = [(rid, vec) for (rid, _), vec in zip(todo, vectors)]
-        except Exception as exc:
-            # One bad row must not sink the batch: retry singly to isolate it.
-            print(f"  batch of {len(todo)} failed ({type(exc).__name__}: {str(exc)[:160]}); retrying singly")
-            for rid, text in todo:
-                try:
-                    updates.append((rid, (await embed_batch([text]))[0]))
-                except Exception as single_exc:
-                    stats["failed"] += 1
-                    print(f"  FAILED id={rid}: {type(single_exc).__name__}: {str(single_exc)[:160]}")
-        stats["embedded"] += await _write(supabase, table, updates)
+        for group in pack_requests(todo, batch_size):
+            updates: list[tuple[str, list[float]]] = []
+            try:
+                vectors = await embed_batch([t for _, t in group])
+                updates = [(rid, vec) for (rid, _), vec in zip(group, vectors)]
+            except Exception as exc:
+                # One bad row must not sink the request: retry singly to isolate it.
+                print(f"  request of {len(group)} failed ({type(exc).__name__}: {str(exc)[:160]}); retrying singly")
+                for rid, text in group:
+                    try:
+                        updates.append((rid, (await embed_batch([text]))[0]))
+                    except Exception as single_exc:
+                        stats["failed"] += 1
+                        print(f"  FAILED id={rid}: {type(single_exc).__name__}: {str(single_exc)[:160]}")
+            written, write_failed = await _write(supabase, table, updates)
+            stats["embedded"] += written
+            stats["failed"] += write_failed
         print(f"  [{table}] embedded {stats['embedded']} / {missing}")
 
     stats["remaining"] = _count_missing(supabase, table)
