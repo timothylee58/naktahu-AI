@@ -128,6 +128,14 @@ class FeedEntry:
     # announced_date: for a ministry announcement it is when the change was
     # announced. None for HTML/PDF sources, which carry no per-item date.
     published: Optional[date] = None
+    # Dates the source-specific extractor read from the page's own structure
+    # (e.g. an accordion item titled "Year of Assessment 2023, 2024 & 2025").
+    # When dates_explicit is True these are used as they are and the text is
+    # NOT scanned for validity phrases, so a menu link or a footer cannot date
+    # (or expire) the chunk. CLI date overrides still win.
+    valid_from: Optional[date] = None
+    valid_until: Optional[date] = None
+    dates_explicit: bool = False
 
     @property
     def content(self) -> str:
@@ -232,16 +240,55 @@ def extract_page_title(html: str, fallback: str) -> str:
     return fallback
 
 
-def parse_html_page(html_bytes: bytes, page_url: str, fallback_title: str) -> list[FeedEntry]:
+def parse_html_page(
+    html_bytes: bytes, page_url: str, fallback_title: str, extractor: Optional[str] = None
+) -> list[FeedEntry]:
     """Turn one HTML page into FeedEntry chunks so the HTML path can reuse the
     RSS path's injection scan, content_hash dedup, embedding and insert logic
-    unchanged. Every chunk carries the page title and the page URL."""
+    unchanged. Every chunk carries the page title and the page URL.
+
+    `extractor` names a source-specific extractor (scripts/html_extractors.py)
+    for a site the generic one mishandles. It raises ExtractionError when the
+    page no longer has the structure it reads, rather than falling back to
+    generic text, which on such a site is the navigation menu."""
     html = html_bytes.decode("utf-8", errors="replace")
+    if extractor:
+        from scripts.html_extractors import EXTRACTORS
+
+        items = EXTRACTORS[extractor](html, fallback_title)
+        entries: list[FeedEntry] = []
+        for item in items:
+            for piece in _split_lines(item.text):
+                entries.append(
+                    FeedEntry(
+                        title=item.title, description=piece, link=page_url,
+                        valid_from=item.valid_from, valid_until=item.valid_until, dates_explicit=True,
+                    )
+                )
+        return entries
     title = extract_page_title(html, fallback_title)
     return [
         FeedEntry(title=title, description=chunk, link=page_url)
         for chunk in _chunk_blocks(extract_blocks(html))
     ]
+
+
+def _split_lines(text: str) -> list[str]:
+    """Pack lines into pieces of at most _CHUNK_MAX_CHARS, splitting only between
+    lines. Unlike _chunk_blocks there is no minimum size: an accordion item is a
+    complete statement (one year's rates) however short."""
+    pieces: list[str] = []
+    current: list[str] = []
+    size = 0
+    for line in text.split("\n"):
+        if current and size + len(line) + 1 > _CHUNK_MAX_CHARS:
+            pieces.append("\n".join(current))
+            current, size = [], 0
+        current.append(line)
+        size += len(line) + 1
+    if current:
+        pieces.append("\n".join(current))
+    return pieces
 
 
 def parse_pdf(pdf_bytes: bytes, pdf_url: str, fallback_title: str) -> list[FeedEntry]:
@@ -517,10 +564,14 @@ def date_fields(entry: FeedEntry, args: argparse.Namespace) -> dict[str, str]:
     (scripts/effective_dates.py). Only known dates are returned, so a row with
     none keeps today's behaviour and pre-052 databases see no new columns.
     """
-    window = extract_validity_window(entry.content)
+    if entry.dates_explicit:
+        from_text, until_text = entry.valid_from, entry.valid_until
+    else:
+        window = extract_validity_window(entry.content)
+        from_text, until_text = window.effective_date, window.effective_until
     values = {
-        "effective_date": _date_arg(args, "effective_date") or window.effective_date,
-        "effective_until": _date_arg(args, "effective_until") or window.effective_until,
+        "effective_date": _date_arg(args, "effective_date") or from_text,
+        "effective_until": _date_arg(args, "effective_until") or until_text,
         "announced_date": _date_arg(args, "announced_date") or entry.published,
     }
     return {k: v.isoformat() for k, v in values.items() if v is not None}
@@ -631,7 +682,16 @@ async def main_async(args: argparse.Namespace) -> None:
 
     fallback_title = getattr(args, "source_title", None) or args.feed_url
     if is_html:
-        entries = parse_html_page(raw_bytes, args.feed_url, fallback_title)[: args.limit]
+        extractor = getattr(args, "extractor", None)
+        extractor = extractor if isinstance(extractor, str) and extractor else None
+        try:
+            entries = parse_html_page(raw_bytes, args.feed_url, fallback_title, extractor)[: args.limit]
+        except Exception as exc:
+            # Only extractor failures are expected here; the generic path does not raise.
+            if not extractor:
+                raise
+            print(f"ERROR: extractor {extractor!r} could not read {args.feed_url} — {exc}. Nothing was written.", file=sys.stderr)
+            sys.exit(1)
     elif kind == "pdf":
         try:
             entries = parse_pdf(raw_bytes, args.feed_url, fallback_title)[: args.limit]
@@ -805,12 +865,13 @@ def main() -> None:
         args.route_domains = args.route_domains or source.route_domains
         args.require_host_suffix = source.require_host_suffix
         args.identity_terms = source.identity_terms
+        args.extractor = source.extractor
         args.feed_url = args.feed_url or source.url
         args.kind = source.kind
         args.domain = args.domain or source.domain
         args.ministry = args.ministry or source.ministry
         args.language = source.language if args.language == "bm" else args.language
-        args.source_title = args.source_title or source.name
+        args.source_title = args.source_title or source.title or source.name
         # A registered source's announcement date (e.g. the Budget's tabling day)
         # fills announced_date unless --announced-date overrides it.
         if source.announced_date and not getattr(args, "announced_date", None):
