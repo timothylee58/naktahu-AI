@@ -1158,3 +1158,52 @@ async def test_html_dry_run_prints_a_content_preview(monkeypatch, capsys):
     await main_async(args)
     out = capsys.readouterr().out
     assert " chars, " in out and " digits: " in out
+
+
+def _mock_http(monkeypatch, handler) -> None:
+    monkeypatch.setattr(
+        "scripts.ingest_feed.httpx.Client",
+        lambda **kw: _REAL_HTTPX_CLIENT(transport=httpx.MockTransport(handler), **kw),
+    )
+
+
+def test_fetch_feed_retries_a_transient_timeout(monkeypatch):
+    monkeypatch.setattr("scripts.ingest_feed.time.sleep", lambda _s: None)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise httpx.ConnectTimeout("slow", request=request)
+        return httpx.Response(200, content=b"ok")
+
+    _mock_http(monkeypatch, handler)
+    assert fetch_feed("https://a.example.com/x") == b"ok"
+    assert calls["n"] == 3
+
+
+def test_fetch_feed_gives_up_after_three_timeouts(monkeypatch):
+    monkeypatch.setattr("scripts.ingest_feed.time.sleep", lambda _s: None)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        raise httpx.ConnectTimeout("slow", request=request)
+
+    _mock_http(monkeypatch, handler)
+    with pytest.raises(httpx.ConnectTimeout):
+        fetch_feed("https://a.example.com/x")
+    assert calls["n"] == 3
+
+
+def test_fetch_feed_does_not_retry_a_404(monkeypatch):
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(404)
+
+    _mock_http(monkeypatch, handler)
+    with pytest.raises(httpx.HTTPStatusError):
+        fetch_feed("https://a.example.com/x")
+    assert calls["n"] == 1

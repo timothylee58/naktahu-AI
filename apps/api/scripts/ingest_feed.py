@@ -53,6 +53,7 @@ import hashlib
 import io
 import re
 import sys
+import time
 import unicodedata
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -433,6 +434,11 @@ def _host_in_domain(host: str, domain: str) -> bool:
     return host == domain or host.endswith("." + domain)
 
 
+_FETCH_ATTEMPTS = 3
+_FETCH_BACKOFF_SECONDS = 3.0
+_FETCH_TIMEOUT = httpx.Timeout(60.0, connect=20.0)
+
+
 def fetch_feed(url: str, allowed_host_suffix: Optional[str] = None) -> bytes:
     """GET `url`. With `allowed_host_suffix` (a registered source's
     require_host_suffix), every host the request passes through, redirects
@@ -441,7 +447,21 @@ def fetch_feed(url: str, allowed_host_suffix: Optional[str] = None) -> bytes:
     Rows are stamped with the REGISTERED url and ministry, never the fetched
     one, so an unchecked redirect would file another site's bytes as the
     official document."""
-    with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+    for attempt in range(1, _FETCH_ATTEMPTS + 1):
+        try:
+            return _fetch_once(url, allowed_host_suffix)
+        except httpx.TransportError:
+            # Timeouts, resets and TLS drops from slow government hosts are
+            # usually transient; a 4xx or an off-domain redirect is not, so
+            # those propagate on the first attempt.
+            if attempt == _FETCH_ATTEMPTS:
+                raise
+            time.sleep(_FETCH_BACKOFF_SECONDS * attempt)
+    raise AssertionError("unreachable")
+
+
+def _fetch_once(url: str, allowed_host_suffix: Optional[str]) -> bytes:
+    with httpx.Client(timeout=_FETCH_TIMEOUT, follow_redirects=True) as client:
         resp = client.get(url, headers={"User-Agent": "NakTahu-FeedIngest/1.0"})
         if allowed_host_suffix:
             hosts = [r.url.host for r in resp.history] + [resp.url.host]
