@@ -969,21 +969,25 @@ SOURCES: tuple[Source, ...] = (
         notes=(
             "LHDN Public Ruling No. 8/2025 — tax treatment for micro, small and "
             "medium companies; the authoritative definition of an SME and the "
-            "rates that apply to it."
+            "rates that apply to it. UNVERIFIED: this URL (from a web search) returned 404 "
+            "from a GitHub runner on 2026-10-14 although the ruling is published (22 Dec 2025). "
+            "Find the current link on https://www.hasil.gov.my/en/perundangan/ketetapan-umum/ "
+            "and fix the URL before ingesting; do not use the 2025-07-18 consultation draft."
         ),
     ),
     Source(
         name="lhdn-individual-tax-rates",
-        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-rate/",
+        url="https://www.hasil.gov.my/en/individu/kadar-cukai/",
         kind="html",
         domain="tax",
         ministry="Lembaga Hasil Dalam Negeri (LHDN)",
         language="en",
         notes=(
-            "LHDN individual income tax rates and reliefs. This is the page the old hand-written "
-            "'Individual Income Tax Rates' chunks (YA2023, undated) were written to cite; the "
-            "chunks were never extracted from it. Ingest this so the rate schedule and reliefs "
-            "come from LHDN's own text, then retire the YA2023 chunks via the supersede queue. "
+            "LHDN 'Tax Rate' page for individuals (resident scale for YA2023-YA2025, older years "
+            "archived on the same page). The old hand-written 'Individual Income Tax Rates' chunks "
+            "(YA2023, undated) cite .../individual-life-cycle/how-to-declare-income/tax-rate/, which "
+            "returns 404 (check_sources, 2026-10-14), so those citations point nowhere: ingest this "
+            "page and retire them via the supersede queue. "
             "NOTE: the lhdn-company-tax-rates run showed the HTML scraper drops table figures on "
             "LHDN pages, so read the dry-run output for the actual rates (digits and RM bands) "
             "before a live run; if they are missing, do not ingest it."

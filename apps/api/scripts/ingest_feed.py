@@ -590,6 +590,15 @@ def queue_supersede_candidates(
         return 0
 
 
+
+def _content_preview(content: str, width: int = 300) -> str:
+    """One line for a dry-run: size, digit count and the start of the text."""
+    flat = " ".join(content.split())
+    digits = sum(ch.isdigit() for ch in flat)
+    more = "..." if len(flat) > width else ""
+    return f"{len(flat)} chars, {digits} digits: {flat[:width]!r}{more}"
+
+
 async def main_async(args: argparse.Namespace) -> None:
     # Real Supabase client regardless of dry_run — dry-run's contract is "no
     # WRITES", not "no reads". Before this fix, dry-run hardcoded `already =
@@ -707,6 +716,12 @@ async def main_async(args: argparse.Namespace) -> None:
         if args.dry_run:
             dated = f" {dates}" if dates else ""
             print(f"  OK (dry-run) [{entry.domain or args.domain}]{dated} — {entry.title[:60]!r}")
+            # A title says nothing about whether the chunk is usable. The LHDN
+            # rates page scraped to menu text and a table with its numbers
+            # stripped, and only reading the stored rows revealed it. Show the
+            # size, the digit count (a rate table with 0 digits is broken) and
+            # the opening text, so the dry-run is the check it claims to be.
+            print(f"    {_content_preview(entry.content)}")
             continue
 
         row = {

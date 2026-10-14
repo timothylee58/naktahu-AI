@@ -1126,3 +1126,35 @@ def test_lhdn_individual_rates_source_is_registered_for_the_tax_domain():
     assert s.domain == "tax" and s.kind == "html"
     assert s.url.startswith("https://www.hasil.gov.my/")
     assert s.require_host_suffix == "hasil.gov.my"
+
+
+# --- dry-run shows what was extracted, not just the title -------------------
+
+def test_content_preview_reports_size_digits_and_start_of_text():
+    from scripts.ingest_feed import _content_preview
+
+    text = "Rate\n\nRM5,001 to RM20,000:   1%\n" + "x" * 400
+    out = _content_preview(text, width=40)
+    assert out.startswith(f"{len(' '.join(text.split()))} chars, 10 digits: ")
+    assert "RM5,001 to RM20,000: 1%" in out      # whitespace collapsed
+    assert out.endswith("...")                    # truncated
+
+
+def test_content_preview_flags_a_table_stripped_of_its_numbers():
+    from scripts.ingest_feed import _content_preview
+
+    assert "0 digits" in _content_preview("Company with paid up capital not more than RM")
+
+
+@pytest.mark.asyncio
+async def test_html_dry_run_prints_a_content_preview(monkeypatch, capsys):
+    monkeypatch.setattr("scripts.ingest_feed.fetch_feed", MagicMock(return_value=_HTML_SAMPLE))
+    monkeypatch.setattr("scripts.ingest_feed.embed_for_storage", AsyncMock(return_value={"embedding": [0.0] * 1536}))
+    monkeypatch.setattr("scripts.ingest_feed.create_client", lambda url, key: _mock_supabase())
+    args = MagicMock(
+        feed_url="https://www.investmalaysia.gov.my", kind="html", domain="business",
+        ministry="MIDA", language="en", limit=50, dry_run=True, source_title="InvestMalaysia",
+    )
+    await main_async(args)
+    out = capsys.readouterr().out
+    assert " chars, " in out and " digits: " in out
