@@ -44,3 +44,35 @@ def test_find_report_gives_the_ancestor_chain_of_a_phrase():
 
 def test_find_report_says_when_a_phrase_is_absent():
     assert "0 text node(s)" in find_report(_soup(), ["no such phrase"])[0]
+
+
+_ACCORDION = """
+<div class="e-n-accordion">
+ <details class="e-n-accordion-item"><summary class="e-n-accordion-item-title"><span>YA 2025</span></summary>
+  <div><ul><li>Company with paid up capital not more than RM2.5 million
+        <ul><li>First RM150,000 <strong>(15%)</strong></li><li>Next RM450,000 <strong>(17%)</strong></li></ul></li></ul></div></details>
+ <details class="e-n-accordion-item"><summary>YA 2024</summary>
+  <div><table><tr><th>Chargeable Income (RM)</th><th>Rate (%)</th></tr><tr><td>5,001 – 20,000</td><td>1</td></tr></table></div></details>
+</div>
+"""
+
+
+def test_accordion_report_lists_items_with_titles_and_shape():
+    from scripts.inspect_page import accordion_report
+
+    lines = accordion_report(BeautifulSoup(_ACCORDION, "html.parser"))
+    assert "2 top-level <details> item(s)" in lines[0]
+    assert any("'YA 2025'" in l and "2 li" not in l and "3 li" in l for l in lines)
+    assert any("'YA 2024'" in l and "1 tables" in l for l in lines)
+
+
+def test_render_structured_keeps_list_nesting_and_table_rows():
+    from scripts.inspect_page import render_structured
+
+    soup = BeautifulSoup(_ACCORDION, "html.parser")
+    for tag in soup.find_all("summary"):
+        tag.extract()
+    text = "\n".join(render_structured(soup))
+    assert "- Company with paid up capital not more than RM2.5 million" in text
+    assert "First RM150,000 (15%)" in text
+    assert "Chargeable Income (RM) | Rate (%)" in text and "5,001 – 20,000 | 1" in text

@@ -70,6 +70,52 @@ def table_report(soup: BeautifulSoup, max_tables: int = 12, max_rows: int = 6) -
     return out
 
 
+def render_structured(el: Tag, depth: int = 0) -> list[str]:
+    """Text with structure kept: table rows joined by ' | ', list items indented."""
+    lines: list[str] = []
+    for child in el.children:
+        if isinstance(child, Tag):
+            if child.name == "table":
+                for tr in child.find_all("tr"):
+                    cells = [_text(c) for c in tr.find_all(["th", "td"])]
+                    if any(cells):
+                        lines.append("  " * depth + " | ".join(cells))
+            elif child.name in ("ul", "ol"):
+                lines.extend(render_structured(child, depth + 1))
+            elif child.name == "li":
+                own = " ".join(_text(c) if isinstance(c, Tag) and c.name not in ("ul", "ol") else str(c).strip()
+                               for c in child.children if not (isinstance(c, Tag) and c.name in ("ul", "ol")))
+                own = _WS.sub(" ", own).strip()
+                if own:
+                    lines.append("  " * depth + "- " + own)
+                for sub in child.find_all(["ul", "ol"], recursive=False):
+                    lines.extend(render_structured(sub, depth + 1))
+            else:
+                lines.extend(render_structured(child, depth))
+        else:
+            text = _WS.sub(" ", str(child)).strip()
+            if text:
+                lines.append("  " * depth + text)
+    return lines
+
+
+def accordion_report(soup: BeautifulSoup, max_items: int = 40, show: int = 2) -> list[str]:
+    items = [d for d in soup.find_all("details") if not d.find_parent("details")]
+    out = [f"  {len(items)} top-level <details> item(s)"]
+    for i, d in enumerate(items[:max_items]):
+        summary = d.find("summary")
+        title = _text(summary) if summary else "(no summary)"
+        body = _text(d)[len(title):] if summary else _text(d)
+        out.append(f"  [{i}] {title[:80]!r}  body {len(body)} chars, {_digits(body)} digits, "
+                   f"{len(d.find_all('table'))} tables, {len(d.find_all('li'))} li")
+    for i, d in enumerate(items[:show]):
+        for tag in d.find_all("summary"):
+            tag.extract()
+        out.append(f"  rendered item [{i}]:")
+        out.extend("      " + line[:160] for line in render_structured(d)[:40])
+    return out
+
+
 def find_report(soup: BeautifulSoup, phrases: list[str]) -> list[str]:
     out = []
     for phrase in phrases:
@@ -109,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
     print("tables:")
     tables = table_report(soup)
     print("\n".join(tables) if tables else "  (none)")
+    print("accordion items:")
+    print("\n".join(accordion_report(soup)))
     if args.find:
         print("phrases:")
         print("\n".join(find_report(soup, args.find)))
