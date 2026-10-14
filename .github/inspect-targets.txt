@@ -1,0 +1,4 @@
+# One page per line: URL, or URL | phrase1,phrase2 (phrases to locate in the markup).
+# Pushing a change to this file on a claude/* branch runs .github/workflows/inspect-page.yml.
+https://www.hasil.gov.my/en/individu/kadar-cukai/ | 5,000,Chargeable,100,001
+https://www.hasil.gov.my/en/syarikat/kadar-cukai-syarikat/ | paid up capital,24%,Company with paid up
