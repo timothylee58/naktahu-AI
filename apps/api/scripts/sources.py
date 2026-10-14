@@ -142,12 +142,17 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="dbkl-commissioner-of-buildings",
-        url="https://www.dbkl.gov.my/en/pesuruhjaya-bangunan-cob/",
+        url="https://www.dbkl.gov.my/en/departments/jabatan-penilaian-dan-pengurusan-harta",
         kind="html",
         domain="property",
         ministry="Dewan Bandaraya Kuala Lumpur (DBKL)",
         language="en",
-        notes="DBKL Commissioner of Buildings (COB) division overview — state-level strata enforcement example.",
+        notes=(
+            "DBKL Valuation and Property Management Department page, which hosts the "
+            "Commissioner of Buildings (COB) division — state-level strata enforcement "
+            "example. The old /pesuruhjaya-bangunan-cob/ page returned 404; confirm in "
+            "the dry-run preview that this page still describes the COB."
+        ),
     ),
 
     # ── business (SSM — registration/compliance beyond the MIDA investment pages) ──
@@ -182,7 +187,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="perkeso-employer-registration",
-        url="https://www.perkeso.gov.my/en/our-services/employer-employee/employer-registration/184-our-services.html",
+        url="https://perkeso.gov.my/en/our-services/employer-employee/employer-registration/",
         kind="html",
         domain="epf",
         ministry="Pertubuhan Keselamatan Sosial (PERKESO/SOCSO)",
@@ -627,7 +632,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="mygov-rukun-negara",
-        url="https://www.malaysia.gov.my/portal/content/30110?language=my",
+        url="https://www.malaysia.gov.my/my/government/learn-about-malaysia/rukun-negara",
         kind="html",
         domain="culture",
         ministry="MyGovernment Portal (MAMPU)",

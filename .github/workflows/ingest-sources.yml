@@ -118,7 +118,7 @@ jobs:
             fi
             tail -n 40 "$RUNNER_TEMP/$name.log"
             echo "::endgroup::"
-            result=$(grep -E 'ERROR|FAILED|Dry-run complete|Ingestion complete|UPCOMING|Nothing to ingest' "$RUNNER_TEMP/$name.log" | tail -n 1 | tr '|' '/' | cut -c1-160 || true)
+            result=$(grep -E 'ERROR|FAILED|Dry-run complete|Ingestion complete|UPCOMING|Nothing to ingest' "$RUNNER_TEMP/$name.log" | tail -n 1 | tr '|' '/' | cut -c1-400 || true)
             recap="${recap}| $name | $code | ${result:-no result line} |\n"
           done
           printf "%b" "$recap" | tee -a "$GITHUB_STEP_SUMMARY"
