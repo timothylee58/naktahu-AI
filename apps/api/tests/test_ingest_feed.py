@@ -1090,3 +1090,39 @@ def test_cli_hands_the_registry_guards_to_main_async(monkeypatch):
     assert args.require_host_suffix == "mof.gov.my"
     assert args.identity_terms == ("2027",)
 
+
+
+# --- Budget 2026 and LHDN individual rates: the baseline Budget 2027 changes ---
+
+def test_budget_2026_sources_are_ungated_pdf_sources_on_mof_with_provenance_guards():
+    from scripts.sources import BUDGET_2026_SOURCES
+
+    assert BUDGET_2026_SOURCES
+    for s in BUDGET_2026_SOURCES:
+        assert s.kind == "pdf"
+        assert s.url.startswith("https://belanjawan.mof.gov.my/pdf/belanjawan2026/")
+        # Already tabled (10 Oct 2025): nothing to gate on.
+        assert s.available_from is None
+        assert s.announced_date == date(2025, 10, 10)
+        # A redirect or a stale file at the same path must not be filed as the 2026 Budget.
+        assert s.require_host_suffix == "mof.gov.my"
+        assert s.identity_terms == ("2026",)
+        assert s in SOURCES
+
+
+def test_budget_2026_and_2027_source_names_do_not_collide():
+    from scripts.sources import BUDGET_2026_SOURCES
+
+    names_2026 = {s.name for s in BUDGET_2026_SOURCES}
+    names_2027 = {s.name for s in BUDGET_2027_SOURCES}
+    assert not names_2026 & names_2027
+    assert len({s.name for s in SOURCES}) == len(SOURCES)
+
+
+def test_lhdn_individual_rates_source_is_registered_for_the_tax_domain():
+    from scripts.sources import get_source
+
+    s = get_source("lhdn-individual-tax-rates")
+    assert s.domain == "tax" and s.kind == "html"
+    assert s.url.startswith("https://www.hasil.gov.my/")
+    assert s.require_host_suffix == "hasil.gov.my"
