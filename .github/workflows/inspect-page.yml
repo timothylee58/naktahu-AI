@@ -1,0 +1,44 @@
+name: Inspect page
+
+# Prints the structure of a web page from a GitHub runner (which, unlike the
+# build sandbox, can reach government sites) so a source-specific HTML extractor
+# can be written against the real markup. Read-only: it fetches one URL and
+# prints a report; it touches no secrets and writes nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Page to inspect"
+        type: string
+        required: true
+      find:
+        description: "Comma-separated phrases to locate in the markup (optional)"
+        type: string
+        required: false
+
+jobs:
+  inspect:
+    name: Inspect page structure
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install parser
+        run: pip install httpx beautifulsoup4
+      - name: Inspect
+        env:
+          PAGE_URL: ${{ github.event.inputs.url }}
+          FIND: ${{ github.event.inputs.find }}
+        run: |
+          args=()
+          IFS=',' read -ra phrases <<< "$FIND"
+          for p in "${phrases[@]}"; do
+            [ -n "$p" ] && args+=(--find "$p")
+          done
+          python -m scripts.inspect_page "$PAGE_URL" "${args[@]}"
