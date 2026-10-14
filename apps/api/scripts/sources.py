@@ -972,6 +972,84 @@ SOURCES: tuple[Source, ...] = (
             "rates that apply to it."
         ),
     ),
+    Source(
+        name="lhdn-individual-tax-rates",
+        url="https://www.hasil.gov.my/en/individual/individual-life-cycle/how-to-declare-income/tax-rate/",
+        kind="html",
+        domain="tax",
+        ministry="Lembaga Hasil Dalam Negeri (LHDN)",
+        language="en",
+        notes=(
+            "LHDN individual income tax rates and reliefs. This is the page the old hand-written "
+            "'Individual Income Tax Rates' chunks (YA2023, undated) were written to cite; the "
+            "chunks were never extracted from it. Ingest this so the rate schedule and reliefs "
+            "come from LHDN's own text, then retire the YA2023 chunks via the supersede queue. "
+            "NOTE: the lhdn-company-tax-rates run showed the HTML scraper drops table figures on "
+            "LHDN pages, so read the dry-run output for the actual rates (digits and RM bands) "
+            "before a live run; if they are missing, do not ingest it."
+        ),
+        require_host_suffix="hasil.gov.my",
+    ),
+)
+
+# ── Belanjawan 2026 (Budget 2026) — tabled 10 October 2025 ──────────────
+# Budget 2026 is the baseline Budget 2027 changes: questions like "what is the
+# individual tax relief?" need both, or an answer states a 2026 rule as if the
+# 2027 announcement did not exist (or the reverse). Same five documents and
+# naming MOF used for 2027 (these 2026 paths are the pattern the 2027 URLs were
+# derived from, and the 2027 files then resolved and ingested), but THESE URLS
+# WERE NOT FETCHED: the build sandbox cannot reach belanjawan.mof.gov.my. Run
+# `python -m scripts.check_sources` and read a dry-run before any live ingest;
+# a 404 means MOF named a file differently, so fix the URL, never guess further.
+# require_host_suffix / identity_terms stop a redirect or stale file at the same
+# path from being filed as the 2026 Budget. The tax-measures appendix (where the
+# effective years of the tax changes are stated) is not listed for the same
+# reason as the 2027 one: its filename is not predictable. Add it from MOF's
+# Budget 2026 download page.
+_BUDGET_2026_TABLED = date(2025, 10, 10)
+_BUDGET_2026_BASE = "https://belanjawan.mof.gov.my/pdf/belanjawan2026"
+
+BUDGET_2026_SOURCES: tuple[Source, ...] = (
+    Source(
+        name="belanjawan-2026-ucapan-bm",
+        url=f"{_BUDGET_2026_BASE}/ucapan/ub26.pdf",
+        kind="pdf", domain="finance", ministry="Kementerian Kewangan Malaysia (MOF)", language="bm",
+        notes="Ucapan Belanjawan 2026 — the original-language Budget speech.",
+        announced_date=_BUDGET_2026_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2026",),
+    ),
+    Source(
+        name="belanjawan-2026-speech-en",
+        url=f"{_BUDGET_2026_BASE}/ucapan/bs26.pdf",
+        kind="pdf", domain="finance", ministry="Kementerian Kewangan Malaysia (MOF)", language="en",
+        notes="Budget 2026 speech — MOF's English translation of ub26.pdf.",
+        announced_date=_BUDGET_2026_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2026",),
+    ),
+    Source(
+        name="belanjawan-2026-fiscal-outlook-en",
+        url=f"{_BUDGET_2026_BASE}/revenue/fiscal_outlook_2026.pdf",
+        kind="pdf", domain="finance", ministry="Kementerian Kewangan Malaysia (MOF)", language="en",
+        notes="Fiscal Outlook 2026 — revenue, expenditure, Medium-Term Fiscal Framework.",
+        announced_date=_BUDGET_2026_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2026",),
+    ),
+    Source(
+        name="belanjawan-2026-tinjauan-fiskal-bm",
+        url=f"{_BUDGET_2026_BASE}/hasil/tinjauan_fiskal_2026.pdf",
+        kind="pdf", domain="finance", ministry="Kementerian Kewangan Malaysia (MOF)", language="bm",
+        notes="Tinjauan Fiskal 2026 — BM edition of the Fiscal Outlook.",
+        announced_date=_BUDGET_2026_TABLED, route_domains=True,
+        require_host_suffix="mof.gov.my", identity_terms=("2026",),
+    ),
+    Source(
+        name="belanjawan-2026-economic-outlook-en",
+        url=f"{_BUDGET_2026_BASE}/economy/economic-2026.pdf",
+        kind="pdf", domain="finance", ministry="Kementerian Kewangan Malaysia (MOF)", language="en",
+        notes="Economic Outlook 2026 — macro context behind the Budget's figures.",
+        announced_date=_BUDGET_2026_TABLED, route_domains=False,
+        require_host_suffix="mof.gov.my", identity_terms=("2026",),
+    ),
 )
 
 # ── Belanjawan 2027 (Budget 2027) — tabled 9 October 2026 ───────────────
@@ -1031,7 +1109,15 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
     ),
 )
 
-SOURCES = SOURCES + BUDGET_2027_SOURCES
+# TODO(budget-2027-tax-measures): the tax-measures appendix is NOT registered yet. It is the
+# document that states WHICH year of assessment each change starts (the speech does not),
+# so until it is added an answer cannot say "from YA2027". Open MOF's Budget 2027 download
+# page (belanjawan.mof.gov.my), find the "Tax Measures" / "Langkah-Langkah Cukai" appendix,
+# copy its exact link, then add a Source like the ones above with announced_date=_BUDGET_2027_TABLED,
+# route_domains=False, domain="tax", require_host_suffix="mof.gov.my" and identity_terms=("2027",).
+# Do not ingest secondary summaries (PwC, Deloitte, news): citations must be official sources.
+
+SOURCES = SOURCES + BUDGET_2026_SOURCES + BUDGET_2027_SOURCES
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
 
