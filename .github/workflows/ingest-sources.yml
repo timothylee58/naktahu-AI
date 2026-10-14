@@ -104,11 +104,24 @@ jobs:
           fi
 
           status=0
+          recap="| source | exit | result |\n|---|---|---|\n"
           for name in $NAMES; do
             echo "::group::Ingesting $name ($WRITE_MODE)"
-            python -m scripts.ingest_feed --source "$name" $DRY_RUN_FLAG || status=1
+            # Output is captured so the one line that says why a source failed
+            # is not buried among 77 sources' logs; the recap below is what the
+            # step ends with (and what the job-log tail shows).
+            if python -m scripts.ingest_feed --source "$name" $DRY_RUN_FLAG > "$RUNNER_TEMP/$name.log" 2>&1; then
+              code=0
+            else
+              code=$?
+              status=1
+            fi
+            tail -n 40 "$RUNNER_TEMP/$name.log"
             echo "::endgroup::"
+            result=$(grep -E 'ERROR|FAILED|Dry-run complete|Ingestion complete|UPCOMING|Nothing to ingest' "$RUNNER_TEMP/$name.log" | tail -n 1 | tr '|' '/' | cut -c1-160 || true)
+            recap="${recap}| $name | $code | ${result:-no result line} |\n"
           done
+          printf "%b" "$recap" | tee -a "$GITHUB_STEP_SUMMARY"
           exit $status
 
       - name: Fetch MP roster (dry-run — selectors unverified, see module docstring)
