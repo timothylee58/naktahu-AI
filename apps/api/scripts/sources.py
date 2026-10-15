@@ -90,6 +90,8 @@ class Source:
     #                 with it. For an announcement document: a future start marks a chunk
     #                 "announced, not yet in force", while past dates in its "current position"
     #                 paragraphs describe the existing rule and must not expire or backdate it.
+    #   "future_start" as future_only, but never an end date: a budget measure has a start
+    #                 and no stated expiry, so a parsed end would wrongly expire it.
     #   "off"         no dates from text. For a ruling full of worked examples about past years.
     date_inference: str = "text"
     # Human-readable page label used in chunk titles (and so in citations), instead
@@ -1170,7 +1172,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         # The year comes from the pinned mof.gov.my host and the /belanjawan2027/ path; read
         # the dry-run preview for the years of assessment before a live ingest.
         identity_terms=("income tax rates for resident individual",),
-        date_inference="future_only",
+        date_inference="future_start",
     ),
 )
 

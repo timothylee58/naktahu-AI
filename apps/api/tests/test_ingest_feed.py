@@ -1268,7 +1268,7 @@ def test_the_ruling_and_the_budget_appendix_are_registered_with_the_right_modes(
 
     assert get_source("lhdn-pr-8-2025-micro-small-medium-companies").date_inference == "off"
     assert get_source("lhdn-ku-8-2025-syarikat-mikro-kecil-sederhana").date_inference == "off"
-    assert get_source("belanjawan-2027-tax-measures").date_inference == "future_only"
+    assert get_source("belanjawan-2027-tax-measures").date_inference == "future_start"
     assert get_source("belanjawan-2027-speech-en").date_inference == "text"
 
 
@@ -1283,7 +1283,7 @@ def test_the_cli_hands_the_registry_date_mode_to_main_async(monkeypatch):
     from scripts.ingest_feed import main
 
     main()
-    assert seen["mode"] == "future_only"
+    assert seen["mode"] == "future_start"
 
 
 def test_the_ingest_workflow_has_a_numeric_limit_input_and_prints_dry_runs_in_full():
@@ -1299,3 +1299,8 @@ def test_the_ingest_workflow_has_a_numeric_limit_input_and_prints_dry_runs_in_fu
     assert "--limit $INGEST_LIMIT" in text and "*[!0-9]*)" in text        # numeric guard
     assert re.search(r'if \[ "\$WRITE_MODE" = "live" \]; then\s+tail -n 40', text)   # live: tail
     assert 'cat "$RUNNER_TEMP/$name.log"' in text                         # dry-run: everything
+
+
+def test_future_start_keeps_the_start_but_never_an_end_date():
+    fields = date_fields(_entry(_FUTURE_TEXT), argparse.Namespace(date_inference="future_start"))
+    assert "effective_date" in fields and "effective_until" not in fields

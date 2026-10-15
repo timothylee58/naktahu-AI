@@ -593,12 +593,14 @@ def date_fields(entry: FeedEntry, args: argparse.Namespace) -> dict[str, str]:
         from_text, until_text = window.effective_date, window.effective_until
         if mode == "off":
             from_text = until_text = None
-        elif mode == "future_only":
+        elif mode in ("future_only", "future_start"):
             # Only an announced FUTURE start is evidence ("not yet in force"); a past date in
             # such a document describes the current position, and an end date without its
             # future start would close a window that was never announced.
             if from_text is None or from_text <= date.today():
                 from_text = until_text = None
+            elif mode == "future_start":
+                until_text = None  # announced start only; the text never says the rule ends
     values = {
         "effective_date": _date_arg(args, "effective_date") or from_text,
         "effective_until": _date_arg(args, "effective_until") or until_text,
