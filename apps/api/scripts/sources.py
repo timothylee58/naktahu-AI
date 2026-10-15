@@ -84,6 +84,14 @@ class Source:
     # site the generic one mishandles; None = generic. It fails loudly if the
     # page's structure changes.
     extractor: Optional[str] = None
+    # How validity dates are taken from the text (scripts/effective_dates.py):
+    #   "text"        every phrase it finds (the default; right for a notice or a feed item)
+    #   "future_only" keep a start date only if it is in the future, and its end date only
+    #                 with it. For an announcement document: a future start marks a chunk
+    #                 "announced, not yet in force", while past dates in its "current position"
+    #                 paragraphs describe the existing rule and must not expire or backdate it.
+    #   "off"         no dates from text. For a ruling full of worked examples about past years.
+    date_inference: str = "text"
     # Human-readable page label used in chunk titles (and so in citations), instead
     # of the source name.
     title: Optional[str] = None
@@ -991,6 +999,7 @@ SOURCES: tuple[Source, ...] = (
             "build sandbox; the earlier /media/fo1ptejq/ URL returned 404 from a GitHub runner on "
             "2026-10-14. check_sources decides. Do not use the 2025-07-18 consultation draft."
         ),
+        date_inference="off",
     ),
     Source(
         name="lhdn-ku-8-2025-syarikat-mikro-kecil-sederhana",
@@ -1006,6 +1015,7 @@ SOURCES: tuple[Source, ...] = (
             "UNVERIFIED: the URL was supplied by the user, not seen by the build sandbox; "
             "check_sources decides."
         ),
+        date_inference="off",
     ),
     Source(
         name="lhdn-individual-tax-rates",
@@ -1160,6 +1170,7 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         # The year comes from the pinned mof.gov.my host and the /belanjawan2027/ path; read
         # the dry-run preview for the years of assessment before a live ingest.
         identity_terms=("income tax rates for resident individual",),
+        date_inference="future_only",
     ),
 )
 

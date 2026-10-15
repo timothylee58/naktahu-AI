@@ -587,8 +587,18 @@ def date_fields(entry: FeedEntry, args: argparse.Namespace) -> dict[str, str]:
     if entry.dates_explicit:
         from_text, until_text = entry.valid_from, entry.valid_until
     else:
+        mode = getattr(args, "date_inference", "text")
+        mode = mode if isinstance(mode, str) else "text"  # tests pass a mock namespace
         window = extract_validity_window(entry.content)
         from_text, until_text = window.effective_date, window.effective_until
+        if mode == "off":
+            from_text = until_text = None
+        elif mode == "future_only":
+            # Only an announced FUTURE start is evidence ("not yet in force"); a past date in
+            # such a document describes the current position, and an end date without its
+            # future start would close a window that was never announced.
+            if from_text is None or from_text <= date.today():
+                from_text = until_text = None
     values = {
         "effective_date": _date_arg(args, "effective_date") or from_text,
         "effective_until": _date_arg(args, "effective_until") or until_text,
@@ -886,6 +896,7 @@ def main() -> None:
         args.require_host_suffix = source.require_host_suffix
         args.identity_terms = source.identity_terms
         args.extractor = source.extractor
+        args.date_inference = source.date_inference
         args.feed_url = args.feed_url or source.url
         args.kind = source.kind
         args.domain = args.domain or source.domain
