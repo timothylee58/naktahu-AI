@@ -1068,10 +1068,19 @@ async def test_live_run_with_failed_inserts_exits_nonzero(monkeypatch, capsys):
     assert "0 inserted" in capsys.readouterr().out
 
 
+_IDENTITY_EXCEPTIONS = {
+    "belanjawan-2027-tax-measures": ("income tax rates for resident individual",),
+}
+
+
 def test_every_budget_2027_source_is_pinned_to_mof_and_checks_its_identity():
     for source in BUDGET_2027_SOURCES:
         assert source.require_host_suffix == "mof.gov.my", source.name
-        assert source.identity_terms == ("2027",), source.name
+        # The tax-measures appendix's contents page names the document but never the
+        # year, so it is checked by title (and by host and path); every other Budget 2027
+        # source must find "2027" in its own first pages.
+        expected = _IDENTITY_EXCEPTIONS.get(source.name, ("2027",))
+        assert source.identity_terms == expected, source.name
         assert source.url.startswith(f"https://belanjawan.{source.require_host_suffix}/"), source.name
 
 

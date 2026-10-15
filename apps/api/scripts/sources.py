@@ -1155,7 +1155,11 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
             "not seen by the build sandbox; check_sources decides."
         ),
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=False,
-        require_host_suffix="mof.gov.my", identity_terms=("2027",),
+        require_host_suffix="mof.gov.my",
+        # The contents page names the document but never the year, so check for its title.
+        # The year comes from the pinned mof.gov.my host and the /belanjawan2027/ path; read
+        # the dry-run preview for the years of assessment before a live ingest.
+        identity_terms=("income tax rates for resident individual",),
     ),
 )
 
