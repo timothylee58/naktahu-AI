@@ -59,6 +59,11 @@ class Source:
     # UPCOMING (with a countdown) instead of fetching it before this date, so
     # a scheduled run can't record a pre-publication 404 as source rot.
     available_from: Optional[date] = None
+    # Why the source cannot be ingested right now (a dead URL, or a host that
+    # refuses GitHub's runners). Scheduled runs and the health check skip it so
+    # a known-broken site does not turn the whole job red every week; an
+    # explicit `--source <name>` dispatch still tries it. Empty/None = healthy.
+    known_broken: Optional[str] = None
     # When the document was announced/tabled. A PDF has no per-item publish date
     # the way an RSS entry does, so this is what ingest_feed stamps on every
     # chunk's announced_date (migration 052): it lets an answer say "announced
@@ -114,18 +119,6 @@ SOURCES: tuple[Source, ...] = (
             "National investment-promotion portal (MIDA). HTML landing page, not a "
             "feed — ingested via --kind html. Feeds the business/grant/investor "
             "answer surfaces."
-        ),
-    ),
-    Source(
-        name="invest-malaysia-mida-eip",
-        url="https://investmalaysia.mida.gov.my/EIP/InvestMalaysia.aspx",
-        kind="html",
-        domain="business",
-        ministry="Malaysian Investment Development Authority (MIDA)",
-        language="en",
-        notes=(
-            "MIDA Electronic Investment Portal (EIP) entry page — ASP.NET WebForms "
-            "HTML, no feed available. Ingested via --kind html."
         ),
     ),
 
@@ -264,6 +257,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="perkeso-eis-benefits-application-guide",
+        known_broken="Returns 404 from GitHub's runners (run 20); a web search still lists this URL, so it may be stale. Find the live page before re-enabling.",
         url="https://www.perkeso.gov.my/en/online/contributor/faedah-sip-new/eis-benefits-application-guide.html",
         kind="html",
         domain="legal",
@@ -367,24 +361,6 @@ SOURCES: tuple[Source, ...] = (
     # slug is a silently broken source entry, not a harmless guess, on a
     # page whose whole job is aggregating real citations.
     Source(
-        name="ihsan-madani-pendapatan",
-        url="https://ihsanmadani.gov.my/inisiatif/pendapatan",
-        kind="html",
-        domain="welfare",
-        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
-        language="bm",
-        notes="Income/entrepreneurship assistance category listing (IPR, INTAN, INSAN, IKHSAN and similar schemes).",
-    ),
-    Source(
-        name="ihsan-madani-pendidikan",
-        url="https://ihsanmadani.gov.my/inisiatif/pendidikan",
-        kind="html",
-        domain="welfare",
-        ministry="National Cost of Living Action Council (NACCOL) / KPDN",
-        language="bm",
-        notes="Education assistance category listing (Program SULUNG and similar financing/exemption schemes).",
-    ),
-    Source(
         name="ihsan-madani-faq",
         url="https://ihsanmadani.gov.my/faq",
         kind="html",
@@ -408,6 +384,7 @@ SOURCES: tuple[Source, ...] = (
     # the statutory exam board under KPM, not a third-party exam-prep site.
     Source(
         name="lpm-spm-overview",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://lp.moe.gov.my/index.php/peperiksaan-pentaksiran/peringkat-menengah-atas/sijil-pelajaran-malaysia-spm",
         kind="html",
         domain="education",
@@ -417,6 +394,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="lpm-makluman-spm",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://lp.moe.gov.my/index.php/makluman-spm",
         kind="html",
         domain="education",
@@ -426,6 +404,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="lpm-takwim-pentaksiran-2026",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://lp.moe.gov.my/index.php/makluman-spm/1405-takwim-pentaksiran-pusat-tingkatan-5-peperiksaan-sijil-pelajaran-malaysia-spm-tahun-2026-dan-tingkatan-4-peperiksaan-spm-tahun-2027",
         kind="html",
         domain="education",
@@ -435,6 +414,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="lpm-jadual-waktu-spmu-2026",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://lp.moe.gov.my/index.php/jadual-waktu/1436-jadual-waktu-peperiksaan-sijil-pelajaran-malaysia-ulangan-spmu-2026ngan-2026",
         kind="html",
         domain="education",
@@ -444,6 +424,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="lpm-home",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://lp.moe.gov.my/",
         kind="html",
         domain="education",
@@ -461,6 +442,7 @@ SOURCES: tuple[Source, ...] = (
     # cycle, different candidates, different page.
     Source(
         name="lpm-jadual-waktu-spm-2026",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://lp.moe.gov.my/index.php/jw-spm/1447-jadual-waktu-peperiksaan-sijil-pelajaran-malaysia-2026",
         kind="html",
         domain="education",
@@ -583,15 +565,6 @@ SOURCES: tuple[Source, ...] = (
         notes="Official Malaysia Premium Visa Programme (PVIP) FAQ — requirements, fees, and the authorised-agency application model.",
     ),
     Source(
-        name="jim-spo-portal",
-        url="https://eapp.imi.gov.my/spo",
-        kind="html",
-        domain="immigration",
-        ministry="Jabatan Imigresen Malaysia (JIM)",
-        language="en",
-        notes="Sistem Pertanyaan Online (SPO) — the official enquiry portal immigration_navigator's SPO track drafts an enquiry for (never submits to).",
-    ),
-    Source(
         name="motac-portal-home",
         url="https://www.motac.gov.my/en/",
         kind="html",
@@ -622,6 +595,7 @@ SOURCES: tuple[Source, ...] = (
     # lens surfaces only the sub-topics that have sources.
     Source(
         name="arkib-pengisytiharan-kemerdekaan",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://pustakailmu.arkib.gov.my/index.php/ms/pustaka-ilmu/imbasan-fakta/dokumen-perisytiharan-kemerdekaan",
         kind="html",
         domain="culture",
@@ -631,6 +605,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="arkib-menjejaki-31-ogos-1957",
+        known_broken="Times out from GitHub's runners even after retries (run 20, 2026-10-15); the host likely blocks them. Needs a different network path, e.g. running the ingest from Railway.",
         url="https://pustakailmu.arkib.gov.my/index.php/ms/pustaka-ilmu/jendela-sejarah/menjejaki-31-ogos-1957",
         kind="html",
         domain="culture",
@@ -688,6 +663,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="parlimen-hansard-dewan-rakyat",
+        known_broken='The server sends an incomplete TLS certificate chain, so verification fails (run 20). TLS verification is not disabled; scripts/ingest_parliament has its own fetcher.',
         url="https://www.parlimen.gov.my/hansard-dewan-rakyat.html",
         kind="html",
         domain="parliament",
@@ -738,6 +714,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="kpdn-portal-home",
+        known_broken='The server drops the TLS handshake mid-connection (run 20), even after retries.',
         url="https://www.kpdn.gov.my/en/home",
         kind="html",
         domain="business",
@@ -987,6 +964,7 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="lhdn-pr-8-2025-micro-small-medium-companies",
+        known_broken='PDF URL returns 404 (run 20) and no verified replacement is known; find it via the Public Rulings index on hasil.gov.my.',
         url="https://www.hasil.gov.my/wp-content/uploads/pr-8-2025-tax-treatment-for-micro-small-and-medium-companies.pdf",
         kind="pdf",
         domain="tax",
@@ -1184,6 +1162,11 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
 SOURCES = SOURCES + BUDGET_2026_SOURCES + BUDGET_2027_SOURCES
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
+
+
+def scheduled_sources() -> tuple[Source, ...]:
+    """Sources a scheduled run should try: everything not marked known_broken."""
+    return tuple(s for s in SOURCES if not s.known_broken)
 
 
 def get_source(name: str) -> Source:

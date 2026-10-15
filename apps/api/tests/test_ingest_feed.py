@@ -457,7 +457,8 @@ def test_get_source_rejects_unknown_name():
 def test_registry_contains_investmalaysia_sources():
     urls = {s.url for s in SOURCES}
     assert "https://www.investmalaysia.gov.my" in urls
-    assert "https://investmalaysia.mida.gov.my/EIP/InvestMalaysia.aspx" in urls
+    # The EIP entry page answers HTTP 418 to GitHub's runners, so it was dropped.
+    assert "https://investmalaysia.mida.gov.my/EIP/InvestMalaysia.aspx" not in urls
 
 
 # ---------------------------------------------------------------------------
@@ -1304,3 +1305,16 @@ def test_the_ingest_workflow_has_a_numeric_limit_input_and_prints_dry_runs_in_fu
 def test_future_start_keeps_the_start_but_never_an_end_date():
     fields = date_fields(_entry(_FUTURE_TEXT), argparse.Namespace(date_inference="future_start"))
     assert "effective_date" in fields and "effective_until" not in fields
+
+
+def test_identity_check_skips_pages_without_text():
+    link = "https://belanjawan.mof.gov.my/pdf/x.pdf#page={}"
+    entries = [FeedEntry(title="t", description="Ucapan Belanjawan 2026", link=link.format(4))]
+    assert missing_identity_terms(entries, ("2026",)) == []
+
+
+def test_identity_check_only_reads_the_first_three_pages_with_text():
+    link = "https://belanjawan.mof.gov.my/pdf/x.pdf#page={}"
+    entries = [FeedEntry(title="t", description=f"page {n}", link=link.format(n)) for n in (4, 5, 6)]
+    entries.append(FeedEntry(title="t", description="Belanjawan 2027", link=link.format(7)))
+    assert missing_identity_terms(entries, ("2027",)) == ["2027"]

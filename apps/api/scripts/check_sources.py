@@ -47,7 +47,10 @@ async def check_sources(sources: tuple[Source, ...]) -> bool:
         if not s.is_available(today) and s.available_from is not None:
             days = (s.available_from - today).days
             print(f"SOON  {s.name:45s} {s.url}  — UPCOMING, published {s.available_from.isoformat()} ({days}d)")
-    live = tuple(s for s in sources if s.is_available(today))
+    for s in sources:
+        if s.known_broken:
+            print(f"SKIP  {s.name:45s} {s.url}  — KNOWN BROKEN: {s.known_broken}")
+    live = tuple(s for s in sources if s.is_available(today) and not s.known_broken)
 
     headers = {"User-Agent": _USER_AGENT}
     async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS, headers=headers) as client:

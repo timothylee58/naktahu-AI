@@ -534,10 +534,14 @@ def missing_identity_terms(entries: list[FeedEntry], terms: tuple[str, ...]) -> 
 
     Reads `description` only: the entry title falls back to the source name
     ("belanjawan-2027-...") which contains the year by construction."""
+    # "First pages" means the first pages that HAVE text: Belanjawan 2026's
+    # cover pages are images, so its title first appears on page 4.
+    by_page: dict[int, list[str]] = {}
+    for e in entries:
+        if m := _PAGE_ANCHOR_RE.search(e.link):
+            by_page.setdefault(int(m.group(1)), []).append(e.description)
     early = " ".join(
-        e.description
-        for e in entries
-        if (m := _PAGE_ANCHOR_RE.search(e.link)) and int(m.group(1)) <= _IDENTITY_PAGES
+        " ".join(by_page[page]) for page in sorted(by_page)[:_IDENTITY_PAGES]
     ).lower()
     return [t for t in terms if t.lower() not in early]
 
@@ -745,7 +749,7 @@ async def main_async(args: argparse.Namespace) -> None:
             first_page = entries[0].description[:200] if entries else "(no extractable text)"
             print(
                 f"ERROR: {args.feed_url} does not look like the expected document — "
-                f"{absent!r} not found in its first {_IDENTITY_PAGES} pages. "
+                f"{absent!r} not found in its first {_IDENTITY_PAGES} pages with text. "
                 f"It begins: {first_page!r}. Nothing was written.",
                 file=sys.stderr,
             )
