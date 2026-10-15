@@ -46,6 +46,13 @@ on:
           - ilmu_bge_m3
           - openai,ilmu_bge_m3
         default: openai
+      limit:
+        description: >-
+          Max chunks per source (--limit). Blank = the script's default of 50, which truncates
+          a long PDF (the Budget 2027 tax-measures appendix and Public Ruling 8/2025 are longer);
+          use 1000 for those, as ingest-budget-2027.yml does.
+        type: string
+        required: false
 
 jobs:
   ingest:
@@ -89,8 +96,16 @@ jobs:
           # exactly as reembed-corpus.yml does. The bge-m3 profile needs neither.
           ILMU_EMBEDDING_MODEL: ""
           EMBEDDING_WRITE_PROFILES: ${{ github.event.inputs.write_profiles || 'openai' }}
+          INGEST_LIMIT: ${{ github.event.inputs.limit }}
         run: |
           WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
+          LIMIT_FLAG=""
+          if [ -n "$INGEST_LIMIT" ]; then
+            case "$INGEST_LIMIT" in
+              *[!0-9]*) echo "limit must be a whole number, got: $INGEST_LIMIT" >&2; exit 2 ;;
+            esac
+            LIMIT_FLAG="--limit $INGEST_LIMIT"
+          fi
           SINGLE_SOURCE="${{ github.event.inputs.source }}"
           DRY_RUN_FLAG="--dry-run"
           if [ "$WRITE_MODE" = "live" ]; then
@@ -110,13 +125,19 @@ jobs:
             # Output is captured so the one line that says why a source failed
             # is not buried among 77 sources' logs; the recap below is what the
             # step ends with (and what the job-log tail shows).
-            if python -m scripts.ingest_feed --source "$name" $DRY_RUN_FLAG > "$RUNNER_TEMP/$name.log" 2>&1; then
+            if python -m scripts.ingest_feed --source "$name" $DRY_RUN_FLAG $LIMIT_FLAG > "$RUNNER_TEMP/$name.log" 2>&1; then
               code=0
             else
               code=$?
               status=1
             fi
-            tail -n 40 "$RUNNER_TEMP/$name.log"
+            # A dry-run is read by a human to decide whether to go live, so show all of
+            # it (every chunk's preview and dates); a live run only needs its tail.
+            if [ "$WRITE_MODE" = "live" ]; then
+              tail -n 40 "$RUNNER_TEMP/$name.log"
+            else
+              cat "$RUNNER_TEMP/$name.log"
+            fi
             echo "::endgroup::"
             result=$(grep -E 'ERROR|FAILED|Dry-run complete|Ingestion complete|UPCOMING|Nothing to ingest' "$RUNNER_TEMP/$name.log" | tail -n 1 | tr '|' '/' | cut -c1-400 || true)
             recap="${recap}| $name | $code | ${result:-no result line} |\n"

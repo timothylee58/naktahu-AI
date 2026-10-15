@@ -1068,10 +1068,19 @@ async def test_live_run_with_failed_inserts_exits_nonzero(monkeypatch, capsys):
     assert "0 inserted" in capsys.readouterr().out
 
 
+_IDENTITY_EXCEPTIONS = {
+    "belanjawan-2027-tax-measures": ("income tax rates for resident individual",),
+}
+
+
 def test_every_budget_2027_source_is_pinned_to_mof_and_checks_its_identity():
     for source in BUDGET_2027_SOURCES:
         assert source.require_host_suffix == "mof.gov.my", source.name
-        assert source.identity_terms == ("2027",), source.name
+        # The tax-measures appendix's contents page names the document but never the
+        # year, so it is checked by title (and by host and path); every other Budget 2027
+        # source must find "2027" in its own first pages.
+        expected = _IDENTITY_EXCEPTIONS.get(source.name, ("2027",))
+        assert source.identity_terms == expected, source.name
         assert source.url.startswith(f"https://belanjawan.{source.require_host_suffix}/"), source.name
 
 
@@ -1207,3 +1216,91 @@ def test_fetch_feed_does_not_retry_a_404(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         fetch_feed("https://a.example.com/x")
     assert calls["n"] == 1
+
+
+# --- date_inference: how a document's dates are taken from its text -------------
+
+import argparse  # noqa: E402
+
+_FUTURE_TEXT = "Effective Date: for loan agreements executed from 1 January 2099 until 31 December 2100."
+_PAST_TEXT = "From the year of assessment 2012, shipping companies are exempt. Effective from 1 January 2012 until 31 December 2012."
+
+
+def _entry(text: str):
+    from scripts.ingest_feed import FeedEntry
+
+    return FeedEntry(title="t", description=text, link="u")
+
+
+def test_text_mode_keeps_every_date_it_finds():
+    ns = argparse.Namespace(date_inference="text")
+    assert date_fields(_entry(_PAST_TEXT), ns).get("effective_date") == "2012-01-01"
+    assert date_fields(_entry(_FUTURE_TEXT), ns).get("effective_until") == "2100-12-31"
+
+
+def test_off_mode_takes_no_dates_from_text():
+    ns = argparse.Namespace(date_inference="off")
+    assert date_fields(_entry(_PAST_TEXT), ns) == {}
+    assert date_fields(_entry(_FUTURE_TEXT), ns) == {}
+
+
+def test_future_only_keeps_an_announced_future_start_with_its_end():
+    ns = argparse.Namespace(date_inference="future_only")
+    assert date_fields(_entry(_FUTURE_TEXT), ns) == {"effective_date": "2099-01-01", "effective_until": "2100-12-31"}
+
+
+def test_future_only_drops_a_past_window_that_would_expire_the_rule():
+    # A "current position" paragraph about YA2012 must not make the chunk look expired.
+    assert date_fields(_entry(_PAST_TEXT), argparse.Namespace(date_inference="future_only")) == {}
+
+
+def test_cli_overrides_and_announced_date_still_apply_when_inference_is_off():
+    ns = argparse.Namespace(date_inference="off", effective_date="2027-01-01", announced_date="2026-10-09")
+    assert date_fields(_entry(_PAST_TEXT), ns) == {"effective_date": "2027-01-01", "announced_date": "2026-10-09"}
+
+
+def test_an_unknown_or_mock_mode_behaves_like_text():
+    assert date_fields(_entry(_PAST_TEXT), MagicMock()).get("effective_date") == "2012-01-01"
+
+
+def test_the_ruling_and_the_budget_appendix_are_registered_with_the_right_modes():
+    from scripts.sources import get_source
+
+    assert get_source("lhdn-pr-8-2025-micro-small-medium-companies").date_inference == "off"
+    assert get_source("lhdn-ku-8-2025-syarikat-mikro-kecil-sederhana").date_inference == "off"
+    assert get_source("belanjawan-2027-tax-measures").date_inference == "future_start"
+    assert get_source("belanjawan-2027-speech-en").date_inference == "text"
+
+
+def test_the_cli_hands_the_registry_date_mode_to_main_async(monkeypatch):
+    seen = {}
+
+    async def fake_main_async(args):
+        seen["mode"] = args.date_inference
+
+    monkeypatch.setattr("scripts.ingest_feed.main_async", fake_main_async)
+    monkeypatch.setattr("sys.argv", ["ingest_feed", "--source", "belanjawan-2027-tax-measures", "--dry-run"])
+    from scripts.ingest_feed import main
+
+    main()
+    assert seen["mode"] == "future_start"
+
+
+def test_the_ingest_workflow_has_a_numeric_limit_input_and_prints_dry_runs_in_full():
+    import re
+    from pathlib import Path
+
+    import yaml
+
+    wf = Path(__file__).resolve().parents[3] / ".github" / "workflows" / "ingest-sources.yml"
+    text = wf.read_text(encoding="utf-8")
+    inputs = yaml.safe_load(text)[True]["workflow_dispatch"]["inputs"]
+    assert inputs["limit"]["type"] == "string" and not inputs["limit"].get("required")
+    assert "--limit $INGEST_LIMIT" in text and "*[!0-9]*)" in text        # numeric guard
+    assert re.search(r'if \[ "\$WRITE_MODE" = "live" \]; then\s+tail -n 40', text)   # live: tail
+    assert 'cat "$RUNNER_TEMP/$name.log"' in text                         # dry-run: everything
+
+
+def test_future_start_keeps_the_start_but_never_an_end_date():
+    fields = date_fields(_entry(_FUTURE_TEXT), argparse.Namespace(date_inference="future_start"))
+    assert "effective_date" in fields and "effective_until" not in fields

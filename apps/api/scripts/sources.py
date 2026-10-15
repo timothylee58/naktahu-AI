@@ -84,6 +84,16 @@ class Source:
     # site the generic one mishandles; None = generic. It fails loudly if the
     # page's structure changes.
     extractor: Optional[str] = None
+    # How validity dates are taken from the text (scripts/effective_dates.py):
+    #   "text"        every phrase it finds (the default; right for a notice or a feed item)
+    #   "future_only" keep a start date only if it is in the future, and its end date only
+    #                 with it. For an announcement document: a future start marks a chunk
+    #                 "announced, not yet in force", while past dates in its "current position"
+    #                 paragraphs describe the existing rule and must not expire or backdate it.
+    #   "future_start" as future_only, but never an end date: a budget measure has a start
+    #                 and no stated expiry, so a parsed end would wrongly expire it.
+    #   "off"         no dates from text. For a ruling full of worked examples about past years.
+    date_inference: str = "text"
     # Human-readable page label used in chunk titles (and so in citations), instead
     # of the source name.
     title: Optional[str] = None
@@ -977,19 +987,37 @@ SOURCES: tuple[Source, ...] = (
     ),
     Source(
         name="lhdn-pr-8-2025-micro-small-medium-companies",
-        url="https://www.hasil.gov.my/media/fo1ptejq/pr-8-2025-tax-treatment-for-micro-small-and-medium-companies.pdf",
+        url="https://www.hasil.gov.my/wp-content/uploads/pr-8-2025-tax-treatment-for-micro-small-and-medium-companies.pdf",
         kind="pdf",
         domain="tax",
         ministry="Lembaga Hasil Dalam Negeri (LHDN)",
         language="en",
+        identity_terms=("8/2025",),
+        require_host_suffix="hasil.gov.my",
         notes=(
             "LHDN Public Ruling No. 8/2025 — tax treatment for micro, small and "
             "medium companies; the authoritative definition of an SME and the "
-            "rates that apply to it. UNVERIFIED: this URL (from a web search) returned 404 "
-            "from a GitHub runner on 2026-10-14 although the ruling is published (22 Dec 2025). "
-            "Find the current link on https://www.hasil.gov.my/en/perundangan/ketetapan-umum/ "
-            "and fix the URL before ingesting; do not use the 2025-07-18 consultation draft."
+            "rates that apply to it. UNVERIFIED: the URL was supplied by the user, not seen by the "
+            "build sandbox; the earlier /media/fo1ptejq/ URL returned 404 from a GitHub runner on "
+            "2026-10-14. check_sources decides. Do not use the 2025-07-18 consultation draft."
         ),
+        date_inference="off",
+    ),
+    Source(
+        name="lhdn-ku-8-2025-syarikat-mikro-kecil-sederhana",
+        url="https://www.hasil.gov.my/wp-content/uploads/ku-8-2025-layanan-cukai-bagi-syarikat-mikro-kecil-dan-sederhana.pdf",
+        kind="pdf",
+        domain="tax",
+        ministry="Lembaga Hasil Dalam Negeri (LHDN)",
+        language="bm",
+        identity_terms=("8/2025",),
+        require_host_suffix="hasil.gov.my",
+        notes=(
+            "Ketetapan Umum No. 8/2025 — Bahasa Melayu edition of the SME tax-treatment ruling. "
+            "UNVERIFIED: the URL was supplied by the user, not seen by the build sandbox; "
+            "check_sources decides."
+        ),
+        date_inference="off",
     ),
     Source(
         name="lhdn-individual-tax-rates",
@@ -1129,15 +1157,29 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
         available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=False,
         require_host_suffix="mof.gov.my", identity_terms=("2027",),
     ),
+    Source(
+        name="belanjawan-2027-tax-measures",
+        url=f"{_BUDGET_2027_BASE}/ucapan/tax-measures.pdf",
+        kind="pdf", domain="tax", ministry=_MOF, language="en",
+        notes=(
+            "Budget 2027 tax measures (appendices): states the year of assessment each change "
+            "starts, which the speech does not. UNVERIFIED: the URL was supplied by the user, "
+            "not seen by the build sandbox; check_sources decides."
+        ),
+        available_from=_BUDGET_2027_TABLED, announced_date=_BUDGET_2027_TABLED, route_domains=False,
+        require_host_suffix="mof.gov.my",
+        # The contents page names the document but never the year, so check for its title.
+        # The year comes from the pinned mof.gov.my host and the /belanjawan2027/ path; read
+        # the dry-run preview for the years of assessment before a live ingest.
+        identity_terms=("income tax rates for resident individual",),
+        date_inference="future_start",
+    ),
 )
 
-# TODO(budget-2027-tax-measures): the tax-measures appendix is NOT registered yet. It is the
-# document that states WHICH year of assessment each change starts (the speech does not),
-# so until it is added an answer cannot say "from YA2027". Open MOF's Budget 2027 download
-# page (belanjawan.mof.gov.my), find the "Tax Measures" / "Langkah-Langkah Cukai" appendix,
-# copy its exact link, then add a Source like the ones above with announced_date=_BUDGET_2027_TABLED,
-# route_domains=False, domain="tax", require_host_suffix="mof.gov.my" and identity_terms=("2027",).
-# Do not ingest secondary summaries (PwC, Deloitte, news): citations must be official sources.
+# The Budget 2027 tax-measures appendix (belanjawan-2027-tax-measures) states which year of
+# assessment each change starts, which the speech does not. Its URL was supplied by a person, not
+# fetched by the build sandbox: confirm it with check_sources and read a dry-run before a live
+# ingest. Do not ingest secondary summaries (PwC, Deloitte, news): citations must be official.
 
 SOURCES = SOURCES + BUDGET_2026_SOURCES + BUDGET_2027_SOURCES
 
