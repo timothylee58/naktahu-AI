@@ -80,6 +80,13 @@ class Source:
     # title and fallback name are NOT searched: the source name itself says
     # "2027"). Empty = no check.
     identity_terms: tuple[str, ...] = ()
+    # Name of a source-specific HTML extractor (scripts/html_extractors.py) for a
+    # site the generic one mishandles; None = generic. It fails loudly if the
+    # page's structure changes.
+    extractor: Optional[str] = None
+    # Human-readable page label used in chunk titles (and so in citations), instead
+    # of the source name.
+    title: Optional[str] = None
 
     def is_available(self, today: Optional[date] = None) -> bool:
         return self.available_from is None or (today or date.today()) >= self.available_from
@@ -945,6 +952,8 @@ SOURCES: tuple[Source, ...] = (
         ministry="Lembaga Hasil Dalam Negeri (LHDN)",
         language="en",
         notes="LHDN 'Tax Rate of Company' — resident company and SME income tax rates.",
+        extractor="lhdn_accordion",
+        title="Company Income Tax Rates (LHDN)",
     ),
     Source(
         name="lhdn-sme-tax",
@@ -954,6 +963,8 @@ SOURCES: tuple[Source, ...] = (
         ministry="Lembaga Hasil Dalam Negeri (LHDN)",
         language="en",
         notes="LHDN SME page — who qualifies as an SME and how SME income is taxed.",
+        extractor="lhdn_accordion",
+        title="SME — Company Income Tax (LHDN)",
     ),
     Source(
         name="lhdn-corporate-tax-overview",
@@ -998,6 +1009,8 @@ SOURCES: tuple[Source, ...] = (
             "before a live run; if they are missing, do not ingest it."
         ),
         require_host_suffix="hasil.gov.my",
+        extractor="lhdn_accordion",
+        title="Individual Income Tax Rates (LHDN)",
     ),
 )
 

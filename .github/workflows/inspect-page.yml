@@ -1,0 +1,72 @@
+name: Inspect page
+
+# Prints the structure of web pages from a GitHub runner (which, unlike the
+# build sandbox, can reach government sites) so a source-specific HTML extractor
+# can be written against the real markup. Read-only: it fetches URLs and prints
+# a report; it uses no secrets and writes nothing.
+#
+# Two ways to run it:
+#   * workflow_dispatch with a url (and optional comma-separated phrases to find)
+#   * push to a claude/* branch that changes .github/inspect-targets.txt: one
+#     target per line as `URL` or `URL | phrase1,phrase2`; blank lines and lines
+#     starting with # are ignored. (A brand-new workflow file cannot be
+#     dispatched until it is on the default branch; a push trigger can run from
+#     the branch it is pushed to.)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Page to inspect"
+        type: string
+        required: true
+      find:
+        description: "Comma-separated phrases to locate in the markup (optional)"
+        type: string
+        required: false
+  push:
+    branches: ["claude/**"]
+    paths: [".github/inspect-targets.txt"]
+
+jobs:
+  inspect:
+    name: Inspect page structure
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install parser
+        run: pip install httpx beautifulsoup4
+      - name: Inspect
+        env:
+          DISPATCH_URL: ${{ github.event.inputs.url }}
+          DISPATCH_FIND: ${{ github.event.inputs.find }}
+        run: |
+          inspect() {
+            local url="$1" find="$2"
+            args=()
+            IFS=',' read -ra phrases <<< "$find"
+            for p in "${phrases[@]}"; do
+              p="$(echo "$p" | sed 's/^ *//;s/ *$//')"
+              [ -n "$p" ] && args+=(--find "$p")
+            done
+            echo "::group::$url"
+            python -m scripts.inspect_page "$url" "${args[@]}" || echo "inspect failed for $url"
+            echo "::endgroup::"
+          }
+          if [ -n "$DISPATCH_URL" ]; then
+            inspect "$DISPATCH_URL" "$DISPATCH_FIND"
+          else
+            while IFS= read -r line; do
+              line="$(echo "$line" | sed 's/^ *//;s/ *$//')"
+              case "$line" in ''|'#'*) continue ;; esac
+              url="${line%%|*}"; find=""
+              [[ "$line" == *"|"* ]] && find="${line#*|}"
+              inspect "$(echo "$url" | sed 's/ *$//')" "$find"
+            done < ../../.github/inspect-targets.txt
+          fi
