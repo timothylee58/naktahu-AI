@@ -108,6 +108,14 @@ def resolve_faithfulness(args: argparse.Namespace) -> Optional[float]:
     return None
 
 
+def resolve_extra_scores(args: argparse.Namespace) -> dict[str, float]:
+    """Reported-but-ungated scores from --scores-json (context precision and per-language numbers)."""
+    if not args.scores_json:
+        return {}
+    data = json.loads(Path(args.scores_json).read_text(encoding="utf-8"))
+    return {k: float(data[k]) for k in ("context_precision",) if data.get(k) is not None}
+
+
 def evaluate_gates(
     scores: dict[str, Optional[float]], *, require: tuple[str, ...] = ()
 ) -> tuple[list[str], list[str]]:
@@ -187,6 +195,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         # gate key mirrors the user-facing snippet / GATES map
         "temporal_accuracy": avg_temporal,
         "faithfulness": faithfulness,
+        **resolve_extra_scores(args),
     }
 
     require = ("faithfulness",) if args.require_faithfulness else ()
@@ -201,6 +210,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"  faithfulness          NOT MEASURED  (gate ≥ {FAITHFULNESS_GATE} did not run: no score supplied)")
     else:
         print(f"  faithfulness          {faithfulness:.3f}  (gate ≥ {FAITHFULNESS_GATE})")
+    if scores.get("context_precision") is not None:
+        print(f"  context_precision     {scores['context_precision']:.3f}  (reported, no gate)")
     for name in skipped:
         print(f"  skipped gate: {name} (no score provided)")
 

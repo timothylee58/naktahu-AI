@@ -1,0 +1,137 @@
+name: RAG eval (faithfulness + context precision)
+
+# Measures the numbers the deploy gate has only ever been handed from outside.
+# Manual only: it calls live LLMs (the pipeline under test, plus the judge), so it
+# spends credits. Steps:
+#   1. export  - run the real pipeline over the question sets and keep what it answered
+#                and which chunks it used (skips are counted, never hidden)
+#   2. score   - an LLM judge scores each claim (faithfulness) and each chunk (context precision)
+#   3. gate    - run_eval_gate checks faithfulness >= 0.75 on the MEASURED score
+#
+# Judge independence: the answers are written by ILMU, so the default judge is
+# Anthropic (a different model family). The judge is not calibrated against human
+# labels; the step summary says so next to the numbers.
+#
+# Required secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ILMU_API_KEY,
+# OPENAI_API_KEY (query embeddings for the openai profile), ANTHROPIC_API_KEY (judge).
+# Set EMBEDDING_PROFILE to whatever Railway reads, so the eval retrieves like production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      judge:
+        description: "Judge model family"
+        type: choice
+        options:
+          - llm-anthropic
+          - llm-ilmu
+        default: llm-anthropic
+      embedding_profile:
+        description: "Must match Railway's EMBEDDING_PROFILE"
+        type: choice
+        options:
+          - openai
+          - ilmu_bge_m3
+        default: openai
+      limit:
+        description: "Max questions (blank = all)"
+        type: string
+        default: ""
+      record:
+        description: "Record the run in eval_runs (writes to Supabase)"
+        type: boolean
+        default: false
+
+jobs:
+  rag-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      # Two environments on purpose: installing apps/api puts ITS `scripts` package on the
+      # path, which shadows the repo-root `scripts` (evals live there). The pipeline export
+      # runs in a venv with the API installed; scoring and the gate run on the plain
+      # interpreter with only the judge's own dependencies.
+      - name: Install dependencies
+        run: |
+          python -m venv "$RUNNER_TEMP/api-venv"
+          "$RUNNER_TEMP/api-venv/bin/pip" install --ignore-installed PyJWT -e apps/api
+          pip install anthropic openai httpx supabase
+
+      - name: Export pipeline answers and contexts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          ILMU_EMBEDDING_MODEL: ""
+          EMBEDDING_PROFILE: ${{ github.event.inputs.embedding_profile }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          PYTHONPATH: apps/api
+        run: |
+          args=(--questions apps/api/evals/answer_quality.jsonl apps/api/evals/language_accuracy.jsonl --out "$RUNNER_TEMP/samples.jsonl")
+          case "$LIMIT" in
+            "") ;;
+            *[!0-9]*) echo "limit must be a whole number, got: $LIMIT" >&2; exit 2 ;;
+            *) args+=(--limit "$LIMIT") ;;
+          esac
+          "$RUNNER_TEMP/api-venv/bin/python" scripts/evals/faithfulness/export_samples.py "${args[@]}"
+
+      - name: Score with the judge
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          JUDGE: ${{ github.event.inputs.judge }}
+        run: |
+          python -m scripts.evals.faithfulness.pilot score \
+            --samples "$RUNNER_TEMP/samples.jsonl" --judge "$JUDGE" --out "$RUNNER_TEMP/scores.json"
+
+      - name: Deploy gate on the measured score
+        env:
+          RECORD: ${{ github.event.inputs.record }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          flags=(--scores-json "$RUNNER_TEMP/scores.json" --require-faithfulness)
+          if [ "$RECORD" != "true" ]; then flags+=(--no-record); fi
+          python -m scripts.evals.run_eval_gate "${flags[@]}" | tee "$RUNNER_TEMP/gate.txt"
+
+      - name: Summary
+        if: always()
+        env:
+          JUDGE: ${{ github.event.inputs.judge }}
+        run: |
+          {
+            echo "### RAG eval"
+            echo "Judge: \`$JUDGE\` (binary verdicts, **not calibrated against human labels**)."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/gate.txt" 2>/dev/null || true
+            echo '```'
+            echo "Exported / skipped (skips are questions with no answer to judge):"
+            echo '```json'
+            cat "$RUNNER_TEMP/samples.meta.json" 2>/dev/null || echo "(no export metadata)"
+            echo '```'
+            echo "Scores:"
+            echo '```json'
+            cat "$RUNNER_TEMP/scores.json" 2>/dev/null || echo "(no scores)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rag-eval
+          path: |
+            ${{ runner.temp }}/samples.jsonl
+            ${{ runner.temp }}/samples.meta.json
+            ${{ runner.temp }}/scores.json

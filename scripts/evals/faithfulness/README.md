@@ -55,14 +55,32 @@ The model card for `autotrust/JEV-27B-VL` lists **English only** and reports its
 benchmarks itself; nothing about Malay or Mandarin is assumed here. That is what the
 per-language gate is for.
 
+## The live run (faithfulness + context precision)
+
+`.github/workflows/rag-eval.yml` (manual, spends credits) is the end-to-end run:
+
+1. `export_samples.py` runs the real LangGraph pipeline over `answer_quality.jsonl` and
+   `language_accuracy.jsonl` and writes each answer with the chunks it was written from.
+   Blocked queries, clarification prompts and chunk-less answers are skipped and counted
+   in `samples.meta.json`, so the score cannot quietly drop the hard questions.
+2. `pilot score --judge llm-anthropic` (or `llm-ilmu`) judges every claim (faithfulness)
+   and every retrieved chunk (context precision, RAGAS's rank-weighted formula with the
+   answer as reference) and writes `scores.json`, with per-language breakdowns.
+3. `run_eval_gate --scores-json ... --require-faithfulness` enforces faithfulness >= 0.75
+   on that measured number. Context precision is reported and recorded, not gated: no
+   threshold has been agreed.
+
+Caveats, stated in the run's step summary too: the LLM judge gives binary verdicts and has
+not been calibrated against human labels (use `calibrate` once real labelled rows exist);
+claims are split by sentence, not atomically; and the judge should be a different model
+family from the one that wrote the answers (the default is Anthropic for that reason).
+
 ## Not done yet
 
 - **Real calibration data.** 90+ examples (30 each of bm/en/zh) labelled by a person from
   real pipeline answers, including hard negatives (wrong number, wrong entity, plausible
   unsupported addition). Check progress with `python -m scripts.evals.faithfulness.pilot validate --cases <file>`. The 120-row
   synthetic set is a floor, not a substitute: only `synthetic != true` rows count toward the verdict.
-- **An exporter** that runs the live pipeline over a question set and writes the
-  `score` sample file. Nothing in the repo produces it today.
 - **Hosting.** The model card asks for a ≥80 GB GPU, a development build of vLLM and
   `--max-num-seqs 8`, and ships its own `serve_decide.py` (review that code before running
   it). A runner image and entrypoint exist (`nebius/`) but have not been built, and the
