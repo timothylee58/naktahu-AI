@@ -12,6 +12,7 @@ import {
   useTransform,
 } from 'framer-motion';
 import { Callout, CalloutContent } from '@govtechmy/myds-react/callout';
+import { Tag } from '@govtechmy/myds-react/tag';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
 import { Button } from '@/components/ui/button';
@@ -201,6 +202,11 @@ export function LandingClient() {
   const domainPillClass = isDark
     ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
     : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
+  // MYDS Tag's primary variant already supplies the tinted bg + blue text; only
+  // the border strength differs from MYDS's default (/20), so keep naktahu's
+  // existing /30 (light) and /40 (dark) via the same class domainPillClass used.
+  const tagBorderClass = isDark ? 'border-nk-official/40' : 'border-nk-official/30';
+  const chipTagClass = `text-xs font-medium ${tagBorderClass}`;
   const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
   const heroHighlightColor = '#60A5FA';
@@ -440,18 +446,22 @@ export function LandingClient() {
                 key={chip.key}
                 href={href}
                 onClick={(e) => handleNavClick(href, e)}
-                className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+                className="rounded-full locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm"
               >
-                {t(`domain.${chip.key}`)}
+                <Tag variant="primary" mode="pill" size="medium" className={chipTagClass}>
+                  {t(`domain.${chip.key}`)}
+                </Tag>
               </Link>
             );
           })}
           <Link
             href="/warung-watch"
             onClick={(e) => handleNavClick('/warung-watch', e)}
-            className={`border rounded-full px-3 py-1 text-xs font-medium locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm ${domainPillClass}`}
+            className="rounded-full locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm"
           >
-            {t('nav.warung_watch')}
+            <Tag variant="primary" mode="pill" size="medium" className={chipTagClass}>
+              {t('nav.warung_watch')}
+            </Tag>
           </Link>
         </motion.div>
 
@@ -627,9 +637,11 @@ export function LandingClient() {
               viewport={{ once: true }}
               whileHover={{ y: -2, scale: 1.03 }}
               transition={{ delay: i * 0.06, duration: 0.3 }}
-              className={`border rounded-full px-3 sm:px-4 py-1.5 text-sm font-medium locale-nowrap transition-shadow hover:shadow-md ${domainPillClass}`}
+              className="rounded-full locale-nowrap transition-shadow hover:shadow-md"
             >
-              {t(`domain.${d.key}`)}
+              <Tag variant="primary" mode="pill" size="large" className={`text-sm px-3 sm:px-4 ${tagBorderClass}`}>
+                {t(`domain.${d.key}`)}
+              </Tag>
             </motion.span>
           ))}
         </div>
