@@ -164,6 +164,8 @@
   --color-txt-warning: var(--myds-txt-warning);
   --color-txt-black-900: var(--myds-txt-black-900);
   --color-txt-black-700: var(--myds-txt-black-700);
+  /* Tag's primary variant uses border-primary-600/20 */
+  --color-primary-600: var(--nk-official);
 }
 
 body {
