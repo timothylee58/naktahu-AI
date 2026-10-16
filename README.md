@@ -24,7 +24,7 @@ A shared LangGraph-based agent framework backs several purpose-built assistants,
 
 | Agent | What it does |
 |---|---|
-| **Grant Finder** (backend: Eligibility Agent) | Multi-turn business grant-eligibility matching — conversational intake (business type, sector, revenue, headcount, Bumiputera status), hybrid retrieval against a seeded, source-cited grant database (Cradle Fund, MDEC, SME Corp, HRD Corp and others), scoring with near-miss detection, and a grant-stacking compatibility matrix (which programmes can legally be combined). Statutory tax-incentive matching (Pioneer Status, ITA, RA) is a known, deliberately unbuilt gap — no verified source corpus for it exists yet, so it's not fabricated. |
+| **Grant Finder** (backend: Eligibility Agent) | Multi-turn business grant-eligibility matching — conversational intake (business type, sector, revenue, headcount, Bumiputera status), hybrid retrieval against a seeded, source-cited grant database (Cradle Fund, MDEC, SME Corp, HRD Corp and others), scoring with near-miss detection, and a grant-stacking compatibility matrix (which programmes can legally be combined). Each top match is re-checked live against the agency's own page (Tavily, restricted to that agency's domain, deterministic date extraction, no LLM reads web text) and shown with a *last verified* stamp: `confirmed`, `changed`, `closed`, `no_signal` or `unavailable`, never silently passed. Optionally, a flag-gated Nemotron model split (Nebius Token Factory) handles intake extraction (fast model) and the streamed eligibility summary (reasoning model); eligibility decisions themselves stay deterministic code. Statutory tax-incentive matching (Pioneer Status, ITA, RA) is a known, deliberately unbuilt gap — no verified source corpus for it exists yet, so it's not fabricated. |
 | **Grant Draft Generator** | Given a selected grant and business profile, drafts an executive summary, use-of-funds narrative, a financial-projection *template* (explicitly never presented as real figures), and a required-document checklist; exports to PDF or Word. |
 | **Compliance Drafter** | Multi-domain compliance report generation with a human-in-the-loop approval step before the final PDF is produced. |
 | **SME Compliance Navigator (PatuhiKu)** | Cross-references a business profile against tax (LHDN), employment (EPF/SOCSO/EIS), and company (SSM) obligations in parallel. |
@@ -53,9 +53,27 @@ A standalone crowdsourced "how busy is it right now" tool for Malaysian warungs/
 - **Interactive citation cards** — hover or tap a citation chip for the full source title, a colour-coded confidence rating, staleness flag, and the direct source link, instead of only a truncated inline chip.
 - **Document export** — Compliance Drafter, Grant Draft Generator, and Health Triage can each export their output to PDF (Grant Draft Generator also supports Word), rendered server-side (WeasyPrint / python-docx) and served via a signed, time-limited Supabase Storage URL.
 - **Optional cross-encoder-style re-ranking** — a second retrieval pass over `hybrid_search`'s candidate pool, re-scoring (query, chunk) pairs together via the same ILMU chat client rather than a new provider. Off by default (`RERANK_ENABLED`) pending an eval-set comparison; degrades to the unranked order on any failure.
+- **Embedding profiles** — search can run on either the OpenAI corpus model (`openai`, 1536-dim) or ILMU's native `bge-m3` (`ilmu_bge_m3`, 1024-dim), each with its own column and search RPC. `EMBEDDING_PROFILE` picks what search reads; `EMBEDDING_WRITE_PROFILES` picks what ingestion fills. A query vector is never compared against another model's column. `scripts/reembed_corpus.py` backfills a new profile (resumable) and compares retrieval before cutover.
 - **Redis-backed caching** — repeated queries skip retrieval entirely (content-hash keyed, TTL-bound).
 - **Tiered rate limiting** — anonymous and authenticated users get different request budgets; the Developer API is independently metered per key.
 - **Plan-based access** — free / student / pro / business tiers, plus an independent "investor" entitlement for the Investor Intelligence product — read from the user's Supabase session, not a separate subscriptions table.
+
+### Quality and evaluation
+- **Deploy eval gate** (`scripts/evals/run_eval_gate.py`) — blocks deploy on a temporal-accuracy regression (chunk currency). Its faithfulness gate (0.75) is enforced only when a score is supplied; otherwise it prints `NOT MEASURED` rather than passing silently.
+- **Grant Agent decision evals** (`apps/api/evals/test_grant_agent.py`) — credential-free: match precision 1.00, stacking accuracy 1.00, and "never confirm a deadline the evidence does not support".
+- **Trilingual intake eval** (`apps/api/evals/test_grant_intake_multilingual.py`) — the same six business descriptions in BM, EN and ZH. Parity checks run in CI; the live accuracy test (`RUN_LIVE_EVALS=1`) requires every language at or above 0.85 and Mandarin within 0.10 of English. It has not been run against a live model yet.
+- **Faithfulness judge pilot** (`scripts/evals/faithfulness/`) — scaffolding for the missing faithfulness measurement, with a Nebius job runner. Not yet calibrated: it needs about 90 human-labelled examples.
+
+---
+
+## What's new (October 2026)
+- **Budget 2027 from official MOF sources** — documents are fetched only from `*.mof.gov.my` (every redirect hop is checked) and identity-checked against the PDF's own text before anything is stored.
+- **ILMU-native embeddings** — side-by-side `bge-m3` column, v2 search RPCs, and a resumable re-embed of the whole corpus (migration 056).
+- **Source-specific extractors** — LHDN rate tables are ingested with their numbers intact (`scripts/html_extractors.py`), with a page inspector workflow (`inspect-page.yml`) for writing more.
+- **Self-diagnosing weekly ingest** — fetches retry transient failures, each run ends with a per-source recap, and sources marked `known_broken` (with a reason) are skipped instead of turning the job red.
+- **Live grant verification** — Tavily-backed deadline checks with last-verified stamps, plus a nightly refresh job (`grant-refresh.yml`).
+- **Nemotron model split** for the Grant Agent only, behind `ELIGIBILITY_USE_NEMOTRON`; ILMU stays the primary provider everywhere else.
+- **Mandarin coverage measured** for the Grant Agent's intake.
 
 ---
 
@@ -235,6 +253,10 @@ Migrations under `infra/supabase/migrations/` are versioned SQL, applied manuall
 | `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | LLM tracing (optional) |
 | `GOOGLE_PLACES_API_KEY` | Enables Warung Watch's real nearby-place search assist (Places API New, Nearby Search). Optional — degrades to a Maps-link-only view when unset. |
 | `GOOGLE_SPEECH_CREDENTIALS_JSON` / `GOOGLE_SPEECH_PROJECT_ID` / `GOOGLE_SPEECH_LOCATION` | Google Speech-to-Text V2, cross-browser voice-input fallback. Optional — the frontend falls back to the browser's own Web Speech API when unset. |
+| `ELIGIBILITY_USE_NEMOTRON` | Enables the Grant Agent's Nemotron model split (default `false`). Also needs `NEMOTRON_API_KEY` and the role's model ID |
+| `NEMOTRON_API_KEY` / `NEMOTRON_BASE_URL` | Nebius Token Factory key and OpenAI-compatible endpoint |
+| `NEMOTRON_FAST_MODEL` / `NEMOTRON_REASONING_MODEL` | Model IDs per role. Never defaulted: run `python scripts/nemotron_check.py` to list the live catalog and test-call your IDs |
+| `TAVILY_API_KEY` | Live grant-deadline verification and the nightly refresh. Unset means grants show as unverified |
 | `RERANK_ENABLED` | Turns on the optional cross-encoder-style re-ranking pass over hybrid-search results (default `false`) |
 
 Most are validated via `apps/api/core/config.py`'s `Settings` object — but not all: `GOOGLE_PLACES_API_KEY`, the `GOOGLE_SPEECH_*` vars, `RERANK_ENABLED`, `SENTRY_DSN`, and `LANGSMITH_API_KEY`/`LANGSMITH_PROJECT` are read directly via `os.environ.get(...)` in their own modules (`services/warung_watch.py`, `app/services/speech.py`, `app/services/reranker.py`) rather than through `Settings`, so `core/config.py` alone won't show the full picture — this table plus a repo-wide `grep -rn "os.environ.get" apps/api` is the accurate way to find every one.
@@ -248,7 +270,11 @@ Most are validated via `apps/api/core/config.py`'s `Settings` object — but not
 | `ci.yml` | PR to `main`, push to `main`/`claude/**` | TypeScript typecheck, Next.js build, pytest, and an automated eval-quality gate (faithfulness + temporal-accuracy scoring) that blocks deploy on regression |
 | `deploy.yml` | Push to `main` | Deploys `apps/web` to Netlify. `apps/api` deploys via Railway's own build hook. |
 | `deadline-monitor.yml` | Daily 18:00 UTC (02:00 MYT), manual dispatch | Runs the Deadline Monitor agent directly on a GitHub runner |
-| `ingest-sources.yml` | Weekly, Sunday 20:00 UTC, manual dispatch | Runs `scripts/ingest_feed.py` against every registered source in `scripts/sources.py` |
+| `ingest-sources.yml` | Weekly, Sunday 20:00 UTC, manual dispatch | Runs `scripts/ingest_feed.py` against every registered source in `scripts/sources.py` except those marked `known_broken`. Dry-run unless dispatched with `write_mode=live`; ends with a per-source recap table |
+| `ingest-budget-2027.yml` | Daily 12:00 UTC on 9–16 October, manual dispatch | Ingests the Budget 2027 documents from official MOF URLs once published (dry-run unless `write_mode=live`) |
+| `reembed-corpus.yml` | Manual dispatch | Probe, backfill or compare an embedding profile (`probe` / `backfill` / `compare`) |
+| `grant-refresh.yml` | Daily 17:30 UTC, manual dispatch | Re-verifies every active grant against its agency's site (Tavily); dry-run unless the repo variable `GRANT_REFRESH_LIVE` is `true` |
+| `inspect-page.yml` | Manual dispatch, or a push to `claude/**` that edits `.github/inspect-targets.txt` | Prints a page's structure from a GitHub runner, for writing source-specific extractors |
 | `ingest-madani.yml` | Weekly, Sunday 21:00 UTC, manual dispatch | Runs `scripts/ingest_madani.py` — scrapes Ihsan MADANI's welfare-scheme listings into `madani_scheme` (defaults to `--dry-run`; selectors need live-site verification before a real run is trusted — see the script's own docstring) |
 | `lighthouse.yml` | Push to `main`, manual dispatch | Lighthouse CI audit, gated on a minimum PWA score |
 | `ping-supabase.yml` | Mon + Thu 9am UTC | Keeps the Supabase free-tier project from auto-pausing |
@@ -261,8 +287,8 @@ Most are validated via `apps/api/core/config.py`'s `Settings` object — but not
 |---|---|
 | Frontend | Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS 4, Framer Motion, Web Speech API |
 | Backend | Python 3.11+, FastAPI, LangGraph, LangChain Core |
-| LLM | ILMU API (primary) + Anthropic Claude (synthesis fallback only) |
-| Embeddings | ILMU API, with an OpenAI-compatible fallback |
+| LLM | ILMU API (primary) + Anthropic Claude (synthesis fallback only). Grant Agent only: optional Nemotron on Nebius Token Factory |
+| Embeddings | Selectable profile: OpenAI `text-embedding-3-small` (default) or ILMU `bge-m3`, each with its own column and search RPC |
 | Vector DB | Supabase pgvector — hybrid cosine + BM25 search |
 | Cache | Redis |
 | Auth | Supabase Auth — plan/entitlements read from the JWT session, no separate subscriptions table |
