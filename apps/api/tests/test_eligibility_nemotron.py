@@ -350,3 +350,17 @@ async def test_a_partial_ilmu_answer_followed_by_anthropic_is_reported_as_both()
          patch.object(syn, "_stream_ilmu", ilmu_then_boom), patch.object(syn, "_stream_anthropic", anthropic):
         events = await _collect(STATE)
     assert _provider(events) == "ilmu+anthropic"
+
+
+def test_repo_root_wrapper_runs_the_check_and_reports_nothing_configured():
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    wrapper = Path(__file__).resolve().parents[3] / "scripts" / "nemotron_check.py"
+    assert wrapper.exists()
+    env = {**os.environ, "NEMOTRON_API_KEY": "", "NEMOTRON_FAST_MODEL": "", "NEMOTRON_REASONING_MODEL": ""}
+    proc = subprocess.run([sys.executable, str(wrapper)], capture_output=True, text=True, env=env, cwd="/")
+    assert proc.returncode == 2
+    assert "Nothing to check" in proc.stdout
