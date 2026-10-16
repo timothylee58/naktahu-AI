@@ -51,6 +51,7 @@ export default function PrivacyPage() {
               <ul>
                 <li><strong>Account information</strong> — email address when you sign in via Email Magic Link or Google OAuth.</li>
                 <li><strong>Query text</strong> — the questions you submit to the AI assistant.</li>
+                <li><strong>Answers and citations</strong> — on plans that include History (currently Pro), the full text of each answer (with its citations, confidence score and suggested follow-ups) is saved with your query so History can show you exactly what you saw.</li>
               </ul>
             </Subsection>
             <Subsection title="2.2 Data collected automatically">
@@ -65,8 +66,7 @@ export default function PrivacyPage() {
               <ul>
                 <li>We do not collect payment information.</li>
                 <li>We do not collect device fingerprints or persistent tracking cookies.</li>
-                <li>We do not store the full AI-generated responses server-side — only a short summary for history display.</li>
-                <li>We do not store the household/eligibility details you enter into the Welfare Eligibility Agent (Check Assistance) — see 2.4 below.</li>
+                                <li>We do not store the household/eligibility details you enter into the Welfare Eligibility Agent (Check Assistance) — see 2.4 below.</li>
               </ul>
             </Subsection>
             <Subsection title="2.4 Welfare Eligibility Agent — stateless processing">
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <Section title="3. How We Use Your Data">
             <ul>
               <li><strong>To provide the service</strong> — routing your query through the AI pipeline and returning an answer.</li>
-              <li><strong>Query history</strong> — storing up to 50 recent queries per account in Redis (TTL 30 days) so you can revisit past questions.</li>
+              <li><strong>Query history</strong> — saving your recent questions and the answers you received, per account on plans that include History (currently Pro), so you can revisit them.</li>
               <li><strong>Rate limiting</strong> — keying anonymous users (30 req/hr) and authenticated users (200 req/hr) to prevent abuse.</li>
               <li><strong>Service improvement</strong> — anonymised traces help us tune model quality and latency.</li>
             </ul>
@@ -112,7 +112,7 @@ export default function PrivacyPage() {
           <Section title="4. Data Storage and Retention">
             <ul>
               <li><strong>Authentication data</strong> is stored by <a href="https://supabase.com/privacy" className="text-nk-official-dim hover:underline" target="_blank" rel="noopener noreferrer">Supabase</a> (hosted on AWS ap-southeast-1).</li>
-              <li><strong>Query history</strong> is stored in Redis with a 30-day rolling TTL. History is automatically deleted after 30 days of inactivity.</li>
+              <li><strong>Query history</strong> (your questions, the full answers and their citations) is saved in our Supabase database against your account until you delete it or your account is deleted; it is not automatically expired. A temporary copy of your most recent entries is also kept in Redis for speed and expires after 30 days of inactivity. History shows your 20 most recent entries. You can delete individual entries from the History page.</li>
               <li><strong>Account deletion</strong> — you may request deletion of your account and all associated data by emailing us. We will process requests within 14 days.</li>
             </ul>
           </Section>
