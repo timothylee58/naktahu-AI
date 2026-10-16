@@ -51,7 +51,7 @@ export default function PrivacyPage() {
               <ul>
                 <li><strong>Account information</strong> — email address when you sign in via Email Magic Link or Google OAuth.</li>
                 <li><strong>Query text</strong> — the questions you submit to the AI assistant.</li>
-                <li><strong>Answers and citations</strong> — when you are signed in, the full text of each answer (with its citations, confidence score and suggested follow-ups) is saved with your query so History can show you exactly what you saw.</li>
+                <li><strong>Answers and citations</strong> — on plans that include History (currently Pro), the full text of each answer (with its citations, confidence score and suggested follow-ups) is saved with your query so History can show you exactly what you saw.</li>
               </ul>
             </Subsection>
             <Subsection title="2.2 Data collected automatically">
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <Section title="3. How We Use Your Data">
             <ul>
               <li><strong>To provide the service</strong> — routing your query through the AI pipeline and returning an answer.</li>
-              <li><strong>Query history</strong> — saving your recent questions and the answers you received, per signed-in account, so you can revisit them.</li>
+              <li><strong>Query history</strong> — saving your recent questions and the answers you received, per account on plans that include History (currently Pro), so you can revisit them.</li>
               <li><strong>Rate limiting</strong> — keying anonymous users (30 req/hr) and authenticated users (200 req/hr) to prevent abuse.</li>
               <li><strong>Service improvement</strong> — anonymised traces help us tune model quality and latency.</li>
             </ul>
