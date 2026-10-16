@@ -29,73 +29,73 @@
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-best-practices/SKILL.md",
-      "computedHash": "abaebe300e512c1bb412a8bfde7650467a8a7a63111554f40b6637b5454cc1a7"
+      "computedHash": "5622d2809a04d655a2f89de7f480fcdd4eec827a417af6709a8e6e566784a48a"
     },
     "remotion-captions": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-captions/SKILL.md",
-      "computedHash": "91cb42a29d990d0fd11edd6b61c5d660b07280408afaa3f2998ddf8b09d38a16"
+      "computedHash": "9848412004a2c3240b9ef565c448bbf3cd8fc32dd71805d2f130c48412338820"
     },
     "remotion-create": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-create/SKILL.md",
-      "computedHash": "0b0edb8688a4ca249bf70965656f69b5121333195a8d1b16c48c72af98fe163c"
+      "computedHash": "bfbe302ff46cfa8af8eab788d0310cdc10794fa38e3bee0f1150c5ffc2ac6a04"
     },
     "remotion-docs": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-docs/SKILL.md",
-      "computedHash": "aa77dbde0522868f69c76dc86f1a5e316b48ae69a88e778bd062546acb9e5269"
+      "computedHash": "a37ce9c19903ed4a38d148558a4f6880df984f9fc8fdea8e37543b76b409457f"
     },
     "remotion-interactivity": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-interactivity/SKILL.md",
-      "computedHash": "07a758931923fb96e915a31d3935a0aa3192ae0fcb4afc6d161999f4569a6a34"
+      "computedHash": "6400dcb408e3186bd2d2fb69f11ceb3cee2309f393c390055d0277ec5b113f15"
     },
     "remotion-maps": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-maps/SKILL.md",
-      "computedHash": "6e41c5c5c23f2f919e603f4c703f1ba0aeac94b8ad9346791b4ef2acea84cc7c"
+      "computedHash": "70a806610f88d5400fd5e0b4086523138b19ef946d7124280d4c1820ce9ffa19"
     },
     "remotion-markup": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-markup/SKILL.md",
-      "computedHash": "6eee5236345d845d8b609dc79ae01fd04f1dd5e3c40069a7cad2e676ffa69c09"
+      "computedHash": "08fe5c6e7fc60898c5d2e20bdc72554083ac806672f6b0faf2fc6d6fe07609f0"
     },
     "remotion-multimedia": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-multimedia/SKILL.md",
-      "computedHash": "02ce7a3b1b2884c046a7236322701e391811e02362314a68c9e7b3b6f87e1dcf"
+      "computedHash": "16e052fd7537f8e3e76510a63b28d01ceb850b46ea236e78395475088b1e2dd6"
     },
     "remotion-render": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-render/SKILL.md",
-      "computedHash": "696d68ebf0cc830bbbebe132b965a8a3ed56ea6751f3a68738035d2677506b10"
+      "computedHash": "a515da546bd1b7af66c5eb2cb249d5805f9bb28bb12f346ee4dbf9ff42378db7"
     },
     "remotion-saas": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-saas/SKILL.md",
-      "computedHash": "2ee152c76fbf4421cdd54d2f9dae1eb83ab2ca0a308c7d115595fbe533b5b0da"
+      "computedHash": "28fa2424b0ee407d056e0c436369d49a7dd56f80084fe61315b76e2c8758d0a7"
     },
     "remotion-studio": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-studio/SKILL.md",
-      "computedHash": "cc44ab6b2ba5090082964f192a4bd51a2487debb766d6506686322b0460c3b56"
+      "computedHash": "5a05c5304558860d64bb94d99e70e944669bf668289480bd40f3ab4b9b265e63"
     },
     "remotion-upgrade": {
       "source": "remotion-dev/skills",
       "sourceType": "github",
       "skillPath": "skills/remotion-upgrade/SKILL.md",
-      "computedHash": "a665745f703d1ca77f8afbfb88020fe84b92908f62d578a89b2404ac66241319"
+      "computedHash": "f734496d18ae621fae039b6b21037a3c013e30a9029d8e8b5b10c77769e63476"
     },
     "review-animations": {
       "source": "emilkowalski/skills",
