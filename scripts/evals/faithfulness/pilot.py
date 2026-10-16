@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+from scripts.evals.faithfulness.context_precision import score_context_precision
 from scripts.evals.faithfulness.judge import JudgeError, LexicalOverlapJudge, make_judge
 from scripts.evals.faithfulness.metrics import calibration_report
 from scripts.evals.faithfulness.scoring import ScoreRefused, score_samples
@@ -59,7 +60,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     val.add_argument("--require-complete", action="store_true", help="also fail unless every language has the 30 real rows needed")
     sc = sub.add_parser("score")
     sc.add_argument("--samples", required=True)
-    sc.add_argument("--judge", choices=["jev", "lexical"], default="jev")
+    sc.add_argument("--judge", choices=["jev", "lexical", "llm-anthropic", "llm-ilmu"], default="jev")
     sc.add_argument("--out", required=True)
     args = parser.parse_args(argv)
 
@@ -96,7 +97,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                     print("ERROR: judge fails the synthetic floor: " + "; ".join(report["synthetic"].get("floor_reasons", [])), file=sys.stderr)
                     return 1
             return 0
-        result = score_samples(load_jsonl(args.samples), judge)
+        samples = load_jsonl(args.samples)
+        result = score_samples(samples, judge)
+        if hasattr(judge, "p_relevant"):
+            result.update(score_context_precision(samples, judge))
         Path(args.out).write_text(json.dumps(result, indent=2), encoding="utf-8")
         print(json.dumps(result, indent=2))
         return 0
