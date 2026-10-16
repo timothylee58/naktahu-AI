@@ -89,3 +89,28 @@ async def test_upcoming_source_is_reported_not_fetched(monkeypatch, capsys):
     assert ok is True
     head.assert_not_called()
     assert "UPCOMING" in capsys.readouterr().out
+
+
+def test_scheduled_sources_exclude_known_broken_and_every_one_has_a_reason():
+    from scripts.sources import SOURCES, scheduled_sources
+
+    broken = [s for s in SOURCES if s.known_broken]
+    assert broken
+    assert all(len(s.known_broken or "") > 20 for s in broken)
+    assert not {s.name for s in broken} & {s.name for s in scheduled_sources()}
+
+
+@pytest.mark.asyncio
+async def test_check_sources_skips_known_broken_without_calling_them(monkeypatch, capsys):
+    calls: list[str] = []
+
+    async def fake_head(self, url, **kw):
+        calls.append(url)
+        return httpx.Response(200)
+
+    monkeypatch.setattr(httpx.AsyncClient, "head", fake_head)
+    broken = Source(name="b", url="https://b.example.gov.my/", kind="html", domain="business",
+                    ministry="m", language="en", notes="n", known_broken="host blocks the runner for good")
+    assert await check_sources((broken,)) is True
+    assert calls == []
+    assert "KNOWN BROKEN" in capsys.readouterr().out

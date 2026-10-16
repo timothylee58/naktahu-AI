@@ -115,7 +115,7 @@ jobs:
           if [ -n "$SINGLE_SOURCE" ]; then
             NAMES="$SINGLE_SOURCE"
           else
-            NAMES=$(python -c "from scripts.sources import SOURCES; print(' '.join(s.name for s in SOURCES))")
+            NAMES=$(python -c "from scripts.sources import scheduled_sources; print(' '.join(s.name for s in scheduled_sources()))")
           fi
 
           status=0
