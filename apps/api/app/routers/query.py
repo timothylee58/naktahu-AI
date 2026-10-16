@@ -6,13 +6,14 @@ import json
 import os
 import time
 import uuid
-from typing import Any, AsyncGenerator, Awaitable, Callable, Optional
+from typing import Any, AsyncGenerator, Awaitable, Callable, Literal, Optional
 
 import structlog
 import weave
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from app.agents.followup import condense_followup
 from app.agents.graph import pipeline
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
@@ -30,6 +31,11 @@ _ANON_RATE = os.environ.get("ANON_RATE_LIMIT", "30/hour")
 _AUTH_RATE = os.environ.get("AUTH_RATE_LIMIT", "200/hour")
 
 
+class HistoryTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., max_length=2000)
+
+
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=2, max_length=1000)
     session_id: Optional[str] = Field(default=None, max_length=128)
@@ -38,6 +44,10 @@ class QueryRequest(BaseModel):
     # MP?" can be answered via postcode_constituencies (migration 054)
     # without the user retyping it. Only digits ever reach the pipeline.
     postcode: Optional[str] = Field(default=None, pattern=r"^\d{5}$")
+    # The last few turns of this conversation, so a follow-up ("what about my
+    # wife?") can be understood. Optional and untrusted: bounded here, bounded
+    # again and treated as data in agents/followup.py.
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=6)
 
     @field_validator("session_id")
     @classmethod
@@ -78,6 +88,7 @@ async def _run_pipeline(
     domain: Optional[str] = None,
     on_token: Optional[Callable[[str], Awaitable[None]]] = None,
     postcode: Optional[str] = None,
+    history: Optional[list[dict]] = None,
 ) -> dict:
     """Execute the full LangGraph pipeline and return a structured result dict.
 
@@ -99,8 +110,11 @@ async def _run_pipeline(
     classification + embed + hybrid search + rerank + the ENTIRE synthesis
     generation — before seeing a single byte).
     """
+    # Resolve follow-ups into a standalone question first, so guard, routing,
+    # retrieval and synthesis all work on what the user actually means.
+    standalone_query = await condense_followup(query, history)
     inputs: AgentState = {
-        "query": query,
+        "query": standalone_query,
         "session_id": session_id,
         "user_id": user_id,
         "retrieved_chunks": [],
@@ -160,6 +174,7 @@ async def _stream_pipeline(
     user_id: Optional[str],
     domain: Optional[str] = None,
     postcode: Optional[str] = None,
+    history: Optional[list[dict]] = None,
 ) -> AsyncGenerator[tuple[str, Any], None]:
     """Runs _run_pipeline in the background and yields ("token", str) events
     the moment each one arrives, followed by exactly one final
@@ -184,7 +199,13 @@ async def _stream_pipeline(
     async def produce() -> None:
         try:
             result = await _run_pipeline(
-                query, session_id, user_id, domain=domain, on_token=on_token, postcode=postcode
+                query,
+                session_id,
+                user_id,
+                domain=domain,
+                on_token=on_token,
+                postcode=postcode,
+                history=history,
             )
             await queue.put(("result", result))
         except Exception as exc:  # noqa: BLE001 — re-raised to the consumer below, not swallowed
@@ -211,12 +232,17 @@ async def _sse_generator(
     request: Request,
     language_hint: Optional[str],
     postcode: Optional[str] = None,
+    history: Optional[list[dict]] = None,
 ) -> AsyncGenerator[str, None]:
     try:
         tokens: list[str] = []
         final_state: dict = {}
         async for kind, payload in _stream_pipeline(
-            query, session_id, user_ctx.user_id if user_ctx else None, postcode=postcode
+            query,
+            session_id,
+            user_ctx.user_id if user_ctx else None,
+            postcode=postcode,
+            history=history,
         ):
             if kind == "token":
                 tokens.append(payload)
@@ -311,7 +337,15 @@ async def query_endpoint(
     log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
 
     return StreamingResponse(
-        _sse_generator(clean_query, session_id, user_ctx, request, body.language, body.postcode),
+        _sse_generator(
+            clean_query,
+            session_id,
+            user_ctx,
+            request,
+            body.language,
+            body.postcode,
+            [t.model_dump() for t in body.history],
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -18,12 +18,19 @@ export interface UseSSEStreamReturn {
   suggestions: string[];
   isStreaming: boolean;
   error: string | null;
-  startStream: (query: string, language?: string) => void;
+  /** `history` is the last few turns of this conversation (oldest first), so
+   * the server can understand a follow-up like "what about my wife?". */
+  startStream: (query: string, language?: string, history?: HistoryTurn[]) => void;
   reset: () => void;
   /** Aborts the in-flight stream. Tokens received so far are kept as the
    * final message (unlike reset(), which also clears state) — the caller's
    * "done" handling (isStreaming flips false) finalises the partial answer. */
   stop: () => void;
+}
+
+export interface HistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 async function* readSSELines(
@@ -89,7 +96,7 @@ export function useSSEStream({
   }, []);
 
   const startStream = useCallback(
-    (query: string, language?: string) => {
+    (query: string, language?: string, history: HistoryTurn[] = []) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -120,6 +127,7 @@ export function useSSEStream({
               session_id: sessionId,
               // Lets "who is my MP?" resolve via the saved postcode.
               postcode: readSavedPostcode(),
+              history,
             }),
             signal: controller.signal,
           });

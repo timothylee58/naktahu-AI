@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { useSWRConfig } from 'swr';
 import { useI18n } from '@/lib/i18n';
-import { useSSEStream } from '@/lib/hooks/useSSEStream';
+import { useSSEStream, type HistoryTurn } from '@/lib/hooks/useSSEStream';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import type { Message } from '@/lib/types';
 import { ChatAmbientMesh } from '@/components/chat/ChatAmbientMesh';
@@ -27,6 +27,16 @@ function makeId() {
   return `msg-${++msgCounter}-${Date.now()}`;
 }
 
+/** The last few finished turns, oldest first, for follow-up understanding.
+ * Skips failed answers and anything still streaming; the server re-bounds
+ * this and treats it as untrusted, so these caps are a courtesy, not a guard. */
+function recentTurns(messages: Message[]): HistoryTurn[] {
+  return messages
+    .filter((m) => !m.isError && !m.isStreaming && m.content.trim() !== '')
+    .slice(-6)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 1500) }));
+}
+
 function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
@@ -36,6 +46,9 @@ function ChatPageInner() {
   const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const [thinkingId, setThinkingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -51,6 +64,9 @@ function ChatPageInner() {
     else setInjectedQuery('');
   }, [q]);
   const lastUserQuery = useRef<string>('');
+  // Always the latest messages, readable inside handleSend without making it
+  // re-create on every streamed token.
+  const messagesRef = useRef<Message[]>([]);
   const wasStreaming = useRef(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -255,7 +271,7 @@ function ChatPageInner() {
       };
 
       setMessages((prev) => [...prev, userMsg, thinkMsg]);
-      startStream(query, locale);
+      startStream(query, locale, recentTurns(messagesRef.current));
     },
     [isStreaming, reset, startStream, locale],
   );
