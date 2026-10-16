@@ -136,7 +136,7 @@ class TestIntakeNode:
         assert any(word in result["next_question"] for word in ["perniagaan", "jenis", "sektor"])
 
     @pytest.mark.asyncio
-    async def test_turn_1_asks_revenue_question(self):
+    async def test_follow_up_asks_only_for_missing_fields(self):
         state = make_state(
             current_turn=1,
             language="en",
@@ -149,20 +149,52 @@ class TestIntakeNode:
         )
         with patch(
             "app.agents.eligibility_agent.intake_node._extract_profile_fields",
-            new=AsyncMock(return_value={
-                "business_type": "sdn_bhd",
-                "sector": "technology",
-                "registered_months": 18,
-            }),
+            new=AsyncMock(return_value={}),
         ):
             result = await intake_node(state)
         assert result["needs_more_info"] is True
-        assert result["current_turn"] == 2
-        question = result["next_question"] or ""
-        assert any(w in question.lower() for w in ["revenue", "employee", "bumiputera"])
+        assert result["missing_fields"] == ["is_bumiputera"]
+        question = (result["next_question"] or "").lower()
+        assert "bumiputera" in question
+        # Already answered on the form: must not be asked again.
+        assert "sector" not in question
+        assert "type of business" not in question
+        assert "months" not in question
 
     @pytest.mark.asyncio
-    async def test_turn_3_marks_intake_complete(self):
+    async def test_complete_form_profile_finishes_on_first_turn(self):
+        """A profile fully supplied by the web form needs no follow-up turns."""
+        state = make_state(
+            current_turn=0,
+            language="en",
+            business_profile={
+                "business_type": "sdn_bhd",
+                "sector": "technology",
+                "registered_months": 18,
+                "is_bumiputera": False,
+            },
+        )
+        result = await intake_node(state)
+        assert result["intake_complete"] is True
+        assert result["needs_more_info"] is False
+        assert result["next_question"] is None
+
+    @pytest.mark.asyncio
+    async def test_revenue_and_employee_count_are_not_required(self):
+        state = make_state(
+            business_profile={
+                "business_type": "startup",
+                "sector": "ai",
+                "registered_months": 3,
+                "is_bumiputera": True,
+            },
+        )
+        result = await intake_node(state)
+        assert result["intake_complete"] is True
+        assert result["missing_fields"] == []
+
+    @pytest.mark.asyncio
+    async def test_complete_profile_is_complete_at_any_turn(self):
         state = make_state(
             current_turn=3,
             language="en",
@@ -378,3 +410,17 @@ class TestGrantRagNode:
         result = await grant_rag_node(state, mock_supabase)
         assert result["structured_grants"] == []
         assert result["retrieved_grant_chunks"] == []
+
+
+class TestStartRequestExistingGrants:
+    def test_existing_grants_accepted_and_bounded(self):
+        from pydantic import ValidationError
+
+        from app.routers.agents import AgentStartRequest
+
+        assert AgentStartRequest(existing_grants=["MD Grant"]).existing_grants == ["MD Grant"]
+        assert AgentStartRequest().existing_grants is None
+        with pytest.raises(ValidationError):
+            AgentStartRequest(existing_grants=["x"] * 21)
+        with pytest.raises(ValidationError):
+            AgentStartRequest(existing_grants=["x" * 201])

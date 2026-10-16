@@ -1,9 +1,10 @@
-"""intake_node — 3-turn conversational business-profile intake for the Eligibility Agent.
+"""intake_node — business-profile intake for the Eligibility Agent.
 
-Turn 0: ask business type + sector.
-Turn 1: ask revenue + employees + Bumiputera status.
-Turn 2: ask Malaysia Digital status + existing grants held.
-Turn 3+: intake considered complete once all required fields are present.
+The web form already collects the whole profile up front, so intake is
+complete as soon as every required field is present — on the very first turn
+when the form was filled in. Only when something is genuinely missing (e.g. a
+caller that sends a partial profile) does it ask a follow-up, and that
+follow-up names only the missing fields instead of replaying a fixed script.
 """
 from __future__ import annotations
 
@@ -18,38 +19,52 @@ from app.agents.tools import llm_complete
 
 log = structlog.get_logger(__name__)
 
+# Only fields that change which grants match. annual_revenue_myr is optional on
+# the form and the analyst already treats an unknown revenue as 0 (see
+# analyst_node's `profile.get("annual_revenue_myr") or 0`). employee_count and
+# has_md_status are not read by any matching or scoring code, so requiring them
+# only forced users to answer questions that couldn't affect their results.
 _REQUIRED_FIELDS = (
     "business_type",
     "sector",
     "registered_months",
-    "annual_revenue_myr",
     "is_bumiputera",
-    "employee_count",
 )
 
-_QUESTIONS_EN = [
-    "What type of business do you have (sole proprietorship, Sdn Bhd, startup, LLP, or cooperative), "
-    "and what sector are you in?",
-    "What is your annual revenue (RM) and how many employees do you have? Is your business Bumiputera-owned?",
-    "Do you have Malaysia Digital (MD) status, and have you received any government grants before?",
-]
+_LEAD = {
+    "en": "Thanks. I just need a little more to match you:",
+    "bm": "Terima kasih. Saya hanya perlukan sedikit maklumat lagi untuk memadankan anda:",
+    "zh": "谢谢。还需要补充以下信息才能为您匹配：",
+}
 
-_QUESTIONS_BM = [
-    "Apakah jenis perniagaan anda (milikan tunggal, Sdn Bhd, startup, LLP, atau koperasi), "
-    "dan apakah sektor perniagaan anda?",
-    "Berapakah hasil tahunan (RM) perniagaan anda dan berapa ramai pekerja anda? "
-    "Adakah perniagaan anda milik Bumiputera?",
-    "Adakah anda mempunyai status Malaysia Digital (MD), dan pernahkah anda menerima geran kerajaan sebelum ini?",
-]
+# One short prompt per field, so a follow-up asks only about what is missing.
+_FIELD_PROMPTS = {
+    "en": {
+        "business_type": "What type of business is it (sole proprietorship, Sdn Bhd, startup, LLP, or cooperative)?",
+        "sector": "Which sector are you in?",
+        "registered_months": "How many months has the business been registered?",
+        "is_bumiputera": "Is your business Bumiputera-owned?",
+    },
+    "bm": {
+        "business_type": "Apakah jenis perniagaan anda (milikan tunggal, Sdn Bhd, startup, LLP, atau koperasi)?",
+        "sector": "Apakah sektor perniagaan anda?",
+        "registered_months": "Berapa bulan perniagaan anda telah didaftarkan?",
+        "is_bumiputera": "Adakah perniagaan anda milik Bumiputera?",
+    },
+    "zh": {
+        "business_type": "您经营的是哪种类型的企业（独资经营、私人有限公司 Sdn Bhd、初创企业、有限责任合伙 LLP 或合作社）？",
+        "sector": "所属行业是什么？",
+        "registered_months": "企业已注册多少个月？",
+        "is_bumiputera": "企业是否为土著（Bumiputera）所有？",
+    },
+}
 
-_QUESTIONS_ZH = [
-    "您经营的是哪种类型的企业（独资经营、私人有限公司 Sdn Bhd、初创企业、有限责任合伙 LLP 或合作社），"
-    "所属行业是什么？",
-    "您企业的年营业额（令吉）是多少，有多少名员工？企业是否为土著（Bumiputera）所有？",
-    "您是否拥有马来西亚数码（Malaysia Digital, MD）资格，以前是否获得过政府补助金？",
-]
 
-_QUESTIONS = {"bm": _QUESTIONS_BM, "en": _QUESTIONS_EN, "zh": _QUESTIONS_ZH}
+def _follow_up_question(missing: list[str], language: str) -> str:
+    lang = language if language in _FIELD_PROMPTS else "en"
+    prompts = _FIELD_PROMPTS[lang]
+    return " ".join([_LEAD[lang], *(prompts[f] for f in missing)])
+
 
 _EXTRACTION_SYSTEM_PROMPT = """\
 You extract structured business-profile fields from a Malaysian SME owner's free-text
@@ -123,7 +138,7 @@ async def intake_node(state: EligibilityState) -> dict[str, Any]:
 
     missing = _missing_required(profile)
 
-    if not missing and turn >= 3:
+    if not missing:
         return {
             "business_profile": profile,
             "missing_fields": [],
@@ -133,13 +148,11 @@ async def intake_node(state: EligibilityState) -> dict[str, Any]:
             "current_turn": turn,
         }
 
-    questions = _QUESTIONS.get(language, _QUESTIONS_EN)
-    idx = min(turn, len(questions) - 1)
     return {
         "business_profile": profile,
         "missing_fields": missing,
         "intake_complete": False,
         "needs_more_info": True,
-        "next_question": questions[idx],
+        "next_question": _follow_up_question(missing, language),
         "current_turn": turn + 1,
     }

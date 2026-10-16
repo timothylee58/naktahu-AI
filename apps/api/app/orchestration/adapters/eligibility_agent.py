@@ -72,6 +72,7 @@ class EligibilityAgentAdapter(AgentProtocol):
             "annual_revenue_myr": context.extra.get("annual_revenue_myr"),
             "is_bumiputera": context.extra.get("is_bumiputera"),
             "registered_months": context.extra.get("registered_months"),
+            "existing_grants": context.extra.get("existing_grants"),
             "message": context.query,
             "language": context.language,
         }

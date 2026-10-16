@@ -17,7 +17,7 @@ from app.agents.eligibility_agent.compatibility import (
     _fallback_explanation,
     grant_compatibility_check,
 )
-from app.agents.eligibility_agent.intake_node import _QUESTIONS, intake_node
+from app.agents.eligibility_agent.intake_node import _FIELD_PROMPTS, _LEAD, intake_node
 from app.routers import eligibility as eligibility_router
 
 _CJK = re.compile(r"[一-鿿]")
@@ -49,22 +49,24 @@ GRANT: dict[str, Any] = {
 
 # ── Mandarin intake ──────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("turn", [0, 1, 2])
-async def test_zh_intake_asks_every_question_in_chinese(turn):
-    out = await intake_node({"current_turn": turn, "language": "zh"})
+async def test_zh_intake_asks_every_missing_field_in_chinese():
+    out = await intake_node({"current_turn": 0, "language": "zh"})
     assert _CJK.search(out["next_question"])
-    assert out["next_question"] == _QUESTIONS["zh"][turn]
+    assert out["next_question"].startswith(_LEAD["zh"])
+    for prompt in _FIELD_PROMPTS["zh"].values():
+        assert prompt in out["next_question"]
 
 
 async def test_unknown_language_still_falls_back_to_english_and_bm_is_unchanged():
     en = await intake_node({"current_turn": 0, "language": "fr"})
-    assert en["next_question"] == _QUESTIONS["en"][0]
+    assert en["next_question"].startswith(_LEAD["en"])
     bm = await intake_node({"current_turn": 0, "language": "bm"})
-    assert bm["next_question"] == _QUESTIONS["bm"][0]
+    assert bm["next_question"].startswith(_LEAD["bm"])
 
 
-def test_all_three_languages_ask_the_same_number_of_questions():
-    assert len(_QUESTIONS["bm"]) == len(_QUESTIONS["en"]) == len(_QUESTIONS["zh"])
+def test_all_three_languages_cover_the_same_fields():
+    assert set(_FIELD_PROMPTS["bm"]) == set(_FIELD_PROMPTS["en"]) == set(_FIELD_PROMPTS["zh"])
+    assert set(_LEAD) == {"bm", "en", "zh"}
 
 
 # ── Mandarin synthesis ───────────────────────────────────────────────────────

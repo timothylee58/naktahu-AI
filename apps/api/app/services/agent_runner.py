@@ -721,7 +721,7 @@ async def start_eligibility_agent(*, user_id: str, payload: dict[str, Any], supa
     session_id = str(uuid.uuid4())
     graph = get_eligibility_agent_graph(checkpointer=checkpointer)
     business_profile: dict[str, Any] = {}
-    for key in ("business_type", "sector", "annual_revenue_myr", "is_bumiputera", "registered_months"):
+    for key in ("business_type", "sector", "annual_revenue_myr", "is_bumiputera", "registered_months", "existing_grants"):
         if payload.get(key) is not None:
             business_profile[key] = payload[key]
     inputs = {
