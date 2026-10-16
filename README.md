@@ -255,7 +255,7 @@ Migrations under `infra/supabase/migrations/` are versioned SQL, applied manuall
 | `GOOGLE_SPEECH_CREDENTIALS_JSON` / `GOOGLE_SPEECH_PROJECT_ID` / `GOOGLE_SPEECH_LOCATION` | Google Speech-to-Text V2, cross-browser voice-input fallback. Optional — the frontend falls back to the browser's own Web Speech API when unset. |
 | `ELIGIBILITY_USE_NEMOTRON` | Enables the Grant Agent's Nemotron model split (default `false`). Also needs `NEMOTRON_API_KEY` and the role's model ID |
 | `NEMOTRON_API_KEY` / `NEMOTRON_BASE_URL` | Nebius Token Factory key and OpenAI-compatible endpoint |
-| `NEMOTRON_FAST_MODEL` / `NEMOTRON_REASONING_MODEL` | Model IDs per role. Never defaulted: run `python scripts/nemotron_check.py` to list the live catalog and test-call your IDs |
+| `NEMOTRON_FAST_MODEL` / `NEMOTRON_REASONING_MODEL` | Model IDs per role. Never defaulted: run `python scripts/nemotron_check.py` (from the repo root or `apps/api`) to list the live catalog and test-call your IDs |
 | `TAVILY_API_KEY` | Live grant-deadline verification and the nightly refresh. Unset means grants show as unverified |
 | `RERANK_ENABLED` | Turns on the optional cross-encoder-style re-ranking pass over hybrid-search results (default `false`) |
 

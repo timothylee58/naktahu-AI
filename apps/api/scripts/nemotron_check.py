@@ -7,7 +7,7 @@ variants appear). This lists what the endpoint actually serves and makes one tin
 real request with each configured ID, so a wrong ID fails here, not in production.
 
     NEMOTRON_API_KEY=... NEMOTRON_FAST_MODEL=... NEMOTRON_REASONING_MODEL=... \\
-        python scripts/nemotron_check.py            # from apps/api
+        python scripts/nemotron_check.py   # from apps/api, or from the repo root (scripts/nemotron_check.py wraps this)
 
 Exit 0: every configured role resolved and answered. Exit 1: a configured ID is
 missing from the catalog or the test call failed. Exit 2: nothing is configured.
