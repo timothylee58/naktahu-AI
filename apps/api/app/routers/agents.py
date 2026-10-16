@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.agents.checkpointer import get_checkpointer
 from app.agents.tools import PdfGenerationError
@@ -49,6 +49,12 @@ class AgentStartRequest(BaseModel):
     annual_revenue_myr: Optional[float] = None
     is_bumiputera: Optional[bool] = None
     registered_months: Optional[int] = None
+    # Optional grants the business already holds — the only profile field beyond
+    # the required ones that can change a match (conflicts_with). Bounded: it is
+    # free text from the web form.
+    existing_grants: Optional[list[Annotated[str, StringConstraints(max_length=200)]]] = Field(
+        default=None, max_length=20
+    )
     # grant-draft-generator
     programme_name: str = ""
     business_profile: dict[str, Any] = Field(default_factory=dict)

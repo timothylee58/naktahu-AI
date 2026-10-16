@@ -308,6 +308,8 @@ function GrantFinderPageInner() {
   const [registeredMonths, setRegisteredMonths] = useState('');
   const [annualRevenue, setAnnualRevenue] = useState('');
   const [isBumiputera, setIsBumiputera] = useState<boolean | null>(null);
+  // Optional, comma-separated programme names the business already holds.
+  const [existingGrants, setExistingGrants] = useState('');
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<'intake' | 'chat' | 'results'>('intake');
@@ -344,6 +346,28 @@ function GrantFinderPageInner() {
     annualRevenue,
     isBumiputera,
   };
+
+  const profileSummary: { label: string; value: string }[] = [
+    { label: t('agents.grant-finder.sector.label'), value: sectors.find((o) => o.id === sector[0])?.label ?? '' },
+    {
+      label: t('agents.grant-finder.business_type.label'),
+      value: businessTypes.find((o) => o.id === businessType[0])?.label ?? '',
+    },
+    { label: t('agents.grant-finder.months.label'), value: registeredMonths },
+    {
+      label: t('agents.grant-finder.revenue.label'),
+      value: revenueValue !== null && !revenueInvalid ? `RM ${revenueValue.toLocaleString()}` : '',
+    },
+    {
+      label: t('agents.grant-finder.bumiputera.label'),
+      value:
+        isBumiputera === null
+          ? ''
+          : isBumiputera
+            ? t('agents.grant-finder.bumiputera.yes')
+            : t('agents.grant-finder.bumiputera.no'),
+    },
+  ].filter((item) => item.value !== '');
 
   const applyResult = (res: Record<string, unknown>) => {
     if (!sessionId && res.session_id) setSessionId(String(res.session_id));
@@ -396,12 +420,20 @@ function GrantFinderPageInner() {
     setLoading(true);
     setError(null);
     try {
+      const heldGrants = existingGrants
+        .split(/[,\n]/)
+        .map((g) => g.trim())
+        .filter(Boolean)
+        .slice(0, 20);
       const res = await start('eligibility-agent', {
         sector: sector[0],
         business_type: businessType[0],
         registered_months: Number(registeredMonths) || 0,
-        annual_revenue_myr: Number(annualRevenue) || 0,
+        // Blank means "not given", not "RM 0": sending 0 told the agent the
+        // business was pre-revenue.
+        annual_revenue_myr: revenueValue,
         is_bumiputera: isBumiputera,
+        ...(heldGrants.length > 0 ? { existing_grants: heldGrants } : {}),
         language: localeToApiLanguage(locale),
       });
       applyResult(res);
@@ -527,6 +559,19 @@ function GrantFinderPageInner() {
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('agents.grant-finder.bumiputera.required')}</p>
               )}
             </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                {t('agents.grant-finder.existing_grants.label')}
+              </span>
+              <input
+                type="text"
+                value={existingGrants}
+                maxLength={500}
+                onChange={(e) => setExistingGrants(e.target.value)}
+                placeholder={t('agents.grant-finder.existing_grants.placeholder')}
+                className="border border-zinc-200 rounded-xl px-3 py-2 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
+              />
+            </label>
             <button
               type="button"
               disabled={loading}
@@ -541,6 +586,21 @@ function GrantFinderPageInner() {
 
         {phase === 'chat' && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm dark:bg-white/5 dark:border-white/10">
+            {/* Show what the user already told us so a follow-up never feels
+                like starting over. */}
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="font-semibold mb-1">{t('agents.grant-finder.summary.title')}</p>
+              <ul className="flex flex-wrap gap-1.5">
+                {profileSummary.map((item) => (
+                  <li
+                    key={item.label}
+                    className="rounded-full border border-zinc-200 px-2.5 py-0.5 dark:border-white/10"
+                  >
+                    {item.label}: <span className="font-medium text-zinc-700 dark:text-zinc-200">{item.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
             {nextQuestion && <p className="text-sm text-nk-official-dim dark:text-nk-official">{nextQuestion}</p>}
             <textarea
               className="border border-zinc-200 rounded-xl p-3 text-sm bg-transparent focus:border-nk-official/50 focus:outline-none focus:ring-1 focus:ring-nk-official/30 dark:border-white/10 dark:placeholder:text-zinc-500"
