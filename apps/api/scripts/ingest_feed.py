@@ -484,6 +484,14 @@ def _host_in_domain(host: str, domain: str) -> bool:
 _FETCH_ATTEMPTS = 3
 _FETCH_BACKOFF_SECONDS = 3.0
 _FETCH_TIMEOUT = httpx.Timeout(60.0, connect=20.0)
+# Server-side hiccups worth another try. Not 501/505 (permanent) and not 4xx.
+_RETRYABLE_STATUSES = frozenset({500, 502, 503, 504})
+
+
+def _is_transient(exc: httpx.HTTPError) -> bool:
+    if isinstance(exc, httpx.TransportError):
+        return True
+    return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in _RETRYABLE_STATUSES
 
 
 def fetch_feed(url: str, allowed_host_suffix: Optional[str] = None) -> bytes:
@@ -497,11 +505,12 @@ def fetch_feed(url: str, allowed_host_suffix: Optional[str] = None) -> bytes:
     for attempt in range(1, _FETCH_ATTEMPTS + 1):
         try:
             return _fetch_once(url, allowed_host_suffix)
-        except httpx.TransportError:
-            # Timeouts, resets and TLS drops from slow government hosts are
-            # usually transient; a 4xx or an off-domain redirect is not, so
-            # those propagate on the first attempt.
-            if attempt == _FETCH_ATTEMPTS:
+        except httpx.HTTPError as exc:
+            # Timeouts, resets, TLS drops and 500/502/503/504 from government
+            # hosts are usually transient (mygov-rukun-negara answered 500 once,
+            # then 200); a 4xx or an off-domain redirect is not, so those
+            # propagate on the first attempt.
+            if not _is_transient(exc) or attempt == _FETCH_ATTEMPTS:
                 raise
             time.sleep(_FETCH_BACKOFF_SECONDS * attempt)
     raise AssertionError("unreachable")

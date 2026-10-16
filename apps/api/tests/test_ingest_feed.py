@@ -1318,3 +1318,43 @@ def test_identity_check_only_reads_the_first_three_pages_with_text():
     entries = [FeedEntry(title="t", description=f"page {n}", link=link.format(n)) for n in (4, 5, 6)]
     entries.append(FeedEntry(title="t", description="Belanjawan 2027", link=link.format(7)))
     assert missing_identity_terms(entries, ("2027",)) == ["2027"]
+
+
+def test_fetch_feed_retries_a_transient_500_then_succeeds(monkeypatch):
+    monkeypatch.setattr("scripts.ingest_feed.time.sleep", lambda _s: None)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(500) if calls["n"] == 1 else httpx.Response(200, content=b"ok")
+
+    _mock_http(monkeypatch, handler)
+    assert fetch_feed("https://a.example.com/x") == b"ok"
+    assert calls["n"] == 2
+
+
+def test_fetch_feed_gives_up_on_a_persistent_503(monkeypatch):
+    monkeypatch.setattr("scripts.ingest_feed.time.sleep", lambda _s: None)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(503)
+
+    _mock_http(monkeypatch, handler)
+    with pytest.raises(httpx.HTTPStatusError):
+        fetch_feed("https://a.example.com/x")
+    assert calls["n"] == 3
+
+
+def test_fetch_feed_does_not_retry_a_501(monkeypatch):
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(501)
+
+    _mock_http(monkeypatch, handler)
+    with pytest.raises(httpx.HTTPStatusError):
+        fetch_feed("https://a.example.com/x")
+    assert calls["n"] == 1
