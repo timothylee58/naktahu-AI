@@ -7,6 +7,12 @@ import { getAnonSessionId } from '@/lib/anon-session';
 import { useI18n } from '@/lib/i18n';
 import { API_BASE } from '@/lib/api-base';
 import { ShareMenu } from './ShareMenu';
+import { WrongAnswerPanel } from './WrongAnswerPanel';
+
+interface FeedbackDetails {
+  comment: string;
+  attachmentPath: string | null;
+}
 
 interface ResponseActionsProps {
   content: string;
@@ -35,6 +41,7 @@ export function ResponseActions({
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
@@ -44,10 +51,11 @@ export function ResponseActions({
   }, [content]);
 
   const handleFeedback = useCallback(
-    async (rating: 'up' | 'down') => {
+    async (rating: 'up' | 'down', details?: FeedbackDetails) => {
       // Rating is final once submitted — avoids ambiguous null ratings in the dataset.
       if (feedback || submitting || !query) return;
       setFeedback(rating);
+      setPanelOpen(false);
       setSubmitting(true);
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -63,12 +71,15 @@ export function ResponseActions({
             domain: domain ?? 'general',
             language: language ?? 'en',
             rating: rating === 'up' ? 1 : -1,
+            ...(details?.comment ? { comment: details.comment } : {}),
+            ...(details?.attachmentPath ? { attachment_path: details.attachmentPath } : {}),
           }),
         });
         if (!res.ok) throw new Error('Failed to submit feedback');
       } catch {
         // Submission failed — revert so the button reflects reality and the user can retry.
         setFeedback(null);
+        setPanelOpen(true);
       } finally {
         setSubmitting(false);
       }
@@ -79,6 +90,7 @@ export function ResponseActions({
   if (isStreaming) return null;
 
   return (
+    <div className="flex flex-col">
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
@@ -148,8 +160,9 @@ export function ResponseActions({
 
       {/* Thumbs down */}
       <button
-        onClick={() => handleFeedback('down')}
+        onClick={() => setPanelOpen((open) => !open)}
         disabled={!!feedback}
+        aria-expanded={panelOpen}
         title={feedback ? t('chat.actions.feedback_thanks') : t('chat.actions.not_helpful')}
         className={`p-1.5 rounded-lg transition-colors ${feedback === 'down' ? 'text-red-500 bg-red-50' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200 dark:hover:bg-white/10'} disabled:cursor-default`}
       >
@@ -158,5 +171,14 @@ export function ResponseActions({
         </svg>
       </button>
     </motion.div>
+    {panelOpen && !feedback && (
+      <WrongAnswerPanel
+        canAttach={!!accessToken}
+        submitting={submitting}
+        onSubmit={(details) => void handleFeedback('down', details)}
+        onCancel={() => setPanelOpen(false)}
+      />
+    )}
+    </div>
   );
 }

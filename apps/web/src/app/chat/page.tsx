@@ -16,6 +16,8 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatEmptyOrbit } from '@/components/chat/ChatEmptyOrbit';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { PromptChips } from '@/components/chat/PromptChips';
+import { PersonaStarters } from '@/components/chat/PersonaStarters';
+import { FirstVisitTour } from '@/components/onboarding/FirstVisitTour';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
@@ -386,6 +388,7 @@ function ChatPageInner() {
 
   return (
     <div className={`flex h-full ${pageBg}`}>
+      <FirstVisitTour />
       <AppSidebar
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
@@ -576,6 +579,9 @@ function ChatPageInner() {
             area so the identity block above can be the full centred
             moment. */}
         {showChips && (
+          <PersonaStarters onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
+        )}
+        {showChips && (
           <PromptChips onSelect={handleChipSelect} disabled={isStreaming} variant={isDark ? 'dark' : 'light'} />
         )}
         {queuedQuery && (
@@ -598,6 +604,7 @@ function ChatPageInner() {
             </button>
           </div>
         )}
+        <div data-tour="chat-input">
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
@@ -607,6 +614,7 @@ function ChatPageInner() {
           conversationChars={conversationChars}
           variant={isDark ? 'dark' : 'light'}
         />
+        </div>
         <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
           {t('chat.keyboard_hint')}
         </p>

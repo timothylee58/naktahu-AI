@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { useFeedbackImage } from '@/lib/hooks/useFeedbackImage';
+import { FeedbackImagePicker } from '@/components/feedback/FeedbackImagePicker';
 
 // Replaces the mailto: placeholder profile/page.tsx used to point at — see
 // that file's git history and 047_product_feedback.sql's docstring for why
@@ -21,7 +23,10 @@ interface FeedbackEntry {
   created_at: string;
 }
 
-type SubmitStatus = { kind: 'idle' } | { kind: 'success' } | { kind: 'error' };
+type SubmitStatus =
+  | { kind: 'idle' }
+  | { kind: 'success' }
+  | { kind: 'error'; reason: 'generic' | 'blocked' | 'duplicate' | 'rate' };
 
 const CATEGORIES = ['bug', 'feature_request', 'general'] as const;
 
@@ -31,6 +36,7 @@ const STATUS_STYLE: Record<string, string> = {
   planned: 'text-nk-official-dim dark:text-nk-official',
   done: 'text-green-600 dark:text-green-400',
   declined: 'text-zinc-400 dark:text-zinc-500',
+  flagged: 'text-amber-600 dark:text-amber-400',
 };
 
 function formatDate(iso: string): string {
@@ -49,6 +55,7 @@ export function ProductFeedbackCard() {
   const [status, setStatus] = useState<SubmitStatus>({ kind: 'idle' });
   const [entries, setEntries] = useState<FeedbackEntry[]>([]);
   const [loadedOnce, setLoadedOnce] = useState(false);
+  const image = useFeedbackImage();
 
   const loadEntries = () => {
     void get('/api/v1/product-feedback')
@@ -73,13 +80,16 @@ export function ProductFeedbackCard() {
         title: title.trim(),
         description: description.trim(),
         page_context: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        ...(image.attachmentPath ? { attachment_path: image.attachmentPath } : {}),
       });
       setStatus({ kind: 'success' });
       setTitle('');
       setDescription('');
+      image.clear();
       loadEntries();
-    } catch {
-      setStatus({ kind: 'error' });
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : '';
+      setStatus({ kind: 'error', reason: detail.includes('disallowed') ? 'blocked' : detail.includes('already') ? 'duplicate' : detail.includes('Too much') ? 'rate' : 'generic' });
     } finally {
       setLoading(false);
     }
@@ -127,9 +137,17 @@ export function ProductFeedbackCard() {
         className="border border-zinc-200 rounded-xl p-2.5 text-sm bg-transparent focus:outline-none focus:border-nk-official/50 dark:border-white/10 dark:placeholder:text-zinc-500"
       />
 
+      <FeedbackImagePicker
+        previewUrl={image.previewUrl}
+        uploading={image.uploading}
+        error={image.error}
+        onPick={(f) => void image.pick(f)}
+        onClear={image.clear}
+      />
+
       <button
         type="button"
-        disabled={loading || !title.trim() || !description.trim()}
+        disabled={loading || image.uploading || !title.trim() || !description.trim()}
         onClick={() => void submit()}
         className="self-start px-4 py-2 bg-nk-official/10 hover:bg-nk-official/20 text-nk-official-dim dark:text-nk-official rounded-full text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -140,7 +158,7 @@ export function ProductFeedbackCard() {
         <p className="text-xs font-medium text-green-600 dark:text-green-400">{t('profile.feedback.success')}</p>
       )}
       {status.kind === 'error' && (
-        <p className="text-xs font-medium text-red-600 dark:text-red-400">{t('profile.feedback.error')}</p>
+        <p className="text-xs font-medium text-red-600 dark:text-red-400">{t(status.reason === 'generic' ? 'profile.feedback.error' : `profile.feedback.error.${status.reason}`)}</p>
       )}
 
       {loadedOnce && entries.length > 0 && (

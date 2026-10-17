@@ -12,6 +12,7 @@ import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { effectivePlan, planBadgeLabel, userRole, ADMIN_ROLES } from '@/lib/auth-plan';
 import { fetchUserCredits } from '@/lib/credits';
 import { ProductFeedbackCard } from '@/components/profile/ProductFeedbackCard';
+import { PersonaCard } from '@/components/profile/PersonaCard';
 
 function formatMemberSince(iso: string | undefined, locale: string): string | null {
   if (!iso) return null;
@@ -206,6 +207,8 @@ export default function ProfilePage() {
                   )}
                 </div>
               </section>
+
+              <PersonaCard />
 
               <ProductFeedbackCard />
 

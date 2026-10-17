@@ -30,6 +30,8 @@ async def submit_feedback(
     domain: str,
     language: str,
     rating: int,
+    comment: Optional[str] = None,
+    attachment_path: Optional[str] = None,
 ) -> None:
     row = {
         "user_id": user_id,
@@ -41,6 +43,11 @@ async def submit_feedback(
         "language": language,
         "rating": rating,
     }
+    # Only sent when set so plain thumbs keep working before migration 058.
+    if comment:
+        row["user_comment"] = comment
+    if attachment_path:
+        row["attachment_path"] = attachment_path
 
     def _insert() -> None:
         supabase_client.table("feedback").insert(row).execute()
