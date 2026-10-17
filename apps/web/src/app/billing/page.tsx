@@ -168,10 +168,7 @@ export default function BillingPage() {
                 )}
               </section>
 
-              <section className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col shadow-sm dark:bg-white/5 dark:border-white/10">
-                <h2 className="text-sm font-semibold mb-3">{t('billing.redeem_section_title')}</h2>
-                <RedeemCodeCard onCreditsGranted={refreshCredits} onPlanGranted={refreshPlanGrant} />
-              </section>
+              <RedeemCodeCard onCreditsGranted={refreshCredits} onPlanGranted={refreshPlanGrant} />
 
               <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center">
                 {fmt(t('billing.support_note'), { email: 'feedback@naktahu.my' })}

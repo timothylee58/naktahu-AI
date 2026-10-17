@@ -21,21 +21,24 @@ async def create_product_feedback(
     title: str,
     description: str,
     page_context: Optional[str],
+    attachment_path: Optional[str] = None,
+    status: Optional[str] = None,
 ) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "user_id": user_id,
+        "category": category,
+        "title": title,
+        "description": description,
+        "page_context": page_context,
+    }
+    # Only sent when set so inserts keep working before migration 058.
+    if attachment_path:
+        row["attachment_path"] = attachment_path
+    if status:
+        row["status"] = status
+
     def _insert() -> dict[str, Any]:
-        res = (
-            supabase_client.table("product_feedback")
-            .insert(
-                {
-                    "user_id": user_id,
-                    "category": category,
-                    "title": title,
-                    "description": description,
-                    "page_context": page_context,
-                }
-            )
-            .execute()
-        )
+        res = supabase_client.table("product_feedback").insert(row).execute()
         return res.data[0] if res.data else {}
 
     return await asyncio.to_thread(_insert)
