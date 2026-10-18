@@ -27,6 +27,59 @@ const MS: Translations = {
   'chat.warning.low_confidence':
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
   'chat.language_indicator': 'BM',
+  'home.title': 'Apa yang anda perlu tahu hari ini?',
+  'home.pill.engine': 'Enjin dwibahasa aktif · {lang}',
+  'home.pill.sources': 'Sumber gov.my disahkan',
+  'cat.group': 'Kategori soalan',
+  'cat.tax': 'Cukai & KWSP',
+  'cat.biz': 'Perniagaan & Geran',
+  'cat.docs': 'Imigresen & Dokumen',
+  'cat.civic': 'Awam & Pendidikan',
+  'cat.tax.agencies': 'LHDN · KWSP',
+  'cat.biz.agencies': 'SSM · MDEC · SME Corp',
+  'cat.docs.agencies': 'Imigresen · JPN',
+  'cat.civic.agencies': 'KKM · KPM · SPR',
+  'cat.tax.example': 'Contoh: pelepasan cukai anak',
+  'cat.biz.example': 'Contoh: daftar syarikat Sdn Bhd',
+  'cat.docs.example': 'Contoh: renew pasport, ganti MyKad',
+  'cat.civic.example': 'Contoh: semak status pendaftaran pengundi',
+  'chip.tax.1': 'Cara bayar cukai',
+  'chip.tax.2': 'Pengeluaran KWSP',
+  'chip.tax.3': 'Pelepasan cukai anak',
+  'chip.biz.1': 'Daftar syarikat Sdn Bhd',
+  'chip.biz.2': 'Geran untuk PKS',
+  'chip.biz.3': 'Lesen perniagaan',
+  'chip.docs.1': 'Renew pasport',
+  'chip.docs.2': 'Ganti MyKad hilang',
+  'chip.docs.3': 'Dokumen untuk renew pasport',
+  'chip.civic.1': 'Semak pendaftaran pengundi',
+  'chip.civic.2': 'Permohonan biasiswa',
+  'chip.civic.3': 'Cara daftar anak ke sekolah',
+  'ph.tax': 'Bila tarikh akhir failkan cukai pendapatan?',
+  'ph.biz': 'Berapa kos daftar syarikat Sdn Bhd?',
+  'ph.docs': 'Apa patut saya buat kalau MyKad hilang?',
+  'ph.civic': 'Bagaimana nak semak pendaftaran pengundi?',
+  'box.label': 'Soalan anda',
+  'box.send': 'Hantar soalan',
+  'box.mic': 'Input suara',
+  'box.mic_stop': 'Henti rakaman',
+  'box.clear': 'Kosongkan soalan',
+  'box.hint.idle': 'Pilih cadangan atau taip soalan sendiri.',
+  'box.hint.keys': 'Enter hantar · Shift+Enter baris baharu · Esc kosongkan',
+  'box.langDetected.ms': 'Dijawab dalam BM',
+  'box.langDetected.en': 'Dijawab dalam English',
+  'box.langDetected.zh': 'Dijawab dalam 中文',
+  'box.sending': 'Membuka perbualan…',
+  'quota.used': '{used} daripada {limit} soalan percuma hari ini',
+  'quota.login': 'Log masuk untuk lebih',
+  'quota.exhausted': 'Soalan percuma anda telah habis',
+  'quota.register': 'Daftar percuma',
+  'quota.label': 'Soalan percuma digunakan hari ini',
+  'pii.warn': 'Jangan masukkan No. MyKad atau maklumat peribadi.',
+  'pii.remove': 'Padam nombor',
+  'pii.confirm_hint': 'Tekan Enter sekali lagi untuk hantar juga.',
+  'disclaimer.short': 'NakTahu AI bukan nasihat rasmi kerajaan. Sentiasa sahkan perkara penting dengan agensi berkaitan.',
+  'section.categories': 'Atau pilih kategori',
   'citation.confidence': 'Keyakinan',
   'citation.stale': 'Sumber mungkin sudah lapuk',
   'citation.as_of': 'Berkuat kuasa {date}',
@@ -1148,6 +1201,59 @@ const EN: Translations = {
   'chat.warning.low_confidence':
     'Jawapan mungkin tidak tepat / Answer may be inaccurate',
   'chat.language_indicator': 'EN',
+  'home.title': 'What do you need to know today?',
+  'home.pill.engine': 'Bilingual engine active · {lang}',
+  'home.pill.sources': 'gov.my sources verified',
+  'cat.group': 'Question categories',
+  'cat.tax': 'Tax & EPF',
+  'cat.biz': 'Business & Grants',
+  'cat.docs': 'Immigration & Documents',
+  'cat.civic': 'Civic & Education',
+  'cat.tax.agencies': 'LHDN · EPF',
+  'cat.biz.agencies': 'SSM · MDEC · SME Corp',
+  'cat.docs.agencies': 'Immigration · JPN',
+  'cat.civic.agencies': 'KKM · KPM · SPR',
+  'cat.tax.example': 'Example: child tax relief',
+  'cat.biz.example': 'Example: register a Sdn Bhd',
+  'cat.docs.example': 'Example: renew passport, replace MyKad',
+  'cat.civic.example': 'Example: check voter registration',
+  'chip.tax.1': 'How to pay taxes',
+  'chip.tax.2': 'EPF withdrawal',
+  'chip.tax.3': 'Child tax relief',
+  'chip.biz.1': 'Register a Sdn Bhd',
+  'chip.biz.2': 'Grants for SMEs',
+  'chip.biz.3': 'Business licence',
+  'chip.docs.1': 'Renew passport',
+  'chip.docs.2': 'Replace lost MyKad',
+  'chip.docs.3': 'Documents to renew passport',
+  'chip.civic.1': 'Check voter registration',
+  'chip.civic.2': 'Scholarship application',
+  'chip.civic.3': 'How to enrol my child in school',
+  'ph.tax': 'When is the income tax filing deadline?',
+  'ph.biz': 'How much does it cost to register a Sdn Bhd?',
+  'ph.docs': 'What should I do if I lose my MyKad?',
+  'ph.civic': 'How do I check my voter registration?',
+  'box.label': 'Your question',
+  'box.send': 'Send question',
+  'box.mic': 'Voice input',
+  'box.mic_stop': 'Stop recording',
+  'box.clear': 'Clear question',
+  'box.hint.idle': 'Pick a suggestion or type your own.',
+  'box.hint.keys': 'Enter to send · Shift+Enter for a new line · Esc to clear',
+  'box.langDetected.ms': 'Answered in BM',
+  'box.langDetected.en': 'Answered in English',
+  'box.langDetected.zh': 'Answered in Chinese',
+  'box.sending': 'Opening the conversation…',
+  'quota.used': '{used} of {limit} free questions today',
+  'quota.login': 'Log in for more',
+  'quota.exhausted': 'You have used all your free questions',
+  'quota.register': 'Sign up free',
+  'quota.label': 'Free questions used today',
+  'pii.warn': 'Don\'t enter your MyKad number or other personal details.',
+  'pii.remove': 'Remove number',
+  'pii.confirm_hint': 'Press Enter again to send anyway.',
+  'disclaimer.short': 'NakTahu AI isn\'t official government advice. Always verify anything important with the relevant agency.',
+  'section.categories': 'Or pick a category',
   'citation.confidence': 'Confidence',
   'citation.stale': 'This source may be outdated',
   'citation.as_of': 'In effect from {date}',
@@ -2264,6 +2370,59 @@ const ZH: Translations = {
   'chat.suggestion.dismiss': '关闭建议',
   'chat.warning.low_confidence': '答案可能不准确 / Answer may be inaccurate',
   'chat.language_indicator': '中文',
+  'home.title': '今天您想了解什么？',  // TODO(native-review)
+  'home.pill.engine': '双语引擎已启用 · {lang}',  // TODO(native-review)
+  'home.pill.sources': 'gov.my 来源已核实',  // TODO(native-review)
+  'cat.group': '问题类别',  // TODO(native-review)
+  'cat.tax': '税务与公积金',  // TODO(native-review)
+  'cat.biz': '商业与资助',  // TODO(native-review)
+  'cat.docs': '移民与证件',  // TODO(native-review)
+  'cat.civic': '公共事务与教育',  // TODO(native-review)
+  'cat.tax.agencies': 'LHDN · 公积金局',  // TODO(native-review)
+  'cat.biz.agencies': 'SSM · MDEC · SME Corp',  // TODO(native-review)
+  'cat.docs.agencies': '移民局 · JPN',  // TODO(native-review)
+  'cat.civic.agencies': 'KKM · KPM · SPR',  // TODO(native-review)
+  'cat.tax.example': '例如：子女税务减免',  // TODO(native-review)
+  'cat.biz.example': '例如：注册私人有限公司',  // TODO(native-review)
+  'cat.docs.example': '例如：更新护照、补领 MyKad',  // TODO(native-review)
+  'cat.civic.example': '例如：查询选民登记状态',  // TODO(native-review)
+  'chip.tax.1': '如何缴税',  // TODO(native-review)
+  'chip.tax.2': '公积金提款',  // TODO(native-review)
+  'chip.tax.3': '子女税务减免',  // TODO(native-review)
+  'chip.biz.1': '注册私人有限公司',  // TODO(native-review)
+  'chip.biz.2': '中小企业资助',  // TODO(native-review)
+  'chip.biz.3': '营业执照',  // TODO(native-review)
+  'chip.docs.1': '更新护照',  // TODO(native-review)
+  'chip.docs.2': '补领遗失的 MyKad',  // TODO(native-review)
+  'chip.docs.3': '更新护照所需文件',  // TODO(native-review)
+  'chip.civic.1': '查询选民登记',  // TODO(native-review)
+  'chip.civic.2': '申请奖学金',  // TODO(native-review)
+  'chip.civic.3': '如何为孩子注册入学',  // TODO(native-review)
+  'ph.tax': '所得税申报截止日期是什么时候？',  // TODO(native-review)
+  'ph.biz': '注册私人有限公司需要多少费用？',  // TODO(native-review)
+  'ph.docs': 'MyKad 遗失了该怎么办？',  // TODO(native-review)
+  'ph.civic': '如何查询我的选民登记？',  // TODO(native-review)
+  'box.label': '您的问题',  // TODO(native-review)
+  'box.send': '发送问题',  // TODO(native-review)
+  'box.mic': '语音输入',  // TODO(native-review)
+  'box.mic_stop': '停止录音',  // TODO(native-review)
+  'box.clear': '清除问题',  // TODO(native-review)
+  'box.hint.idle': '选择建议，或自行输入问题。',  // TODO(native-review)
+  'box.hint.keys': 'Enter 发送 · Shift+Enter 换行 · Esc 清除',  // TODO(native-review)
+  'box.langDetected.ms': '将以马来文回答',  // TODO(native-review)
+  'box.langDetected.en': '将以英文回答',  // TODO(native-review)
+  'box.langDetected.zh': '将以中文回答',  // TODO(native-review)
+  'box.sending': '正在打开对话…',  // TODO(native-review)
+  'quota.used': '今日 {used} / {limit} 个免费提问',  // TODO(native-review)
+  'quota.login': '登录以获取更多',  // TODO(native-review)
+  'quota.exhausted': '您的免费提问已用完',  // TODO(native-review)
+  'quota.register': '免费注册',  // TODO(native-review)
+  'quota.label': '今日已用免费提问',  // TODO(native-review)
+  'pii.warn': '请勿输入 MyKad 号码或其他个人资料。',  // TODO(native-review)
+  'pii.remove': '删除号码',  // TODO(native-review)
+  'pii.confirm_hint': '再按一次 Enter 仍要发送。',  // TODO(native-review)
+  'disclaimer.short': 'NakTahu AI 并非官方政府建议。重要事项请务必向相关机构核实。',  // TODO(native-review)
+  'section.categories': '或选择类别',  // TODO(native-review)
   'citation.confidence': '置信度',
   'citation.stale': '此来源可能已过时',
   'citation.as_of': '自 {date} 起生效',

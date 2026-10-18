@@ -132,6 +132,70 @@
   --myds-txt-black-700: var(--nk-text-muted);
 }
 
+/* Homepage prompt-first hero tokens. Dark is the default surface (ThemeProvider
+   defaults to dark and sets data-theme on mount), so :root carries the dark
+   values and [data-theme="light"] overrides them; using variables instead of
+   `dark:` classes means no wrong-theme flash before hydration.
+
+   The *-text colours exist because plain --nk-official (#3b5bff) on the dark
+   page is only ~3.6:1, and --nk-text-muted (#8a8f98) on white is ~3.4:1: use
+   them for any small text in these hues. Plain official is for controls,
+   icons, borders and 14px+ semibold text. */
+:root,
+[data-theme="dark"] {
+  --nk-ink: #edeae3;
+  --nk-official-text: #aebcff;
+  --nk-official-text-strong: #c4cfff;
+  --nk-heritage-text: #e9a67d;
+  --nk-community-text: #e0a83b;
+  --nk-community-text-warn: #f0c36a;
+  --nk-muted-aa: #8a8f98;
+
+  --nk-card: #1b2028;
+  --nk-border: rgba(237, 234, 227, 0.12);
+  --nk-fill-official: rgba(59, 91, 255, 0.16);
+  --nk-pill-official-bg: rgba(59, 91, 255, 0.12);
+  --nk-pill-official-border: rgba(59, 91, 255, 0.4);
+  --nk-pill-heritage-bg: rgba(224, 141, 91, 0.1);
+  --nk-pill-heritage-border: rgba(224, 141, 91, 0.4);
+  --nk-tab-active-bg: rgba(224, 141, 91, 0.16);
+  --nk-chip-border: rgba(59, 91, 255, 0.5);
+  --nk-badge-bg: rgba(237, 234, 227, 0.1);
+  --nk-badge-detected-bg: rgba(59, 91, 255, 0.2);
+  --nk-track: rgba(237, 234, 227, 0.12);
+  --nk-warn-bg: rgba(224, 168, 59, 0.12);
+  --nk-box-border: rgba(237, 234, 227, 0.12);
+  --nk-box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25), 0 4px 6px -4px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] {
+  --nk-ink: #171717;
+  --nk-official-text: #2540c9;
+  --nk-official-text-strong: #2540c9;
+  --nk-heritage-text: #9c4a2a;
+  --nk-community-text: #7a5a10;
+  --nk-community-text-warn: #7a5a10;
+  --nk-muted-aa: #5f646d;
+
+  /* White tiles/box on the existing cream page: the board's cream-on-white
+     would vanish against this page's cream background. */
+  --nk-card: #ffffff;
+  --nk-border: rgba(23, 23, 23, 0.1);
+  --nk-fill-official: rgba(59, 91, 255, 0.12);
+  --nk-pill-official-bg: rgba(59, 91, 255, 0.08);
+  --nk-pill-official-border: rgba(59, 91, 255, 0.35);
+  --nk-pill-heritage-bg: rgba(224, 141, 91, 0.12);
+  --nk-pill-heritage-border: rgba(156, 74, 42, 0.35);
+  --nk-tab-active-bg: rgba(224, 141, 91, 0.2);
+  --nk-chip-border: rgba(37, 64, 201, 0.45);
+  --nk-badge-bg: rgba(23, 23, 23, 0.07);
+  --nk-badge-detected-bg: rgba(59, 91, 255, 0.2);
+  --nk-track: rgba(23, 23, 23, 0.1);
+  --nk-warn-bg: rgba(224, 168, 59, 0.12);
+  --nk-box-border: rgba(23, 23, 23, 0.22);
+  --nk-box-shadow: 0 10px 15px -3px rgba(23, 23, 23, 0.08), 0 4px 6px -4px rgba(23, 23, 23, 0.08);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -149,6 +213,14 @@
   --color-nk-heritage-dim: var(--nk-heritage-dim);
   --color-nk-text: var(--nk-text);
   --color-nk-text-muted: var(--nk-text-muted);
+  --color-nk-ink: var(--nk-ink);
+  --color-nk-official-text: var(--nk-official-text);
+  --color-nk-official-text-strong: var(--nk-official-text-strong);
+  --color-nk-heritage-text: var(--nk-heritage-text);
+  --color-nk-community-text: var(--nk-community-text);
+  --color-nk-community-text-warn: var(--nk-community-text-warn);
+  --color-nk-muted-aa: var(--nk-muted-aa);
+  --color-nk-card: var(--nk-card);
   --color-brand-blue: var(--brand-blue);
   --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-amber: var(--brand-amber);

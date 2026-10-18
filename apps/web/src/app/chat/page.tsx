@@ -21,6 +21,7 @@ import { FirstVisitTour } from '@/components/onboarding/FirstVisitTour';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
+import { takePending } from '@/lib/prompt/handoff';
 import { canAccessHistory } from '@/lib/auth-plan';
 import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } from '@/lib/history';
 
@@ -346,6 +347,18 @@ function ChatPageInner() {
         agencyContact: entry.agency_contact ?? undefined,
       },
     ]);
+  }, []);
+
+  // Question handed over from the homepage prompt box (see lib/prompt/handoff).
+  // Typed text travels via sessionStorage, never the URL. The ref guards
+  // React Strict Mode's double-invoked effect so it is only sent once.
+  const handoffTaken = useRef(false);
+  useEffect(() => {
+    if (handoffTaken.current || searchParams.get('from') !== 'home') return;
+    handoffTaken.current = true;
+    const pending = takePending();
+    if (pending) handleSend(pending.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Pick up a history entry handed off from /history's "click to view"

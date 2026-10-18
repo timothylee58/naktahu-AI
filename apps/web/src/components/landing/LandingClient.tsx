@@ -1,28 +1,18 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-} from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Callout, CalloutContent } from '@govtechmy/myds-react/callout';
 import { Tag } from '@govtechmy/myds-react/tag';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { LandingHeader } from '@/components/layout/LandingHeader';
-import { TypewriterQueryWrapper } from './TypewriterQueryWrapper';
+import { HomeHero } from '@/components/home/HomeHero';
 import { LandingFeatureShowcase } from './LandingFeatureShowcase';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { PostcodePersonalizer } from './PostcodePersonalizer';
-import { HeroBrandReveal } from './HeroBrandReveal';
 import { AgentSpotlight } from './AgentSpotlight';
 import { ComparisonSection } from './ComparisonSection';
 import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
@@ -47,20 +37,6 @@ const CHAT_MORPH_MS = 420;
 // before the route actually changes underneath it.
 const NAV_TRANSITION_MS = 380;
 
-// Interactive hero chips — each is a real, functioning shortcut: domain
-// chips prefill /chat with a representative query for that domain (see
-// app/chat/page.tsx's ?q= handling), and the Warung Watch chip links
-// straight to its own page rather than into chat, since it isn't a RAG
-// domain.
-// Trimmed to a representative spread (gov/finance, business, personal) —
-// the full 10-domain list is already one scroll away in "Knowledge
-// Domains" below; the hero chips are a taste, not the whole menu.
-const DOMAIN_CHIPS = [
-  { key: 'tax', queryKey: 'landing.chip.tax.query' },
-  { key: 'business', queryKey: 'landing.chip.business.query' },
-  { key: 'immigration', queryKey: 'landing.chip.immigration.query' },
-] as const;
-
 // Full domain badge list shown further down the page ("Knowledge Domains")
 // — static, not clickable, distinct from the interactive hero chips above.
 const ALL_DOMAINS = [
@@ -71,15 +47,6 @@ const ALL_DOMAINS = [
   { key: 'health' },
   { key: 'immigration' },
 ] as const;
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.5, ease: 'easeOut' as const },
-  }),
-};
 
 export function LandingClient() {
   const { t } = useI18n();
@@ -95,54 +62,7 @@ export function LandingClient() {
   const tagline = t(taglineKey);
   const isDark = theme === 'dark';
 
-  // framer's useReducedMotion() is false on the server and updates
-  // post-mount on the client — safe here because every value it gates
-  // below only ever changes a `style` transform amount or whether an
-  // event listener is attached, never which DOM nodes render, so there's
-  // nothing for a server/client markup diff to catch (same reasoning
-  // ChatInput/PromptChips/ChatAmbientMesh already document for their own
-  // client-only season/motion checks elsewhere in this codebase).
   const reduceMotion = useReducedMotion();
-
-  // ── Scroll parallax: two ambient glow blobs drift at different speeds
-  // as the hero scrolls out of view. Scoped to the hero section itself
-  // (not the whole page's scroll range) via `target`, so the effect is
-  // "hero leaving the viewport", not "how far down the whole page you are".
-  const heroRef = useRef<HTMLElement>(null);
-  const { scrollYProgress: heroScroll } = useScroll({
-    target: heroRef,
-    offset: ['start start', 'end start'],
-  });
-  // Background blob (larger, sits further back visually) drifts less;
-  // foreground blob (smaller, heritage accent) drifts more — the classic
-  // depth cue where the nearer layer appears to move faster.
-  const glowBgY = useTransform(heroScroll, [0, 1], reduceMotion ? [0, 0] : [0, 60]);
-  const glowFgY = useTransform(heroScroll, [0, 1], reduceMotion ? [0, 0] : [0, 160]);
-
-  // ── Mouse tilt: raw pointer offset from the hero's center (-0.5..0.5 on
-  // each axis), sprung for a natural settle instead of snapping 1:1 to the
-  // cursor — springs are interruptible and velocity-aware (apple-design
-  // guidance already applied elsewhere in this codebase), which matters
-  // here since the pointer can reverse direction at any instant.
-  const pointerX = useMotionValue(0);
-  const pointerY = useMotionValue(0);
-  const springX = useSpring(pointerX, { stiffness: 150, damping: 20, mass: 0.5 });
-  const springY = useSpring(pointerY, { stiffness: 150, damping: 20, mass: 0.5 });
-  const tiltRotateX = useTransform(springY, [-0.5, 0.5], reduceMotion ? [0, 0] : [6, -6]);
-  const tiltRotateY = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [-6, 6]);
-  const glowBgX = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [-16, 16]);
-  const glowFgX = useTransform(springX, [-0.5, 0.5], reduceMotion ? [0, 0] : [24, -24]);
-
-  const handleHeroMouseMove = (e: ReactMouseEvent<HTMLElement>) => {
-    if (reduceMotion) return; // never attach real work behind a no-op listener
-    const rect = e.currentTarget.getBoundingClientRect();
-    pointerX.set((e.clientX - rect.left) / rect.width - 0.5);
-    pointerY.set((e.clientY - rect.top) / rect.height - 0.5);
-  };
-  const handleHeroMouseLeave = () => {
-    pointerX.set(0);
-    pointerY.set(0);
-  };
 
   // ── Header → sidebar chat-morph. reduceMotion skips straight to
   // navigation — a shape-morphing header is exactly the kind of large
@@ -159,17 +79,6 @@ export function LandingClient() {
     setIsEnteringChat(true);
     setShowLoadingScreen(true);
     window.setTimeout(() => router.push(href), CHAT_MORPH_MS);
-  };
-
-  // The hero search bar is a real input: whatever the visitor types is
-  // carried into /chat via ?q= (the same prefill the domain chips use), and
-  // an empty submit just opens chat. Start Asking is the bar's submit button.
-  const [heroQuery, setHeroQuery] = useState('');
-  const [heroFocused, setHeroFocused] = useState(false);
-  const handleHeroSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const q = heroQuery.trim();
-    enterChat(q ? `/chat?q=${encodeURIComponent(q)}` : '/chat');
   };
 
   // Every OTHER real navigation this page offers (header nav links, domain
@@ -196,20 +105,12 @@ export function LandingClient() {
   const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const mutedText = isDark ? 'text-zinc-300' : 'text-zinc-600';
   const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
-  const searchBoxClass = isDark
-    ? 'bg-white/5 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)] focus-within:border-nk-official/50'
-    : 'bg-white border-zinc-200 shadow-[0_2px_16px_rgba(15,23,42,0.06)] focus-within:border-nk-official/40';
   const domainPillClass = isDark
     ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
     : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
-  // MYDS Tag's primary variant already supplies the tinted bg + blue text; only
-  // the border strength differs from MYDS's default (/20), so keep naktahu's
-  // existing /30 (light) and /40 (dark) via the same class domainPillClass used.
   const tagBorderClass = isDark ? 'border-nk-official/40' : 'border-nk-official/30';
-  const chipTagClass = `text-xs font-medium ${tagBorderClass}`;
   const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
   const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
-  const heroHighlightColor = '#60A5FA';
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
@@ -227,9 +128,8 @@ export function LandingClient() {
           repaint, which would fight this product's restrained register),
           but it now carries both of NakTahu's identity accents instead of
           only the functional blue. */}
-      <motion.div
+      <div
         aria-hidden
-        style={{ y: glowBgY, x: glowBgX }}
         className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
           isDark ? 'opacity-100' : 'opacity-70'
         }`}
@@ -241,17 +141,6 @@ export function LandingClient() {
               : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
           }`}
         />
-      </motion.div>
-      {/* Foreground blob on its own transform, independent of the background
-          one above — a different scroll speed and a larger mouse nudge is
-          what reads as "in front of" the other blob. */}
-      <motion.div
-        aria-hidden
-        style={{ y: glowFgY, x: glowFgX }}
-        className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
-          isDark ? 'opacity-100' : 'opacity-70'
-        }`}
-      >
         <div
           className={`absolute left-[68%] top-[-60px] h-[360px] w-[520px] -translate-x-1/2 rounded-full blur-3xl ${
             isDark
@@ -259,7 +148,7 @@ export function LandingClient() {
               : 'bg-[radial-gradient(closest-side,rgba(156,74,42,0.07),transparent)]'
           }`}
         />
-      </motion.div>
+      </div>
 
       <LandingHeader collapsing={isEnteringChat} onNavClick={handleNavClick} />
 
@@ -279,244 +168,14 @@ export function LandingClient() {
       >
       <AuthErrorBanner />
 
-      <section
-        ref={heroRef}
-        onMouseMove={handleHeroMouseMove}
-        onMouseLeave={handleHeroMouseLeave}
-        style={{ perspective: 800 }}
-        className="relative flex flex-col items-center justify-center flex-1 text-center px-4 sm:px-6 py-16 sm:py-24 gap-6 sm:gap-8 max-w-6xl mx-auto w-full"
-      >
-        {/* Springed 3D tilt on the whole content group — `contents` keeps
-            each child's own fadeUp entrance untouched, this just adds the
-            tilt transform as an ancestor. */}
-        <motion.div
-          style={{ rotateX: tiltRotateX, rotateY: tiltRotateY }}
-          className="contents"
-        >
-        {/* Hero opener — the brand mark assembling once on load, then three
-            citation-chip motifs. Plays immediately on mount (own internal
-            stagger), ahead of the fadeUp-staggered content below. */}
-        <HeroBrandReveal />
+      <HomeHero onEnterChat={enterChat} />
 
-        <motion.div
-          custom={0}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest text-nk-official uppercase border border-nk-official/30 rounded-full px-4 py-1.5 locale-nowrap"
-        >
-          🇲🇾 {t('landing.badge')}
-        </motion.div>
-
-        <motion.div
-          custom={1}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="contents"
-        >
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight max-w-3xl tracking-tight locale-text-balance text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-          {(() => {
-            const headline = t('landing.hero.headline');
-            const highlight = t('landing.hero.headline.highlight');
-            // A literal \n in the headline string forces a line break at that
-            // point (only the zh copy uses this, for "为您解答关于 / “马来西亚”
-            // 政策问题" — an explicit two-line format, not just natural wrap).
-            // BM/EN headlines have no \n, so this is a no-op single-line render
-            // for them, identical to before.
-            return headline.split('\n').map((line, i) => {
-              const idx = line.indexOf(highlight);
-              return (
-                <Fragment key={i}>
-                  {i > 0 && <br />}
-                  {idx === -1 ? (
-                    line
-                  ) : (
-                    <>
-                      {line.slice(0, idx)}
-                      <span style={{ color: heroHighlightColor }} className="font-extrabold">{highlight}</span>
-                      {line.slice(idx + highlight.length)}
-                    </>
-                  )}
-                </Fragment>
-              );
-            });
-          })()}
-        </h1>
-
-        <p className={`text-base sm:text-lg max-w-xl leading-relaxed locale-text-balance ${mutedText}`}>
-          {tagline}
-        </p>
-        </motion.div>
-
-        <motion.form
-          custom={3}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          role="search"
-          onSubmit={handleHeroSubmit}
-          className={`w-full max-w-xl border rounded-2xl pl-4 sm:pl-5 pr-1.5 py-1.5 flex items-center gap-3 transition-colors duration-200 ${searchBoxClass}`}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden
-            className={`w-5 h-5 flex-shrink-0 ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}
-          >
-            <path
-              fillRule="evenodd"
-              d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <div className="relative flex-1 min-w-0 text-left">
-            <Input
-              type="text"
-              value={heroQuery}
-              onChange={(e) => setHeroQuery(e.target.value)}
-              onFocus={() => setHeroFocused(true)}
-              onBlur={() => setHeroFocused(false)}
-              maxLength={500}
-              enterKeyHint="search"
-              aria-label={t('landing.hero.search_label')}
-              className={`border-0 px-0 py-2 text-sm sm:text-base rounded-none focus:ring-0 ${
-                isDark ? 'text-white' : 'text-zinc-900'
-              }`}
-            />
-            {/* The rotating example queries are the idle placeholder: shown
-                only while the field is empty and unfocused, so they never sit
-                on top of what the visitor is typing. */}
-            {!heroQuery && !heroFocused && (
-              <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap">
-                <TypewriterQueryWrapper isDark={isDark} />
-              </div>
-            )}
-          </div>
-          <Button
-            type="submit"
-            aria-label={t('landing.hero.cta')}
-            className="relative flex-shrink-0 inline-flex items-center gap-2 bg-nk-official hover:bg-nk-official-dim active:scale-[0.97] transition-all duration-150 text-white font-semibold h-10 sm:h-11 px-3 sm:px-5 rounded-xl text-sm shadow-md shadow-blue-900/30 locale-nowrap group"
-          >
-            <span className="hidden sm:inline">{t('landing.hero.cta')}</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden
-              className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-0.5"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </Button>
-        </motion.form>
-
-        {/* Trust disclaimer — moved from above the headline (where it
-            competed with it for first-glance attention) to a quiet
-            footnote right under the input, where a first-time visitor
-            actually needs it: the moment before they type. A MYDS Callout
-            (role="alert", icon, proper semantic structure) instead of a
-            plain <p> — this is exactly the kind of "heads up, verify
-            this" notice the component is built for, and it gets that
-            structure for free instead of being hand-rolled. */}
-        <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="w-full max-w-md -mt-2">
-          <Callout variant="warning">
-            <CalloutContent className="text-xs locale-text-balance">
-              {t('landing.hero.disclaimer_note')}
-            </CalloutContent>
-          </Callout>
-        </motion.div>
-
-        <motion.div
-          custom={5}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="flex flex-wrap justify-center gap-2 max-w-xl"
-        >
-          {DOMAIN_CHIPS.map((chip) => {
-            const href = `/chat?q=${encodeURIComponent(t(chip.queryKey))}`;
-            return (
-              <Link
-                key={chip.key}
-                href={href}
-                onClick={(e) => handleNavClick(href, e)}
-                className="rounded-full locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm"
-              >
-                <Tag variant="primary" mode="pill" size="medium" className={chipTagClass}>
-                  {t(`domain.${chip.key}`)}
-                </Tag>
-              </Link>
-            );
-          })}
-          <Link
-            href="/warung-watch"
-            onClick={(e) => handleNavClick('/warung-watch', e)}
-            className="rounded-full locale-nowrap transition-all hover:-translate-y-0.5 hover:shadow-sm"
-          >
-            <Tag variant="primary" mode="pill" size="medium" className={chipTagClass}>
-              {t('nav.warung_watch')}
-            </Tag>
-          </Link>
-        </motion.div>
-
-        <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="w-full max-w-xl">
-          <PostcodePersonalizer
-            className={`flex flex-wrap items-center justify-center gap-2 ${mutedText}`}
-            inputClassName={`w-56 text-center border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors ${domainPillClass}`}
-          />
-        </motion.div>
-
-        <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show">
-          {/* Start Asking now lives inside the search bar, so Explore AI
-              Agents is the hero's one standalone action: a real secondary
-              button (glass pill, icon, arrow that leads on hover) instead of
-              a bare text link that read as a footnote. */}
-          <Link
-            href="/agents"
-            onClick={(e) => handleNavClick('/agents', e)}
-            className={`group inline-flex items-center gap-3 rounded-full border pl-2 pr-4 py-2 text-sm font-medium backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 locale-nowrap ${
-              isDark
-                ? 'border-white/15 bg-white/[0.04] text-zinc-100 hover:border-nk-official/50 hover:bg-white/[0.07] hover:shadow-[0_8px_30px_rgba(37,99,235,0.18)]'
-                : 'border-zinc-200 bg-white/70 text-zinc-800 hover:border-nk-official/40 hover:shadow-[0_8px_24px_rgba(37,99,235,0.12)]'
-            }`}
-          >
-            <span
-              aria-hidden
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-nk-official/15 text-nk-official"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                <path d="M10 1.5a.75.75 0 0 1 .71.51l1.07 3.2a2 2 0 0 0 1.26 1.26l3.2 1.07a.75.75 0 0 1 0 1.42l-3.2 1.07a2 2 0 0 0-1.26 1.26l-1.07 3.2a.75.75 0 0 1-1.42 0l-1.07-3.2a2 2 0 0 0-1.26-1.26l-3.2-1.07a.75.75 0 0 1 0-1.42l3.2-1.07a2 2 0 0 0 1.26-1.26l1.07-3.2A.75.75 0 0 1 10 1.5ZM15.5 13a.5.5 0 0 1 .47.33l.4 1.2a1 1 0 0 0 .63.63l1.2.4a.5.5 0 0 1 0 .94l-1.2.4a1 1 0 0 0-.63.63l-.4 1.2a.5.5 0 0 1-.94 0l-.4-1.2a1 1 0 0 0-.63-.63l-1.2-.4a.5.5 0 0 1 0-.94l1.2-.4a1 1 0 0 0 .63-.63l.4-1.2A.5.5 0 0 1 15.5 13Z" />
-              </svg>
-            </span>
-            <span className="flex flex-col items-start leading-tight">
-              <span>{t('landing.hero.secondary_cta')}</span>
-              <span className={`hidden sm:block text-[11px] font-normal ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                {t('landing.hero.secondary_cta_hint')}
-              </span>
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden
-              className="w-4 h-4 opacity-60 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </Link>
-        </motion.div>
-        </motion.div>
-      </section>
+      <div className="mx-auto flex w-full max-w-6xl justify-center px-4 pb-14 sm:px-6">
+        <PostcodePersonalizer
+          className={`flex flex-wrap items-center justify-center gap-2 ${mutedText}`}
+          inputClassName={`w-56 text-center border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors ${domainPillClass}`}
+        />
+      </div>
 
       <motion.section
         initial={{ opacity: 0 }}
