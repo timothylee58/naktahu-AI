@@ -32,6 +32,10 @@ class Citation(TypedDict):
     # not "this rule took effect on {date}". Both can be shown together.
     # None when the chunk predates the RPC returning this column.
     retrieved_at: NotRequired[str | None]
+    # 'official' | 'community' when the source's tier is known (migration 059),
+    # absent otherwise. Drives the UI's Official/Community badge; never inferred
+    # from the URL, since not every official body is on .gov.my.
+    source_tier: NotRequired[str]
 
 
 class AgentState(TypedDict, total=False):

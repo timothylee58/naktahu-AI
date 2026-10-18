@@ -19,6 +19,10 @@ export interface Citation {
    * effective_date: this says "we checked this on {date}", not "this rule
    * took effect on {date}". Render nothing when missing. */
   retrieved_at?: string | null;
+  /** From document_chunks.source_tier (migration 059). Absent when the tier is
+   * unknown (not yet labelled / migration not applied): render NO badge then.
+   * Never infer it from the URL: not every official body is on .gov.my. */
+  source_tier?: 'official' | 'community' | null;
 }
 
 /** Real government contact for a personal-record query NakTahu can't answer

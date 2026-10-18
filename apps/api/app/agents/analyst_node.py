@@ -59,6 +59,8 @@ def _build_citation(chunk: ChunkResult, score: float, domain: str | None, *, pen
         effective_date=staleness_ref(chunk),
         retrieved_at=chunk.retrieved_at,
     )
+    if chunk.source_tier in ("official", "community"):
+        citation["source_tier"] = chunk.source_tier
     if pending:
         # Lets the UI say "takes effect {date}" instead of "in effect from".
         citation["not_yet_effective"] = True

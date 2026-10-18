@@ -328,3 +328,22 @@ async def test_hybrid_search_falls_back_when_migration_051_missing(mock_supabase
     assert results == []
     assert mock_supabase_client.rpc.call_count == 2
     assert "keyword_query" not in mock_supabase_client.rpc.call_args_list[1][0][1]
+
+
+@pytest.mark.asyncio
+async def test_hybrid_search_maps_source_tier_and_tolerates_its_absence() -> None:
+    """source_tier comes from the RPC row (migration 059); before that is
+    applied the row has no such key and the chunk's tier is None, not an error."""
+    with_tier = {**_make_row(id="t-1"), "source_tier": "community"}
+    without = _make_row(id="t-2")
+    result = MagicMock()
+    result.data = [with_tier, without]
+    rpc_chain = MagicMock()
+    rpc_chain.execute = AsyncMock(return_value=result)
+    client = AsyncMock()
+    client.rpc = MagicMock(return_value=rpc_chain)
+
+    with patch("app.services.vector_store._get_client", AsyncMock(return_value=client)):
+        results = await hybrid_search(query="q", embedding=FAKE_EMBEDDING, domain=None, limit=5)
+
+    assert [r.source_tier for r in results] == ["community", None]

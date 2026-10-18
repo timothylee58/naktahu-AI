@@ -680,6 +680,7 @@ def test_existing_hashes_batches_the_in_query():
 
 from scripts.ingest_feed import (  # noqa: E402
     _insert_chunk,
+    tier_fields,
     date_fields,
     queue_supersede_candidates,
 )
@@ -1358,3 +1359,36 @@ def test_fetch_feed_does_not_retry_a_501(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         fetch_feed("https://a.example.com/x")
     assert calls["n"] == 1
+
+
+def test_insert_retries_without_source_tier_before_migration_059():
+    sb = MagicMock()
+    ok = MagicMock(data=[{"id": "new-2"}])
+    sb.table.return_value.insert.return_value.execute.side_effect = [
+        Exception("Could not find the 'source_tier' column of 'document_chunks'"), ok,
+    ]
+
+    assert _insert_chunk(sb, {"content": "c", "source_tier": "official"}) == "new-2"
+    assert sb.table.return_value.insert.call_args_list[1].args[0] == {"content": "c"}
+
+
+def test_insert_drops_both_optional_groups_on_a_very_old_database():
+    sb = MagicMock()
+    ok = MagicMock(data=[{"id": "new-3"}])
+    sb.table.return_value.insert.return_value.execute.side_effect = [
+        Exception("Could not find the 'announced_date' column"),
+        Exception("Could not find the 'source_tier' column"),
+        ok,
+    ]
+    row = {"content": "c", "announced_date": "2026-11-10", "source_tier": "official"}
+
+    assert _insert_chunk(sb, row) == "new-3"
+    assert sb.table.return_value.insert.call_args_list[2].args[0] == {"content": "c"}
+
+
+def test_tier_fields_only_for_a_registered_tier():
+    assert tier_fields(argparse.Namespace(source_tier="community")) == {"source_tier": "community"}
+    assert tier_fields(argparse.Namespace(source_tier="official")) == {"source_tier": "official"}
+    # Ad-hoc --feed-url run: tier unknown, never assumed official.
+    assert tier_fields(argparse.Namespace()) == {}
+    assert tier_fields(argparse.Namespace(source_tier="bogus")) == {}

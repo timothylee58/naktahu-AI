@@ -211,7 +211,7 @@ def test_cache_round_trip_preserves_every_chunk_field() -> None:
         "ministry": "M", "language": "en", "similarity": 0.8, "expiry_aware": True,
         "source_date": "2026-01-01", "effective_date": "2026-02-01", "superseded_by": "c2",
         "retrieved_at": "2026-10-01T00:00:00+00:00", "effective_until": "2026-12-31",
-        "announced_date": "2026-10-09",
+        "announced_date": "2026-10-09", "source_tier": "community",
     }
     names = {f.name for f in dataclasses.fields(ChunkResult)}
     assert names == set(sample), f"update this test's sample for new ChunkResult fields: {names ^ set(sample)}"

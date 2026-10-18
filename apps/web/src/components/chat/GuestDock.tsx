@@ -39,7 +39,7 @@ function asLang(value: string | undefined): Lang | null {
 export function GuestDock({ onSend, isStreaming, onStop, detectedLanguage, inject, quota, exhausted, onLogin }: GuestDockProps) {
   const { t, locale } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const box = usePromptBox({ onSend });
+  const box = usePromptBox({ onSend, clearOnSend: true });
   const { fill } = box;
 
   useEffect(() => {

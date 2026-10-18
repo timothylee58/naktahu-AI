@@ -41,6 +41,10 @@ class ChunkResult:
     # current rule — see analyst_node.
     effective_until: str | None = None
     announced_date: str | None = None
+    # 'official' | 'community' | None (unknown), from document_chunks.source_tier
+    # (migration 059). None before that is applied or for rows not yet labelled:
+    # the UI shows no badge rather than guessing from the URL.
+    source_tier: str | None = None
 
 
 async def _get_client() -> AsyncClient:
@@ -106,6 +110,7 @@ async def hybrid_search(
                 retrieved_at=row.get("retrieved_at"),
                 effective_until=row.get("effective_until"),
                 announced_date=row.get("announced_date"),
+                source_tier=row.get("source_tier"),
             )
         )
     return results
