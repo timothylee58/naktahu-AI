@@ -22,6 +22,11 @@ import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
 import { useTheme } from '@/lib/theme';
 import { takePending } from '@/lib/prompt/handoff';
+import { isDailyLimitError } from '@/lib/prompt/guestChat';
+import { useDailyQuota } from '@/lib/hooks/useDailyQuota';
+import { useKeyboardInset } from '@/lib/hooks/useKeyboardInset';
+import { GuestDock } from '@/components/chat/GuestDock';
+import { GuestHeader } from '@/components/chat/GuestHeader';
 import { canAccessHistory } from '@/lib/auth-plan';
 import { sidebarHistoryKey, HISTORY_RESTORE_STORAGE_KEY, type HistoryEntry } from '@/lib/history';
 
@@ -44,7 +49,20 @@ function ChatPageInner() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const { user, userId, accessToken } = useSupabaseSession();
+  const { supabase, user, userId, accessToken, ready } = useSupabaseSession();
+  // Signed-out visitors get a slim shell (no sidebar). `ready` keeps a signed-in
+  // user from briefly seeing it while the session is read from storage.
+  const guest = ready && !user;
+  const { quota, refresh: refreshQuota } = useDailyQuota();
+  const [dailyLimitHit, setDailyLimitHit] = useState(false);
+  const exhausted = guest && (dailyLimitHit || (quota !== null && quota.used >= quota.limit));
+  useKeyboardInset();
+  const loginWithGoogle = useCallback(() => {
+    void supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+  }, [supabase]);
   const { mutate: globalMutate } = useSWRConfig();
   const searchParams = useSearchParams();
 
@@ -60,6 +78,9 @@ function ChatPageInner() {
   // and auto-fired once isStreaming flips false, instead of blocking input
   // entirely until the in-flight answer completes.
   const [queuedQuery, setQueuedQuery] = useState<string | null>(null);
+  // True from first render of /chat?from=home until the handoff has been read:
+  // keeps the empty-state hero from flashing before the question appears.
+  const [awaitingHandoff, setAwaitingHandoff] = useState(() => searchParams.get('from') === 'home');
 
   const q = searchParams.get('q');
   useEffect(() => {
@@ -208,7 +229,7 @@ function ChatPageInner() {
             m.id === id
               ? {
                   ...m,
-                  content: t('error.stream'),
+                  content: isDailyLimitError(error) ? t('quota.exhausted') : t('error.stream'),
                   tokens: [],
                   isStreaming: false,
                   isError: true,
@@ -222,6 +243,18 @@ function ChatPageInner() {
       }
     }
   }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A daily-limit 429 means the free quota is spent: lock the dock and refresh
+  // the meter instead of leaving a generic "error fetching answer".
+  useEffect(() => {
+    if (isDailyLimitError(error)) setDailyLimitHit(true);
+  }, [error]);
+
+  const wasStreamingForQuota = useRef(false);
+  useEffect(() => {
+    if (wasStreamingForQuota.current && !isStreaming) refreshQuota();
+    wasStreamingForQuota.current = isStreaming;
+  }, [isStreaming, refreshQuota]);
 
   const handleNewChat = useCallback(() => {
     reset();
@@ -358,6 +391,7 @@ function ChatPageInner() {
     handoffTaken.current = true;
     const pending = takePending();
     if (pending) handleSend(pending.q);
+    setAwaitingHandoff(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -383,7 +417,8 @@ function ChatPageInner() {
   const detectedLang =
     (metadata?.detectedLanguage as string | undefined) ?? undefined;
 
-  const showChips = messages.length === 0 && !isStreaming;
+  const showEmpty = messages.length === 0 && !awaitingHandoff;
+  const showChips = showEmpty && !isStreaming;
 
   const pageBg = isDark ? 'bg-[#12151C]' : 'bg-zinc-50/50';
   const headerClass = isDark
@@ -402,6 +437,7 @@ function ChatPageInner() {
   return (
     <div className={`flex h-full ${pageBg}`}>
       <FirstVisitTour />
+      {ready && !guest && (
       <AppSidebar
         variant={isDark ? 'dark' : 'light'}
         isMobileOpen={sidebarOpen}
@@ -413,8 +449,12 @@ function ChatPageInner() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
       />
+      )}
 
       <div className="flex flex-col flex-1 min-w-0 h-full">
+      {guest ? (
+        <GuestHeader canStartNew={messages.length > 0} onNewChat={handleNewChat} onLogin={loginWithGoogle} />
+      ) : (
       <header className={`flex-shrink-0 flex items-center justify-between px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 shadow-sm ${headerClass}`}>
         <div className="flex items-center gap-2">
           <button
@@ -454,10 +494,11 @@ function ChatPageInner() {
           </button>
         )}
       </header>
+      )}
 
       {/* message list */}
       <div className="relative flex-1 min-h-0">
-      {messages.length === 0 && <ChatAmbientMesh />}
+      {showEmpty && <ChatAmbientMesh />}
       <div
         ref={listRef}
         onScroll={handleScroll}
@@ -470,10 +511,10 @@ function ChatPageInner() {
             // conversation column rather than clinging to the top. min-h-full
             // + centred flex does that without affecting the normal
             // message-list layout once a conversation starts.
-            messages.length === 0 ? 'min-h-full flex flex-col justify-center' : ''
+            showEmpty ? 'min-h-full flex flex-col justify-center' : ''
           }`}
         >
-        {messages.length === 0 && (
+        {showEmpty && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -585,7 +626,7 @@ function ChatPageInner() {
       )}
       </div>
 
-      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
+      <div className={`flex-shrink-0 border-t backdrop-blur-md px-4 pt-3 pb-safe pb-3 mb-[var(--kb-inset,0px)] shadow-[0_-4px_20px_rgba(0,0,0,0.03)] ${inputBarClass}`}>
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-2">
         {/* Suggestions sit directly above the input they fill in — the
             control and its target adjacent, and out of the conversation
@@ -618,6 +659,18 @@ function ChatPageInner() {
           </div>
         )}
         <div data-tour="chat-input">
+        {guest ? (
+          <GuestDock
+            onSend={handleSend}
+            isStreaming={isStreaming}
+            onStop={handleStop}
+            detectedLanguage={detectedLang}
+            inject={injectedQuery}
+            quota={quota}
+            exhausted={exhausted}
+            onLogin={loginWithGoogle}
+          />
+        ) : (
         <ChatInput
           onSend={handleSend}
           isStreaming={isStreaming}
@@ -627,7 +680,11 @@ function ChatPageInner() {
           conversationChars={conversationChars}
           variant={isDark ? 'dark' : 'light'}
         />
+        )}
         </div>
+        {/* Guests get the hint and disclaimer inside GuestDock. */}
+        {!guest && (
+          <>
         <p className={`hidden sm:block text-center text-[10px] ${hintClass}`}>
           {t('chat.keyboard_hint')}
         </p>
@@ -641,6 +698,8 @@ function ChatPageInner() {
         <p className={`text-center text-[10px] leading-snug locale-text-balance ${hintClass}`}>
           {t('landing.hero.disclaimer_note')}
         </p>
+          </>
+        )}
         </div>
       </div>
       </div>

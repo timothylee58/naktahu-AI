@@ -16,7 +16,9 @@ interface PromptBoxProps {
   /** Badge text, already uppercase ("BM", "EN"). */
   languageBadge: string;
   languageDetected: boolean;
-  status: 'idle' | 'submitting' | 'disabled';
+  status: 'idle' | 'submitting' | 'streaming' | 'disabled';
+  /** Required for status 'streaming': the send button becomes a stop button. */
+  onStop?: () => void;
   piiWarning: boolean;
   mic: { available: boolean; listening: boolean; onToggle: () => void };
   inputRef?: RefObject<HTMLTextAreaElement | null>;
@@ -36,6 +38,7 @@ export function PromptBox({
   languageBadge,
   languageDetected,
   status,
+  onStop,
   piiWarning,
   mic,
   inputRef,
@@ -45,6 +48,7 @@ export function PromptBox({
   const ref = inputRef ?? localRef;
   const disabled = status === 'disabled';
   const submitting = status === 'submitting';
+  const streaming = status === 'streaming';
   const hasText = value.trim().length > 0;
   const hero = variant === 'hero';
 
@@ -147,19 +151,25 @@ export function PromptBox({
           )}
           <button
             type="button"
-            onClick={onSubmit}
-            disabled={!hasText || submitting || disabled}
-            aria-label={t('box.send')}
+            onClick={streaming ? onStop : onSubmit}
+            disabled={streaming ? !onStop : !hasText || submitting || disabled}
+            aria-label={streaming ? t('box.stop') : t('box.send')}
             aria-busy={submitting}
             className={cn(
               'flex shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nk-official focus-visible:ring-offset-2 sm:order-6',
               hero ? 'h-12 w-12' : 'h-11 w-11',
-              hasText || submitting
+              hasText || submitting || streaming
                 ? 'bg-nk-official text-white hover:bg-nk-official-dim'
                 : 'bg-[var(--nk-badge-bg)] text-nk-muted-aa',
             )}
           >
-            {submitting ? <Loader2 aria-hidden className="h-5 w-5 animate-spin motion-reduce:animate-none" /> : <ArrowUp aria-hidden className="h-5 w-5" strokeWidth={2.2} />}
+            {streaming ? (
+              <Square aria-hidden className="h-4 w-4 fill-current" />
+            ) : submitting ? (
+              <Loader2 aria-hidden className="h-5 w-5 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <ArrowUp aria-hidden className="h-5 w-5" strokeWidth={2.2} />
+            )}
           </button>
         </div>
       </div>

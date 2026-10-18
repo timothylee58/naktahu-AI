@@ -8,9 +8,11 @@ import { cn } from '@/lib/utils';
 interface QuotaMeterProps {
   quota: DailyQuota;
   onLogin: () => void;
+  /** Text only, no bar: used in the chat dock where vertical space is tight. */
+  compact?: boolean;
 }
 
-export function QuotaMeter({ quota, onLogin }: QuotaMeterProps) {
+export function QuotaMeter({ quota, onLogin, compact }: QuotaMeterProps) {
   const { t } = useI18n();
   const full = quota.used >= quota.limit;
   const percent = Math.min(100, (quota.used / quota.limit) * 100);
@@ -18,6 +20,7 @@ export function QuotaMeter({ quota, onLogin }: QuotaMeterProps) {
   return (
     <div className="flex w-full max-w-[420px] flex-col gap-1.5 text-left">
       <div
+        hidden={compact}
         role="progressbar"
         aria-label={t('quota.label')}
         aria-valuemin={0}
