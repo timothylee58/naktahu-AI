@@ -104,4 +104,9 @@ def make_judge(name: str) -> Judge:
         return LexicalOverlapJudge()
     if name == "jev":
         return JevDecideJudge.from_env()
+    if name in ("llm-anthropic", "llm-ilmu"):
+        from scripts.evals.faithfulness.llm_judge import LlmJudge, anthropic_complete, ilmu_complete
+
+        complete = anthropic_complete() if name == "llm-anthropic" else ilmu_complete()
+        return LlmJudge(complete, name=name)
     raise JudgeError(f"unknown judge: {name}")

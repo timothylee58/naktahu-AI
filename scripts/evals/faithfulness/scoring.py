@@ -50,7 +50,11 @@ def score_samples(samples: Sequence[dict[str, Any]], judge: Judge, *, workers: i
     if not per_sample:
         raise ScoreRefused("no claims were judged; no score emitted")
     ratios = [sum(v) / len(v) for v in per_sample.values()]
+    by_language: dict[str, list[float]] = {}
+    for i, v in per_sample.items():
+        by_language.setdefault(str(samples[i].get("language") or "unknown"), []).append(sum(v) / len(v))
     return {
+        "faithfulness_by_language": {k: round(sum(v) / len(v), 4) for k, v in sorted(by_language.items())},
         "faithfulness": round(sum(ratios) / len(ratios), 4),
         "judge": judge.name,
         "samples_scored": len(ratios),
