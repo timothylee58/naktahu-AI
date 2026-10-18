@@ -3,6 +3,7 @@ the eval-gate CI job installs only pytest and supabase (which brings httpx)."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -336,14 +337,68 @@ def test_synthetic_file_is_the_generators_output_balanced_and_trilingual():
     assert not validate_cases(rows)[0]                  # synthetic rows pass the validator too
 
 
-def test_every_perturbed_claim_changes_a_fact_that_the_context_states():
+# Each variant targets ONE fact. n1/p1 amount, n2/p2 closing date, n3/p3 months registered,
+# n4/p4 eligible entity. A negative must change exactly its own fact and restate nothing else
+# wrongly; a positive must keep every fact it mentions. Facts are read out of the TEXT of each
+# row (not out of the generator's variables), so a mislabeled row cannot hide behind the builder.
+_VARIANT_FACT = {"1": "amount", "2": "date", "3": "months", "4": "entity"}
+_MONTH_NAMES = "|".join(build_synthetic_set.MONTH["en"] + build_synthetic_set.MONTH["bm"])
+
+
+def _facts(text: str, lang: str) -> dict[str, frozenset]:
+    out: dict[str, frozenset] = {}
+    if lang == "zh":
+        amount = re.findall(r"(\d+) 万令吉", text)
+        date = re.findall(r"(\d+) 月 (\d+) 日", text)
+        months = re.findall(r"(\d+) 个月", text)
+    else:
+        amount = re.findall(r"RM([\d,]+)", text)
+        date = re.findall(rf"(\d{{1,2}}) ({_MONTH_NAMES})\b", text)
+        months = re.findall(r"(\d+) (?:months|bulan)\b", text)
+    for kind, found in (("amount", amount), ("date", date), ("months", months)):
+        if found:
+            out[kind] = frozenset(found)
+    entities = frozenset(k for k, names in build_synthetic_set.ENTITY.items() if names[lang] in text)
+    if entities:
+        out["entity"] = entities
+    return out
+
+
+def _changed_facts(row: dict) -> set[str]:
+    """Which facts the claim states differently from its context."""
+    ctx, claim = _facts(row["context"], row["language"]), _facts(row["claim"], row["language"])
+    return {kind for kind, value in claim.items() if ctx.get(kind) != value}
+
+
+def test_each_synthetic_variant_changes_exactly_its_own_fact():
     rows = load_jsonl(SYNTHETIC)
-    for r in (r for r in rows if r["label"] == 0 and True):
-        assert r["claim"] not in r["context"]
-    # the x10 amount in each 'n1' claim never appears in its own context
-    for r in (r for r in rows if r["id"].endswith("-n1")):
-        figure = next(tok for tok in r["claim"].replace("，", " ").split() if tok.startswith("RM") or tok.endswith("万令吉") or tok.isdigit())
-        assert figure not in r["context"]
+    assert len(rows) == 120
+    for r in rows:
+        variant = r["id"][-1]
+        expected = _VARIANT_FACT[variant]
+        changed = _changed_facts(r)
+        mentioned = set(_facts(r["claim"], r["language"]))
+        assert expected in mentioned, f"{r['id']}: claim never states its {expected}"
+        if r["label"] == 0:
+            assert changed == {expected}, f"{r['id']}: changed {changed or 'nothing'}, wanted only {expected}"
+        else:
+            assert changed == set(), f"{r['id']}: a supported claim changes {changed}"
+        assert r["label"] == (1 if r["id"].split("-")[-1].startswith("p") else 0)
+
+
+@pytest.mark.parametrize("lang", ["en", "bm", "zh"])
+def test_fact_check_catches_a_mislabeled_row(lang):
+    """Sensitivity: the check must fail when a 'negative' restates the context, or a
+    'positive' changes a fact, otherwise the test above would pass vacuously."""
+    rows = {r["id"]: r for r in build_synthetic_set.build() if r["language"] == lang}
+    for variant in "1234":
+        neg, pos = rows[f"syn-{lang}-sef-n{variant}"], rows[f"syn-{lang}-sef-p{variant}"]
+        assert _changed_facts(neg) == {_VARIANT_FACT[variant]}
+        assert _changed_facts(pos) == set()
+        # a negative that actually restates its context's fact changes nothing -> would be flagged
+        assert _changed_facts({**neg, "claim": pos["claim"]}) == set()
+        # a positive that carries a negative's claim changes a fact -> would be flagged
+        assert _changed_facts({**pos, "claim": neg["claim"]}) == {_VARIANT_FACT[variant]}
 
 
 # ── validating a human-labelled set ──────────────────────────────────────────
