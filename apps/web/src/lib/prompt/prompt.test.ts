@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { detectLanguage } from './detectLanguage';
 import { HANDOFF_TTL_MS, savePending, takePending } from './handoff';
 import { hasMyKad, stripMyKad } from './piiGuard';
+import { isDailyLimitError, keyboardInset } from './guestChat';
 import { decideSubmit, initialPromptState, isComposingEnter, promptReducer } from './promptState';
 
 class MemoryStorage {
@@ -125,5 +126,22 @@ describe('promptState', () => {
     expect(isComposingEnter({ nativeEvent: { isComposing: true } })).toBe(true);
     expect(isComposingEnter({ keyCode: 229 })).toBe(true);
     expect(isComposingEnter({ nativeEvent: { isComposing: false }, keyCode: 13 })).toBe(false);
+  });
+});
+
+describe('guestChat', () => {
+  it('recognises only the daily-limit 429', () => {
+    expect(isDailyLimitError('HTTP 429: {"detail":"Daily query limit reached (25/day on the free plan)."}')).toBe(true);
+    expect(isDailyLimitError('HTTP 429: {"error":"Rate limit exceeded: 30 per 1 hour"}')).toBe(false);
+    expect(isDailyLimitError('HTTP 500: Daily query limit')).toBe(false);
+    expect(isDailyLimitError(null)).toBe(false);
+  });
+
+  it('reports the keyboard height and ignores URL-bar jitter', () => {
+    expect(keyboardInset(800, 480, 0)).toBe(320);
+    expect(keyboardInset(800, 740, 0)).toBe(0);
+    expect(keyboardInset(800, 800, 0)).toBe(0);
+    // iOS scrolls the visual viewport when the keyboard opens.
+    expect(keyboardInset(800, 480, 40)).toBe(280);
   });
 });

@@ -70,6 +70,7 @@ const MS: Translations = {
   'box.langDetected.en': 'Dijawab dalam English',
   'box.langDetected.zh': 'Dijawab dalam 中文',
   'box.sending': 'Membuka perbualan…',
+  'box.stop': 'Berhenti menjana',
   'quota.used': '{used} daripada {limit} soalan percuma hari ini',
   'quota.login': 'Log masuk untuk lebih',
   'quota.exhausted': 'Soalan percuma anda telah habis',
@@ -1244,6 +1245,7 @@ const EN: Translations = {
   'box.langDetected.en': 'Answered in English',
   'box.langDetected.zh': 'Answered in Chinese',
   'box.sending': 'Opening the conversation…',
+  'box.stop': 'Stop generating',
   'quota.used': '{used} of {limit} free questions today',
   'quota.login': 'Log in for more',
   'quota.exhausted': 'You have used all your free questions',
@@ -2413,6 +2415,7 @@ const ZH: Translations = {
   'box.langDetected.en': '将以英文回答',  // TODO(native-review)
   'box.langDetected.zh': '将以中文回答',  // TODO(native-review)
   'box.sending': '正在打开对话…',  // TODO(native-review)
+  'box.stop': '停止生成',  // TODO(native-review)
   'quota.used': '今日 {used} / {limit} 个免费提问',  // TODO(native-review)
   'quota.login': '登录以获取更多',  // TODO(native-review)
   'quota.exhausted': '您的免费提问已用完',  // TODO(native-review)
