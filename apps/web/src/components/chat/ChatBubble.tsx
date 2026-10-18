@@ -8,6 +8,7 @@ import type { AgencyContact, Citation } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { AgencyContactCard } from './AgencyContactCard';
 import { CitationChip } from './CitationChip';
+import { AnswerSources } from './AnswerSources';
 import { StreamingText } from './StreamingText';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { ResponseActions } from './ResponseActions';
@@ -193,6 +194,10 @@ export function ChatBubble(props: ChatBubbleProps) {
               </motion.div>
             ))}
           </motion.div>
+        )}
+
+        {!isStreaming && !isThinking && !isError && citations.length > 0 && (
+          <AnswerSources citations={citations} />
         )}
 
         {/* Suggestions — only show after streaming completes and if we have suggestions */}

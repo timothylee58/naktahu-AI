@@ -154,6 +154,7 @@
   --nk-card: #1b2028;
   --nk-border: rgba(237, 234, 227, 0.12);
   --nk-fill-official: rgba(59, 91, 255, 0.16);
+  --nk-fill-community: rgba(224, 168, 59, 0.16);
   --nk-pill-official-bg: rgba(59, 91, 255, 0.12);
   --nk-pill-official-border: rgba(59, 91, 255, 0.4);
   --nk-pill-heritage-bg: rgba(224, 141, 91, 0.1);
@@ -182,6 +183,7 @@
   --nk-card: #ffffff;
   --nk-border: rgba(23, 23, 23, 0.1);
   --nk-fill-official: rgba(59, 91, 255, 0.12);
+  --nk-fill-community: rgba(224, 168, 59, 0.2);
   --nk-pill-official-bg: rgba(59, 91, 255, 0.08);
   --nk-pill-official-border: rgba(59, 91, 255, 0.35);
   --nk-pill-heritage-bg: rgba(224, 141, 91, 0.12);

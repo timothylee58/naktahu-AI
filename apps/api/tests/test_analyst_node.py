@@ -25,6 +25,7 @@ def _make_chunk(
     effective_date: str | None = None,
     superseded_by: str | None = None,
     retrieved_at: str | None = None,
+    source_tier: str | None = None,
     chunk_id: str = "test-id",
 ) -> ChunkResult:
     return ChunkResult(
@@ -40,6 +41,7 @@ def _make_chunk(
         effective_date=effective_date,
         superseded_by=superseded_by,
         retrieved_at=retrieved_at,
+        source_tier=source_tier,
     )
 
 
@@ -623,3 +625,35 @@ async def test_analyst_citation_effective_date_falls_back_to_source_date() -> No
     assert citation["effective_date"] == _STALE_DATE
     # The pair must agree: flagged stale AND dated with the date that made it so.
     assert citation["stale_disclaimer"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tier", ["official", "community"])
+async def test_analyst_citation_carries_source_tier(tier: str) -> None:
+    """A known tier is threaded from the chunk into the citation so the UI can
+    badge it; it is never inferred from the URL."""
+    chunk = _make_chunk(source_tier=tier)
+
+    result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    assert result["citations"][0]["source_tier"] == tier
+
+
+@pytest.mark.asyncio
+async def test_analyst_citation_omits_unknown_source_tier() -> None:
+    """NULL (not yet labelled / pre-migration 059) means no badge: the key is
+    absent, even for a .gov.my URL."""
+    chunk = _make_chunk(source_url="https://www.hasil.gov.my", source_tier=None)
+
+    result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    assert "source_tier" not in result["citations"][0]
+
+
+@pytest.mark.asyncio
+async def test_analyst_ignores_unrecognised_source_tier_value() -> None:
+    chunk = _make_chunk(source_tier="verified-by-me")
+
+    result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
+
+    assert "source_tier" not in result["citations"][0]

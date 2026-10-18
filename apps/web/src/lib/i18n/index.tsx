@@ -71,6 +71,14 @@ const MS: Translations = {
   'box.langDetected.zh': 'Dijawab dalam 中文',
   'box.sending': 'Membuka perbualan…',
   'box.stop': 'Berhenti menjana',
+  'answer.sources': 'Sumber',
+  'answer.official': 'Sumber rasmi',
+  'answer.badge.official': 'Rasmi',
+  'answer.badge.community': 'Komuniti',
+  'answer.communityNote': 'Laman bukan kerajaan — bukan sumber rasmi',
+  'answer.checked': 'Disemak: {date}',
+  'answer.scopeTitle': 'Apa yang NakTahu tidak boleh buat:',
+  'answer.scopeBody': 'semak status permohonan atau akses rekod peribadi anda. Untuk itu, gunakan portal agensi berkaitan.',
   'quota.used': '{used} daripada {limit} soalan percuma hari ini',
   'quota.login': 'Log masuk untuk lebih',
   'quota.exhausted': 'Soalan percuma anda telah habis',
@@ -1246,6 +1254,14 @@ const EN: Translations = {
   'box.langDetected.zh': 'Answered in Chinese',
   'box.sending': 'Opening the conversation…',
   'box.stop': 'Stop generating',
+  'answer.sources': 'Sources',
+  'answer.official': 'Official source',
+  'answer.badge.official': 'Official',
+  'answer.badge.community': 'Community',
+  'answer.communityNote': 'Not a government site — not an official source',
+  'answer.checked': 'Checked: {date}',
+  'answer.scopeTitle': 'What NakTahu can\'t do:',
+  'answer.scopeBody': 'check application status or access your personal records. Use the relevant agency portal for that.',
   'quota.used': '{used} of {limit} free questions today',
   'quota.login': 'Log in for more',
   'quota.exhausted': 'You have used all your free questions',
@@ -2416,6 +2432,14 @@ const ZH: Translations = {
   'box.langDetected.zh': '将以中文回答',  // TODO(native-review)
   'box.sending': '正在打开对话…',  // TODO(native-review)
   'box.stop': '停止生成',  // TODO(native-review)
+  'answer.sources': '来源',  // TODO(native-review)
+  'answer.official': '官方来源',  // TODO(native-review)
+  'answer.badge.official': '官方',  // TODO(native-review)
+  'answer.badge.community': '社区',  // TODO(native-review)
+  'answer.communityNote': '非政府网站——并非官方来源',  // TODO(native-review)
+  'answer.checked': '核查日期：{date}',  // TODO(native-review)
+  'answer.scopeTitle': 'NakTahu 无法做到的事：',  // TODO(native-review)
+  'answer.scopeBody': '查询申请状态或访问您的个人记录。这些请使用相关机构的官方门户。',  // TODO(native-review)
   'quota.used': '今日 {used} / {limit} 个免费提问',  // TODO(native-review)
   'quota.login': '登录以获取更多',  // TODO(native-review)
   'quota.exhausted': '您的免费提问已用完',  // TODO(native-review)

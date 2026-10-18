@@ -41,6 +41,7 @@ from datetime import date
 from typing import Literal, Optional
 
 SourceKind = Literal["rss", "html", "pdf"]
+SourceTier = Literal["official", "community"]
 SourceLanguage = Literal["bm", "en", "zh"]
 
 
@@ -102,6 +103,12 @@ class Source:
     # Human-readable page label used in chunk titles (and so in citations), instead
     # of the source name.
     title: Optional[str] = None
+    # Stamped on every chunk as document_chunks.source_tier (migration 059) and
+    # shown to users as an Official/Community badge. "official" = a government
+    # body or statutory/government-owned agency; "community" = civil society or
+    # private-sector pages. A source whose ministry says it is NOT a government
+    # body MUST be "community" (enforced by tests/test_sources_tier.py).
+    tier: SourceTier = "official"
 
     def is_available(self, today: Optional[date] = None) -> bool:
         return self.available_from is None or (today or date.today()) >= self.available_from
@@ -651,6 +658,7 @@ SOURCES: tuple[Source, ...] = (
         kind="html",
         domain="parliament",
         ministry="MyMP (MCCHR — Malaysian Centre for Constitutionalism and Human Rights; civil-society, NOT a government body)",
+        tier="community",
         language="en",
         notes=(
             "Constituency-to-MP lookup and MP biographies for all 222 Dewan Rakyat "
@@ -909,6 +917,7 @@ SOURCES: tuple[Source, ...] = (
         kind="html",
         domain="tax",
         ministry="Malaysian Business Angel Network (MBAN) — private-sector accreditation body for angel investors under the Angel Tax Incentive framework, NOT a government body",
+        tier="community",
         language="en",
         notes=(
             "MBAN accredits the individual angel investors and clubs the "

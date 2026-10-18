@@ -569,9 +569,11 @@ def _existing_hashes(supabase, hashes: list[str]) -> set[str]:
     return found
 
 
-# Pre-052 databases have no effective_until/announced_date columns; an insert
-# naming them fails. Matched against the error text to retry without them.
+# Pre-052 databases have no effective_until/announced_date columns, and pre-059
+# ones no source_tier; an insert naming a missing column fails. Each group is
+# matched against the error text and dropped (as a group) on retry.
 _DATE_COLUMNS = ("effective_date", "effective_until", "announced_date")
+_OPTIONAL_COLUMN_GROUPS = (_DATE_COLUMNS, ("source_tier",))
 
 # Supersede candidates: how similar (hybrid_search's combined 0.7 cosine +
 # 0.3 keyword score) an older chunk must be to be queued for review, and how
@@ -622,16 +624,36 @@ def date_fields(entry: FeedEntry, args: argparse.Namespace) -> dict[str, str]:
     return {k: v.isoformat() for k, v in values.items() if v is not None}
 
 
+def tier_fields(args: argparse.Namespace) -> dict[str, str]:
+    """source_tier for one row: only when a registered source set it.
+
+    An ad-hoc --feed-url run has no registry entry, so the tier stays unknown
+    (NULL) rather than being assumed official.
+    """
+    tier = getattr(args, "source_tier", None)
+    return {"source_tier": tier} if tier in ("official", "community") else {}
+
+
 def _insert_chunk(supabase, row: dict) -> Optional[str]:
-    """Insert one row and return its id; retry without date columns pre-052."""
-    try:
-        res = supabase.table("document_chunks").insert(row).execute()
-    except Exception as exc:
-        dated = [k for k in _DATE_COLUMNS if k in row]
-        if not dated or not any(k in str(exc) for k in _DATE_COLUMNS):
-            raise
-        log.warning("ingest_date_columns_unsupported", columns=dated, error=str(exc)[:200])
-        res = supabase.table("document_chunks").insert({k: v for k, v in row.items() if k not in dated}).execute()
+    """Insert one row and return its id; on older databases, retry without the
+    optional columns (pre-052 dates, pre-059 source_tier) the error names."""
+    row = dict(row)
+    for _ in range(len(_OPTIONAL_COLUMN_GROUPS) + 1):
+        try:
+            res = supabase.table("document_chunks").insert(row).execute()
+            break
+        except Exception as exc:
+            group = next(
+                (g for g in _OPTIONAL_COLUMN_GROUPS if any(k in row and k in str(exc) for k in g)),
+                None,
+            )
+            if group is None:
+                raise
+            dropped = [k for k in group if k in row]
+            log.warning("ingest_optional_columns_unsupported", columns=dropped, error=str(exc)[:200])
+            row = {k: v for k, v in row.items() if k not in dropped}
+    else:
+        raise RuntimeError("document_chunks insert failed after dropping all optional columns")
     data = res.data if isinstance(res.data, list) else []
     return data[0].get("id") if data else None
 
@@ -839,6 +861,7 @@ async def main_async(args: argparse.Namespace) -> None:
             "ministry": args.ministry,
             **vectors,
             **dates,
+            **tier_fields(args),
         }
         try:
             new_id = _insert_chunk(supabase, row)
@@ -916,6 +939,7 @@ def main() -> None:
         args.kind = source.kind
         args.domain = args.domain or source.domain
         args.ministry = args.ministry or source.ministry
+        args.source_tier = source.tier
         args.language = source.language if args.language == "bm" else args.language
         args.source_title = args.source_title or source.title or source.name
         # A registered source's announcement date (e.g. the Budget's tabling day)
