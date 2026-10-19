@@ -9,6 +9,7 @@ is shared, not any client/session state.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from math import asin, cos, radians, sin, sqrt
 from typing import Any, Optional
 
 # How far back a check-in still counts as "live" before being treated as
@@ -16,6 +17,9 @@ from typing import Any, Optional
 FRESH_WINDOW = timedelta(hours=2)
 # How far back to look at all before saying "no recent reports."
 STALE_WINDOW = timedelta(hours=24)
+# "Typical at this hour" stays unstated until this many reports exist
+# for the current hour. Fewer than that is not a pattern.
+MIN_HOUR_REPORTS = 10
 
 _STATUS_WEIGHT = {"empty": 0, "moderate": 1, "packed": 2}
 _WEIGHT_STATUS = {v: k for k, v in _STATUS_WEIGHT.items()}
@@ -42,7 +46,16 @@ def aggregate_checkin_status(
     confidence gate is the same principle applied elsewhere).
     """
     if not rows:
-        return {"status": None, "is_fresh": False, "report_count": 0, "last_updated": None, "sources": []}
+        return {
+            "status": None,
+            "is_fresh": False,
+            "report_count": 0,
+            "last_updated": None,
+            "sources": [],
+            "counts": {"empty": 0, "moderate": 0, "packed": 0},
+            "hour_reports": 0,
+            "hour_status": None,
+        }
 
     now = now or datetime.now(timezone.utc)
     fresh_cutoff = now - FRESH_WINDOW
@@ -52,6 +65,13 @@ def aggregate_checkin_status(
 
     avg_weight = sum(_STATUS_WEIGHT[r["status"]] for r in active_rows) / len(active_rows)
     status = _WEIGHT_STATUS[round(avg_weight)]
+    counts = _count_statuses(active_rows)
+    hour_rows = [r for r in active_rows if _same_hour(r.get("created_at"), now)]
+    hour_reports = len(hour_rows)
+    hour_status = None
+    if hour_reports >= MIN_HOUR_REPORTS:
+        hour_avg = sum(_STATUS_WEIGHT[r["status"]] for r in hour_rows) / hour_reports
+        hour_status = _WEIGHT_STATUS[round(hour_avg)]
 
     return {
         "status": status,
@@ -59,7 +79,64 @@ def aggregate_checkin_status(
         "report_count": len(active_rows),
         "last_updated": active_rows[0]["created_at"],
         "sources": sorted({r["source"] for r in active_rows}),
+        "counts": counts,
+        "hour_reports": hour_reports,
+        "hour_status": hour_status,
     }
+
+
+def _count_statuses(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {"empty": 0, "moderate": 0, "packed": 0}
+    for row in rows:
+        status = row.get("status")
+        if status in counts:
+            counts[status] += 1
+    return counts
+
+
+def _same_hour(created_at: Any, now: datetime) -> bool:
+    if not isinstance(created_at, str):
+        return False
+    try:
+        ts = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    ts = ts.astimezone(timezone.utc)
+    current = now.astimezone(timezone.utc)
+    return ts.date() == current.date() and ts.hour == current.hour
+
+
+def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in metres. Used to keep a nearby list inside
+    a stated radius instead of calling every geotagged warung 'nearby'."""
+    earth_radius_m = 6_371_000.0
+    phi1, phi2 = radians(lat1), radians(lat2)
+    d_phi = radians(lat2 - lat1)
+    d_lng = radians(lng2 - lng1)
+    a = sin(d_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(d_lng / 2) ** 2
+    return 2 * earth_radius_m * asin(sqrt(a))
+
+
+def nearby_warungs(
+    rows: list[dict[str, Any]], *, lat: float, lng: float, radius_m: float
+) -> list[dict[str, Any]]:
+    """Warungs with coordinates inside radius_m, nearest first.
+    Rows without lat/lng are skipped — a place we cannot locate is not
+    shown as '120 m away'."""
+    found: list[dict[str, Any]] = []
+    for row in rows:
+        row_lat, row_lng = row.get("lat"), row.get("lng")
+        if isinstance(row_lat, bool) or isinstance(row_lng, bool):
+            continue
+        if not isinstance(row_lat, (int, float)) or not isinstance(row_lng, (int, float)):
+            continue
+        distance = haversine_m(lat, lng, float(row_lat), float(row_lng))
+        if distance <= radius_m:
+            found.append({**row, "distance_m": int(round(distance))})
+    found.sort(key=lambda item: int(item["distance_m"]))
+    return found
 
 
 def normalize_name(name: str) -> str:

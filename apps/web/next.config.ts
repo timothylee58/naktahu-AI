@@ -24,6 +24,18 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Warung Watch is the only page that asks for location. A later
+      // matching rule overwrites the catch-all geolocation=() for this
+      // path; every other route stays blocked.
+      {
+        source: "/warung-watch",
+        headers: [
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(self), geolocation=(self)",
+          },
+        ],
+      },
     ];
   },
 

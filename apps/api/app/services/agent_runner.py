@@ -599,6 +599,11 @@ async def start_health_triage(*, user_id: str, payload: dict[str, Any], supabase
         "user_id": user_id,
         "message": payload.get("message", ""),
         "language": payload.get("language", "bm"),
+        "body_area": payload.get("body_area") or "",
+        "symptom_ids": payload.get("symptom_ids") or [],
+        "duration": payload.get("duration") or "",
+        "reported_severity": payload.get("reported_severity") or "",
+        "red_flags": payload.get("red_flags") or {},
         "tool_calls": [],
     }
     values, _ = await _run_graph(graph, session_id, inputs)
@@ -626,6 +631,7 @@ def _render_health_triage_html(values: dict[str, Any]) -> str:
     own HTML building doesn't escape either), worth not repeating here."""
     symptoms = ", ".join(html.escape(s) for s in (values.get("symptoms") or []))
     severity = html.escape(str(values.get("severity") or ""))
+    urgency = html.escape(str(values.get("urgency") or ""))
     recommendation = html.escape(str(values.get("facility_recommendation") or ""))
     disclaimer = html.escape(str(values.get("disclaimer") or ""))
 
@@ -651,7 +657,8 @@ def _render_health_triage_html(values: dict[str, Any]) -> str:
         "<h1>Health Triage Summary</h1>"
         f"<p><strong>Symptoms reported:</strong> {symptoms or '—'}</p>"
         f"<p><strong>Severity:</strong> {severity}</p>"
-        f"<h2>Recommendation</h2><p>{recommendation}</p>"
+        + (f"<p><strong>Urgency:</strong> {urgency}</p>" if urgency else "")
+        + f"<h2>Recommendation</h2><p>{recommendation}</p>"
         f"<h2>Suggested Facilities</h2><ul>{facility_items}</ul>"
         + (f"<h2>Sources</h2><ul>{citation_items}</ul>" if citation_items else "")
         + f"<p><em>{disclaimer}</em></p>"

@@ -40,7 +40,14 @@ import httpx
 import structlog
 from supabase import Client
 
-from core.warung_watch import STALE_WINDOW, aggregate_checkin_status, normalize_name, rank_candidates, select_best_match
+from core.warung_watch import (
+    STALE_WINDOW,
+    aggregate_checkin_status,
+    nearby_warungs,
+    normalize_name,
+    rank_candidates,
+    select_best_match,
+)
 
 logger = structlog.get_logger()
 
@@ -133,7 +140,7 @@ async def search_warungs(
         # sort — DB-side `ilike` order is not meaningful on its own.
         res = (
             supabase_client.table("warungs")
-            .select("id,name,location,verified")
+            .select("id,name,location,lat,lng,verified")
             .ilike("normalized_name", f"%{normalized}%")
             .limit(max(limit * 3, 25))
             .execute()
@@ -142,6 +149,37 @@ async def search_warungs(
 
     candidates = await asyncio.to_thread(_search)
     return rank_candidates(query, candidates)[:limit]
+
+
+async def list_nearby_warungs(
+    *,
+    supabase_client: Client,
+    lat: float,
+    lng: float,
+    radius_m: int = 800,
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    """Geotagged warungs inside radius_m, each with its real crowd status.
+    Places without coordinates are absent. An empty list means we have no
+    located warungs in range — the caller must not fill that with sample rows."""
+
+    def _fetch() -> list[dict[str, Any]]:
+        res = (
+            supabase_client.table("warungs")
+            .select("id,name,location,lat,lng,verified")
+            .not_.is_("lat", "null")
+            .limit(500)
+            .execute()
+        )
+        return res.data or []
+
+    rows = await asyncio.to_thread(_fetch)
+    nearest = nearby_warungs(rows, lat=lat, lng=lng, radius_m=float(radius_m))[: max(1, min(limit, 20))]
+    listed: list[dict[str, Any]] = []
+    for warung in nearest:
+        status = await get_status(supabase_client=supabase_client, warung_id=warung["id"])
+        listed.append({"warung": warung, **status})
+    return listed
 
 
 async def find_best_warung_match(

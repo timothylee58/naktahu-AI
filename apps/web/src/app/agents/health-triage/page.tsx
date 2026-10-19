@@ -142,15 +142,23 @@ const STEP_ORDER: Step[] = ['body', 'symptoms', 'duration', 'severity', 'details
 
 type UrgencyLevel = 'emergency' | 'moderate' | 'mild' | 'unknown';
 
-// This keyword match runs against `output.facility_recommendation`, which
-// the backend synthesises in the query's own language (this page's
-// `language` field, now locale-derived instead of always 'bm' — see
-// localeToApiLanguage below). Before that fix, the field was hardcoded to
-// 'bm' so this text was always Malay and the bm-only keyword list always
-// matched; fixing the hardcoded language exposed this as a real gap for
-// en/zh responses, so it needs the same three-language coverage as the
-// rest of the page, not just bm+partial-en.
+const EMERGENCY_SEVERE_SYMPTOMS = new Set(['sakit_dada', 'sesak_nafas']);
+
+function intakeIsEmergency(
+  severity: Severity | null,
+  symptoms: string[],
+  redFlags: Record<string, boolean | null>,
+): boolean {
+  if (Object.values(redFlags).some((answer) => answer === true)) return true;
+  return severity === 'severe' && symptoms.some((id) => EMERGENCY_SEVERE_SYMPTOMS.has(id));
+}
+
 function getUrgencyLevel(output: Record<string, unknown>): UrgencyLevel {
+  // New runs carry a scored urgency. Older history rows only have the
+  // recommendation sentence, so the keyword fallback stays for those.
+  if (output.urgency === 'emergency') return 'emergency';
+  if (output.urgency === 'clinic') return 'moderate';
+  if (output.urgency === 'monitor') return 'mild';
   const rec = String(output.facility_recommendation ?? '').toLowerCase();
   if (rec.includes('999') || rec.includes('kecemasan') || rec.includes('emergency') || rec.includes('紧急')) {
     return 'emergency';
@@ -225,6 +233,20 @@ function HealthTriagePageInner() {
     () => selectedSymptoms.filter((id) => REDFLAG_QUESTIONS[id]),
     [selectedSymptoms],
   );
+  const emergencyNow = intakeIsEmergency(severity, selectedSymptoms, redFlagAnswers);
+
+  const dismissEmergency = () => {
+    setSeverity((current) =>
+      current === 'severe' && selectedSymptoms.some((id) => EMERGENCY_SEVERE_SYMPTOMS.has(id)) ? null : current,
+    );
+    setRedFlagAnswers((prev) => {
+      const next = { ...prev };
+      for (const id of Object.keys(next)) {
+        if (next[id] === true) next[id] = null;
+      }
+      return next;
+    });
+  };
 
   const toggleSymptom = (id: string) => {
     setSelectedSymptoms((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -306,7 +328,20 @@ function HealthTriagePageInner() {
     setLoading(true);
     setError(null);
     try {
-      const res = await start('health-triage', { message: buildMessage(), language: localeToApiLanguage(locale) });
+      const redFlags: Record<string, boolean> = {};
+      for (const id of applicableRedFlags) {
+        const answer = redFlagAnswers[id];
+        if (answer === true || answer === false) redFlags[id] = answer;
+      }
+      const res = await start('health-triage', {
+        message: buildMessage(),
+        language: localeToApiLanguage(locale),
+        body_area: bodyArea,
+        symptom_ids: selectedSymptoms,
+        duration: duration[0] ?? null,
+        reported_severity: severity,
+        red_flags: redFlags,
+      });
       setOutput((res.output as Record<string, unknown>) ?? res);
       setSessionId(typeof res.session_id === 'string' ? res.session_id : null);
     } catch (e) {
@@ -372,7 +407,28 @@ function HealthTriagePageInner() {
       >
         <p className="text-xs text-zinc-500 leading-relaxed dark:text-zinc-400">{t('agents.health-triage.disclaimer_intro')}</p>
 
-        {!output && (
+        {emergencyNow && !output && (
+          <section className="rounded-2xl border-2 border-red-300 bg-red-50 p-5 flex flex-col gap-3 dark:border-red-500/40 dark:bg-red-500/10">
+            <h2 className="font-bold text-lg text-red-800 dark:text-red-300">{t('agents.health-triage.emergency_title')}</h2>
+            <p className="text-sm text-red-800 dark:text-red-200 leading-relaxed">{t('agents.health-triage.emergency_body')}</p>
+            <a
+              href="tel:999"
+              className="inline-flex items-center justify-center gap-2 self-start px-4 py-3 bg-red-600 hover:bg-red-500 transition-colors text-white rounded-xl text-sm font-semibold"
+            >
+              <Phone className="h-4 w-4" aria-hidden />
+              {t('agents.health-triage.emergency_call')}
+            </a>
+            <button
+              type="button"
+              onClick={dismissEmergency}
+              className="self-start text-sm text-red-800 underline dark:text-red-300"
+            >
+              {t('agents.health-triage.emergency_mistake')}
+            </button>
+          </section>
+        )}
+
+        {!output && !emergencyNow && (
           <section className="bg-white border border-zinc-200 rounded-2xl p-5 flex flex-col gap-4 shadow-[0_2px_16px_rgba(15,23,42,0.06)] dark:bg-white/5 dark:border-white/10">
             {/* Progress bar */}
             <div className="flex items-center gap-1.5">
