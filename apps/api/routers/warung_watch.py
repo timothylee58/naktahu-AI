@@ -19,6 +19,7 @@ from services.warung_watch import (
     get_or_create_warung,
     get_price_history,
     get_status,
+    list_nearby_warungs,
     search_nearby_places,
     search_warungs,
 )
@@ -94,6 +95,28 @@ async def warung_nearby(
     frontend can degrade to its Maps-link-only fallback instead of erroring.
     """
     return await search_nearby_places(lat=lat, lng=lng, radius_m=radius_m)
+
+
+@router.get("/nearby-reports")
+@anonymous_limiter.limit("30/minute")
+async def warung_nearby_reports(
+    request: Request,
+    response: Response,
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius_m: int = Query(800, ge=100, le=5000),
+) -> dict[str, Any]:
+    """Warungs we have coordinates for, inside the radius, with the same
+    status aggregation as /status. Empty when none are geotagged nearby."""
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Warung Watch is temporarily unavailable")
+    warungs = await list_nearby_warungs(
+        supabase_client=request.app.state.supabase,
+        lat=lat,
+        lng=lng,
+        radius_m=radius_m,
+    )
+    return {"radius_m": radius_m, "warungs": warungs}
 
 
 @router.post("/checkin", status_code=201)

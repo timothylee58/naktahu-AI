@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 import main as api_main
 from core.config import settings
 from middleware.rate_limit import anonymous_limiter, authenticated_limiter
-from core.warung_watch import rank_candidates, select_best_match
+from core.warung_watch import nearby_warungs, rank_candidates, select_best_match
 from services.warung_watch import (
     create_checkin,
     find_best_warung_match,
@@ -209,6 +209,25 @@ def test_status_503_when_supabase_unavailable(client, monkeypatch):
     assert res.status_code == 503
 
 
+def test_nearby_reports_503_when_supabase_unavailable(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    res = c.get("/api/v1/warung-watch/nearby-reports", params={"lat": 3.14, "lng": 101.7})
+    assert res.status_code == 503
+
+
+def test_nearby_warungs_keeps_only_places_inside_the_radius():
+    origin_lat, origin_lng = 3.1390, 101.6869
+    rows = [
+        {"id": "near", "name": "Near", "lat": 3.1399, "lng": 101.6869},
+        {"id": "far", "name": "Far", "lat": 3.1570, "lng": 101.6869},
+        {"id": "unlocated", "name": "No pin", "lat": None, "lng": None},
+    ]
+    found = nearby_warungs(rows, lat=origin_lat, lng=origin_lng, radius_m=800)
+    assert [row["id"] for row in found] == ["near"]
+    assert found[0]["distance_m"] < 800
+
+
 def test_search_503_when_supabase_unavailable(client, monkeypatch):
     c, *_ = client
     monkeypatch.setattr(api_main.app.state, "supabase", None)
@@ -261,6 +280,9 @@ async def test_get_status_majority_vote_among_fresh_reports():
     assert result["status"] == "packed"
     assert result["is_fresh"] is True
     assert result["report_count"] == 3
+    assert result["counts"] == {"empty": 0, "moderate": 1, "packed": 2}
+    assert result["hour_reports"] <= 3
+    assert result["hour_status"] is None
 
 
 @pytest.mark.asyncio

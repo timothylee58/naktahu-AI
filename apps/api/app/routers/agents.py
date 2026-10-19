@@ -5,9 +5,10 @@ from typing import Annotated, Any, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, field_validator, StringConstraints
 
 from app.agents.checkpointer import get_checkpointer
+from app.agents.health_triage.state import HEALTH_SYMPTOM_IDS
 from app.agents.tools import PdfGenerationError
 from app.services.agent_runner import (
     AGENT_CONFIRM_HANDLERS,
@@ -31,7 +32,28 @@ router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 class AgentStartRequest(BaseModel):
     language: Literal["bm", "en", "zh"] = "bm"
     message: str = ""
+    # health-triage wizard. Urgency is scored from these ids, not from
+    # `message` (that sentence is localized display text and always
+    # contains the symptom name).
+    body_area: Optional[Literal["general", "head", "chest", "abdomen", "skin"]] = None
+    symptom_ids: list[Literal[
+        "demam", "batuk", "sakit_kepala", "pening", "sesak_nafas",
+        "sakit_dada", "sakit_perut", "loya", "cirit_birit", "ruam",
+    ]] = Field(default_factory=list, max_length=10)
+    duration: Optional[Literal["less_1", "1_3", "3_7", "more_7"]] = None
+    reported_severity: Optional[Literal["mild", "moderate", "severe"]] = None
+    red_flags: dict[str, bool] = Field(default_factory=dict)
     context: str = Field(default="", max_length=5000)
+
+    @field_validator("red_flags")
+    @classmethod
+    def _bound_red_flags(cls, value: dict[str, bool]) -> dict[str, bool]:
+        if len(value) > 10:
+            raise ValueError("red_flags exceeds 10 entries")
+        unknown = set(value) - set(HEALTH_SYMPTOM_IDS)
+        if unknown:
+            raise ValueError(f"unknown red flag: {sorted(unknown)[0]}")
+        return value
     query: Optional[str] = None
     # compliance-drafter
     business_type: str = Field(default="sole_proprietor", max_length=100)

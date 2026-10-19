@@ -28,3 +28,11 @@
     X-XSS-Protection       = "1; mode=block"
     Referrer-Policy        = "strict-origin-when-cross-origin"
     Permissions-Policy     = "camera=(), microphone=(self), geolocation=()"
+
+# Warung Watch is the only page that reads location. Listed after the
+# site-wide rule so this header wins for the page.
+[[headers]]
+  for = "/warung-watch"
+
+  [headers.values]
+    Permissions-Policy = "camera=(), microphone=(self), geolocation=(self)"
