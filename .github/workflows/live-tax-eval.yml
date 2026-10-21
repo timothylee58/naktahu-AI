@@ -56,6 +56,14 @@ jobs:
           curl -sS -H "Authorization: Bearer $ILMU_API_KEY" https://api.ilmu.ai/v1/models \
             | python3 -c 'import json,sys; print("\n".join(sorted(m["id"] for m in json.load(sys.stdin).get("data", []))))'
 
+      - name: Pick the chat model (dispatch input, else the trigger file's model= line)
+        working-directory: .
+        run: |
+          m="${{ github.event.inputs.ilmu_chat_model }}"
+          if [ -z "$m" ]; then m=$(sed -n 's/^model=//p' .github/live-eval-trigger.txt | head -n1); fi
+          echo "ILMU_CHAT_MODEL=${m:-ilmu-chat}" >> "$GITHUB_ENV"
+          echo "Chat model for this run: ${m:-ilmu-chat}"
+
       - name: Run live eval
         env:
           PYTHONPATH: .
@@ -70,6 +78,5 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ILMU_BASE_URL: https://api.ilmu.ai/v1
           ILMU_EMBEDDING_MODEL: ""
-          ILMU_CHAT_MODEL: ${{ github.event.inputs.ilmu_chat_model || vars.ILMU_CHAT_MODEL || 'ilmu-chat' }}
           EMBEDDING_PROFILE: ${{ github.event.inputs.embedding_profile || 'ilmu_bge_m3' }}
         run: pytest evals/test_tax_accuracy.py -q -s -k live
