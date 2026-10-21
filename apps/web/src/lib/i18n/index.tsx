@@ -250,6 +250,13 @@ const MS: Translations = {
   'warung_watch.add_place': 'Tambah “{name}” sebagai tempat baharu',
   'warung_watch.back': 'Kembali',
   'warung_watch.close': 'Tutup',
+  'warung_watch.results_count': '{n} tempat berdekatan',
+  'warung_watch.pick_place_title': 'Pilih warung',
+  'warung_watch.pick_place_body': 'Pilih tempat daripada senarai untuk lihat sejauh mana sesaknya, atau lapor dari tempat anda berada.',
+  'warung_watch.search_results': 'Hasil carian',
+  'warung_watch.price_item_label': 'Item',
+  'warung_watch.price_amount_label': 'Harga (RM)',
+  'warung_watch.sending': 'Menghantar…',
   'warung_watch.pick_place': 'Pilih warung, kemudian suasana di sana.',
   'warung_watch.distance_m': '{n} m',
   'suggestions.api.query': 'POST /api/v1/public/query — jawapan tunggal',
@@ -1495,6 +1502,13 @@ const EN: Translations = {
   'warung_watch.add_place': 'Add “{name}” as a new place',
   'warung_watch.back': 'Back',
   'warung_watch.close': 'Close',
+  'warung_watch.results_count': '{n} places nearby',
+  'warung_watch.pick_place_title': 'Pick a warung',
+  'warung_watch.pick_place_body': 'Choose a place from the list to see how busy it is, or report from where you are.',
+  'warung_watch.search_results': 'Search results',
+  'warung_watch.price_item_label': 'Item',
+  'warung_watch.price_amount_label': 'Price (RM)',
+  'warung_watch.sending': 'Sending…',
   'warung_watch.pick_place': 'Choose the warung, then how busy it is.',
   'warung_watch.distance_m': '{n} m',
   'suggestions.api.query': 'POST /api/v1/public/query — single answer',
@@ -2736,6 +2750,13 @@ const ZH: Translations = {
   'warung_watch.add_place': '把“{name}”添加为新地点',
   'warung_watch.back': '返回',
   'warung_watch.close': '关闭',
+  'warung_watch.results_count': '附近有 {n} 个地点',  // TODO(native-review)
+  'warung_watch.pick_place_title': '选择摊位',  // TODO(native-review)
+  'warung_watch.pick_place_body': '从列表中选一个地点查看拥挤程度，或在你所在的地方通报。',  // TODO(native-review)
+  'warung_watch.search_results': '搜索结果',  // TODO(native-review)
+  'warung_watch.price_item_label': '项目',  // TODO(native-review)
+  'warung_watch.price_amount_label': '价格 (RM)',  // TODO(native-review)
+  'warung_watch.sending': '发送中…',  // TODO(native-review)
   'warung_watch.pick_place': '先选摊位，再说有多挤。',
   'warung_watch.distance_m': '{n} 米',
   'suggestions.api.query': 'POST /api/v1/public/query — 单次回答',

@@ -151,6 +151,16 @@
   --nk-community-text-warn: #f0c36a;
   --nk-muted-aa: #8a8f98;
 
+  /* Warung Watch crowd levels. Fill is for meters (3:1 graphics), text is
+     for words on the card (AA). Colour is never the only cue: every level
+     also carries a word and a segment count. */
+  --nk-quiet: #34b27b;
+  --nk-moderate: #f0a92e;
+  --nk-packed: #e5484d;
+  --nk-quiet-text: #4cc995;
+  --nk-moderate-text: #f5be5c;
+  --nk-packed-text: #ff7a7e;
+
   --nk-card: #1b2028;
   --nk-border: rgba(237, 234, 227, 0.12);
   --nk-fill-official: rgba(59, 91, 255, 0.16);
@@ -177,6 +187,13 @@
   --nk-community-text: #7a5a10;
   --nk-community-text-warn: #7a5a10;
   --nk-muted-aa: #5f646d;
+
+  --nk-quiet: #1f9d68;
+  --nk-moderate: #d98b0b;
+  --nk-packed: #d92d33;
+  --nk-quiet-text: #0f6b46;
+  --nk-moderate-text: #8a5a00;
+  --nk-packed-text: #b42318;
 
   /* White tiles/box on the existing cream page: the board's cream-on-white
      would vanish against this page's cream background. */
@@ -223,6 +240,12 @@
   --color-nk-community-text-warn: var(--nk-community-text-warn);
   --color-nk-muted-aa: var(--nk-muted-aa);
   --color-nk-card: var(--nk-card);
+  --color-nk-quiet: var(--nk-quiet);
+  --color-nk-moderate: var(--nk-moderate);
+  --color-nk-packed: var(--nk-packed);
+  --color-nk-quiet-text: var(--nk-quiet-text);
+  --color-nk-moderate-text: var(--nk-moderate-text);
+  --color-nk-packed-text: var(--nk-packed-text);
   --color-brand-blue: var(--brand-blue);
   --color-brand-blue-dark: var(--brand-blue-dark);
   --color-brand-amber: var(--brand-amber);

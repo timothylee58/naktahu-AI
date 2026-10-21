@@ -3,176 +3,47 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { BadgeCheck, Check, Clock, MapPin, Menu, Navigation } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { useSupabaseSession } from '@/lib/hooks/useSupabaseSession';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { NakTahuWordmark } from '@/components/logo/NakTahuWordmark';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { API_BASE } from '@/lib/api-base';
 import { WarungPriceChart, type PriceHistoryPoint } from '@/components/warung-watch/WarungPriceChart';
+import { PlaceCard } from '@/components/warung-watch/PlaceCard';
+import { PlaceSearch } from '@/components/warung-watch/PlaceSearch';
+import { ReportSheet } from '@/components/warung-watch/ReportSheet';
+import { StatusMeter } from '@/components/warung-watch/StatusMeter';
+import { cn } from '@/lib/utils';
+import {
+  asCrowd,
+  directionsUrl,
+  EMPTY_CROWD,
+  FILL_CLASS,
+  fill,
+  freshnessTone,
+  haversineM,
+  hintKey,
+  levelKey,
+  normName,
+  STATUSES,
+  TEXT_CLASS,
+  type Coords,
+  type CrowdStatus,
+  type Place,
+} from '@/lib/warung-watch/crowd';
 
 const ANON_SESSION_KEY = 'naktahu_anon_session_id';
 const RADIUS_M = 800;
 
-type CrowdStatus = 'empty' | 'moderate' | 'packed';
 type Screen = 'home' | 'detail' | 'thanks';
-
-interface Counts {
-  empty: number;
-  moderate: number;
-  packed: number;
-}
-
-interface Crowd {
-  status: CrowdStatus | null;
-  is_fresh: boolean;
-  report_count: number;
-  last_updated: string | null;
-  counts: Counts;
-  hour_reports: number;
-  hour_status: CrowdStatus | null;
-}
-
-interface Place {
-  key: string;
-  name: string;
-  location: string | null;
-  verified: boolean;
-  lat: number | null;
-  lng: number | null;
-  distance_m: number | null;
-  crowd: Crowd;
-}
-
-interface Coords {
-  lat: number;
-  lng: number;
-}
-
-const EMPTY_CROWD: Crowd = {
-  status: null,
-  is_fresh: false,
-  report_count: 0,
-  last_updated: null,
-  counts: { empty: 0, moderate: 0, packed: 0 },
-  hour_reports: 0,
-  hour_status: null,
-};
-
-function fill(template: string, values: Record<string, string | number>): string {
-  return Object.entries(values).reduce((text, [key, value]) => text.split(`{${key}}`).join(String(value)), template);
-}
-
-function normName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function isStatus(value: unknown): value is CrowdStatus {
-  return value === 'empty' || value === 'moderate' || value === 'packed';
-}
-
-function asCrowd(data: Record<string, unknown> | null): Crowd {
-  if (!data) return EMPTY_CROWD;
-  const counts = (data.counts ?? {}) as Partial<Counts>;
-  return {
-    status: isStatus(data.status) ? data.status : null,
-    is_fresh: data.is_fresh === true,
-    report_count: typeof data.report_count === 'number' ? data.report_count : 0,
-    last_updated: typeof data.last_updated === 'string' ? data.last_updated : null,
-    counts: {
-      empty: typeof counts.empty === 'number' ? counts.empty : 0,
-      moderate: typeof counts.moderate === 'number' ? counts.moderate : 0,
-      packed: typeof counts.packed === 'number' ? counts.packed : 0,
-    },
-    hour_reports: typeof data.hour_reports === 'number' ? data.hour_reports : 0,
-    hour_status: isStatus(data.hour_status) ? data.hour_status : null,
-  };
-}
-
-function levelKey(status: CrowdStatus): string {
-  switch (status) {
-    case 'empty':
-      return 'warung_watch.level.empty';
-    case 'moderate':
-      return 'warung_watch.level.moderate';
-    case 'packed':
-      return 'warung_watch.level.packed';
-    default: {
-      const neverStatus: never = status;
-      return neverStatus;
-    }
-  }
-}
-
-function hintKey(status: CrowdStatus): string {
-  switch (status) {
-    case 'empty':
-      return 'warung_watch.hint.empty';
-    case 'moderate':
-      return 'warung_watch.hint.moderate';
-    case 'packed':
-      return 'warung_watch.hint.packed';
-    default: {
-      const neverStatus: never = status;
-      return neverStatus;
-    }
-  }
-}
-
-function segmentCount(status: CrowdStatus): number {
-  switch (status) {
-    case 'empty':
-      return 1;
-    case 'moderate':
-      return 2;
-    case 'packed':
-      return 3;
-    default: {
-      const neverStatus: never = status;
-      return neverStatus;
-    }
-  }
-}
-
-function segmentClass(status: CrowdStatus, stale: boolean): string {
-  if (stale) return 'bg-zinc-400';
-  switch (status) {
-    case 'empty':
-      return 'bg-emerald-500';
-    case 'moderate':
-      return 'bg-amber-500';
-    case 'packed':
-      return 'bg-red-500';
-    default: {
-      const neverStatus: never = status;
-      return neverStatus;
-    }
-  }
-}
-
-function directionsUrl(place: Place): string {
-  if (place.lat !== null && place.lng !== null) {
-    return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
-  }
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`;
-}
 
 async function apiFetch(path: string, accessToken: string | null, init?: RequestInit) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   return fetch(`${API_BASE}${path}`, { ...init, headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) } });
-}
-
-function StatusMeter({ status, stale }: { status: CrowdStatus; stale: boolean }) {
-  const filled = segmentCount(status);
-  const tone = segmentClass(status, stale);
-  return (
-    <span className="inline-flex items-center gap-0.5" aria-hidden>
-      {[0, 1, 2].map((index) => (
-        <span key={index} className={`h-2 w-3 rounded-sm ${index < filled ? tone : 'bg-zinc-200 dark:bg-white/15'}`} />
-      ))}
-    </span>
-  );
 }
 
 export default function WarungWatchPage() {
@@ -298,13 +169,7 @@ export default function WarungWatchPage() {
         if (known.has(normName(place.name))) continue;
         let distance: number | null = null;
         if (place.lat !== null && place.lng !== null) {
-          const toRad = (deg: number) => (deg * Math.PI) / 180;
-          const dLat = toRad(place.lat - next.lat);
-          const dLng = toRad(place.lng - next.lng);
-          const a =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(next.lat)) * Math.cos(toRad(place.lat)) * Math.sin(dLng / 2) ** 2;
-          distance = Math.round(2 * 6_371_000 * Math.asin(Math.sqrt(a)));
+          distance = haversineM(next, { lat: place.lat, lng: place.lng });
           if (distance > RADIUS_M) continue;
         }
         extras.push({
@@ -462,11 +327,46 @@ export default function WarungWatchPage() {
     return places.filter((place) => place.crowd.status === 'empty' && place.crowd.is_fresh);
   }, [places, quietOnly]);
 
-  const exactSuggestion = suggestions.some((place) => normName(place.name) === normName(query));
   const latestPrice = priceHistory.length > 0 ? priceHistory[priceHistory.length - 1] : null;
 
-  const card = isDark ? 'bg-white/5 border-white/10' : 'bg-white border-zinc-200';
-  const muted = isDark ? 'text-zinc-400' : 'text-zinc-500';
+
+
+  const announce = locating
+    ? t('warung_watch.nearby_locating')
+    : browsing === 'list' && places.length > 0
+      ? fill(t('warung_watch.results_count'), { n: visiblePlaces.length })
+      : '';
+
+  const closeDetail = () => {
+    setScreen('home');
+    setSheet(false);
+    setPickForReport(false);
+  };
+
+  const openReport = () => {
+    setSheet(true);
+    setReportError(false);
+  };
+
+  const actions = selected && (
+    <>
+      <a
+        href={directionsUrl(selected)}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(buttonVariants({ variant: 'outline' }), 'h-12 flex-1 text-base sm:text-sm')}
+      >
+        <Navigation className="h-4 w-4" aria-hidden />
+        {t('warung_watch.directions')}
+      </a>
+      <Button type="button" className="h-12 flex-1 text-base sm:text-sm" onClick={openReport}>
+        {t('warung_watch.report_now')}
+      </Button>
+    </>
+  );
+
+  const crowd = selected?.crowd;
+  const tone = crowd ? freshnessTone(crowd) : 'none';
 
   return (
     <div className={`flex h-full ${isDark ? 'bg-[#12151C] text-white' : 'bg-zinc-50/50 text-zinc-900'}`}>
@@ -479,367 +379,332 @@ export default function WarungWatchPage() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
       />
-      <div className="flex flex-col flex-1 min-w-0 h-full overflow-y-auto">
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-y-auto">
         <header
-          className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b backdrop-blur-md sticky top-0 z-10 ${
+          className={`sticky top-0 z-10 flex flex-shrink-0 items-center gap-2 border-b px-4 py-2 backdrop-blur-md ${
             isDark ? 'border-white/10 bg-[#12151C]/90 text-white' : 'border-zinc-100 bg-white/90 text-zinc-900'
           }`}
         >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            aria-label={t('header.menu')}
-            className={`p-1.5 rounded-lg transition-colors lg:hidden ${isDark ? 'text-zinc-400 hover:bg-white/10' : 'text-zinc-500 hover:bg-zinc-100'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <Link href="/" className="flex flex-col">
+          <Button type="button" variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label={t('header.menu')} className="-ml-2 h-11 w-11 lg:hidden">
+            <Menu className="h-5 w-5" aria-hidden />
+          </Button>
+          <Link href="/" className="flex min-h-11 flex-col justify-center">
             <NakTahuWordmark markSize={20} className="text-base" />
-            <span className={`text-xs ${muted}`}>{t('header.subtitle')}</span>
+            <span className="text-xs text-nk-muted-aa">{t('header.subtitle')}</span>
           </Link>
         </header>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="max-w-md mx-auto px-4 py-6 w-full flex flex-col gap-4">
-          {screen === 'home' && (
-            <>
-              <div>
-                <h1 className="font-display text-2xl font-bold">{t('warung_watch.title')}</h1>
-                <p className={`text-sm mt-1 ${muted}`}>{t('warung_watch.lede')}</p>
-                <span className={`inline-block mt-2 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${isDark ? 'border-white/15 text-zinc-300' : 'border-zinc-200 text-zinc-600'}`}>
-                  {t('warung_watch.badge.community')}
-                </span>
-              </div>
+        <p className="sr-only" role="status" aria-live="polite">{announce}</p>
 
-              {browsing === 'list' && coords && (
-                <div className="flex items-center justify-between text-sm">
-                  <p>{fill(t('warung_watch.within'), { m: RADIUS_M })}</p>
-                  <button type="button" onClick={() => setBrowsing('search')} className="font-semibold text-nk-official">
-                    {t('warung_watch.change')}
-                  </button>
-                </div>
-              )}
-
-              {(browsing === 'ask' || browsing === 'search') && (
-                <section className={`rounded-2xl border p-4 flex flex-col gap-3 ${card}`}>
-                  {browsing === 'ask' && (
-                    <>
-                      <h2 className="font-semibold">{t('warung_watch.location_off_title')}</h2>
-                      <p className={`text-sm ${muted}`}>{t('warung_watch.location_off_body')}</p>
-                      <button
-                        type="button"
-                        onClick={loadNearby}
-                        disabled={locating}
-                        className="px-4 py-2.5 rounded-xl bg-nk-official text-white text-sm font-semibold disabled:opacity-50"
-                      >
-                        {locating ? t('warung_watch.nearby_locating') : t('warung_watch.use_location')}
-                      </button>
-                    </>
-                  )}
-                  <label className={`text-xs font-semibold uppercase tracking-wide ${muted}`}>{t('warung_watch.search_label')}</label>
-                  <input
-                    ref={searchRef}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t('warung_watch.search_placeholder')}
-                    className={`w-full border rounded-xl p-3 text-sm bg-transparent focus:outline-none focus:border-nk-official ${isDark ? 'border-white/10' : 'border-zinc-200'}`}
-                  />
-                  {pickForReport && <p className={`text-xs ${muted}`}>{t('warung_watch.pick_place')}</p>}
-                  {suggestions.length > 0 && (
-                    <ul className="flex flex-col gap-1">
-                      {suggestions.map((place) => (
-                        <li key={place.key}>
-                          <button type="button" onClick={() => void openPlace(place, { report: pickForReport })} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-zinc-100 dark:hover:bg-white/5">
-                            {place.name}
-                            {place.location && <span className={`block text-xs ${muted}`}>{place.location}</span>}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {query.trim().length >= 2 && !exactSuggestion && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void openPlace(
-                          { key: `new:${normName(query)}`, name: query.trim(), location: null, verified: false, lat: null, lng: null, distance_m: null, crowd: EMPTY_CROWD },
-                          { report: pickForReport },
-                        )
-                      }
-                      className="text-left text-sm font-semibold text-nk-official"
-                    >
-                      {fill(t('warung_watch.add_place'), { name: query.trim() })}
-                    </button>
-                  )}
-                </section>
-              )}
-
-              {browsing === 'list' && (
-                <section className={`rounded-2xl border p-4 flex items-center justify-between gap-3 ${card}`}>
-                  <div>
-                    <h2 className="font-semibold text-sm">{t('warung_watch.here_title')}</h2>
-                    <p className={`text-xs mt-1 ${muted}`}>{t('warung_watch.here_body')}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPickForReport(true);
-                      setBrowsing('search');
-                      setTimeout(() => searchRef.current?.focus(), 0);
-                    }}
-                    className="px-3 py-2 rounded-xl bg-nk-official text-white text-sm font-semibold"
-                  >
-                    {t('warung_watch.report')}
-                  </button>
-                </section>
-              )}
-
-              {locating && (
-                <div className="flex flex-col gap-2" aria-hidden>
-                  {[0, 1, 2].map((row) => (
-                    <div key={row} className={`h-16 rounded-2xl animate-pulse ${isDark ? 'bg-white/5' : 'bg-zinc-200'}`} />
-                  ))}
-                </div>
-              )}
-
-              {listError && (
-                <section className={`rounded-2xl border p-4 flex flex-col gap-2 ${card}`}>
-                  <h2 className="font-semibold">{t('warung_watch.load_title')}</h2>
-                  <p className={`text-sm ${muted}`}>{t('warung_watch.load_body')}</p>
-                  <button type="button" onClick={loadNearby} className="self-start px-4 py-2 rounded-xl bg-nk-official text-white text-sm font-semibold">
-                    {t('warung_watch.try_again')}
-                  </button>
-                </section>
-              )}
-
-              {browsing === 'list' && !locating && places.length > 0 && (
-                <div className="flex justify-end">
-                  <button type="button" onClick={() => setQuietOnly((current) => !current)} className={`text-xs font-semibold px-2 py-1 rounded-full border ${quietOnly ? 'bg-emerald-600 text-white border-emerald-600' : isDark ? 'border-white/15' : 'border-zinc-200'}`}>
-                    {t('warung_watch.quiet_only')}
-                  </button>
-                </div>
-              )}
-
-              {browsing === 'list' && !locating && quietOnly && places.length > 0 && visiblePlaces.length === 0 && (
-                <section className={`rounded-2xl border p-4 flex flex-col gap-2 ${card}`}>
-                  <h2 className="font-semibold">{t('warung_watch.nothing_quiet_title')}</h2>
-                  <p className={`text-sm ${muted}`}>{t('warung_watch.nothing_quiet_body')}</p>
-                  <button type="button" onClick={() => setQuietOnly(false)} className="self-start px-4 py-2 rounded-xl bg-nk-official text-white text-sm font-semibold">
-                    {t('warung_watch.show_all')}
-                  </button>
-                </section>
-              )}
-
-              {browsing === 'list' && !locating && places.length === 0 && !listError && (
-                <section className={`rounded-2xl border p-4 ${card}`}>
-                  <h2 className="font-semibold">{t('warung_watch.none_nearby_title')}</h2>
-                  <p className={`text-sm mt-1 ${muted}`}>{t('warung_watch.none_nearby_body')}</p>
-                </section>
-              )}
-
-              {browsing === 'list' && !locating && (
-                <ul className="flex flex-col gap-2">
-                  {visiblePlaces.map((place) => (
-                    <li key={place.key}>
-                      <button type="button" onClick={() => void openPlace(place)} className={`w-full text-left rounded-2xl border p-4 ${card}`}>
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="font-semibold">{place.name}</span>
-                          {place.crowd.status && (
-                            <span className="inline-flex items-center gap-2 text-sm">
-                              <StatusMeter status={place.crowd.status} stale={!place.crowd.is_fresh} />
-                              {t(levelKey(place.crowd.status))}
-                            </span>
-                          )}
-                        </span>
-                        <span className={`block text-xs mt-1 ${!place.crowd.is_fresh && place.crowd.status ? 'text-amber-600 dark:text-amber-400' : muted}`}>
-                          {(() => {
-                            const where = [place.location, place.distance_m !== null ? fill(t('warung_watch.distance_m'), { n: place.distance_m }) : null]
-                              .filter(Boolean)
-                              .join(' · ');
-                            const when = !place.crowd.status
-                              ? t('warung_watch.no_reports')
-                              : place.crowd.is_fresh
-                                ? `${fill(t('warung_watch.updated'), { time: formatAgo(place.crowd.last_updated) })} · ${fill(t('warung_watch.reports_n'), { n: place.crowd.report_count })}`
-                                : fill(t('warung_watch.stale_age'), { time: formatAgo(place.crowd.last_updated) });
-                            return [where, when].filter(Boolean).join(' · ');
-                          })()}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+        <motion.main
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            'mx-auto w-full max-w-md px-4 py-6 lg:grid lg:max-w-6xl lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-8',
+            screen !== 'home' && 'pb-28 lg:pb-6',
           )}
+        >
+          <section aria-label={t('warung_watch.title')} className={cn('flex-col gap-4', screen === 'home' ? 'flex' : 'hidden lg:flex')}>
+            <div>
+              <h1 className="font-display text-2xl font-bold text-nk-ink">{t('warung_watch.title')}</h1>
+              <p className="mt-1 text-sm text-nk-muted-aa">{t('warung_watch.lede')}</p>
+              <span className="mt-2 inline-block rounded-full border border-nk-community/40 bg-[var(--nk-fill-community)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-nk-community-text">
+                {t('warung_watch.badge.community')}
+              </span>
+            </div>
 
-          {screen !== 'home' && selected && (
-            <div className="flex flex-col gap-4">
-              <button type="button" onClick={() => { setScreen('home'); setSheet(false); setPickForReport(false); }} className={`self-start text-sm font-semibold ${muted}`}>
-                ← {t('warung_watch.back')}
-              </button>
+            {browsing === 'list' && coords && (
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <p className="text-nk-ink">{fill(t('warung_watch.within'), { m: RADIUS_M })}</p>
+                <Button type="button" variant="ghost" className="h-11 px-3 text-nk-official-text" onClick={() => setBrowsing('search')}>
+                  {t('warung_watch.change')}
+                </Button>
+              </div>
+            )}
 
-              {screen === 'thanks' && selected.crowd.status && (
-                <section className={`rounded-2xl border p-5 flex flex-col items-center text-center gap-2 ${card}`}>
-                  <span className="h-10 w-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold" aria-hidden>✓</span>
-                  <h2 className="text-lg font-bold">{t('warung_watch.thanks_title')}</h2>
-                  <p className={`text-sm ${muted}`}>{fill(t('warung_watch.thanks_body'), { name: selected.name, status: t(levelKey(selected.crowd.status)) })}</p>
-                </section>
-              )}
-
-              <section className={`rounded-2xl border p-5 flex flex-col gap-3 ${card}`}>
-                <div>
-                  <h2 className="text-lg font-bold">{selected.name}</h2>
-                  <p className={`text-xs mt-1 ${muted}`}>
-                    {[selected.location, selected.distance_m !== null ? fill(t('warung_watch.distance_m'), { n: selected.distance_m }) : null].filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-                {detailLoading && <div className={`h-24 rounded-xl animate-pulse ${isDark ? 'bg-white/10' : 'bg-zinc-100'}`} />}
-                {detailError && (
-                  <div>
-                    <p className="font-semibold">{t('warung_watch.load_title')}</p>
-                    <button type="button" onClick={() => void openPlace(selected)} className="mt-2 px-4 py-2 rounded-xl bg-nk-official text-white text-sm font-semibold">
-                      {t('warung_watch.try_again')}
-                    </button>
-                  </div>
-                )}
-                {!detailLoading && !detailError && selected.crowd.status && (
+            {(browsing === 'ask' || browsing === 'search') && (
+              <section className="flex flex-col gap-3 rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                {browsing === 'ask' && (
                   <>
-                    <div className={selected.crowd.is_fresh ? '' : 'opacity-70'}>
-                      <p className="flex items-center gap-2 text-2xl font-bold">
-                        <StatusMeter status={selected.crowd.status} stale={!selected.crowd.is_fresh} />
-                        {t(levelKey(selected.crowd.status))}
-                      </p>
-                      <p className={`text-sm mt-1 ${muted}`}>{t(hintKey(selected.crowd.status))}</p>
-                    </div>
-                    <p className={`text-xs ${selected.crowd.is_fresh ? muted : 'text-amber-600 dark:text-amber-400'}`}>
-                      {selected.crowd.is_fresh
-                        ? `${fill(t('warung_watch.updated'), { time: formatAgo(selected.crowd.last_updated) })} · ${fill(t('warung_watch.reports_n'), { n: selected.crowd.report_count })}`
-                        : fill(t('warung_watch.stale_age'), { time: formatAgo(selected.crowd.last_updated) })}
-                    </p>
+                    <h2 className="font-semibold text-nk-ink">{t('warung_watch.location_off_title')}</h2>
+                    <p className="text-sm text-nk-muted-aa">{t('warung_watch.location_off_body')}</p>
+                    <Button type="button" onClick={loadNearby} disabled={locating} className="h-12 w-full text-base sm:text-sm">
+                      <MapPin className="h-4 w-4" aria-hidden />
+                      {locating ? t('warung_watch.nearby_locating') : t('warung_watch.use_location')}
+                    </Button>
                   </>
                 )}
-                {!detailLoading && !detailError && !selected.crowd.status && (
-                  <div>
-                    <h3 className="font-semibold">{fill(t('warung_watch.no_reports_title'), { name: selected.name })}</h3>
-                    <p className={`text-sm mt-1 ${muted}`}>{t('warung_watch.no_reports_body')}</p>
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <span className={`text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${isDark ? 'border-white/15' : 'border-zinc-200'}`}>{t('warung_watch.badge.community')}</span>
-                  {selected.verified && (
-                    <span className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
-                      {t('warung_watch.badge.verified')}
-                    </span>
-                  )}
-                </div>
+                <PlaceSearch
+                  query={query}
+                  onQueryChange={setQuery}
+                  suggestions={suggestions}
+                  onPick={(place) => void openPlace(place, { report: pickForReport })}
+                  onAddNew={(name) =>
+                    void openPlace(
+                      { key: `new:${normName(name)}`, name, location: null, verified: false, lat: null, lng: null, distance_m: null, crowd: EMPTY_CROWD },
+                      { report: pickForReport },
+                    )
+                  }
+                  hint={pickForReport ? t('warung_watch.pick_place') : undefined}
+                  inputRef={searchRef}
+                  t={t}
+                />
               </section>
+            )}
 
-              {selected.crowd.status && selected.crowd.report_count > 0 && (
-                <section className={`rounded-2xl border p-4 ${card}`}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h3 className="text-sm font-semibold">{t('warung_watch.what_reported')}</h3>
-                    <p className={`text-xs ${muted}`}>{fill(t('warung_watch.last_window'), { n: selected.crowd.report_count })}</p>
-                  </div>
-                  <ul className="mt-3 flex flex-col gap-2">
-                    {(['empty', 'moderate', 'packed'] as CrowdStatus[]).map((status) => {
-                      const count = selected.crowd.counts[status];
-                      const width = selected.crowd.report_count > 0 ? Math.round((count / selected.crowd.report_count) * 100) : 0;
-                      return (
-                        <li key={status} className="grid grid-cols-[6rem_1fr_1.5rem] items-center gap-2 text-xs">
-                          <span>{t(levelKey(status))}</span>
-                          <span className="flex gap-0.5">
-                            {Array.from({ length: 10 }, (_, index) => (
-                              <span key={index} className={`h-1.5 flex-1 rounded-sm ${index < Math.round(width / 10) ? segmentClass(status, false) : isDark ? 'bg-white/10' : 'bg-zinc-100'}`} />
-                            ))}
-                          </span>
-                          <span className="text-right">{count}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              )}
-
-              <section className={`rounded-2xl border p-4 ${card}`}>
-                <h3 className="text-sm font-semibold">{t('warung_watch.typical_title')}</h3>
-                <p className={`text-sm mt-1 ${muted}`}>
-                  {selected.crowd.hour_status
-                    ? fill(t('warung_watch.typical_value'), { status: t(levelKey(selected.crowd.hour_status)), n: selected.crowd.hour_reports })
-                    : t('warung_watch.typical_empty')}
-                </p>
-              </section>
-
-              {latestPrice && (
-                <section className={`rounded-2xl border p-4 ${card}`}>
-                  <h3 className={`text-xs font-semibold uppercase tracking-wide ${muted}`}>{t('warung_watch.latest_price')}</h3>
-                  <p className="mt-1 font-semibold">{latestPrice.price_item}</p>
-                  <p className="text-sm">RM {latestPrice.price_myr.toFixed(2)} · {formatAgo(latestPrice.created_at)}</p>
-                  {priceHistory.length >= 3 && <div className="mt-3"><WarungPriceChart history={priceHistory} isDark={isDark} /></div>}
-                </section>
-              )}
-
-              <div className="flex gap-2">
-                <a href={directionsUrl(selected)} target="_blank" rel="noreferrer" className={`flex-1 text-center px-4 py-3 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/15' : 'border-zinc-200'}`}>
-                  {t('warung_watch.directions')}
-                </a>
-                <button type="button" onClick={() => { setSheet(true); setReportError(false); }} className="flex-1 px-4 py-3 rounded-xl bg-nk-official text-white text-sm font-semibold">
-                  {t('warung_watch.report_now')}
-                </button>
-              </div>
-
-              {screen === 'thanks' && (
-                <div className="flex flex-col gap-2">
-                  <button type="button" onClick={() => { setScreen('home'); setPickForReport(false); if (coords) void fetchNearby(coords); }} className="px-4 py-3 rounded-xl bg-nk-official text-white text-sm font-semibold">
-                    {t('warung_watch.back_nearby')}
-                  </button>
-                  <button type="button" onClick={() => void shareStatus()} className={`px-4 py-3 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/15' : 'border-zinc-200'}`}>
-                    {t('warung_watch.share')}
-                  </button>
+            {browsing === 'list' && (
+              <section className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-nk-ink">{t('warung_watch.here_title')}</h2>
+                  <p className="mt-1 text-xs text-nk-muted-aa">{t('warung_watch.here_body')}</p>
                 </div>
-              )}
-            </div>
-          )}
-        </motion.div>
+                <Button
+                  type="button"
+                  className="h-11 shrink-0"
+                  onClick={() => {
+                    setPickForReport(true);
+                    setBrowsing('search');
+                    setTimeout(() => searchRef.current?.focus(), 0);
+                  }}
+                >
+                  {t('warung_watch.report')}
+                </Button>
+              </section>
+            )}
 
-        {sheet && selected && (
-          <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="warung-report-title">
-            <div className={`w-full max-w-md rounded-2xl border p-5 flex flex-col gap-3 ${isDark ? 'bg-[#1A1F2B] border-white/10 text-white' : 'bg-white border-zinc-200 text-zinc-900'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <h2 id="warung-report-title" className="font-bold">{fill(t('warung_watch.sheet_title'), { name: selected.name })}</h2>
-                <button type="button" onClick={() => setSheet(false)} className={`text-sm ${muted}`}>{t('warung_watch.close')}</button>
-              </div>
-              <p className={`text-sm ${muted}`}>{t('warung_watch.sheet_body')}</p>
-              <div className="flex flex-col gap-2">
-                {(['empty', 'moderate', 'packed'] as CrowdStatus[]).map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => setReportStatus(status)}
-                    className={`text-left rounded-xl border px-3 py-2 ${reportStatus === status ? 'border-nk-official bg-nk-official/10' : isDark ? 'border-white/10' : 'border-zinc-200'}`}
-                  >
-                    <span className="flex items-center gap-2 font-semibold text-sm">
-                      <StatusMeter status={status} stale={false} />
-                      {t(levelKey(status))}
-                    </span>
-                    <span className={`block text-xs mt-0.5 ${muted}`}>{t(hintKey(status))}</span>
-                  </button>
+            {locating && (
+              <div className="flex flex-col gap-2" aria-hidden>
+                {[0, 1, 2].map((row) => (
+                  <div key={row} className="h-[4.5rem] rounded-2xl bg-[var(--nk-track)]" />
                 ))}
               </div>
-              <div>
-                <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1.5 ${muted}`}>{t('warung_watch.price_label')}</p>
-                <div className="flex gap-2">
-                  <input value={priceItem} onChange={(event) => { setPriceItem(event.target.value); setPriceError(false); }} placeholder={t('warung_watch.price_item_placeholder')} maxLength={80} className={`flex-1 min-w-0 border rounded-lg px-3 py-2 text-xs bg-transparent ${isDark ? 'border-white/10' : 'border-zinc-200'}`} />
-                  <input value={priceMyr} onChange={(event) => { setPriceMyr(event.target.value); setPriceError(false); }} inputMode="decimal" placeholder="RM" className={`w-20 border rounded-lg px-3 py-2 text-xs bg-transparent ${isDark ? 'border-white/10' : 'border-zinc-200'}`} />
-                </div>
-                {priceError && <p className="text-xs text-red-500 mt-1">{t('warung_watch.price_incomplete')}</p>}
+            )}
+
+            {listError && (
+              <section role="alert" className="flex flex-col gap-2 rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                <h2 className="font-semibold text-nk-ink">{t('warung_watch.load_title')}</h2>
+                <p className="text-sm text-nk-muted-aa">{t('warung_watch.load_body')}</p>
+                <Button type="button" onClick={loadNearby} className="h-11 self-start">
+                  {t('warung_watch.try_again')}
+                </Button>
+              </section>
+            )}
+
+            {browsing === 'list' && !locating && places.length > 0 && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  aria-pressed={quietOnly}
+                  onClick={() => setQuietOnly((current) => !current)}
+                  className={cn(
+                    'min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nk-official',
+                    quietOnly ? 'border-nk-quiet bg-nk-quiet text-white' : 'border-[var(--nk-border)] text-nk-ink hover:border-nk-official/40',
+                  )}
+                >
+                  {t('warung_watch.quiet_only')}
+                </button>
               </div>
-              {reportError && <p className="text-sm text-red-500">{t('warung_watch.report_failed')}</p>}
-              <button type="button" disabled={!reportStatus || submitting} onClick={() => void submitReport()} className="px-4 py-3 rounded-xl bg-nk-official text-white text-sm font-semibold disabled:opacity-40">
-                {reportError ? t('warung_watch.retry') : t('warung_watch.send_report')}
-              </button>
-            </div>
+            )}
+
+            {browsing === 'list' && !locating && quietOnly && places.length > 0 && visiblePlaces.length === 0 && (
+              <section className="flex flex-col gap-2 rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                <h2 className="font-semibold text-nk-ink">{t('warung_watch.nothing_quiet_title')}</h2>
+                <p className="text-sm text-nk-muted-aa">{t('warung_watch.nothing_quiet_body')}</p>
+                <Button type="button" onClick={() => setQuietOnly(false)} className="h-11 self-start">
+                  {t('warung_watch.show_all')}
+                </Button>
+              </section>
+            )}
+
+            {browsing === 'list' && !locating && places.length === 0 && !listError && (
+              <section className="rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                <h2 className="font-semibold text-nk-ink">{t('warung_watch.none_nearby_title')}</h2>
+                <p className="mt-1 text-sm text-nk-muted-aa">{t('warung_watch.none_nearby_body')}</p>
+              </section>
+            )}
+
+            {browsing === 'list' && !locating && (
+              <ul className="flex flex-col gap-2">
+                {visiblePlaces.map((place) => (
+                  <li key={place.key}>
+                    <PlaceCard place={place} t={t} formatAgo={formatAgo} onOpen={(next) => void openPlace(next)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-label={selected?.name ?? t('warung_watch.pick_place_title')} className={cn('flex-col gap-4 lg:sticky lg:top-20', screen === 'home' ? 'hidden lg:flex' : 'flex')}>
+            {!selected && (
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--nk-border)] p-8 text-center">
+                <MapPin className="h-8 w-8 text-nk-muted-aa" aria-hidden />
+                <h2 className="font-semibold text-nk-ink">{t('warung_watch.pick_place_title')}</h2>
+                <p className="max-w-xs text-sm text-nk-muted-aa">{t('warung_watch.pick_place_body')}</p>
+              </div>
+            )}
+
+            {selected && (
+              <>
+                <Button type="button" variant="ghost" className="-ml-3 h-11 self-start px-3 text-nk-muted-aa lg:hidden" onClick={closeDetail}>
+                  ← {t('warung_watch.back')}
+                </Button>
+
+                {screen === 'thanks' && crowd?.status && (
+                  <section role="status" className="flex flex-col items-center gap-2 rounded-2xl border border-[var(--nk-border)] bg-nk-card p-5 text-center">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-nk-quiet text-white">
+                      <Check className="h-6 w-6" aria-hidden />
+                    </span>
+                    <h2 className="text-lg font-bold text-nk-ink">{t('warung_watch.thanks_title')}</h2>
+                    <p className="text-sm text-nk-muted-aa">
+                      {fill(t('warung_watch.thanks_body'), { name: selected.name, status: t(levelKey(crowd.status)) })}
+                    </p>
+                  </section>
+                )}
+
+                <section className="flex flex-col gap-3 rounded-2xl border border-[var(--nk-border)] bg-nk-card p-5" aria-busy={detailLoading}>
+                  <div>
+                    <h2 className="font-display text-xl font-bold text-nk-ink">{selected.name}</h2>
+                    <p className="mt-1 text-sm text-nk-muted-aa">
+                      {[selected.location, selected.distance_m !== null ? fill(t('warung_watch.distance_m'), { n: selected.distance_m }) : null].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  {detailLoading && <div className="h-24 rounded-xl bg-[var(--nk-track)]" aria-hidden />}
+                  {detailError && (
+                    <div role="alert">
+                      <p className="font-semibold text-nk-ink">{t('warung_watch.load_title')}</p>
+                      <Button type="button" className="mt-2 h-11" onClick={() => void openPlace(selected)}>
+                        {t('warung_watch.try_again')}
+                      </Button>
+                    </div>
+                  )}
+                  {!detailLoading && !detailError && crowd?.status && (
+                    <>
+                      <div className={cn('flex items-center gap-4', tone === 'stale' && 'opacity-75')}>
+                        <StatusMeter status={crowd.status} stale={tone === 'stale'} size="lg" />
+                        <div>
+                          <p className={cn('text-2xl font-bold', tone === 'stale' ? 'text-nk-muted-aa' : TEXT_CLASS[crowd.status])}>{t(levelKey(crowd.status))}</p>
+                          <p className="text-sm text-nk-muted-aa">{t(hintKey(crowd.status))}</p>
+                        </div>
+                      </div>
+                      <p className={cn('flex items-center gap-1.5 font-mono text-xs', tone === 'stale' ? 'text-nk-moderate-text' : 'text-nk-muted-aa')}>
+                        <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <time dateTime={crowd.last_updated ?? undefined}>
+                          {tone === 'fresh'
+                            ? `${fill(t('warung_watch.updated'), { time: formatAgo(crowd.last_updated) })} · ${fill(t('warung_watch.reports_n'), { n: crowd.report_count })}`
+                            : fill(t('warung_watch.stale_age'), { time: formatAgo(crowd.last_updated) })}
+                        </time>
+                      </p>
+                    </>
+                  )}
+                  {!detailLoading && !detailError && !crowd?.status && (
+                    <div>
+                      <h3 className="font-semibold text-nk-ink">{fill(t('warung_watch.no_reports_title'), { name: selected.name })}</h3>
+                      <p className="mt-1 text-sm text-nk-muted-aa">{t('warung_watch.no_reports_body')}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-nk-community/40 bg-[var(--nk-fill-community)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-nk-community-text">
+                      {t('warung_watch.badge.community')}
+                    </span>
+                    {selected.verified && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-nk-quiet/40 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-nk-quiet-text">
+                        <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+                        {t('warung_watch.badge.verified')}
+                      </span>
+                    )}
+                  </div>
+                </section>
+
+                {crowd?.status && crowd.report_count > 0 && (
+                  <section className="rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-nk-ink">{t('warung_watch.what_reported')}</h3>
+                      <p className="text-xs text-nk-muted-aa">{fill(t('warung_watch.last_window'), { n: crowd.report_count })}</p>
+                    </div>
+                    <ul className="mt-3 flex flex-col gap-2.5">
+                      {STATUSES.map((status: CrowdStatus) => {
+                        const count = crowd.counts[status];
+                        const tenths = crowd.report_count > 0 ? Math.round((count / crowd.report_count) * 10) : 0;
+                        return (
+                          <li key={status} className="grid grid-cols-[6rem_1fr_1.5rem] items-center gap-2 text-sm text-nk-ink">
+                            <span>{t(levelKey(status))}</span>
+                            <span className="flex gap-0.5" aria-hidden>
+                              {Array.from({ length: 10 }, (_, index) => (
+                                <span key={index} className={cn('h-2 flex-1 rounded-sm', index < tenths ? FILL_CLASS[status] : 'bg-[var(--nk-track)]')} />
+                              ))}
+                            </span>
+                            <span className="text-right tabular-nums">{count}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                )}
+
+                <section className="rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                  <h3 className="text-sm font-semibold text-nk-ink">{t('warung_watch.typical_title')}</h3>
+                  <p className="mt-1 text-sm text-nk-muted-aa">
+                    {crowd?.hour_status
+                      ? fill(t('warung_watch.typical_value'), { status: t(levelKey(crowd.hour_status)), n: crowd.hour_reports })
+                      : t('warung_watch.typical_empty')}
+                  </p>
+                </section>
+
+                {latestPrice && (
+                  <section className="rounded-2xl border border-[var(--nk-border)] bg-nk-card p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-nk-muted-aa">{t('warung_watch.latest_price')}</h3>
+                    <p className="mt-1 font-semibold text-nk-ink">{latestPrice.price_item}</p>
+                    <p className="text-sm text-nk-ink">RM {latestPrice.price_myr.toFixed(2)} · {formatAgo(latestPrice.created_at)}</p>
+                    {priceHistory.length >= 3 && <div className="mt-3"><WarungPriceChart history={priceHistory} isDark={isDark} /></div>}
+                  </section>
+                )}
+
+                <div className="hidden gap-2 lg:flex">{actions}</div>
+
+                {screen === 'thanks' && (
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      className="h-12 text-base lg:hidden"
+                      onClick={() => {
+                        closeDetail();
+                        if (coords) void fetchNearby(coords);
+                      }}
+                    >
+                      {t('warung_watch.back_nearby')}
+                    </Button>
+                    <Button type="button" variant="outline" className="h-12 text-base sm:text-sm" onClick={() => void shareStatus()}>
+                      {t('warung_watch.share')}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </motion.main>
+
+        {selected && screen !== 'home' && !sheet && (
+          <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-[var(--nk-border)] bg-nk-card/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
+            {actions}
           </div>
         )}
+
+        <ReportSheet
+          open={sheet && Boolean(selected)}
+          placeName={selected?.name ?? ''}
+          status={reportStatus}
+          onStatus={setReportStatus}
+          priceItem={priceItem}
+          priceMyr={priceMyr}
+          onPriceItem={(value) => { setPriceItem(value); setPriceError(false); }}
+          onPriceMyr={(value) => { setPriceMyr(value); setPriceError(false); }}
+          priceError={priceError}
+          reportError={reportError}
+          submitting={submitting}
+          onSubmit={() => void submitReport()}
+          onClose={() => setSheet(false)}
+          t={t}
+        />
       </div>
     </div>
   );
