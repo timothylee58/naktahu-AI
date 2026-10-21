@@ -79,8 +79,13 @@ def _pair_key(a: str, b: str) -> tuple[str, str]:
 
 
 def _explanation(rule: dict[str, Any], language: str) -> str:
+    """The rule's text in the user's language. A language with no text yet (migration
+    060 not applied, or a rule added without a zh row) falls back to English, never to
+    another non-English language the user did not ask for."""
     if language == "bm":
         return rule.get("explanation_bm") or rule.get("explanation_en") or ""
+    if language == "zh":
+        return rule.get("explanation_zh") or rule.get("explanation_en") or rule.get("explanation_bm") or ""
     return rule.get("explanation_en") or rule.get("explanation_bm") or ""
 
 
