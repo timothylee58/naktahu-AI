@@ -1,0 +1,59 @@
+name: Live tax accuracy eval
+
+# Runs apps/api/evals/test_tax_accuracy.py through the REAL pipeline (ILMU + the live
+# document_chunks) and prints accuracy and the confidence-calibration table. Read-only:
+# it queries Supabase and calls the LLM, it writes nothing. Costs LLM calls (30 cases).
+#
+# `embedding_profile` is set here, not read from Railway, so the eval measures the profile
+# you name regardless of what production currently serves. Use ilmu_bge_m3 to measure the
+# corpus the LHDN / Budget 2027 ingests wrote; use openai for the pre-cutover baseline.
+#
+# Manual: dispatch it, or push a change to .github/live-eval-trigger.txt on a claude/**
+# branch (a brand-new workflow cannot be dispatched until it is on the default branch).
+
+on:
+  workflow_dispatch:
+    inputs:
+      embedding_profile:
+        description: "Embedding profile the pipeline searches with"
+        type: choice
+        options:
+          - ilmu_bge_m3
+          - openai
+        default: ilmu_bge_m3
+  push:
+    branches: ["claude/**"]
+    paths: [".github/live-eval-trigger.txt"]
+
+jobs:
+  live-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e ".[dev]"
+
+      - name: Run live eval
+        env:
+          PYTHONPATH: .
+          RUN_LIVE_EVALS: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          ILMU_EMBEDDING_MODEL: ""
+          EMBEDDING_PROFILE: ${{ github.event.inputs.embedding_profile || 'ilmu_bge_m3' }}
+        run: pytest evals/test_tax_accuracy.py -q -s -k live
