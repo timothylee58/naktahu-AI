@@ -56,6 +56,18 @@ jobs:
           curl -sS -H "Authorization: Bearer $ILMU_API_KEY" https://api.ilmu.ai/v1/models \
             | python3 -c 'import json,sys; print("\n".join(sorted(m["id"] for m in json.load(sys.stdin).get("data", []))))'
 
+      - name: Probe which chat models this key may call (1 token each)
+        continue-on-error: true
+        env:
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+        run: |
+          for m in ilmu-glm-5.3 ilmu-glm-5.3-flash ilmu-v3.1 ilmu-mini-v3.3 ilmu-nemo-nano nemo-super; do
+            code=$(curl -sS -o /tmp/probe.json -w '%{http_code}' https://api.ilmu.ai/v1/chat/completions \
+              -H "Authorization: Bearer $ILMU_API_KEY" -H 'Content-Type: application/json' \
+              -d "{\"model\":\"$m\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")
+            echo "PROBE $m -> HTTP $code $(python3 -c 'import json;d=json.load(open("/tmp/probe.json"));print(d.get("error",{}).get("code",""))' 2>/dev/null)"
+          done
+
       - name: Pick the chat model (dispatch input, else the trigger file's model= line)
         working-directory: .
         run: |
