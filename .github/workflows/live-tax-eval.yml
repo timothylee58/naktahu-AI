@@ -21,6 +21,10 @@ on:
           - ilmu_bge_m3
           - openai
         default: ilmu_bge_m3
+      ilmu_chat_model:
+        description: "ILMU chat model id (blank = the default in llm_client.py, which the gateway rejects; see the model list in the log)"
+        type: string
+        default: ""
   push:
     branches: ["claude/**"]
     paths: [".github/live-eval-trigger.txt"]
@@ -44,6 +48,14 @@ jobs:
       - name: Install dependencies
         run: pip install --ignore-installed PyJWT -e ".[dev]"
 
+      - name: List the chat models the ILMU gateway offers (ids only)
+        continue-on-error: true
+        env:
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+        run: |
+          curl -sS -H "Authorization: Bearer $ILMU_API_KEY" https://api.ilmu.ai/v1/models \
+            | python3 -c 'import json,sys; print("\n".join(sorted(m["id"] for m in json.load(sys.stdin).get("data", []))))'
+
       - name: Run live eval
         env:
           PYTHONPATH: .
@@ -58,5 +70,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ILMU_BASE_URL: https://api.ilmu.ai/v1
           ILMU_EMBEDDING_MODEL: ""
+          ILMU_CHAT_MODEL: ${{ github.event.inputs.ilmu_chat_model || vars.ILMU_CHAT_MODEL || 'ilmu-chat' }}
           EMBEDDING_PROFILE: ${{ github.event.inputs.embedding_profile || 'ilmu_bge_m3' }}
         run: pytest evals/test_tax_accuracy.py -q -s -k live
