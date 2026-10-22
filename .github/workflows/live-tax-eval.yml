@@ -1,0 +1,94 @@
+name: Live tax accuracy eval
+
+# Runs apps/api/evals/test_tax_accuracy.py through the REAL pipeline (ILMU + the live
+# document_chunks) and prints accuracy and the confidence-calibration table. Read-only:
+# it queries Supabase and calls the LLM, it writes nothing. Costs LLM calls (30 cases).
+#
+# `embedding_profile` is set here, not read from Railway, so the eval measures the profile
+# you name regardless of what production currently serves. Use ilmu_bge_m3 to measure the
+# corpus the LHDN / Budget 2027 ingests wrote; use openai for the pre-cutover baseline.
+#
+# Manual: dispatch it, or push a change to .github/live-eval-trigger.txt on a claude/**
+# branch (a brand-new workflow cannot be dispatched until it is on the default branch).
+
+on:
+  workflow_dispatch:
+    inputs:
+      embedding_profile:
+        description: "Embedding profile the pipeline searches with"
+        type: choice
+        options:
+          - ilmu_bge_m3
+          - openai
+        default: ilmu_bge_m3
+      ilmu_chat_model:
+        description: "ILMU chat model id (blank = the default in llm_client.py, which the gateway rejects; see the model list in the log)"
+        type: string
+        default: ""
+  push:
+    branches: ["claude/**"]
+    paths: [".github/live-eval-trigger.txt"]
+
+jobs:
+  live-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e ".[dev]"
+
+      - name: List the chat models the ILMU gateway offers (ids only)
+        continue-on-error: true
+        env:
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+        run: |
+          curl -sS -H "Authorization: Bearer $ILMU_API_KEY" https://api.ilmu.ai/v1/models \
+            | python3 -c 'import json,sys; print("\n".join(sorted(m["id"] for m in json.load(sys.stdin).get("data", []))))'
+
+      - name: Probe which chat models this key may call (1 token each)
+        continue-on-error: true
+        env:
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+        run: |
+          for m in ilmu-glm-5.3 ilmu-glm-5.3-flash ilmu-v3.1 ilmu-mini-v3.3 ilmu-nemo-nano nemo-super; do
+            code=$(curl -sS -o /tmp/probe.json -w '%{http_code}' https://api.ilmu.ai/v1/chat/completions \
+              -H "Authorization: Bearer $ILMU_API_KEY" -H 'Content-Type: application/json' \
+              -d "{\"model\":\"$m\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")
+            echo "PROBE $m -> HTTP $code $(python3 -c 'import json;d=json.load(open("/tmp/probe.json"));print(d.get("error",{}).get("code",""))' 2>/dev/null)"
+          done
+
+      - name: Pick the chat model (dispatch input, else the trigger file's model= line)
+        working-directory: .
+        run: |
+          m="${{ github.event.inputs.ilmu_chat_model }}"
+          if [ -z "$m" ]; then m=$(sed -n 's/^model=//p' .github/live-eval-trigger.txt | head -n1); fi
+          echo "ILMU_CHAT_MODEL=${m:-ilmu-chat}" >> "$GITHUB_ENV"
+          echo "Chat model for this run: ${m:-ilmu-chat}"
+
+      - name: Run live eval
+        env:
+          PYTHONPATH: .
+          RUN_LIVE_EVALS: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # vector_store.py reads this exact name; without it every retrieval fails and the
+          # eval answers nothing.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          ILMU_EMBEDDING_MODEL: ""
+          EMBEDDING_PROFILE: ${{ github.event.inputs.embedding_profile || 'ilmu_bge_m3' }}
+        run: pytest evals/test_tax_accuracy.py -q -s -k live

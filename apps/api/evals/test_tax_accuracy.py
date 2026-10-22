@@ -157,7 +157,10 @@ async def test_live_accuracy_and_confidence_calibration(capsys: pytest.CaptureFi
             correct = declined and score_answer(answer, case)[0]
         else:
             correct = not clarified and score_answer(answer, case)[0]
-        rows.append({"id": case["id"], "status": case["key_status"], "confidence": confidence, "correct": correct})
+        rows.append({
+            "id": case["id"], "status": case["key_status"], "confidence": confidence, "correct": correct,
+            "answerable": not case.get("expect_low_confidence"), "clarified": clarified,
+        })
 
     with capsys.disabled():
         print("\n  id                          key_status                       conf  correct")
@@ -169,6 +172,16 @@ async def test_live_accuracy_and_confidence_calibration(capsys: pytest.CaptureFi
             bucket = [r for r in rows if lo <= r["confidence"] < hi]
             if bucket:
                 print(f"  confidence {lo:.1f}-{min(hi, 1.0):.1f}: {sum(r['correct'] for r in bucket)}/{len(bucket)} correct")
+
+    # A broken pipeline (no retrieval, LLM down) answers nothing, so nothing is confidently
+    # wrong and the check below would pass vacuously. Require that answerable cases were
+    # actually answered before trusting the result.
+    answerable = [r for r in rows if r["answerable"]]
+    answered = [r for r in answerable if not r["clarified"]]
+    assert len(answered) * 2 >= len(answerable), (
+        f"only {len(answered)}/{len(answerable)} answerable cases got an answer: "
+        "the pipeline did not run properly (check Supabase/LLM credentials), so this run measures nothing"
+    )
 
     confidently_wrong = [r["id"] for r in rows if r["confidence"] >= _CONFIDENCE_THRESHOLD and not r["correct"]]
     assert not confidently_wrong, f"wrong answers at confidence >= {_CONFIDENCE_THRESHOLD}: {confidently_wrong}"
