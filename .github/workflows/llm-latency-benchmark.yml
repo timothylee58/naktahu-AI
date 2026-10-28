@@ -1,0 +1,106 @@
+name: LLM latency benchmark
+
+# Streams the same two prompts (a short intake extraction and a longer eligibility
+# summary) through each configured target and records time-to-first-token, total time
+# and decode speed: Nemotron on Nebius Token Factory (fast + reasoning roles) vs ILMU.
+# Read-only; it spends a handful of small completions per target.
+#
+# Targets are configured by name only. A target missing any of its variables is skipped
+# and listed in the summary, so the run still reports whatever is configured:
+#   secrets: NEMOTRON_API_KEY, ILMU_API_KEY
+#   secrets or repository variables: NEMOTRON_BASE_URL, NEMOTRON_FAST_MODEL,
+#            NEMOTRON_REASONING_MODEL, NEMOTRON_EXTRA_BODY (optional JSON object)
+# The first step lists the models the Token Factory endpoint actually serves, because
+# the model ids are deliberately never defaulted in code.
+#
+# Manual: dispatch it, or push a change to .github/llm-benchmark-trigger.txt on a
+# claude/** branch (a new workflow cannot be dispatched before it is on main). On a
+# push, an optional `model=` line in that file sets the ILMU chat model.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Timed runs per prompt per target (1-30)"
+        type: string
+        default: "5"
+      max_tokens:
+        description: "Max completion tokens per call"
+        type: string
+        default: "400"
+      ilmu_chat_model:
+        description: "ILMU chat model id (blank = the model= line in the trigger file, else nemo-super)"
+        type: string
+        default: ""
+  push:
+    branches: ["claude/**"]
+    paths: [".github/llm-benchmark-trigger.txt"]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Resolve inputs
+        working-directory: .
+        env:
+          IN_RUNS: ${{ github.event.inputs.runs }}
+          IN_MAX_TOKENS: ${{ github.event.inputs.max_tokens }}
+          IN_MODEL: ${{ github.event.inputs.ilmu_chat_model }}
+        run: |
+          case "${IN_RUNS:-5}" in ''|*[!0-9]*) echo "runs must be a number" >&2; exit 1;; esac
+          case "${IN_MAX_TOKENS:-400}" in ''|*[!0-9]*) echo "max_tokens must be a number" >&2; exit 1;; esac
+          m="$IN_MODEL"
+          if [ -z "$m" ]; then m=$(sed -n 's/^model=//p' .github/llm-benchmark-trigger.txt 2>/dev/null | head -n1); fi
+          {
+            echo "BENCH_RUNS=${IN_RUNS:-5}"
+            echo "BENCH_MAX_TOKENS=${IN_MAX_TOKENS:-400}"
+            echo "ILMU_CHAT_MODEL=${m:-nemo-super}"
+          } >> "$GITHUB_ENV"
+
+      - name: List the models the Token Factory endpoint serves (and test-call any configured ids)
+        continue-on-error: true
+        env:
+          PYTHONPATH: .
+          NEMOTRON_API_KEY: ${{ secrets.NEMOTRON_API_KEY }}
+          NEMOTRON_BASE_URL: ${{ secrets.NEMOTRON_BASE_URL || vars.NEMOTRON_BASE_URL }}
+          NEMOTRON_FAST_MODEL: ${{ secrets.NEMOTRON_FAST_MODEL || vars.NEMOTRON_FAST_MODEL }}
+          NEMOTRON_REASONING_MODEL: ${{ secrets.NEMOTRON_REASONING_MODEL || vars.NEMOTRON_REASONING_MODEL }}
+          NEMOTRON_EXTRA_BODY: ${{ secrets.NEMOTRON_EXTRA_BODY || vars.NEMOTRON_EXTRA_BODY }}
+        run: python scripts/nemotron_check.py
+
+      - name: Run the benchmark
+        env:
+          PYTHONPATH: .
+          NEMOTRON_API_KEY: ${{ secrets.NEMOTRON_API_KEY }}
+          NEMOTRON_BASE_URL: ${{ secrets.NEMOTRON_BASE_URL || vars.NEMOTRON_BASE_URL }}
+          NEMOTRON_FAST_MODEL: ${{ secrets.NEMOTRON_FAST_MODEL || vars.NEMOTRON_FAST_MODEL }}
+          NEMOTRON_REASONING_MODEL: ${{ secrets.NEMOTRON_REASONING_MODEL || vars.NEMOTRON_REASONING_MODEL }}
+          NEMOTRON_EXTRA_BODY: ${{ secrets.NEMOTRON_EXTRA_BODY || vars.NEMOTRON_EXTRA_BODY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+        run: |
+          python -m scripts.llm_latency_benchmark --runs "$BENCH_RUNS" --max-tokens "$BENCH_MAX_TOKENS" --out "$RUNNER_TEMP/bench.json" | tee "$RUNNER_TEMP/bench.md"
+          cat "$RUNNER_TEMP/bench.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the raw results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-latency-benchmark
+          path: ${{ runner.temp }}/bench.json
+          if-no-files-found: ignore
