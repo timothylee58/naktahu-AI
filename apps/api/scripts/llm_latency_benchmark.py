@@ -60,6 +60,9 @@ PROMPTS: list[dict[str, str]] = [
 ]
 
 _CHARS_PER_TOKEN = 4  # rough estimate when the provider sends no usage
+_CALL_TIMEOUT_S = 45.0  # per request; keeps the worst case (every call hangs) inside the job budget
+_MAX_RUNS = 30
+_MAX_TOKENS_CEILING = 4096
 
 
 @dataclass
@@ -127,6 +130,11 @@ async def measure_stream(chunks: AsyncIterator[Any], *, start: float, clock: Any
         content_chars += len(text)
         reasoning_chars += len(thought)
     sample.total = clock() - start
+    if sample.ttft_any is None:
+        # Headers and usage but no content or reasoning delta (a filtered or empty reply):
+        # there is nothing to time, so it must not count as a successful sample.
+        sample.error = "EmptyStream: no content or reasoning delta received"
+        return sample
     if sample.tokens is None and (content_chars or reasoning_chars):
         sample.tokens = max(1, (content_chars + reasoning_chars) // _CHARS_PER_TOKEN)
         sample.tokens_estimated = True
@@ -190,7 +198,7 @@ async def _one_call(client: Any, target: Target, prompt: dict[str, str], max_tok
         try:
             stream = await client.chat.completions.create(
                 model=target.model, messages=messages, max_tokens=max_tokens, stream=True,
-                stream_options={"include_usage": True}, timeout=120.0, **kwargs,
+                stream_options={"include_usage": True}, timeout=_CALL_TIMEOUT_S, **kwargs,
             )
         except Exception as exc:  # some gateways reject stream_options with a 400
             if getattr(exc, "status_code", None) != 400:
@@ -198,7 +206,7 @@ async def _one_call(client: Any, target: Target, prompt: dict[str, str], max_tok
             start = time.perf_counter()
             stream = await client.chat.completions.create(
                 model=target.model, messages=messages, max_tokens=max_tokens, stream=True,
-                timeout=120.0, **kwargs,
+                timeout=_CALL_TIMEOUT_S, **kwargs,
             )
         return await measure_stream(stream, start=start)
     except Exception as exc:
@@ -208,13 +216,17 @@ async def _one_call(client: Any, target: Target, prompt: dict[str, str], max_tok
 async def run_target(target: Target, runs: int, max_tokens: int) -> dict[str, Any]:
     from openai import AsyncOpenAI
 
-    client = AsyncOpenAI(api_key=target.api_key, base_url=target.base_url)
     per_prompt: dict[str, Any] = {}
-    for prompt in PROMPTS:
-        await _one_call(client, target, prompt, max_tokens)  # warm-up: connection + cold start, discarded
-        samples = [await _one_call(client, target, prompt, max_tokens) for _ in range(runs)]
-        errors = sorted({s.error for s in samples if s.error})
-        per_prompt[prompt["name"]] = {**summarise(samples), "error_samples": errors[:3]}
+    async with AsyncOpenAI(api_key=target.api_key, base_url=target.base_url) as client:
+        for prompt in PROMPTS:
+            await _one_call(client, target, prompt, max_tokens)  # warm-up: connection + cold start, discarded
+            samples = [await _one_call(client, target, prompt, max_tokens) for _ in range(runs)]
+            errors = sorted({s.error for s in samples if s.error})
+            per_prompt[prompt["name"]] = {
+                **summarise(samples),
+                "error_samples": errors[:3],
+                "samples": [{**asdict(sample), "tok_per_s": sample.tok_per_s} for sample in samples],
+            }
     return {"model": target.model, "prompts": per_prompt}
 
 
@@ -273,8 +285,10 @@ def main() -> int:
     parser.add_argument("--max-tokens", type=int, default=400, help="max completion tokens per call (default 400)")
     parser.add_argument("--out", default="", help="write full results as JSON to this path")
     args = parser.parse_args()
-    if not 1 <= args.runs <= 30:
-        parser.error("--runs must be between 1 and 30")
+    if not 1 <= args.runs <= _MAX_RUNS:
+        parser.error(f"--runs must be between 1 and {_MAX_RUNS}")
+    if not 1 <= args.max_tokens <= _MAX_TOKENS_CEILING:
+        parser.error(f"--max-tokens must be between 1 and {_MAX_TOKENS_CEILING}")
     return asyncio.run(main_async(args))
 
 

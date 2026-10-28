@@ -39,7 +39,9 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Worst case (every call hangs for the 45 s client timeout): 3 targets x 2 prompts x (runs+1)
+    # calls = 49.5 min at the 10-run cap, so 60 leaves headroom for setup.
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: apps/api
@@ -64,8 +66,11 @@ jobs:
         run: |
           case "${IN_RUNS:-5}" in ''|*[!0-9]*) echo "runs must be a number" >&2; exit 1;; esac
           case "${IN_MAX_TOKENS:-400}" in ''|*[!0-9]*) echo "max_tokens must be a number" >&2; exit 1;; esac
+          if [ "${IN_RUNS:-5}" -lt 1 ] || [ "${IN_RUNS:-5}" -gt 10 ]; then echo "runs must be 1-10 here (job time budget)" >&2; exit 1; fi
           m="$IN_MODEL"
           if [ -z "$m" ]; then m=$(sed -n 's/^model=//p' .github/llm-benchmark-trigger.txt 2>/dev/null | head -n1); fi
+          # The id goes into $GITHUB_ENV: a newline would inject more variables.
+          case "${m:-nemo-super}" in *[!A-Za-z0-9._:/-]*) echo "ilmu_chat_model has characters outside [A-Za-z0-9._:/-]" >&2; exit 1;; esac
           {
             echo "BENCH_RUNS=${IN_RUNS:-5}"
             echo "BENCH_MAX_TOKENS=${IN_MAX_TOKENS:-400}"
@@ -94,6 +99,7 @@ jobs:
           ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
           ILMU_BASE_URL: https://api.ilmu.ai/v1
         run: |
+          set -o pipefail  # the default step shell has none; without it a crash behind `| tee` stays green
           python -m scripts.llm_latency_benchmark --runs "$BENCH_RUNS" --max-tokens "$BENCH_MAX_TOKENS" --out "$RUNNER_TEMP/bench.json" | tee "$RUNNER_TEMP/bench.md"
           cat "$RUNNER_TEMP/bench.md" >> "$GITHUB_STEP_SUMMARY"
 

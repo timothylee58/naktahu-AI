@@ -119,3 +119,24 @@ def test_render_markdown_labels_estimated_tokens_and_lists_skipped_targets() -> 
     text = bench.render_markdown({"ilmu": {"model": "m", "prompts": {"intake-extraction": {**summary, "error_samples": []}}}},
                                  ["nemotron-fast (missing NEMOTRON_API_KEY)"], runs=5)
     assert "estimated" in text and "Skipped: nemotron-fast (missing NEMOTRON_API_KEY)" in text
+
+
+@pytest.mark.asyncio
+async def test_a_stream_with_no_delta_is_an_error_not_an_ok_sample() -> None:
+    sample = await bench.measure_stream(_stream([_chunk(usage=5, choices=False)]), start=0.0, clock=_Clock(1.0))
+    assert sample.error is not None and "EmptyStream" in sample.error
+    assert bench.summarise([sample])["ok"] == 0
+
+
+def test_samples_are_kept_in_the_json_shape_with_tok_per_s() -> None:
+    sample = bench.Sample(ttft_any=1.0, ttft_content=1.0, total=3.0, tokens=20)
+    row = {**bench.asdict(sample), "tok_per_s": sample.tok_per_s}
+    assert row["tok_per_s"] == pytest.approx(10.0) and row["tokens"] == 20
+
+
+def test_cli_rejects_non_positive_or_huge_max_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    for bad in ("0", "-5", "100000"):
+        monkeypatch.setattr("sys.argv", ["bench", "--max-tokens", bad])
+        with pytest.raises(SystemExit) as exc:
+            bench.main()
+        assert exc.value.code == 2
