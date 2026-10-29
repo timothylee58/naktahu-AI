@@ -160,12 +160,21 @@ async def test_live_accuracy_and_confidence_calibration(capsys: pytest.CaptureFi
         rows.append({
             "id": case["id"], "status": case["key_status"], "confidence": confidence, "correct": correct,
             "answerable": not case.get("expect_low_confidence"), "clarified": clarified,
+            "answer": answer, "reasons": score_answer(answer, case)[1],
+            "query": case["query"], "note": case.get("note", ""),
         })
 
     with capsys.disabled():
         print("\n  id                          key_status                       conf  correct")
         for r in rows:
             print(f"  {r['id']:<27} {r['status']:<32} {r['confidence']:.2f}  {r['correct']}")
+        for r in rows:
+            if not r["correct"]:
+                print(f"\n--- WRONG: {r['id']} (confidence {r['confidence']:.2f}, clarified={r['clarified']})")
+                print(f"Q: {r['query']}")
+                print(f"Why scored wrong: {'; '.join(r['reasons']) or 'declined/clarified instead of answering'}")
+                print(f"Key note: {r['note']}")
+                print(f"A: {r['answer'][:1200]!r}")
         accuracy = sum(r["correct"] for r in rows) / len(rows)
         print(f"  accuracy: {accuracy:.0%} over {len(rows)} cases")
         for lo, hi in ((0.0, 0.6), (0.6, 0.8), (0.8, 1.01)):
