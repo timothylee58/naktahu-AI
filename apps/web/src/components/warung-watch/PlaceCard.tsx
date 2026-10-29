@@ -41,7 +41,7 @@ export function PlaceCard({ place, t, formatAgo, onOpen }: PlaceCardProps) {
           <CircleDashed className="h-6 w-6 text-nk-muted-aa" />
         )}
       </span>
-      <span className={cn('flex min-w-0 flex-1 flex-col gap-0.5', tone === 'stale' && 'opacity-80')}>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate font-semibold text-nk-ink">{place.name}</span>
         {where && <span className="truncate text-sm text-nk-muted-aa">{where}</span>}
         <span className={cn('text-xs', tone === 'stale' ? 'text-nk-moderate-text' : 'text-nk-muted-aa')}>{when}</span>

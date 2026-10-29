@@ -52,14 +52,23 @@ export function ReportSheet(props: ReportSheetProps) {
     return () => opener?.focus?.();
   }, [open]);
 
+  // Esc must work even if focus slipped out (e.g. a tap on the backdrop-less area).
+  useEffect(() => {
+    if (!open) return;
+    const onEsc = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onEsc);
+    return () => document.removeEventListener('keydown', onEsc);
+  }, [open, onClose]);
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      onClose();
-      return;
-    }
     if (event.key !== 'Tab' || !panelRef.current) return;
-    const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+    // display:none fields (the collapsed price row) are not focusable, so they
+    // must not count as the first or last stop.
+    const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+      (el) => el.getClientRects().length > 0 || el.matches('input[type="radio"]'),
+    );
     if (items.length === 0) return;
     const first = items[0];
     const last = items[items.length - 1];
