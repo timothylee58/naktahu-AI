@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { BadgeCheck, Check, Clock, MapPin, Menu, Navigation } from 'lucide-react';
@@ -44,6 +44,39 @@ async function apiFetch(path: string, accessToken: string | null, init?: Request
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   return fetch(`${API_BASE}${path}`, { ...init, headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) } });
+}
+
+interface BatchRow {
+  name: string;
+  warung: { id?: unknown; location?: unknown; verified?: unknown } | null;
+}
+
+// Google-only places have no crowd of their own. If a reported warung with the
+// same name exists (exact, normalised match on the server), borrow its status;
+// any failure just leaves the plain card, so the board never blocks on this.
+async function withKnownCrowd(extras: Place[], accessToken: string | null): Promise<Place[]> {
+  if (extras.length === 0) return extras;
+  try {
+    const res = await apiFetch('/api/v1/warung-watch/batch-status', accessToken, {
+      method: 'POST',
+      body: JSON.stringify({ names: extras.slice(0, 20).map((place) => place.name) }),
+    });
+    if (!res.ok) return extras;
+    const data = (await res.json()) as { results?: Array<BatchRow & Record<string, unknown>> };
+    const byName = new Map((data.results ?? []).map((row) => [normName(row.name), row]));
+    return extras.map((place) => {
+      const row = byName.get(normName(place.name));
+      if (!row?.warung) return place;
+      return {
+        ...place,
+        key: typeof row.warung.id === 'string' ? row.warung.id : place.key,
+        verified: row.warung.verified === true,
+        crowd: asCrowd(row),
+      };
+    });
+  } catch {
+    return extras;
+  }
 }
 
 export default function WarungWatchPage() {
@@ -183,7 +216,8 @@ export default function WarungWatchPage() {
           crowd: EMPTY_CROWD,
         });
       }
-      setPlaces([...fromReports, ...extras]);
+      const enriched = await withKnownCrowd(extras, accessToken);
+      setPlaces([...fromReports, ...enriched]);
       setListError(!reportsRes.ok);
     } catch {
       setListError(true);
@@ -337,6 +371,8 @@ export default function WarungWatchPage() {
       ? fill(t('warung_watch.results_count'), { n: visiblePlaces.length })
       : '';
 
+  const closeSheet = useCallback(() => setSheet(false), []);
+
   const closeDetail = () => {
     setScreen('home');
     setSheet(false);
@@ -404,9 +440,10 @@ export default function WarungWatchPage() {
             screen !== 'home' && 'pb-28 lg:pb-6',
           )}
         >
+          <h1 className="sr-only">{t('warung_watch.title')}</h1>
           <section aria-label={t('warung_watch.title')} className={cn('flex-col gap-4', screen === 'home' ? 'flex' : 'hidden lg:flex')}>
             <div>
-              <h1 className="font-display text-2xl font-bold text-nk-ink">{t('warung_watch.title')}</h1>
+              <p className="font-display text-2xl font-bold text-nk-ink" aria-hidden>{t('warung_watch.title')}</p>
               <p className="mt-1 text-sm text-nk-muted-aa">{t('warung_watch.lede')}</p>
               <span className="mt-2 inline-block rounded-full border border-nk-community/40 bg-[var(--nk-fill-community)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-nk-community-text">
                 {t('warung_watch.badge.community')}
@@ -579,7 +616,7 @@ export default function WarungWatchPage() {
                   )}
                   {!detailLoading && !detailError && crowd?.status && (
                     <>
-                      <div className={cn('flex items-center gap-4', tone === 'stale' && 'opacity-75')}>
+                      <div className="flex items-center gap-4">
                         <StatusMeter status={crowd.status} stale={tone === 'stale'} size="lg" />
                         <div>
                           <p className={cn('text-2xl font-bold', tone === 'stale' ? 'text-nk-muted-aa' : TEXT_CLASS[crowd.status])}>{t(levelKey(crowd.status))}</p>
@@ -684,9 +721,9 @@ export default function WarungWatchPage() {
         </motion.main>
 
         {selected && screen !== 'home' && !sheet && (
-          <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-[var(--nk-border)] bg-nk-card/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
+          <aside aria-label={selected.name} className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-[var(--nk-border)] bg-nk-card/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
             {actions}
-          </div>
+          </aside>
         )}
 
         <ReportSheet
@@ -702,7 +739,7 @@ export default function WarungWatchPage() {
           reportError={reportError}
           submitting={submitting}
           onSubmit={() => void submitReport()}
-          onClose={() => setSheet(false)}
+          onClose={closeSheet}
           t={t}
         />
       </div>

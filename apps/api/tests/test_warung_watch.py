@@ -22,6 +22,9 @@ from services.warung_watch import (
     find_best_warung_match,
     get_or_create_warung,
     get_status,
+    get_statuses_bulk,
+    get_statuses_by_name,
+    list_nearby_warungs,
     normalize_name,
     search_nearby_places,
     search_warungs,
@@ -655,3 +658,125 @@ def test_price_history_returns_priced_checkins(client):
     body = res.json()
     assert body["warung"]["name"] == "Pelita"
     assert body["history"] == priced_rows
+
+
+# ── bulk status / batch-status ───────────────────────────────────────────
+
+def _iso(minutes_ago: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat()
+
+
+def _bulk_sb(warung_rows, checkin_rows):
+    sb = MagicMock()
+    warungs = MagicMock()
+    warungs.select.return_value.in_.return_value.limit.return_value.execute.return_value = MagicMock(data=warung_rows)
+    checkins = MagicMock()
+    chain = checkins.select.return_value.in_.return_value.gte.return_value.order.return_value.limit
+    chain.return_value.execute.return_value = MagicMock(data=checkin_rows)
+    sb.table.side_effect = lambda name: {"warungs": warungs, "warung_checkins": checkins}[name]
+    return sb, warungs, checkins
+
+
+@pytest.mark.asyncio
+async def test_get_statuses_bulk_uses_one_query_and_groups_per_warung():
+    sb, _, checkins = _bulk_sb([], [
+        {"warung_id": "a", "status": "packed", "source": "user_report", "created_at": _iso(5)},
+        {"warung_id": "a", "status": "packed", "source": "user_report", "created_at": _iso(9)},
+        {"warung_id": "b", "status": "empty", "source": "user_report", "created_at": _iso(3)},
+    ])
+    out = await get_statuses_bulk(supabase_client=sb, warung_ids=["a", "b", "c", "a"])
+    assert checkins.select.call_count == 1
+    assert out["a"]["status"] == "packed" and out["a"]["report_count"] == 2
+    assert out["b"]["status"] == "empty"
+    assert out["c"]["status"] is None and out["c"]["report_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_get_statuses_bulk_empty_ids_makes_no_query():
+    sb = MagicMock()
+    assert await get_statuses_bulk(supabase_client=sb, warung_ids=[]) == {}
+    sb.table.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_statuses_bulk_keeps_newest_rows_when_capped():
+    rows = [{"warung_id": "a", "status": "packed", "source": "user_report", "created_at": _iso(1 + i)} for i in range(3)]
+    rows += [{"warung_id": "a", "status": "empty", "source": "user_report", "created_at": _iso(200 + i)} for i in range(60)]
+    sb, *_ = _bulk_sb([], rows)
+    out = await get_statuses_bulk(supabase_client=sb, warung_ids=["a"])
+    assert out["a"]["report_count"] == 3 and out["a"]["status"] == "packed"
+
+
+@pytest.mark.asyncio
+async def test_get_statuses_by_name_exact_match_only_and_keeps_input_order():
+    sb, *_ = _bulk_sb(
+        [{"id": "a", "name": "Pelita", "location": None, "lat": None, "lng": None, "verified": True, "normalized_name": "pelita"}],
+        [{"warung_id": "a", "status": "moderate", "source": "user_report", "created_at": _iso(4)}],
+    )
+    out = await get_statuses_by_name(supabase_client=sb, names=["Kopitiam Lain", "  PELITA "])
+    assert [r["name"] for r in out] == ["Kopitiam Lain", "  PELITA "]
+    assert out[0]["warung"] is None and out[0]["status"] is None
+    assert out[1]["warung"]["id"] == "a" and "normalized_name" not in out[1]["warung"]
+    assert out[1]["status"] == "moderate"
+
+
+@pytest.mark.asyncio
+async def test_list_nearby_warungs_fetches_all_statuses_in_one_query():
+    sb = MagicMock()
+    warungs = MagicMock()
+    warungs.select.return_value.not_.is_.return_value.limit.return_value.execute.return_value = MagicMock(data=[
+        {"id": f"w{i}", "name": f"W{i}", "location": None, "lat": 3.1390 + i * 0.0001, "lng": 101.6869, "verified": False}
+        for i in range(5)
+    ])
+    checkins = MagicMock()
+    checkins.select.return_value.in_.return_value.gte.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+    sb.table.side_effect = lambda name: {"warungs": warungs, "warung_checkins": checkins}[name]
+    out = await list_nearby_warungs(supabase_client=sb, lat=3.1390, lng=101.6869, radius_m=800)
+    assert len(out) == 5
+    assert checkins.select.call_count == 1
+
+
+def test_batch_status_happy_path(client):
+    c, sb, warungs_table, checkins_table = client
+    warungs_table.select.return_value.in_.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[{"id": "w1", "name": "Pelita", "location": None, "lat": None, "lng": None, "verified": False, "normalized_name": "pelita"}]
+    )
+    checkins_table.select.return_value.in_.return_value.gte.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
+        data=[{"warung_id": "w1", "status": "packed", "source": "user_report", "created_at": _iso(2)}]
+    )
+    res = c.post("/api/v1/warung-watch/batch-status", json={"names": ["Pelita", "Unknown"]})
+    assert res.status_code == 200, res.text
+    body = res.json()["results"]
+    assert body[0]["status"] == "packed" and body[0]["warung"]["id"] == "w1"
+    assert body[1]["warung"] is None and body[1]["status"] is None
+
+
+def test_batch_status_is_public_so_anonymous_works(client):
+    c, *_ = client
+    res = c.post("/api/v1/warung-watch/batch-status", json={"names": ["Pelita"]})
+    assert res.status_code == 200
+
+
+@pytest.mark.parametrize("payload", [
+    {"names": []},
+    {"names": [""]},
+    {"names": ["x" * 201]},
+    {"names": [f"n{i}" for i in range(21)]},
+    {},
+])
+def test_batch_status_rejects_invalid_bodies(client, payload):
+    c, *_ = client
+    assert c.post("/api/v1/warung-watch/batch-status", json=payload).status_code == 422
+
+
+def test_batch_status_503_when_supabase_unavailable(client, monkeypatch):
+    c, *_ = client
+    monkeypatch.setattr(api_main.app.state, "supabase", None)
+    assert c.post("/api/v1/warung-watch/batch-status", json={"names": ["Pelita"]}).status_code == 503
+
+
+def test_batch_status_rate_limit_31st_returns_429(client):
+    c, *_ = client
+    for _ in range(30):
+        assert c.post("/api/v1/warung-watch/batch-status", json={"names": ["Pelita"]}).status_code == 200
+    assert c.post("/api/v1/warung-watch/batch-status", json={"names": ["Pelita"]}).status_code == 429

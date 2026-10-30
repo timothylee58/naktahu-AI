@@ -175,11 +175,10 @@ async def list_nearby_warungs(
 
     rows = await asyncio.to_thread(_fetch)
     nearest = nearby_warungs(rows, lat=lat, lng=lng, radius_m=float(radius_m))[: max(1, min(limit, 20))]
-    listed: list[dict[str, Any]] = []
-    for warung in nearest:
-        status = await get_status(supabase_client=supabase_client, warung_id=warung["id"])
-        listed.append({"warung": warung, **status})
-    return listed
+    statuses = await get_statuses_bulk(
+        supabase_client=supabase_client, warung_ids=[w["id"] for w in nearest]
+    )
+    return [{"warung": warung, **statuses[warung["id"]]} for warung in nearest]
 
 
 async def find_best_warung_match(
@@ -287,6 +286,82 @@ async def get_status(
 
     rows = await asyncio.to_thread(_fetch)
     return aggregate_checkin_status(rows)
+
+
+# Same per-warung cap get_status() applies, so bulk and single lookups agree.
+_ROWS_PER_WARUNG = 50
+
+
+async def get_statuses_bulk(
+    *, supabase_client: Client, warung_ids: list[str]
+) -> dict[str, dict[str, Any]]:
+    """get_status() for many warungs in ONE query instead of one per id.
+    Every requested id is present in the result; ids with no recent
+    check-ins get the honest empty aggregate, never a guessed status."""
+    ids = list(dict.fromkeys(warung_ids))
+    if not ids:
+        return {}
+    stale_cutoff = (datetime.now(timezone.utc) - STALE_WINDOW).isoformat()
+
+    def _fetch() -> list[dict[str, Any]]:
+        res = (
+            supabase_client.table("warung_checkins")
+            .select("warung_id,status,source,created_at")
+            .in_("warung_id", ids)
+            .gte("created_at", stale_cutoff)
+            .order("created_at", desc=True)
+            .limit(len(ids) * _ROWS_PER_WARUNG)
+            .execute()
+        )
+        return res.data or []
+
+    rows = await asyncio.to_thread(_fetch)
+    grouped: dict[str, list[dict[str, Any]]] = {warung_id: [] for warung_id in ids}
+    for row in rows:
+        bucket = grouped.get(row.get("warung_id"))
+        # Rows arrive newest-first, so the cap keeps each warung's latest.
+        if bucket is not None and len(bucket) < _ROWS_PER_WARUNG:
+            bucket.append(row)
+    return {warung_id: aggregate_checkin_status(bucket) for warung_id, bucket in grouped.items()}
+
+
+async def get_statuses_by_name(
+    *, supabase_client: Client, names: list[str]
+) -> list[dict[str, Any]]:
+    """Status for each input name, in input order. Matching is EXACT on
+    normalized_name (the table's unique key) — deliberately not the fuzzy
+    ranking search uses, because a wrong match here would put another
+    warung's crowd level on a place card. Unmatched names get warung=None
+    and the empty aggregate."""
+    normalized = [normalize_name(name) for name in names]
+    wanted = sorted({n for n in normalized if n})
+    by_norm: dict[str, dict[str, Any]] = {}
+    if wanted:
+
+        def _find() -> list[dict[str, Any]]:
+            res = (
+                supabase_client.table("warungs")
+                .select("id,name,location,lat,lng,verified,normalized_name")
+                .in_("normalized_name", wanted)
+                .limit(len(wanted))
+                .execute()
+            )
+            return res.data or []
+
+        for row in await asyncio.to_thread(_find):
+            by_norm[row["normalized_name"]] = row
+
+    statuses = await get_statuses_bulk(
+        supabase_client=supabase_client, warung_ids=[w["id"] for w in by_norm.values()]
+    )
+    empty = aggregate_checkin_status([])
+    results: list[dict[str, Any]] = []
+    for name, norm in zip(names, normalized):
+        warung = by_norm.get(norm)
+        status = statuses[warung["id"]] if warung else empty
+        public = {k: v for k, v in warung.items() if k != "normalized_name"} if warung else None
+        results.append({"name": name, "warung": public, **status})
+    return results
 
 
 def places_api_configured() -> bool:
