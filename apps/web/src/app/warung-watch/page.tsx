@@ -46,6 +46,39 @@ async function apiFetch(path: string, accessToken: string | null, init?: Request
   return fetch(`${API_BASE}${path}`, { ...init, headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) } });
 }
 
+interface BatchRow {
+  name: string;
+  warung: { id?: unknown; location?: unknown; verified?: unknown } | null;
+}
+
+// Google-only places have no crowd of their own. If a reported warung with the
+// same name exists (exact, normalised match on the server), borrow its status;
+// any failure just leaves the plain card, so the board never blocks on this.
+async function withKnownCrowd(extras: Place[], accessToken: string | null): Promise<Place[]> {
+  if (extras.length === 0) return extras;
+  try {
+    const res = await apiFetch('/api/v1/warung-watch/batch-status', accessToken, {
+      method: 'POST',
+      body: JSON.stringify({ names: extras.slice(0, 20).map((place) => place.name) }),
+    });
+    if (!res.ok) return extras;
+    const data = (await res.json()) as { results?: Array<BatchRow & Record<string, unknown>> };
+    const byName = new Map((data.results ?? []).map((row) => [normName(row.name), row]));
+    return extras.map((place) => {
+      const row = byName.get(normName(place.name));
+      if (!row?.warung) return place;
+      return {
+        ...place,
+        key: typeof row.warung.id === 'string' ? row.warung.id : place.key,
+        verified: row.warung.verified === true,
+        crowd: asCrowd(row),
+      };
+    });
+  } catch {
+    return extras;
+  }
+}
+
 export default function WarungWatchPage() {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -183,7 +216,8 @@ export default function WarungWatchPage() {
           crowd: EMPTY_CROWD,
         });
       }
-      setPlaces([...fromReports, ...extras]);
+      const enriched = await withKnownCrowd(extras, accessToken);
+      setPlaces([...fromReports, ...enriched]);
       setListError(!reportsRes.ok);
     } catch {
       setListError(true);
