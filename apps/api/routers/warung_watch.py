@@ -19,6 +19,7 @@ from services.warung_watch import (
     get_or_create_warung,
     get_price_history,
     get_status,
+    get_statuses_by_name,
     list_nearby_warungs,
     search_nearby_places,
     search_warungs,
@@ -50,6 +51,26 @@ class CheckinRequest(BaseModel):
         if (self.price_item is None) != (self.price_myr is None):
             raise ValueError("price_item and price_myr must both be set or both omitted")
         return self
+
+
+class BatchStatusRequest(BaseModel):
+    names: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(..., min_length=1, max_length=20)
+
+
+@router.post("/batch-status")
+@anonymous_limiter.limit("30/minute")
+async def warung_batch_status(
+    request: Request,
+    response: Response,
+    body: BatchStatusRequest,
+) -> dict[str, Any]:
+    """Crowd status for a list of place names (the Google nearby results the
+    board shows alongside geotagged warungs). Exact normalized-name match
+    only; unknown names come back with warung=null and no status."""
+    if not request.app.state.supabase:
+        raise HTTPException(status_code=503, detail="Warung Watch is temporarily unavailable")
+    results = await get_statuses_by_name(supabase_client=request.app.state.supabase, names=body.names)
+    return {"results": results}
 
 
 @router.get("/search")
