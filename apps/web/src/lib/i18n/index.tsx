@@ -1245,6 +1245,7 @@ const MS: Translations = {
 
   /* ── footer ── */
   'footer.privacy': 'Dasar Privasi',
+  'footer.makakami_alt': 'Disenaraikan di MakaKami',
 
   /* ── perniagaan-terurus (managed service lead form) ── */
   'perniagaan.form.name_label': 'Nama',
@@ -2494,6 +2495,7 @@ const EN: Translations = {
 
   /* ── footer ── */
   'footer.privacy': 'Privacy Policy',
+  'footer.makakami_alt': 'Listed on MakaKami',
 
   /* ── perniagaan-terurus (managed service lead form) ── */
   'perniagaan.form.name_label': 'Name',
@@ -3714,6 +3716,7 @@ const ZH: Translations = {
 
   /* ── footer ── */
   'footer.privacy': '隐私政策',
+  'footer.makakami_alt': '已在 MakaKami 上架',
 
   /* ── perniagaan-terurus (managed service lead form) ── */
   'perniagaan.form.name_label': '姓名',

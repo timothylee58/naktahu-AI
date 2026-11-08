@@ -328,6 +328,21 @@ export function LandingClient() {
               {t('footer.privacy')}
             </Link>
           </div>
+          <a
+            href="https://makakami.com.my/app/naktahu-my"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 transition-opacity hover:opacity-80"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- external SVG badge; next/image would need remotePatterns for one asset */}
+            <img
+              src="https://makakami.com.my/badge/naktahu-my.svg"
+              alt={t('footer.makakami_alt')}
+              width={150}
+              height={40}
+              loading="lazy"
+            />
+          </a>
           <span className="text-xs max-w-xs locale-text-balance">
             {t('landing.footer.disclaimer')}
           </span>
