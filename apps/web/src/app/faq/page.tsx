@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { useI18n } from '@/lib/i18n';
+import { MakaKamiBadge } from '@/components/layout/MakaKamiBadge';
 import { useTheme } from '@/lib/theme';
 
 interface FAQItem {
@@ -366,7 +367,10 @@ export default function FAQPage() {
         <footer className={`border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm ${
           isDark ? 'border-white/10 text-zinc-500' : 'border-zinc-200 text-zinc-500'
         }`}>
-          <span className="locale-nowrap">&copy; 2026 NakTahu AI</span>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <span className="locale-nowrap">&copy; 2026 NakTahu AI</span>
+            <MakaKamiBadge />
+          </div>
           <div className="flex items-center gap-4">
             <Link href="/" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('nav.home')}</Link>
             <Link href="/about" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>{t('nav.about')}</Link>
