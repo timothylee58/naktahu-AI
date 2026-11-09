@@ -42,12 +42,13 @@ const CONTENT: Record<'ms' | 'en' | 'zh', StatementContent> = {
         'Jawapan yang distrim dan mesej status diumumkan kepada pembaca skrin melalui kawasan langsung (aria-live).',
         'Tema cerah dan gelap, dengan warna teks yang dipilih untuk kontras yang mencukupi.',
         'Penunjuk fokus yang jelas untuk navigasi papan kekunci, dan input suara sebagai alternatif kepada menaip.',
+        'Pautan "Langkau ke kandungan utama" sebagai elemen pertama di setiap halaman.',
+        'Animasi demo di halaman utama boleh dijeda, dan setiap demo mempunyai penerangan teks untuk pembaca skrin.',
       ],
     },
     limits: {
       title: 'Had yang diketahui',
       items: [
-        'Belum ada pautan "langkau ke kandungan utama".',
         'Tiada ujian kebolehcapaian automatik dijalankan pada setiap perubahan lagi.',
         'Jawapan AI boleh menjadi panjang; kami sedang menambah baik struktur tajuk dan senarai dalam jawapan.',
         'Lencana pihak ketiga (seperti MakaKami) dimuatkan dari laman luar dan di luar kawalan kami.',
@@ -76,12 +77,13 @@ const CONTENT: Record<'ms' | 'en' | 'zh', StatementContent> = {
         'Streaming answers and status messages are announced to screen readers through live regions (aria-live).',
         'Light and dark themes, with text colours chosen for sufficient contrast.',
         'Visible focus indicators for keyboard navigation, and voice input as an alternative to typing.',
+        'A “Skip to main content” link as the first element on every page.',
+        'The demo animations on the home page can be paused, and each demo has a text description for screen readers.',
       ],
     },
     limits: {
       title: 'Known limitations',
       items: [
-        'There is no “skip to main content” link yet.',
         'Automated accessibility tests do not yet run on every change.',
         'AI answers can be long; we are improving the heading and list structure inside answers.',
         'Third-party badges (such as MakaKami) load from external sites outside our control.',
@@ -109,12 +111,13 @@ const CONTENT: Record<'ms' | 'en' | 'zh', StatementContent> = {
         '实时生成的答案和状态信息会通过实时区域（aria-live）告知屏幕阅读器。',
         '提供浅色和深色主题，文字颜色经过挑选以确保足够的对比度。',
         '键盘导航时有清晰的焦点指示，并支持语音输入代替打字。',
+        '每个页面的第一个元素都是“跳到主要内容”链接。',
+        '首页的演示动画可以暂停，每个演示都附有供屏幕阅读器使用的文字说明。',
       ],
     },
     limits: {
       title: '已知限制',
       items: [
-        '目前还没有“跳到主要内容”链接。',
         '尚未对每次更改运行自动化无障碍测试。',
         'AI 答案可能较长；我们正在改进答案中的标题和列表结构。',
         '第三方徽章（例如 MakaKami）从外部网站加载，不在我们的控制范围内。',
