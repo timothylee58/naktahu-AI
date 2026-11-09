@@ -547,6 +547,7 @@ const MS: Translations = {
   /* ── landing ── */
   'landing.badge': 'Dibuat untuk Malaysia',
   'landing.postcode.placeholder': 'Poskod anda (cth. 50450)',
+  'landing.postcode.prompt': 'Jawapan untuk negeri anda?',
   'landing.postcode.invalid': 'Poskod tidak sah — masukkan 5 digit.',
   'landing.postcode.personalized': 'Menyajikan {state}.',
   'landing.postcode.change': 'Tukar',
@@ -1818,6 +1819,7 @@ const EN: Translations = {
   /* ── landing ── */
   'landing.badge': 'Built for Malaysia',
   'landing.postcode.placeholder': 'Your postcode (e.g. 50450)',
+  'landing.postcode.prompt': 'Answers for your state?',
   'landing.postcode.invalid': 'Not a valid postcode — enter 5 digits.',
   'landing.postcode.personalized': 'Serving {state}.',
   'landing.postcode.change': 'Change',
@@ -3088,6 +3090,7 @@ const ZH: Translations = {
   /* ── landing ── */
   'landing.badge': '专为马来西亚打造',
   'landing.postcode.placeholder': '您的邮政编码（例如 50450）',
+  'landing.postcode.prompt': '获取您所在州的答案？',
   'landing.postcode.invalid': '邮政编码无效——请输入 5 位数字。',
   'landing.postcode.personalized': '正在为{state}提供服务。',
   'landing.postcode.change': '更改',

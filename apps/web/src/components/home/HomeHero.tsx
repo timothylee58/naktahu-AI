@@ -9,6 +9,8 @@ import type { CategoryId } from '@/lib/categories';
 import { detectLanguage } from '@/lib/prompt/detectLanguage';
 import { savePending, type HandoffSource } from '@/lib/prompt/handoff';
 import { Button } from '@/components/ui/button';
+import { MapPin } from 'lucide-react';
+import { PostcodePersonalizer } from '@/components/landing/PostcodePersonalizer';
 import { CategoryTabs } from '@/components/prompt/CategoryTabs';
 import { PiiWarning } from '@/components/prompt/PiiWarning';
 import { PromptBox } from '@/components/prompt/PromptBox';
@@ -127,6 +129,17 @@ export function HomeHero({ onEnterChat }: HomeHeroProps) {
         <CategoryTabs active={category} onSelect={selectCategory} />
         <SuggestionChips category={category} onSelect={pickChip} disabled={exhausted} />
       </div>
+
+      <PostcodePersonalizer
+        className="flex flex-wrap items-center justify-center gap-2 text-sm text-nk-ink/80"
+        inputClassName="w-44 rounded-full border border-[var(--nk-border)] bg-transparent px-3.5 py-1.5 text-center text-sm text-nk-ink placeholder:text-nk-muted-aa focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nk-official"
+        prompt={
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin aria-hidden className="h-4 w-4 text-nk-official-text" />
+            {t('landing.postcode.prompt')}
+          </span>
+        }
+      />
 
       {(quota || exhausted) && (
         <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center">

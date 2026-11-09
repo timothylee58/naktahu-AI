@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { API_BASE } from '@/lib/api-base';
 import { useI18n } from '@/lib/i18n';
 import { readSavedPostcode, resolveStateFromPostcode, SAVED_POSTCODE_KEY } from '@/lib/postcode';
@@ -69,12 +69,15 @@ function clearStored() {
 interface PostcodePersonalizerProps {
   className?: string;
   inputClassName?: string;
+  /** Shown before the input only while no postcode is set, so the resolved
+   *  "Menyajikan {state}" line doesn't sit under a now-stale question. */
+  prompt?: ReactNode;
 }
 
 /** Postcode → state personalization. Resolves a postcode to a state and
  * remembers it locally so a returning visitor sees a state-aware welcome
  * line without re-entering it — no backend call, no account required. */
-export function PostcodePersonalizer({ className, inputClassName }: PostcodePersonalizerProps) {
+export function PostcodePersonalizer({ className, inputClassName, prompt }: PostcodePersonalizerProps) {
   const { t } = useI18n();
   const [postcode, setPostcode] = useState('');
   const [stateId, setStateId] = useState<string | null>(null);
@@ -175,6 +178,7 @@ export function PostcodePersonalizer({ className, inputClassName }: PostcodePers
 
   return (
     <form onSubmit={handleSubmit} className={className}>
+      {prompt}
       <input
         type="text"
         inputMode="numeric"

@@ -10,7 +10,6 @@ import { LandingHeader } from '@/components/layout/LandingHeader';
 import { HomeHero } from '@/components/home/HomeHero';
 import { LandingFeatureShowcase } from './LandingFeatureShowcase';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
-import { PostcodePersonalizer } from './PostcodePersonalizer';
 import { AgentSpotlight } from './AgentSpotlight';
 import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
 import { SectionHeading } from './SectionHeading';
@@ -91,10 +90,6 @@ export function LandingClient() {
   const pageClass = isDark
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
     : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
-  const mutedText = isDark ? 'text-zinc-300' : 'text-zinc-600';
-  const domainPillClass = isDark
-    ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
-    : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
@@ -155,13 +150,6 @@ export function LandingClient() {
       <AuthErrorBanner />
 
       <HomeHero onEnterChat={enterChat} />
-
-      <div className="mx-auto flex w-full max-w-6xl justify-center px-4 pb-14 sm:px-6">
-        <PostcodePersonalizer
-          className={`flex flex-wrap items-center justify-center gap-2 ${mutedText}`}
-          inputClassName={`w-56 text-center border rounded-full px-3.5 py-1.5 text-xs font-medium locale-nowrap transition-colors ${domainPillClass}`}
-        />
-      </div>
 
       <motion.section
         aria-labelledby="landing-features"
