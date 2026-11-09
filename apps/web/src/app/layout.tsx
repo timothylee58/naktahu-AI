@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Plus_Jakarta_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { SkipLink } from '@/components/layout/SkipLink';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme';
 import { PageTransition } from '@/components/PageTransition';
@@ -112,6 +113,7 @@ export default function RootLayout({
     >
       <body className="min-h-full h-full flex flex-col bg-zinc-50 font-sans">
         <I18nProvider>
+          <SkipLink />
           <ThemeProvider>
             <ErrorBoundary>
               <PageTransition>{children}</PageTransition>

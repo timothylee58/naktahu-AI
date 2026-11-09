@@ -8,10 +8,9 @@ import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
 import { LandingHeader } from '@/components/layout/LandingHeader';
 import { HomeHero } from '@/components/home/HomeHero';
-import { LandingFeatureShowcase } from './LandingFeatureShowcase';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { AgentSpotlight } from './AgentSpotlight';
-import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
+import { TaskDemoCards } from './TaskDemoCards';
 import { SectionHeading } from './SectionHeading';
 import { TrustStrip } from './TrustStrip';
 import { LandingFooter } from './LandingFooter';
@@ -149,24 +148,13 @@ export function LandingClient() {
       >
       <AuthErrorBanner />
 
+      <main id="main-content" tabIndex={-1} className="focus:outline-none">
       <HomeHero onEnterChat={enterChat} />
 
-      <motion.section
-        aria-labelledby="landing-features"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, margin: '-80px' }}
-        transition={{ duration: 0.6 }}
-        className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8"
-      >
-        <SectionHeading id="landing-features" title={t('landing.features.title')} />
-        <LandingFeatureShowcase isDark={isDark} />
-      </motion.section>
-
-      {/* Preview + agency sources merged into one "proof" section: the
-          streamed, cited demo answer IS the trust argument, so it sits
-          beside the claim (split layout) instead of in a separate section
-          repeating the same centred heading pattern. */}
+      {/* Task demos + agency sources as one "proof" section: watching a
+          question become a cited answer IS the trust argument. Pausable,
+          auto-playing cards (america.gov/coming-soon pattern) replace both
+          the old feature showcase and the single tabbed preview. */}
       <motion.section
         aria-labelledby="landing-proof"
         initial={{ opacity: 0 }}
@@ -175,15 +163,12 @@ export function LandingClient() {
         transition={{ duration: 0.6 }}
         className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20"
       >
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-12">
-          <SectionHeading
-            id="landing-proof"
-            title={t('landing.proof.title')}
-            description={t('landing.proof.desc')}
-            className="mb-0 lg:sticky lg:top-24"
-          />
-          <InteractiveAnswerPreview isDark={isDark} />
-        </div>
+        <SectionHeading
+          id="landing-proof"
+          title={t('landing.proof.title')}
+          description={t('landing.proof.desc')}
+        />
+        <TaskDemoCards />
         <div className="mt-16">
           <h3 className="font-display text-xl font-bold text-nk-ink sm:text-2xl locale-text-balance">
             {t('landing.trust.title')}
@@ -233,6 +218,8 @@ export function LandingClient() {
           </div>
         </div>
       </motion.section>
+
+      </main>
 
       <LandingFooter tagline={tagline} />
       </motion.div>

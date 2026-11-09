@@ -8,9 +8,7 @@ import { useI18n } from '@/lib/i18n';
 // apps/api/scripts/sources.py) — badge, full name, and two qualitative
 // coverage tags. Deliberately no "N+ documents indexed" style counts:
 // this repo has no per-agency ingestion-count query anywhere, so a
-// precise-looking number here would be fabricated, not a real live stat
-// (see InteractiveAnswerPreview.tsx's module comment for the same
-// reasoning applied to the confidence-% and hotline-number fields).
+// precise-looking number here would be fabricated, not a real live stat.
 //
 // Icon, not logo: real ministry crests aren't used here on purpose. This
 // product's own brand mark deliberately avoids reading as an official
