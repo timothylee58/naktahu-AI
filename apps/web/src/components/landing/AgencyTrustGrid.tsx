@@ -126,7 +126,7 @@ export function AgencyTrustGrid({ isDark = true }: AgencyTrustGridProps) {
 
   return (
     <div
-      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 rounded-2xl border max-w-4xl mx-auto w-full overflow-hidden ${containerClass}`}
+      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 rounded-2xl border w-full overflow-hidden ${containerClass}`}
     >
       {AGENCIES.map((agency, i) => (
         <motion.div

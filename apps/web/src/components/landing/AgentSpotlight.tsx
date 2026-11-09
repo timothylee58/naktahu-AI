@@ -27,7 +27,7 @@ export function AgentSpotlight({ isDark = true }: AgentSpotlightProps) {
   const linkClass = isDark ? 'text-nk-official' : 'text-nk-official-dim';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full">
       {SPOTLIGHT_SLUGS.map((slug, i) => (
         <motion.div
           key={slug}

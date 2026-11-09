@@ -547,6 +547,7 @@ const MS: Translations = {
   /* ── landing ── */
   'landing.badge': 'Dibuat untuk Malaysia',
   'landing.postcode.placeholder': 'Poskod anda (cth. 50450)',
+  'landing.postcode.prompt': 'Jawapan untuk negeri anda?',
   'landing.postcode.invalid': 'Poskod tidak sah — masukkan 5 digit.',
   'landing.postcode.personalized': 'Menyajikan {state}.',
   'landing.postcode.change': 'Tukar',
@@ -656,6 +657,26 @@ const MS: Translations = {
   'landing.footer.disclaimer':
     'NakTahu AI adalah projek portfolio. Bukan nasihat rasmi kerajaan.',
   'landing.footer.github': 'GitHub',
+  'landing.footer.who':
+    'Dibangunkan dan dikendalikan secara bebas. NakTahu tidak bergabung dengan mana-mana kementerian atau agensi kerajaan.',
+  'landing.footer.sourcing.title': 'Dasar sumber',
+  'landing.footer.sourcing.desc':
+    'Jawapan diringkaskan daripada dokumen awam di laman rasmi kerajaan (gov.my). Petikan hanya dipaparkan apabila pautan sumber sebenar wujud. Sahkan maklumat penting dengan agensi berkenaan.',
+  'landing.footer.links': 'Pautan',
+  'landing.footer.nav_label': 'Pautan kaki laman',
+  'landing.footer.contact': 'Hubungi / laporkan isu',
+  'landing.proof.title': 'Jawapan bersumber, bukan tekaan',
+  'landing.proof.desc':
+    'Setiap jawapan dibina daripada dokumen awam agensi rasmi. Lihat bagaimana jawapan distrim, dan dari mana petikannya datang.',
+  'trust_strip.summary': 'Perkhidmatan bebas · bukan laman kerajaan · jawapan bersumberkan laman rasmi gov.my',
+  'trust_strip.how': 'Bagaimana kami tahu?',
+  'trust_strip.independent.title': 'Ini bukan laman web kerajaan',
+  'trust_strip.independent.desc':
+    'NakTahu AI ialah projek bebas. Ia tidak dikendalikan, ditaja atau disahkan oleh mana-mana agensi kerajaan Malaysia.',
+  'trust_strip.sources.title': 'Dari mana jawapan datang',
+  'trust_strip.sources.desc':
+    'Jawapan diringkaskan daripada dokumen awam di laman gov.my, dengan pautan ke sumber asal apabila ada. AI boleh tersilap, jadi sahkan perkara penting dengan agensi berkenaan.',
+  'trust_strip.learn_more': 'Ketahui lebih lanjut',
 
   /* ── domains ── */
   'domain.tax': 'Cukai & LHDN',
@@ -1246,6 +1267,7 @@ const MS: Translations = {
   /* ── footer ── */
   'footer.privacy': 'Dasar Privasi',
   'footer.makakami_alt': 'Disenaraikan di MakaKami',
+  'footer.accessibility': 'Kebolehcapaian',
 
   /* ── perniagaan-terurus (managed service lead form) ── */
   'perniagaan.form.name_label': 'Nama',
@@ -1797,6 +1819,7 @@ const EN: Translations = {
   /* ── landing ── */
   'landing.badge': 'Built for Malaysia',
   'landing.postcode.placeholder': 'Your postcode (e.g. 50450)',
+  'landing.postcode.prompt': 'Answers for your state?',
   'landing.postcode.invalid': 'Not a valid postcode — enter 5 digits.',
   'landing.postcode.personalized': 'Serving {state}.',
   'landing.postcode.change': 'Change',
@@ -1906,6 +1929,26 @@ const EN: Translations = {
   'landing.footer.disclaimer':
     'NakTahu AI is a portfolio project. Not official government advice.',
   'landing.footer.github': 'GitHub',
+  'landing.footer.who':
+    'Built and run independently. NakTahu is not affiliated with any government ministry or agency.',
+  'landing.footer.sourcing.title': 'Sourcing policy',
+  'landing.footer.sourcing.desc':
+    'Answers are summarised from public documents on official government sites (gov.my). Citations appear only when a real source link exists. Confirm anything important with the agency concerned.',
+  'landing.footer.links': 'Links',
+  'landing.footer.nav_label': 'Footer links',
+  'landing.footer.contact': 'Contact / report an issue',
+  'landing.proof.title': 'Sourced answers, not guesses',
+  'landing.proof.desc':
+    'Every answer is built from public documents published by official agencies. See how an answer streams in, and where its citations come from.',
+  'trust_strip.summary': 'Independent service · not a government website · answers sourced from official gov.my sites',
+  'trust_strip.how': 'How do we know?',
+  'trust_strip.independent.title': 'This is not a government website',
+  'trust_strip.independent.desc':
+    'NakTahu AI is an independent project. It is not run, sponsored or endorsed by any Malaysian government agency.',
+  'trust_strip.sources.title': 'Where answers come from',
+  'trust_strip.sources.desc':
+    'Answers are summarised from public documents on gov.my sites, with links to the original source where one exists. AI can make mistakes, so confirm anything important with the agency concerned.',
+  'trust_strip.learn_more': 'Learn more',
 
   /* ── domains ── */
   'domain.tax': 'Tax & LHDN',
@@ -2496,6 +2539,7 @@ const EN: Translations = {
   /* ── footer ── */
   'footer.privacy': 'Privacy Policy',
   'footer.makakami_alt': 'Listed on MakaKami',
+  'footer.accessibility': 'Accessibility',
 
   /* ── perniagaan-terurus (managed service lead form) ── */
   'perniagaan.form.name_label': 'Name',
@@ -3046,6 +3090,7 @@ const ZH: Translations = {
   /* ── landing ── */
   'landing.badge': '专为马来西亚打造',
   'landing.postcode.placeholder': '您的邮政编码（例如 50450）',
+  'landing.postcode.prompt': '获取您所在州的答案？',
   'landing.postcode.invalid': '邮政编码无效——请输入 5 位数字。',
   'landing.postcode.personalized': '正在为{state}提供服务。',
   'landing.postcode.change': '更改',
@@ -3142,6 +3187,23 @@ const ZH: Translations = {
   'landing.chip.immigration.query': '如何更新马来西亚护照？',
   'landing.footer.disclaimer': 'NakTahu AI 是一个作品集项目，不代表官方政府建议。',
   'landing.footer.github': 'GitHub',
+  'landing.footer.who': '由独立团队开发和运营。NakTahu 与任何政府部门或机构均无关联。',
+  'landing.footer.sourcing.title': '来源政策',
+  'landing.footer.sourcing.desc':
+    '答案摘自政府官方网站（gov.my）上的公开文件。仅在存在真实来源链接时才显示引用。重要信息请向相关机构核实。',
+  'landing.footer.links': '链接',
+  'landing.footer.nav_label': '页脚链接',
+  'landing.footer.contact': '联系我们 / 报告问题',
+  'landing.proof.title': '有来源的答案，而不是猜测',
+  'landing.proof.desc': '每个答案都基于官方机构发布的公开文件。看看答案如何实时生成，以及引用来自哪里。',
+  'trust_strip.summary': '独立服务 · 非政府网站 · 答案来源于 gov.my 官方网站',
+  'trust_strip.how': '我们如何确定？',
+  'trust_strip.independent.title': '这不是政府网站',
+  'trust_strip.independent.desc': 'NakTahu AI 是一个独立项目，不由任何马来西亚政府机构运营、赞助或认可。',
+  'trust_strip.sources.title': '答案从哪里来',
+  'trust_strip.sources.desc':
+    '答案摘自 gov.my 网站上的公开文件，并在有来源时附上原文链接。AI 可能出错，重要事项请向相关机构核实。',
+  'trust_strip.learn_more': '了解更多',
 
   /* ── domains ── */
   'domain.tax': '税务与国内税收局',
@@ -3717,6 +3779,7 @@ const ZH: Translations = {
   /* ── footer ── */
   'footer.privacy': '隐私政策',
   'footer.makakami_alt': '已在 MakaKami 上架',
+  'footer.accessibility': '无障碍',
 
   /* ── perniagaan-terurus (managed service lead form) ── */
   'perniagaan.form.name_label': '姓名',

@@ -9,14 +9,14 @@ import type { CategoryId } from '@/lib/categories';
 import { detectLanguage } from '@/lib/prompt/detectLanguage';
 import { savePending, type HandoffSource } from '@/lib/prompt/handoff';
 import { Button } from '@/components/ui/button';
+import { MapPin } from 'lucide-react';
+import { PostcodePersonalizer } from '@/components/landing/PostcodePersonalizer';
 import { CategoryTabs } from '@/components/prompt/CategoryTabs';
 import { PiiWarning } from '@/components/prompt/PiiWarning';
 import { PromptBox } from '@/components/prompt/PromptBox';
 import { QuotaMeter } from '@/components/prompt/QuotaMeter';
-import { StatusPills } from '@/components/prompt/StatusPills';
 import { SuggestionChips } from '@/components/prompt/SuggestionChips';
 import { usePromptBox } from '@/components/prompt/usePromptBox';
-import { CategoryTiles } from './CategoryTiles';
 
 interface HomeHeroProps {
   /** Navigates to /chat (parent owns the route-change animation). */
@@ -70,34 +70,29 @@ export function HomeHero({ onEnterChat }: HomeHeroProps) {
     setCategory(id);
     box.clear();
   };
-  const selectTile = (id: CategoryId) => {
-    selectCategory(id);
-    inputRef.current?.focus();
-    inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  };
   const pickChip = (text: string) => {
     source.current = 'chip';
     box.fill(text);
     inputRef.current?.focus();
   };
 
-  const hint = box.value.trim()
-    ? `${t(`box.langDetected.${answerLang}`)} · ${t('box.hint.keys')}`
-    : t('box.hint.idle');
+  // Only show the hint once there is something to say about the typed
+  // question; the idle "pick a suggestion" line was one more grey row
+  // competing with the box itself.
+  const hint = box.value.trim() ? `${t(`box.langDetected.${answerLang}`)} · ${t('box.hint.keys')}` : '';
 
+  // Box first, popular tasks underneath it (the USA.gov "search, then top
+  // tasks" order). The status pills and the separate category-tile grid
+  // were removed: the language badge already sits inside the box, the trust
+  // strip carries the sourcing claim, and the tiles repeated the same four
+  // categories as the tabs — two pickers for one choice made the hero crowded.
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col items-center gap-5 px-4 pb-10 pt-12 text-center sm:px-6 sm:pt-16">
+    <div className="mx-auto flex w-full max-w-[860px] flex-col items-center gap-6 px-4 pb-16 pt-14 text-center sm:px-6 sm:pt-20">
       <h1 className="font-display text-[clamp(32px,5.5vw,52px)] font-extrabold leading-[1.08] tracking-[-0.02em] text-nk-ink locale-text-balance">
         {t('home.title')}
       </h1>
-      <StatusPills lang={badge} />
 
-      <div className="mt-4 flex w-full flex-col gap-2.5 sm:mt-6">
-        <CategoryTabs active={category} onSelect={selectCategory} />
-        <SuggestionChips category={category} onSelect={pickChip} disabled={exhausted} />
-      </div>
-
-      <div className="flex w-full flex-col gap-3">
+      <div className="mt-2 flex w-full flex-col gap-3">
         <PromptBox
           variant="hero"
           value={box.value}
@@ -125,34 +120,44 @@ export function HomeHero({ onEnterChat }: HomeHeroProps) {
             {t('box.sending')}
           </p>
         )}
+        <p className="min-h-4 text-right text-xs text-nk-muted-aa" aria-live="polite">
+          {hint}
+        </p>
       </div>
 
-      <div className="flex w-full flex-col items-center justify-between gap-3 sm:flex-row sm:items-start">
-        {quota && !exhausted ? <QuotaMeter quota={quota} onLogin={login} /> : <span />}
-        {exhausted ? (
-          <div className="flex w-full flex-wrap items-center justify-center gap-3 sm:justify-start">
-            <Button type="button" size="lg" onClick={login}>
-              {t('header.login')}
-            </Button>
-            <button type="button" onClick={login} className="text-sm font-semibold text-nk-official-text underline underline-offset-2">
-              {t('quota.register')}
-            </button>
-          </div>
-        ) : (
-          <p className="hidden text-xs text-nk-muted-aa sm:block" aria-live="polite">
-            {hint}
-          </p>
-        )}
+      <div className="flex w-full flex-col gap-2.5">
+        <CategoryTabs active={category} onSelect={selectCategory} />
+        <SuggestionChips category={category} onSelect={pickChip} disabled={exhausted} />
       </div>
+
+      <PostcodePersonalizer
+        className="flex flex-wrap items-center justify-center gap-2 text-sm text-nk-ink/80"
+        inputClassName="w-44 rounded-full border border-[var(--nk-border)] bg-transparent px-3.5 py-1.5 text-center text-sm text-nk-ink placeholder:text-nk-muted-aa focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nk-official"
+        prompt={
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin aria-hidden className="h-4 w-4 text-nk-official-text" />
+            {t('landing.postcode.prompt')}
+          </span>
+        }
+      />
+
+      {(quota || exhausted) && (
+        <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          {quota && !exhausted && <QuotaMeter quota={quota} onLogin={login} />}
+          {exhausted && (
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button type="button" size="lg" onClick={login}>
+                {t('header.login')}
+              </Button>
+              <button type="button" onClick={login} className="text-sm font-semibold text-nk-official-text underline underline-offset-2">
+                {t('quota.register')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="max-w-xl text-xs leading-normal text-nk-muted-aa locale-text-balance">{t('disclaimer.short')}</p>
-
-      <section aria-labelledby="home-categories" className="mt-8 w-full text-left">
-        <h2 id="home-categories" className="mb-5 font-display text-xl font-bold text-nk-ink sm:text-2xl">
-          {t('section.categories')}
-        </h2>
-        <CategoryTiles active={category} onSelect={selectTile} />
-      </section>
     </div>
   );
 }
