@@ -34,6 +34,7 @@ export function LandingFooter({ tagline }: LandingFooterProps) {
           <Link href="/about" className={linkClass}>{t('nav.about')}</Link>
           <Link href="/faq" className={linkClass}>{t('nav.faq')}</Link>
           <Link href="/privacy" className={linkClass}>{t('footer.privacy')}</Link>
+          <Link href="/accessibility" className={linkClass}>{t('footer.accessibility')}</Link>
           <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noopener noreferrer" className={linkClass}>
             {t('landing.footer.contact')} ↗
           </a>
