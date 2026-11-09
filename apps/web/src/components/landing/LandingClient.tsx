@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Callout, CalloutContent } from '@govtechmy/myds-react/callout';
-import { Tag } from '@govtechmy/myds-react/tag';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
 import { LandingHeader } from '@/components/layout/LandingHeader';
@@ -14,10 +12,11 @@ import { LandingFeatureShowcase } from './LandingFeatureShowcase';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { PostcodePersonalizer } from './PostcodePersonalizer';
 import { AgentSpotlight } from './AgentSpotlight';
-import { ComparisonSection } from './ComparisonSection';
 import { InteractiveAnswerPreview } from './InteractiveAnswerPreview';
+import { SectionHeading } from './SectionHeading';
+import { TrustStrip } from './TrustStrip';
+import { LandingFooter } from './LandingFooter';
 import { useI18n } from '@/lib/i18n';
-import { MakaKamiBadge } from '@/components/layout/MakaKamiBadge';
 import {
   LANDING_TAGLINE_KEYS,
   pickRandomTaglineKey,
@@ -37,17 +36,6 @@ const CHAT_MORPH_MS = 420;
 // into) — just enough time for the loading screen to read as intentional
 // before the route actually changes underneath it.
 const NAV_TRANSITION_MS = 380;
-
-// Full domain badge list shown further down the page ("Knowledge Domains")
-// — static, not clickable, distinct from the interactive hero chips above.
-const ALL_DOMAINS = [
-  { key: 'tax' },
-  { key: 'epf' },
-  { key: 'business' },
-  { key: 'education' },
-  { key: 'health' },
-  { key: 'immigration' },
-] as const;
 
 export function LandingClient() {
   const { t } = useI18n();
@@ -103,15 +91,10 @@ export function LandingClient() {
   const pageClass = isDark
     ? 'flex-1 min-h-0 overflow-y-auto bg-[#12151C] text-white'
     : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
-  const borderClass = isDark ? 'border-white/10' : 'border-zinc-200';
   const mutedText = isDark ? 'text-zinc-300' : 'text-zinc-600';
-  const sectionTitle = isDark ? 'text-zinc-200' : 'text-zinc-800';
   const domainPillClass = isDark
     ? 'border-nk-official/40 text-nk-official bg-nk-official/10'
     : 'border-nk-official/30 text-nk-official-dim bg-nk-official/10';
-  const tagBorderClass = isDark ? 'border-nk-official/40' : 'border-nk-official/30';
-  const footerText = isDark ? 'text-zinc-500' : 'text-zinc-500';
-  const footerTitle = isDark ? 'text-zinc-300' : 'text-zinc-700';
 
   return (
     <div className={`relative flex flex-col font-sans ${pageClass}`}>
@@ -151,6 +134,8 @@ export function LandingClient() {
         />
       </div>
 
+      <TrustStrip />
+
       <LandingHeader collapsing={isEnteringChat} onNavClick={handleNavClick} />
 
       {/* Everything below the header fades+blurs+scales out while the
@@ -179,51 +164,43 @@ export function LandingClient() {
       </div>
 
       <motion.section
+        aria-labelledby="landing-features"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.6 }}
-        className={`px-4 sm:px-6 py-16 sm:py-20 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+        className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8"
       >
-        <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-10 sm:mb-12 locale-text-balance ${sectionTitle}`}>
-          {t('landing.features.title')}
-        </h2>
+        <SectionHeading id="landing-features" title={t('landing.features.title')} />
         <LandingFeatureShowcase isDark={isDark} />
       </motion.section>
 
+      {/* Preview + agency sources merged into one "proof" section: the
+          streamed, cited demo answer IS the trust argument, so it sits
+          beside the claim (split layout) instead of in a separate section
+          repeating the same centred heading pattern. */}
       <motion.section
+        aria-labelledby="landing-proof"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.6 }}
-        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+        className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20"
       >
-        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
-          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
-            {t('landing.preview.title')}
-          </h2>
-          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.preview.desc')}</p>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start lg:gap-12">
+          <SectionHeading
+            id="landing-proof"
+            title={t('landing.proof.title')}
+            description={t('landing.proof.desc')}
+            className="mb-0 lg:sticky lg:top-24"
+          />
+          <InteractiveAnswerPreview isDark={isDark} />
         </div>
-        <InteractiveAnswerPreview isDark={isDark} />
-      </motion.section>
-
-      <motion.section
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, margin: '-80px' }}
-        transition={{ duration: 0.6 }}
-        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
-      >
-        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
-          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
+        <div className="mt-16">
+          <h3 className="font-display text-xl font-bold text-nk-ink sm:text-2xl locale-text-balance">
             {t('landing.trust.title')}
-          </h2>
-          {/* Same inline-bold-highlight technique as the hero headline above
-              (indexOf a marked substring, wrap it in a heavier span) — V7's
-              "bold the keywords that matter, inline" pattern applied to the
-              one sentence on this page making the sourcing claim, instead of
-              only saying it via the chip grid below. */}
-          <p className={`text-sm locale-text-balance ${mutedText}`}>
+          </h3>
+          <p className="mb-6 mt-2 max-w-2xl text-base leading-relaxed text-nk-ink/80 locale-text-balance">
             {(() => {
               const desc = t('landing.trust.desc');
               const highlight = t('landing.trust.desc.highlight');
@@ -232,109 +209,44 @@ export function LandingClient() {
               return (
                 <>
                   {desc.slice(0, idx)}
-                  <span className={`font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>{highlight}</span>
+                  <span className="font-semibold text-nk-ink">{highlight}</span>
                   {desc.slice(idx + highlight.length)}
                 </>
               );
             })()}
           </p>
+          <AgencyTrustGrid isDark={isDark} />
         </div>
-        <AgencyTrustGrid isDark={isDark} />
       </motion.section>
 
+      {/* Full-bleed tinted band — the one section that breaks the max-w
+          column, so the page has rhythm instead of identical stacked boxes. */}
       <motion.section
+        aria-labelledby="landing-spotlight"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ duration: 0.6 }}
-        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
+        className="border-y border-[var(--nk-border)] bg-nk-card"
       >
-        <div className="text-center mb-8 sm:mb-10 max-w-xl mx-auto">
-          <h2 className={`text-xl sm:text-2xl font-bold font-display mb-2 locale-text-balance ${sectionTitle}`}>
-            {t('landing.spotlight.title')}
-          </h2>
-          <p className={`text-sm locale-text-balance ${mutedText}`}>{t('landing.spotlight.desc')}</p>
-        </div>
-        <AgentSpotlight isDark={isDark} />
-        <div className="mt-6 max-w-2xl mx-auto">
-          <Callout variant="warning">
-            <CalloutContent className="text-xs locale-text-balance">
-              {t('landing.spotlight.disclaimer')}
-            </CalloutContent>
-          </Callout>
-        </div>
-      </motion.section>
-
-      <motion.section
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, margin: '-80px' }}
-        transition={{ duration: 0.6 }}
-        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} max-w-6xl mx-auto w-full`}
-      >
-        <h2 className={`text-center text-xl sm:text-2xl font-bold font-display mb-8 sm:mb-10 locale-text-balance ${sectionTitle}`}>
-          {t('landing.compare.title')}
-        </h2>
-        <ComparisonSection isDark={isDark} />
-      </motion.section>
-
-      <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-60px' }}
-        transition={{ duration: 0.5 }}
-        className={`px-4 sm:px-6 py-14 sm:py-16 border-t ${borderClass} flex flex-col items-center gap-6 max-w-6xl mx-auto w-full`}
-      >
-        <h2 className={`text-xl sm:text-2xl font-bold font-display locale-text-balance ${sectionTitle}`}>
-          {t('landing.domains.title')}
-        </h2>
-        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-2xl">
-          {ALL_DOMAINS.map((d, i) => (
-            <motion.span
-              key={d.key}
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              whileHover={{ y: -2, scale: 1.03 }}
-              transition={{ delay: i * 0.06, duration: 0.3 }}
-              className="rounded-full locale-nowrap transition-shadow hover:shadow-md"
-            >
-              <Tag variant="primary" mode="pill" size="large" className={`text-sm px-3 sm:px-4 ${tagBorderClass}`}>
-                {t(`domain.${d.key}`)}
-              </Tag>
-            </motion.span>
-          ))}
-        </div>
-      </motion.section>
-
-      <footer className={`border-t ${borderClass} px-4 sm:px-6 py-8 sm:py-10 max-w-6xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4 text-sm ${footerText}`}>
-        <div className="flex flex-col gap-1 text-center sm:text-left">
-          <span className={`font-semibold locale-nowrap ${footerTitle}`}>NakTahu AI</span>
-          <span className="locale-text-balance">{tagline}</span>
-        </div>
-        <div className="flex flex-col items-center sm:items-end gap-1 text-center sm:text-right">
-          <div className="flex items-center gap-3">
-            <a
-              href="https://github.com/timothylee58/naktahu-AI"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`transition-colors locale-nowrap ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}
-            >
-              {t('landing.footer.github')} ↗
-            </a>
-            <Link
-              href="/privacy"
-              className={`transition-colors locale-nowrap ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}
-            >
-              {t('footer.privacy')}
-            </Link>
+        <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <SectionHeading
+            id="landing-spotlight"
+            title={t('landing.spotlight.title')}
+            description={t('landing.spotlight.desc')}
+          />
+          <AgentSpotlight isDark={isDark} />
+          <div className="mt-8 max-w-2xl">
+            <Callout variant="warning">
+              <CalloutContent className="text-sm locale-text-balance">
+                {t('landing.spotlight.disclaimer')}
+              </CalloutContent>
+            </Callout>
           </div>
-          <MakaKamiBadge className="mt-1" />
-          <span className="text-xs max-w-xs locale-text-balance">
-            {t('landing.footer.disclaimer')}
-          </span>
         </div>
-      </footer>
+      </motion.section>
+
+      <LandingFooter tagline={tagline} />
       </motion.div>
     </div>
   );
