@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { LandingHeader } from '@/components/layout/LandingHeader';
+import { MakaKamiBadge } from '@/components/layout/MakaKamiBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/lib/i18n';
@@ -342,6 +343,7 @@ function PerniagaanTerurusInner() {
         <Link href="/" className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-zinc-900'}`}>
           &larr; NakTahu AI
         </Link>
+        <MakaKamiBadge />
       </footer>
     </div>
   );
