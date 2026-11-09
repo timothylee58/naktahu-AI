@@ -1,11 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { LandingHeader } from '@/components/layout/LandingHeader';
-import { LandingFooter } from '@/components/landing/LandingFooter';
+import { LegalLayout, type LegalSection } from '@/components/legal/LegalLayout';
 import { useI18n } from '@/lib/i18n';
-import { LANDING_TAGLINE_KEYS } from '@/lib/landing-taglines';
-import { useTheme } from '@/lib/theme';
 
 const ISSUES_URL = 'https://github.com/timothylee58/naktahu-AI/issues';
 const LAST_REVIEWED = '2026-11-09';
@@ -132,61 +128,46 @@ const CONTENT: Record<'ms' | 'en' | 'zh', StatementContent> = {
 };
 
 export default function AccessibilityPage() {
-  const { t, locale } = useI18n();
-  const { theme } = useTheme();
+  const { locale } = useI18n();
   const c = CONTENT[(locale as 'ms' | 'en' | 'zh') in CONTENT ? (locale as 'ms' | 'en' | 'zh') : 'ms'];
-  const pageBg = theme === 'dark' ? 'bg-[#12151C]' : 'bg-nk-bg-warm';
 
-  return (
-    <div className={`flex min-h-screen flex-col font-sans ${pageBg}`}>
-      <LandingHeader />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6 sm:py-16">
-        <h1 className="font-display text-3xl font-extrabold tracking-[-0.01em] text-nk-ink sm:text-4xl">{c.title}</h1>
-        <p className="mt-2 text-sm text-nk-muted-aa">
-          {c.reviewed}: <time dateTime={LAST_REVIEWED}>{LAST_REVIEWED}</time>
-        </p>
-        <p className="mt-6 text-base leading-relaxed text-nk-ink/80">{c.intro}</p>
-
-        <Block title={c.goal.title}>
-          <p>{c.goal.desc}</p>
-        </Block>
-        <Block title={c.features.title}>
-          <List items={c.features.items} />
-        </Block>
-        <Block title={c.limits.title}>
-          <List items={c.limits.items} />
-        </Block>
-        <Block title={c.feedback.title}>
+  const sections: LegalSection[] = [
+    { id: 'goal', title: c.goal.title, content: <p>{c.goal.desc}</p> },
+    { id: 'features', title: c.features.title, content: <List items={c.features.items} /> },
+    { id: 'limitations', title: c.limits.title, content: <List items={c.limits.items} /> },
+    {
+      id: 'feedback',
+      title: c.feedback.title,
+      content: (
+        <>
           <p>{c.feedback.desc}</p>
-          <p className="mt-3">
-            <a
-              href={ISSUES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-nk-official-text underline underline-offset-2"
-            >
+          <p>
+            <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
               {c.feedback.link} ↗
             </a>
           </p>
-        </Block>
-      </main>
-      <LandingFooter tagline={t(LANDING_TAGLINE_KEYS[0])} />
-    </div>
-  );
-}
+        </>
+      ),
+    },
+  ];
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mt-10">
-      <h2 className="font-display text-xl font-bold text-nk-ink sm:text-2xl">{title}</h2>
-      <div className="mt-3 text-base leading-relaxed text-nk-ink/80">{children}</div>
-    </section>
+    <LegalLayout
+      title={c.title}
+      meta={
+        <>
+          {c.reviewed}: <time dateTime={LAST_REVIEWED}>{LAST_REVIEWED}</time>
+        </>
+      }
+      intro={<p>{c.intro}</p>}
+      sections={sections}
+    />
   );
 }
 
 function List({ items }: { items: string[] }) {
   return (
-    <ul className="list-disc space-y-2 pl-5">
+    <ul>
       {items.map((item) => (
         <li key={item}>{item}</li>
       ))}

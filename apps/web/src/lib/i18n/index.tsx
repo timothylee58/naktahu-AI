@@ -657,6 +657,8 @@ const MS: Translations = {
   'landing.footer.disclaimer':
     'NakTahu AI adalah projek portfolio. Bukan nasihat rasmi kerajaan.',
   'landing.footer.github': 'GitHub',
+  'landing.features.api.cta': 'Lihat dokumentasi API',
+  'legal.on_this_page': 'Di halaman ini',
   'a11y.skip_to_main': 'Langkau ke kandungan utama',
   'landing.demos.searching': 'Mencari dokumen rasmi {agency}…',
   'landing.demos.found': 'Dokumen rasmi ditemui',
@@ -1943,6 +1945,8 @@ const EN: Translations = {
   'landing.footer.disclaimer':
     'NakTahu AI is a portfolio project. Not official government advice.',
   'landing.footer.github': 'GitHub',
+  'landing.features.api.cta': 'View the API docs',
+  'legal.on_this_page': 'On this page',
   'a11y.skip_to_main': 'Skip to main content',
   'landing.demos.searching': 'Searching official {agency} documents…',
   'landing.demos.found': 'Official document found',
@@ -3215,6 +3219,8 @@ const ZH: Translations = {
   'landing.chip.immigration.query': '如何更新马来西亚护照？',
   'landing.footer.disclaimer': 'NakTahu AI 是一个作品集项目，不代表官方政府建议。',
   'landing.footer.github': 'GitHub',
+  'landing.features.api.cta': '查看 API 文档',
+  'legal.on_this_page': '本页内容',
   'a11y.skip_to_main': '跳到主要内容',
   'landing.demos.searching': '正在搜索 {agency} 官方文件…',
   'landing.demos.found': '已找到官方文件',
