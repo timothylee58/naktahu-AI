@@ -93,7 +93,6 @@ function ChatPageInner() {
   const messagesRef = useRef<Message[]>([]);
   const wasStreaming = useRef(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // Tracked as a ref (not state) so the auto-scroll effect can read it
   // synchronously without re-running on every scroll pixel — only the
@@ -122,7 +121,12 @@ function ChatPageInner() {
   const bubbleCreated = useRef(false);
 
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll the list's own container rather than scrollIntoView on a
+    // sentinel: in Chromium, scrollIntoView also moves the sequential-focus
+    // starting point, so the first Tab on /chat skipped the skip link,
+    // header and sidebar and landed in the composer.
+    const el = listRef.current;
+    el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     isAtBottomRef.current = true;
     setShowJumpToLatest(false);
   }, []);
@@ -496,6 +500,10 @@ function ChatPageInner() {
       </header>
       )}
 
+      {/* Landmark target for the global skip link: conversation + input,
+          skipping the sidebar and header. flex-col/min-h-0 keeps the
+          message list's own scroll container sizing unchanged. */}
+      <main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col focus:outline-none">
       {/* message list */}
       <div className="relative flex-1 min-h-0">
       {showEmpty && <ChatAmbientMesh />}
@@ -603,7 +611,6 @@ function ChatPageInner() {
             />
           ),
         )}
-        <div ref={bottomRef} />
         </div>
       </div>
 
@@ -702,6 +709,7 @@ function ChatPageInner() {
         )}
         </div>
       </div>
+      </main>
       </div>
     </div>
   );
