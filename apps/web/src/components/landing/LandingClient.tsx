@@ -11,6 +11,7 @@ import { HomeHero } from '@/components/home/HomeHero';
 import { AgencyTrustGrid } from './AgencyTrustGrid';
 import { AgentSpotlight } from './AgentSpotlight';
 import { TaskDemoCards } from './TaskDemoCards';
+import { FeatureStrip } from './FeatureStrip';
 import { SectionHeading } from './SectionHeading';
 import { TrustStrip } from './TrustStrip';
 import { LandingFooter } from './LandingFooter';
@@ -191,6 +192,11 @@ export function LandingClient() {
           <AgencyTrustGrid isDark={isDark} />
         </div>
       </motion.section>
+
+      <section aria-labelledby="landing-features" className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 sm:pb-20">
+        <SectionHeading id="landing-features" title={t('landing.features.title')} />
+        <FeatureStrip />
+      </section>
 
       {/* Full-bleed tinted band — the one section that breaks the max-w
           column, so the page has rhythm instead of identical stacked boxes. */}
