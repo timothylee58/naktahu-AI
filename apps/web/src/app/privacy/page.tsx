@@ -129,8 +129,8 @@ const SECTIONS: readonly LegalSection[] = [
                 <tr><td>ILMU API (Malaysia)</td><td>AI language model (primary)</td></tr>
                 <tr><td>Sentry</td><td>Error monitoring</td></tr>
                 <tr><td>Weights &amp; Biases</td><td>Model experiment tracking</td></tr>
-                <tr><td>Vercel</td><td>Frontend hosting</td></tr>
-                <tr><td>Render</td><td>Backend API hosting</td></tr>
+                <tr><td>Netlify</td><td>Frontend hosting</td></tr>
+                <tr><td>Railway</td><td>Backend API hosting</td></tr>
               </tbody>
             </table>
             <p>
