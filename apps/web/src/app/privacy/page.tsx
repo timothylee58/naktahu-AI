@@ -127,10 +127,13 @@ const SECTIONS: readonly LegalSection[] = [
                 <tr><td>Supabase</td><td>Authentication and database</td></tr>
                 <tr><td>Anthropic</td><td>AI language model (fallback synthesis)</td></tr>
                 <tr><td>ILMU API (Malaysia)</td><td>AI language model (primary)</td></tr>
+                <tr><td>OpenAI</td><td>Text embeddings for search (fallback when the ILMU gateway is unavailable); receives query text</td></tr>
                 <tr><td>Sentry</td><td>Error monitoring</td></tr>
                 <tr><td>Weights &amp; Biases</td><td>Model experiment tracking</td></tr>
-                <tr><td>Vercel</td><td>Frontend hosting</td></tr>
-                <tr><td>Render</td><td>Backend API hosting</td></tr>
+                <tr><td>Netlify</td><td>Frontend hosting</td></tr>
+                <tr><td>Railway</td><td>Backend API hosting</td></tr>
+                <tr><td>Stripe</td><td>Payments for subscriptions and credit packs</td></tr>
+                <tr><td>HitPay</td><td>Payments for credit packs (FPX / DuitNow)</td></tr>
               </tbody>
             </table>
             <p>
