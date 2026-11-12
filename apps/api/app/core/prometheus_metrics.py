@@ -19,9 +19,24 @@ Three metric families:
 3. Circuit-breaker state — NOT dual-written. Read lazily at scrape time via
    a custom Collector wrapping app.orchestration.circuit_breaker's existing
    get_all_breaker_metrics(), so circuit_breaker.py's hot path is untouched.
+
+Multiple workers: start.sh runs uvicorn with --workers 2, and a Counter or
+Histogram lives in ONE process's memory, so a plain /metrics scrape returned
+whichever worker happened to answer: counters jumped up and down between
+scrapes and rate() saw constant resets. Setting PROMETHEUS_MULTIPROC_DIR
+(start.sh does) switches prometheus_client to multiprocess mode: every worker
+writes into that directory and render_metrics() merges them. It must be set
+before this module is imported, which is why start.sh exports it rather than
+the app. With it unset (tests, a local single-process run) nothing changes.
+
+Known limit: the circuit-breaker gauges (3) are read from the in-process
+breaker, so they still describe only the worker that answered the scrape.
 """
 from __future__ import annotations
 
+import glob
+import os
+import re
 from typing import Iterable
 
 from prometheus_client import (
@@ -31,6 +46,7 @@ from prometheus_client import (
     Gauge,
     Histogram,
     generate_latest,
+    multiprocess,
 )
 from prometheus_client.metrics_core import GaugeMetricFamily
 from prometheus_client.registry import Collector
@@ -57,6 +73,8 @@ http_requests_in_progress = Gauge(
     "naktahu_http_requests_in_progress",
     "HTTP requests currently being processed",
     ["method"],
+    # Summed across live workers in multiprocess mode (ignored otherwise).
+    multiprocess_mode="livesum",
     registry=REGISTRY,
 )
 
@@ -195,9 +213,56 @@ class CircuitBreakerCollector(Collector):
 REGISTRY.register(CircuitBreakerCollector())
 
 
+_MULTIPROC_ENV = "PROMETHEUS_MULTIPROC_DIR"
+_LIVE_GAUGE_FILE_PID = re.compile(r"gauge_live\w+_(\d+)\.db$")
+
+
+def multiprocess_enabled() -> bool:
+    return bool(os.environ.get(_MULTIPROC_ENV))
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def prune_dead_gauge_files(directory: str) -> int:
+    """Delete the live-gauge files of workers that no longer exist.
+
+    uvicorn respawns a crashed worker under a new pid and never tells
+    prometheus_client, so a dead worker's "requests in progress" would stay in
+    the sum forever. Only the live-mode gauge files are touched; counters and
+    histograms are cumulative and must keep a dead worker's totals.
+    Returns how many files were removed.
+    """
+    removed = 0
+    for path in glob.glob(os.path.join(directory, "gauge_live*_*.db")):
+        match = _LIVE_GAUGE_FILE_PID.search(path)
+        if match and not _pid_alive(int(match.group(1))):
+            try:
+                os.remove(path)
+                removed += 1
+            except FileNotFoundError:
+                pass
+    return removed
+
+
 def render_metrics() -> bytes:
-    """Render the full registry in Prometheus text-exposition format."""
-    return generate_latest(REGISTRY)
+    """Render the metrics in Prometheus text-exposition format, merging every
+    worker's samples when multiprocess mode is on (see the module docstring)."""
+    directory = os.environ.get(_MULTIPROC_ENV)
+    if not directory:
+        return generate_latest(REGISTRY)
+    prune_dead_gauge_files(directory)
+    registry = CollectorRegistry()
+    multiprocess.MultiProcessCollector(registry, path=directory)
+    registry.register(CircuitBreakerCollector())
+    return generate_latest(registry)
 
 
 __all__ = [
