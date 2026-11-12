@@ -578,3 +578,27 @@ async def test_other_query_paths_use_the_shared_embedder() -> None:
         assert await tools_module._embed("q") == _FAKE_EMBEDDING
         assert await grant_rag_node._embed_query("q") == _FAKE_EMBEDDING
     assert corpus_embed.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_rag_node_cache_miss_returns_query_embedding_for_retry() -> None:
+    """retrieval_retry_node reuses this instead of paying for a second embedding."""
+    with (
+        patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=None)),
+        patch("app.agents.rag_node.cache_svc.set_cached_result", AsyncMock()),
+        patch("app.agents.rag_node.ilmu_client") as mock_client,
+        patch("app.agents.rag_node.hybrid_search", AsyncMock(return_value=_FAKE_CHUNKS)),
+    ):
+        mock_client.embeddings.create = AsyncMock(return_value=_mock_embed_response(_FAKE_EMBEDDING))
+        result = await rag_node(_STATE)
+
+    assert result["_query_embedding"] == _FAKE_EMBEDDING
+
+
+@pytest.mark.asyncio
+async def test_rag_node_cache_hit_returns_no_embedding_so_retry_is_skipped() -> None:
+    cached = _serialize_chunks(_FAKE_CHUNKS)
+    with patch("app.agents.rag_node.cache_svc.get_cached_result", AsyncMock(return_value=cached)):
+        result = await rag_node(_STATE)
+
+    assert "_query_embedding" not in result

@@ -133,6 +133,59 @@ retrieval_score = Histogram(
     registry=REGISTRY,
 )
 
+# ── Retrieval-quality diagnostics (analyst_node / retrieval_retry_node / ──────
+#    rag_node / routers/query.py). Added to answer "how often is retrieval
+#    weak, why, and what does retrying cost?" before deciding on anything
+#    heavier than the single deterministic retry. ────────────────────────────
+
+retrieval_low_confidence_total = Counter(
+    "naktahu_retrieval_low_confidence_total",
+    "Queries whose FIRST analyst pass came out below the clarification bar, by cause",
+    # cause: no_usable_chunks (nothing retrieved, or all superseded/expired),
+    #        weak_relevance (top-3 mean < 0.6), too_few_supporting (mean ok but
+    #        fewer than 2 corroborating chunks).
+    # domain_scoped: "yes" when router_node set a domain (so an unscoped retry
+    #        is possible), "no" otherwise.
+    ["cause", "domain_scoped"],
+    registry=REGISTRY,
+)
+
+retrieval_retry_total = Counter(
+    "naktahu_retrieval_retry_total",
+    "Unscoped-domain retrieval retries attempted after a low-confidence analyst pass, by outcome",
+    # outcome: improved | unchanged | no_results | error
+    ["outcome"],
+    registry=REGISTRY,
+)
+
+retrieval_retry_seconds = Histogram(
+    "naktahu_retrieval_retry_seconds",
+    "Wall time of the retry stage (unscoped search + re-score), only when it ran",
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
+    registry=REGISTRY,
+)
+
+retrieval_retry_confidence_gain = Histogram(
+    "naktahu_retrieval_retry_confidence_gain",
+    "Confidence gained by a retry that improved on the first pass (new minus old)",
+    buckets=(0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5),
+    registry=REGISTRY,
+)
+
+rag_search_seconds = Histogram(
+    "naktahu_rag_search_seconds",
+    "Wall time of rag_node's cache-miss path (embedding + hybrid search + rerank)",
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0),
+    registry=REGISTRY,
+)
+
+time_to_first_token_seconds = Histogram(
+    "naktahu_time_to_first_token_seconds",
+    "Seconds from the /query request reaching the pipeline to the first SSE token",
+    buckets=(0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 8.0, 15.0),
+    registry=REGISTRY,
+)
+
 provider_fallback_total = Counter(
     "naktahu_provider_fallback_total",
     "Times Claude was invoked as fallback because ILMU produced no usable output",

@@ -2,6 +2,10 @@
 
 Execution order:
   START → router → guard → rag → analyst → synthesiser   (normal path)
+                                      ↓
+                          retrieval_retry (low confidence + domain-scoped
+                          + fresh search only; one unscoped re-search, then
+                          the same post-analyst routing as below)
                        ↓     ↓
               warung_watch,  END  (blocked query — refusal already streamed)
               parliament_query
@@ -45,6 +49,7 @@ from app.agents.clarification import clarification_message
 from app.agents.guard_node import guard_node
 from app.agents.parliament_query_node import parliament_query_node
 from app.agents.rag_node import rag_node
+from app.agents.retrieval_retry_node import retrieval_retry_node, should_retry
 from app.agents.router_node import router_node
 from app.agents.synthesiser_node import synthesiser_node
 from app.agents.warung_watch_node import warung_watch_node
@@ -88,6 +93,15 @@ def _route_after_analyst(state: AgentState) -> str:
     return "synthesiser"
 
 
+def _route_after_analyst_or_retry(state: AgentState) -> str:
+    """analyst → retrieval_retry when a single unscoped re-search could help,
+    otherwise the normal post-analyst routing. retrieval_retry is not looped
+    back into analyst, so there is at most one retry per request."""
+    if should_retry(state):
+        return "retrieval_retry"
+    return _route_after_analyst(state)
+
+
 def build_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
@@ -95,6 +109,7 @@ def build_graph() -> StateGraph:
     graph.add_node("guard", guard_node)
     graph.add_node("rag", rag_node)
     graph.add_node("analyst", analyst_node)
+    graph.add_node("retrieval_retry", retrieval_retry_node)
     graph.add_node("synthesiser", synthesiser_node)
     graph.add_node("clarification", _clarification_node)
     graph.add_node("warung_watch", warung_watch_node)
@@ -112,6 +127,15 @@ def build_graph() -> StateGraph:
     graph.add_edge("rag", "analyst")
     graph.add_conditional_edges(
         "analyst",
+        _route_after_analyst_or_retry,
+        {
+            "retrieval_retry": "retrieval_retry",
+            "synthesiser": "synthesiser",
+            "clarification": "clarification",
+        },
+    )
+    graph.add_conditional_edges(
+        "retrieval_retry",
         _route_after_analyst,
         {"synthesiser": "synthesiser", "clarification": "clarification"},
     )

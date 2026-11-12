@@ -14,7 +14,7 @@ from app.agents.freshness import (
     staleness_ref,
 )
 from app.agents.personal_data import detect_personal_data_agency
-from app.core.prometheus_metrics import retrieval_score
+from app.core.prometheus_metrics import retrieval_low_confidence_total, retrieval_score
 from app.models.state import AgentState, Citation
 from app.services.vector_store import ChunkResult
 
@@ -42,6 +42,31 @@ _MAX_PENDING_CHANGES = 3
 # changes alone (e.g. "what did Budget 2027 announce for EPF?" asked before any
 # of it takes effect), those chunks ARE the evidence, so allow more of them.
 _MAX_PENDING_ANNOUNCED_ONLY = 5
+
+
+def _record_low_confidence(
+    cause: str,
+    domain: str | None,
+    state: AgentState,
+    *,
+    retrieved: int,
+    confidence: float,
+    supporting_chunks: int = 0,
+) -> None:
+    """Count and log why a query's first analyst pass fell below the bar, so
+    "is this a retrieval miss or a corpus gap?" is answerable from production
+    data. Deliberately logs no query text."""
+    retrieval_low_confidence_total.labels(cause=cause, domain_scoped="yes" if domain else "no").inc()
+    log.info(
+        "analyst_low_confidence",
+        cause=cause,
+        domain=domain,
+        language=state.get("language"),
+        retrieved=retrieved,
+        confidence=round(confidence, 4),
+        supporting_chunks=supporting_chunks,
+        cache_miss=state.get("_query_embedding") is not None,
+    )
 
 
 def _build_citation(chunk: ChunkResult, score: float, domain: str | None, *, pending: bool = False) -> Citation:
@@ -146,6 +171,17 @@ async def analyst_node(state: AgentState) -> dict:
     ``effective_date`` is still in the future are returned as
     ``pending_changes`` rather than scored as today's rule.
     """
+    return await analyse(state, first_pass=True)
+
+
+async def analyse(state: AgentState, *, first_pass: bool = True) -> dict:
+    """The scoring body behind analyst_node.
+
+    ``first_pass=False`` is for retrieval_retry_node re-scoring a second chunk
+    set through the identical thresholds. It skips the metrics side effects
+    (the retrieval_score histogram and the low-confidence counter) so a
+    retried query is still counted once, by its first pass.
+    """
     query = state.get("query", "")
     domain = state.get("domain")
     retrieved: list[ChunkResult] = state.get("retrieved_chunks", [])
@@ -195,7 +231,9 @@ async def analyst_node(state: AgentState) -> dict:
     if not chunks and not pending:
         # Either nothing was retrieved, or everything retrieved was superseded.
         log.warning("analyst_no_usable_chunks", superseded_count=superseded_count)
-        retrieval_score.observe(0.0)
+        if first_pass:
+            retrieval_score.observe(0.0)
+            _record_low_confidence("no_usable_chunks", domain, state, retrieved=len(retrieved), confidence=0.0)
         return {
             "retrieved_chunks": chunks,
             "citations": [],
@@ -224,7 +262,8 @@ async def analyst_node(state: AgentState) -> dict:
 
     top3 = scored[:3]
     confidence = sum(s for s, _, _ in top3) / len(top3)
-    retrieval_score.observe(confidence)
+    if first_pass:
+        retrieval_score.observe(confidence)
 
     citations: list[Citation] = [
         _build_citation(chunk, score, domain, pending=announced_only)
@@ -256,8 +295,20 @@ async def analyst_node(state: AgentState) -> dict:
     supporting_chunks = sum(
         1 for score, _, _ in scored if score > _MIN_SUPPORTING_CHUNK_SCORE
     )
+    too_few_supporting = False
     if not needs_clarification and supporting_chunks < _MIN_SUPPORTING_CHUNKS:
         needs_clarification = True
+        too_few_supporting = True
+
+    if first_pass and needs_clarification:
+        _record_low_confidence(
+            "too_few_supporting" if too_few_supporting else "weak_relevance",
+            domain,
+            state,
+            retrieved=len(retrieved),
+            confidence=confidence,
+            supporting_chunks=supporting_chunks,
+        )
 
     log.info(
         "analyst_done",
