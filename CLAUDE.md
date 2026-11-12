@@ -133,7 +133,7 @@ Netlify preview "canceled" on backend-only diffs, CodeRabbit "draft skip", and C
 
 **Bilingual.** `router_node` detects query language (`bm`/`en`); the synthesiser answers in the query's language regardless of the UI toggle (the toggle switches UI strings only). Citations: 1–3 chips per answer, `{title, ministry, url, confidence}`.
 
-**LangGraph pipeline.** `router_node` (intent/domain/language classification) → `guard_node` → `rag_node` (hybrid search, Redis-cache-first) → `analyst_node` (citation scoring, confidence) → `synthesiser_node` (streaming synthesis, ILMU→Anthropic fallback). Cache hit skips `rag_node` + `analyst_node`. State is a `TypedDict`; new fields must be threaded through every node that reads them.
+**LangGraph pipeline.** `router_node` (intent/domain/language classification) → `guard_node` → `rag_node` (hybrid search, Redis-cache-first) → `analyst_node` (citation scoring, confidence) → `synthesiser_node` (streaming synthesis, ILMU→Anthropic fallback). Cache hit skips `rag_node` + `analyst_node`. State is a `TypedDict`; new fields must be threaded through every node that reads them. After a low-confidence `analyst_node` pass on a domain-scoped, freshly-searched (cache-miss) query, `retrieval_retry_node` does ONE unscoped re-search and re-scores through the same analyst thresholds (never a query rewrite, never a second retry; kill switch `RETRIEVAL_RETRY_ENABLED=false`).
 
 **Commit messages.** Imperative subject; body explains the *why* and names any reviewer finding being addressed — or rejected, with the failure scenario that justifies the rejection.
 

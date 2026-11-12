@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from app.agents.followup import condense_followup
 from app.agents.graph import pipeline
+from app.core.prometheus_metrics import time_to_first_token_seconds
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
 from routers._request_fields import Language, normalise_language
@@ -192,6 +193,8 @@ async def _stream_pipeline(
     /query/stream) so the bridging logic exists in exactly one place.
     """
     queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+    started = time.monotonic()
+    first_token_seen = False
 
     async def on_token(token: str) -> None:
         await queue.put(("token", token))
@@ -217,6 +220,11 @@ async def _stream_pipeline(
             kind, payload = await queue.get()
             if kind == "error":
                 raise payload
+            if kind == "token" and not first_token_seen:
+                first_token_seen = True
+                ttft = time.monotonic() - started
+                time_to_first_token_seconds.observe(ttft)
+                log.info("first_token", duration_ms=round(ttft * 1000))
             yield kind, payload
             if kind == "result":
                 return

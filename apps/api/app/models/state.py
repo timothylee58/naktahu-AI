@@ -116,3 +116,9 @@ class AgentState(TypedDict, total=False):
     # persists AgentState anywhere; a checkpointed graph must never carry
     # this field.
     _speculative_embedding_task: NotRequired[Any]
+    # The query embedding rag_node computed on a cache MISS, so
+    # retrieval_retry_node can re-search without paying for a second
+    # embedding call. Absent on a cache hit (no embedding was computed) —
+    # the retry is skipped in that case, which also means a query is
+    # retried at most once per cache TTL. Internal, never sent to the client.
+    _query_embedding: NotRequired[list[float]]

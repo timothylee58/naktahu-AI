@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import time
 
 import structlog
 import weave
 
+from app.core.prometheus_metrics import rag_search_seconds
 from app.models.state import AgentState
 from app.services import cache as cache_svc
 from app.services.llm_client import (
@@ -30,6 +32,22 @@ _FINAL_CHUNK_COUNT = 5
 # pool from hybrid_search would just waste DB work for chunks nothing
 # reads, so this only takes effect behind the RERANK_ENABLED flag below.
 _RERANK_CANDIDATE_POOL = 12
+
+
+async def retrieve_unscoped(query: str, embedding: list[float]) -> list[ChunkResult]:
+    """Search every domain with an embedding rag_node already computed.
+
+    Used by retrieval_retry_node. Mirrors rag_node's own search + rerank
+    settings so a retried result set is comparable to the first one. Raises on
+    a search failure; the caller decides how to degrade.
+    """
+    do_rerank = rerank_enabled()
+    chunks = await hybrid_search(
+        query, embedding, domain=None, limit=_RERANK_CANDIDATE_POOL if do_rerank else _FINAL_CHUNK_COUNT
+    )
+    if do_rerank and chunks:
+        return await rerank_chunks(query=query, chunks=chunks, top_n=_FINAL_CHUNK_COUNT)
+    return chunks[:_FINAL_CHUNK_COUNT]
 
 
 def _cache_key(query: str, language: str, domain: str | None) -> str:
@@ -175,6 +193,7 @@ async def rag_node(state: AgentState) -> dict:
     log.info("rag_cache_miss", key=key[:16])
     do_rerank = rerank_enabled()
     search_limit = _RERANK_CANDIDATE_POOL if do_rerank else _FINAL_CHUNK_COUNT
+    t0 = time.monotonic()
     try:
         embedding = await speculative_task if speculative_task is not None else await _embed(query)
         chunks = await hybrid_search(query, embedding, domain=domain, limit=search_limit)
@@ -209,6 +228,9 @@ async def rag_node(state: AgentState) -> dict:
     except Exception as exc:
         log.warning("rag_retrieval_failed", error=str(exc))
         return {"retrieved_chunks": []}
+    elapsed = time.monotonic() - t0
+    rag_search_seconds.observe(elapsed)
+    log.info("rag_search_done", duration_ms=round(elapsed * 1000), rerank=do_rerank, chunks=len(chunks))
 
     # Persist to cache, and record that this query text has now been
     # cached (domain/language-agnostic marker — see cache.mark_query_seen's
@@ -217,4 +239,4 @@ async def rag_node(state: AgentState) -> dict:
     await cache_svc.set_cached_result(key, _serialize_chunks(chunks), ttl=_CACHE_TTL)
     await cache_svc.mark_query_seen(query, ttl=_CACHE_TTL)
 
-    return {"retrieved_chunks": chunks}
+    return {"retrieved_chunks": chunks, "_query_embedding": embedding}
