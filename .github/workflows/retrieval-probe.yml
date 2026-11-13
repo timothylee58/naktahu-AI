@@ -1,0 +1,71 @@
+name: Retrieval probe
+
+# For answer-key questions the live tax eval gets wrong, shows whether the chunk holding the
+# right answer is retrieved at all, and if not, why: its rank with no domain filter, and its
+# rank under each domain filter the router can emit (the pipeline hard-filters on the router's
+# domain). Runs the same search the pipeline runs, under both embedding profiles. Read-only.
+#
+# Manual: dispatch it, or push a change to .github/retrieval-probe-trigger.txt on a claude/**
+# branch (a new workflow cannot be dispatched before it is on main). On a push, an optional
+# `cases=` line in that file lists answer-key case ids separated by spaces.
+
+on:
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: "Answer-key case ids, space separated (blank = the four the bge-m3 profile lost)"
+        type: string
+        default: ""
+  push:
+    branches: ["claude/**"]
+    paths: [".github/retrieval-probe-trigger.txt"]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Resolve cases
+        working-directory: .
+        env:
+          IN_CASES: ${{ github.event.inputs.cases }}
+        run: |
+          c="$IN_CASES"
+          if [ -z "$c" ]; then c=$(sed -n 's/^cases=//p' .github/retrieval-probe-trigger.txt 2>/dev/null | head -n1); fi
+          # The ids go into $GITHUB_ENV and a command line: allow only id characters and spaces.
+          case "$c" in *[!a-z0-9\ -]*) echo "cases may only contain a-z, 0-9, '-' and spaces" >&2; exit 1;; esac
+          echo "PROBE_CASES=$c" >> "$GITHUB_ENV"
+
+      - name: Probe retrieval
+        env:
+          PYTHONPATH: .
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ILMU_API_KEY: ${{ secrets.ILMU_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ILMU_BASE_URL: https://api.ilmu.ai/v1
+          # The openai profile goes straight to OpenAI direct (the ILMU gateway 404s on it).
+          ILMU_EMBEDDING_MODEL: ""
+        run: |
+          set -o pipefail
+          if [ -n "$PROBE_CASES" ]; then
+            # shellcheck disable=SC2086  # intentional word splitting into case ids
+            python -m scripts.retrieval_probe --cases $PROBE_CASES | tee "$RUNNER_TEMP/probe.txt"
+          else
+            python -m scripts.retrieval_probe | tee "$RUNNER_TEMP/probe.txt"
+          fi
+          { echo '### Retrieval probe'; echo '```'; cat "$RUNNER_TEMP/probe.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
