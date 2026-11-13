@@ -22,6 +22,7 @@ Read-only: it embeds queries and calls search RPCs, and writes nothing.
 
     python -m scripts.retrieval_probe                       # default cases, both profiles
     python -m scripts.retrieval_probe --cases spouse-relief --profiles ilmu_bge_m3
+    python -m scripts.retrieval_probe --find "stamp duty;rpgt"   # which chunks mention these, and under which domain
 """
 from __future__ import annotations
 
@@ -125,11 +126,47 @@ async def probe_case(supabase: Any, case: dict[str, Any], groups: list[list[str]
     return lines
 
 
+def find_phrases(supabase: Any, phrases: list[str], limit: int = 8) -> list[str]:
+    """Chunks whose text contains each phrase (case-insensitive), with domain and validity dates.
+
+    Answers "does a chunk about this exist at all, and under which domain is it stored", which a
+    similarity search cannot: it only ever shows what ranked.
+    """
+    lines: list[str] = []
+    for phrase in phrases:
+        res = (
+            supabase.table("document_chunks")
+            .select("source_title,domain,source_url,effective_date,effective_until", count="exact")
+            .ilike("content", f"%{phrase}%")
+            .limit(limit)
+            .execute()
+        )
+        total = res.count if res.count is not None else len(res.data or [])
+        lines.append(f"\n=== chunks containing {phrase!r}: {total}" + (f" (showing {limit})" if total > limit else ""))
+        by_domain: dict[str, int] = {}
+        for row in res.data or []:
+            by_domain[str(row.get("domain"))] = by_domain.get(str(row.get("domain")), 0) + 1
+            lines.append(
+                f"  domain={str(row.get('domain')):<10} {_short(str(row.get('source_title') or ''), 58):<58} "
+                f"from={row.get('effective_date')} until={row.get('effective_until')}  "
+                f"[{_short(str(row.get('source_url') or ''), 44)}]"
+            )
+        if not res.data:
+            lines.append("  (none)")
+    return lines
+
+
 async def main_async(args: argparse.Namespace) -> int:
     from supabase import create_client
 
     from app.services.embedding_profiles import PROFILES
     from core.config import settings
+
+    if args.find:
+        client = create_client(settings.supabase_url, settings.supabase_service_key)
+        phrases = [p.strip() for p in args.find.split(";") if p.strip()]
+        print("\n".join(find_phrases(client, phrases)))
+        return 0
 
     cases = load_cases()
     unknown = [c for c in args.cases if c not in cases]
@@ -157,6 +194,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--cases", nargs="+", default=list(DEFAULT_CASES), help="answer-key case ids")
     parser.add_argument("--profiles", nargs="+", default=list(from_profiles), choices=from_profiles)
+    parser.add_argument("--find", default="", help="semicolon-separated phrases: list chunks containing each, with domain")
     args = parser.parse_args()
     return asyncio.run(main_async(args))
 

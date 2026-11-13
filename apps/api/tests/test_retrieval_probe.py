@@ -49,3 +49,41 @@ def test_router_domains_match_router_node() -> None:
     assert match, "router_node._VALID_DOMAINS not found"
     router = set(re.findall(r'"([a-z_]+)"', match.group(1)))
     assert router == set(probe.ROUTER_DOMAINS), "retrieval_probe.ROUTER_DOMAINS drifted from router_node"
+
+
+class _FakeQuery:
+    def __init__(self, rows: list[dict[str, Any]], count: int | None) -> None:
+        self._rows, self._count, self.filters = rows, count, []
+
+    def select(self, *a: Any, **k: Any) -> "_FakeQuery":
+        return self
+
+    def ilike(self, column: str, pattern: str) -> "_FakeQuery":
+        self.filters.append((column, pattern))
+        return self
+
+    def limit(self, n: int) -> "_FakeQuery":
+        return self
+
+    def execute(self) -> Any:
+        from types import SimpleNamespace
+        return SimpleNamespace(data=self._rows, count=self._count)
+
+
+class _FakeSupabase:
+    def __init__(self, rows: list[dict[str, Any]], count: int | None = None) -> None:
+        self.query = _FakeQuery(rows, count)
+
+    def table(self, name: str) -> _FakeQuery:
+        assert name == "document_chunks"
+        return self.query
+
+
+def test_find_phrases_lists_domain_and_total_and_reports_none() -> None:
+    rows = [{"source_title": "Stamp Duty Guide", "domain": "property", "source_url": "https://x.gov.my/a",
+             "effective_date": None, "effective_until": None}]
+    fake = _FakeSupabase(rows, count=12)
+    out = "\n".join(probe.find_phrases(fake, ["stamp duty"], limit=8))
+    assert "chunks containing 'stamp duty': 12 (showing 8)" in out and "domain=property" in out
+    assert fake.query.filters == [("content", "%stamp duty%")]
+    assert "(none)" in "\n".join(probe.find_phrases(_FakeSupabase([]), ["nothing here"]))

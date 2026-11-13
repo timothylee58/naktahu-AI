@@ -7,7 +7,9 @@ name: Retrieval probe
 #
 # Manual: dispatch it, or push a change to .github/retrieval-probe-trigger.txt on a claude/**
 # branch (a new workflow cannot be dispatched before it is on main). On a push, an optional
-# `cases=` line in that file lists answer-key case ids separated by spaces.
+# `cases=` line in that file lists answer-key case ids separated by spaces, and an optional
+# `find=` line lists phrases separated by semicolons: instead of the probe it then lists the
+# chunks containing each phrase, with their domain (does the chunk exist, and where is it filed).
 
 on:
   workflow_dispatch:
@@ -49,6 +51,9 @@ jobs:
           # The ids go into $GITHUB_ENV and a command line: allow only id characters and spaces.
           case "$c" in *[!a-z0-9\ -]*) echo "cases may only contain a-z, 0-9, '-' and spaces" >&2; exit 1;; esac
           echo "PROBE_CASES=$c" >> "$GITHUB_ENV"
+          f=$(sed -n 's/^find=//p' .github/retrieval-probe-trigger.txt 2>/dev/null | head -n1)
+          case "$f" in *[!A-Za-z0-9\ \;.-]*) echo "find may only contain letters, digits, spaces, ';', '.' and '-'" >&2; exit 1;; esac
+          echo "PROBE_FIND=$f" >> "$GITHUB_ENV"
 
       - name: Probe retrieval
         env:
@@ -62,7 +67,9 @@ jobs:
           ILMU_EMBEDDING_MODEL: ""
         run: |
           set -o pipefail
-          if [ -n "$PROBE_CASES" ]; then
+          if [ -n "$PROBE_FIND" ]; then
+            python -m scripts.retrieval_probe --find "$PROBE_FIND" | tee "$RUNNER_TEMP/probe.txt"
+          elif [ -n "$PROBE_CASES" ]; then
             # shellcheck disable=SC2086  # intentional word splitting into case ids
             python -m scripts.retrieval_probe --cases $PROBE_CASES | tee "$RUNNER_TEMP/probe.txt"
           else
