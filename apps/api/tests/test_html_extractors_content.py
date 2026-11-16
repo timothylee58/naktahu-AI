@@ -9,7 +9,14 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.html_extractors import EXTRACTORS, ExtractionError, parse_eael_accordion, parse_lhdn_content, render_table
+from scripts.html_extractors import (
+    EXTRACTORS,
+    ExtractionError,
+    parse_eael_accordion,
+    parse_lhdn_accordion_current,
+    parse_lhdn_content,
+    render_table,
+)
 from scripts.ingest_feed import parse_html_page
 
 _NAV = "<nav><a>Filing Programme For The Year Of Assessment 2025</a></nav>"
@@ -136,3 +143,39 @@ def test_a_table_inside_a_list_item_is_not_folded_into_its_caption() -> None:
     first_line = titled[0].text.splitlines()[0]
     assert first_line.startswith("- RPGT rate for a disposer under Part I Schedule 5 RPGTA") and "30%" not in first_line
     assert any(line.endswith("Starting from the 1.1.2022: 30%") for line in titled[0].text.splitlines())
+
+
+_YEARS_PAGE = """<html><body><nav>menu</nav>
+<details><summary>Year of Assessment 2024</summary><table><tr><th>No.</th><th>Relief</th><th>Amount (RM)</th></tr>
+<tr><td>14</td><td>Husband / wife</td><td>4,000</td></tr></table></details>
+<details><summary>Year of Assessment 2025</summary><table><tr><th>No.</th><th>Relief</th><th>Amount (RM)</th></tr>
+<tr><td>14</td><td>Husband / wife</td><td>4,000</td></tr></table></details>
+<details><summary>How to claim</summary><p>Keep your receipts and claim the relief in the return form for the year.</p></details>
+</body></html>"""
+
+
+def test_only_current_year_items_are_kept_from_a_per_year_page() -> None:
+    items = parse_lhdn_accordion_current(_YEARS_PAGE, "Individual Tax Reliefs (LHDN)")
+    titles = [i.title for i in items]
+    assert titles == [
+        "Individual Tax Reliefs (LHDN) — Year of Assessment 2025",
+        "Individual Tax Reliefs (LHDN) — How to claim",
+    ]
+    assert all(i.valid_until is None for i in items)  # the 2024 table (ended 31 Dec 2024) is not ingested
+
+
+def test_the_current_extractor_fails_loudly_when_every_item_is_a_past_year() -> None:
+    only_old = """<html><body><details><summary>Year of Assessment 2023</summary><p>old table text long enough to keep it</p></details>
+<details><summary>Year of Assessment 2024</summary><p>old table text long enough to keep it too</p></details></body></html>"""
+    # The newest year on the page stays current, so this page still yields its newest item.
+    assert [i.title for i in parse_lhdn_accordion_current(only_old, "X")] == ["X — Year of Assessment 2024"]
+    with pytest.raises(ExtractionError):
+        parse_lhdn_accordion_current("<html><body><p>no accordion</p></body></html>", "X")
+
+
+def test_the_two_per_year_sources_use_the_current_year_extractor() -> None:
+    from scripts.sources import SOURCES_BY_NAME
+
+    assert "lhdn_accordion_current" in EXTRACTORS
+    for name in ("lhdn-tax-reliefs", "lhdn-individual-tax-rates"):
+        assert SOURCES_BY_NAME[name].extractor == "lhdn_accordion_current"

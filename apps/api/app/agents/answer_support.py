@@ -53,17 +53,49 @@ _GROUNDING = (
 _FIRST_PERSON = ("i ", "i'm ", "i\u2019m ", "saya ", "我")
 
 
-def answer_declines(text: str) -> bool:
-    """True when the answer's opening sentence says the provided context has no answer."""
+# A model often restates what the context DOES contain first and only then says it lacks the answer
+# ("The documents detail withholding rates of 10% to 15%. However, the context does not contain the
+# rate for a non-resident individual."). The second sentence counts, but only when it opens like a
+# decline AND is about the question: a side remark ("the documents do not mention a rebate") is not.
+_SECOND_SENTENCE_LEADS = (
+    "however", "but ", "unfortunately", "yet ", "there is no ", "there are no ",
+    "namun", "tetapi", "walau bagaimanapun", "tiada ", "但是", "然而", "不过",
+)
+_QUESTION_OVERLAP_MIN = 2
+_WORD = re.compile(r"[a-z]{4,}")
+_FILLER = frozenset("what which that this with from about does have your their there where when into than then".split())
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in _WORD.findall(text.lower()) if w not in _FILLER}
+
+
+def _is_decline_sentence(sentence: str) -> bool:
+    if any(ch.isdigit() for ch in sentence):
+        return False
+    if not any(phrase in sentence for phrase in _DECLINE_PHRASES):
+        return False
+    return sentence.startswith(_FIRST_PERSON) or any(word in sentence for word in _GROUNDING)
+
+
+def answer_declines(text: str, query: str = "") -> bool:
+    """True when the answer says the provided context has no answer.
+
+    The opening sentence is judged on its own. With the question supplied, a second sentence that
+    leads like a decline and shares at least two content words with the question counts too.
+    """
     cleaned = _MARKDOWN.sub("", text or "").replace("\u2019", "'").strip()
     if not cleaned:
         return False
-    opening = _SENTENCE_END.split(cleaned, maxsplit=1)[0][:_OPENING_MAX_CHARS].lower()
-    if any(ch.isdigit() for ch in opening):
-        return False
-    if not any(phrase in opening for phrase in _DECLINE_PHRASES):
-        return False
-    return opening.startswith(_FIRST_PERSON) or any(word in opening for word in _GROUNDING)
+    sentences = [part for part in _SENTENCE_END.split(cleaned) if part and part.strip()]
+    opening = sentences[0][:_OPENING_MAX_CHARS].lower()
+    if _is_decline_sentence(opening):
+        return True
+    if query and len(sentences) > 1:
+        second = sentences[1][:_OPENING_MAX_CHARS].lower().lstrip(" ,;:-")
+        if second.startswith(_SECOND_SENTENCE_LEADS) and _is_decline_sentence(second):
+            return len(_content_words(second) & _content_words(query)) >= _QUESTION_OVERLAP_MIN
+    return False
 
 
 def apply_support_check(state: Mapping[str, Any], answer_text: str) -> dict[str, Any]:
@@ -73,7 +105,7 @@ def apply_support_check(state: Mapping[str, Any], answer_text: str) -> dict[str,
     dropped (chips under "I could not find it" read as endorsements). A decline that still carries
     figures, such as an announced change offered in place of the missing current rule, keeps them.
     """
-    if not answer_declines(answer_text):
+    if not answer_declines(answer_text, str(state.get("query") or "")):
         return {"answer_declined": False}
     update: dict[str, Any] = {
         "answer_declined": True,

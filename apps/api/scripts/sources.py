@@ -1067,7 +1067,7 @@ SOURCES: tuple[Source, ...] = (
             "before a live run; if they are missing, do not ingest it."
         ),
         require_host_suffix="hasil.gov.my",
-        extractor="lhdn_accordion",
+        extractor="lhdn_accordion_current",
         title="Individual Income Tax Rates (LHDN)",
     ),
 
@@ -1085,9 +1085,11 @@ SOURCES: tuple[Source, ...] = (
         notes=(
             "LHDN 'Tax Relief' page: one accordion item (table) per year of assessment (11 tables). "
             "Holds the spouse relief (RM4,000) and the EPF + life insurance combined limit (RM7,000, EPF "
-            "RM4,000 within it) that the old chunk quoted only as 'up to RM7,000'."
+            "RM4,000 within it) that the old chunk quoted only as 'up to RM7,000'. Only the CURRENT year is "
+            "ingested (lhdn_accordion_current): ten past years of near-identical tables filled the top-5 "
+            "retrieval slots and pushed the current one out; migration 061 removes those already ingested."
         ),
-        require_host_suffix="hasil.gov.my", extractor="lhdn_accordion", title="Individual Tax Reliefs (LHDN)",
+        require_host_suffix="hasil.gov.my", extractor="lhdn_accordion_current", title="Individual Tax Reliefs (LHDN)",
     ),
     Source(
         name="lhdn-withholding-tax",

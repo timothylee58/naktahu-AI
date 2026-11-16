@@ -207,6 +207,21 @@ def parse_lhdn_accordion(html: str, fallback_title: str) -> list[ExtractedItem]:
     return items
 
 
+def parse_lhdn_accordion_current(html: str, fallback_title: str) -> list[ExtractedItem]:
+    """parse_lhdn_accordion, keeping only the items that are still in force.
+
+    A per-year page (reliefs, rates) lists every past year of assessment. The analyst drops an
+    expired chunk, but only AFTER retrieval: eleven near-identical yearly tables fill the top-5
+    slots and push the one current table out (a live eval: child-relief, "no usable chunks"). So
+    the history is not ingested at all: an item is kept when it has no end date (the newest year,
+    and items whose title names no year).
+    """
+    items = [i for i in parse_lhdn_accordion(html, fallback_title) if i.valid_until is None]
+    if not items:
+        raise ExtractionError("every accordion item is a past year: nothing current to ingest")
+    return items
+
+
 _CONTENT_MIN_CHARS = 80
 
 
@@ -321,6 +336,7 @@ def parse_eael_accordion(html: str, fallback_title: str) -> list[ExtractedItem]:
 
 EXTRACTORS = {
     "lhdn_accordion": parse_lhdn_accordion,
+    "lhdn_accordion_current": parse_lhdn_accordion_current,
     "lhdn_content": parse_lhdn_content,
     "eael_accordion": parse_eael_accordion,
 }

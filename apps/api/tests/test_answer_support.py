@@ -78,3 +78,46 @@ def test_a_figureless_decline_drops_its_citations_but_a_decline_with_figures_kee
     )
     update = apply_support_check({"confidence_score": 0.7}, with_figures)
     assert update["answer_declined"] is True and "citations" not in update
+
+
+# The two declines the first live run on the branch missed (non-resident 0.83, Singapore 0.75): the
+# model restated what the context contains and only then said it lacks the answer.
+_NON_RESIDENT_Q = "What income tax rate applies to a non-resident individual in Malaysia?"
+_NON_RESIDENT_A = (
+    "The provided context documents detail specific withholding tax rates applicable to certain types of "
+    "income paid to non-residents in Malaysia, ranging from 10% to 15%. However, the context does not "
+    "contain information about the general income tax rate that applies to a non-resident individual."
+)
+_SINGAPORE_Q = "What is the corporate tax rate in Singapore?"
+_SINGAPORE_A = (
+    "The query asks about the corporate tax rate in Singapore, but all provided context documents pertain "
+    "exclusively to Malaysia's tax system. There is no mention of Singapore's corporate tax rate in the context."
+)
+
+
+def test_a_decline_in_the_second_sentence_counts_when_it_is_about_the_question() -> None:
+    assert answer_declines(_NON_RESIDENT_A, _NON_RESIDENT_Q)
+    assert answer_declines(_SINGAPORE_A, _SINGAPORE_Q)
+
+
+def test_the_second_sentence_rule_needs_the_question() -> None:
+    assert not answer_declines(_NON_RESIDENT_A)
+    assert not answer_declines(_SINGAPORE_A)
+
+
+def test_blank_lines_between_paragraphs_do_not_hide_the_second_sentence() -> None:
+    spaced = _NON_RESIDENT_A.replace(". However,", ".\n\nHowever,")
+    assert answer_declines(spaced, _NON_RESIDENT_Q)
+
+
+def test_a_side_remark_about_something_else_is_not_a_decline() -> None:
+    q = "What is the corporate tax rate for SMEs under the Malaysian tax system?"
+    side = "The SME rate is stated in the ruling. However, the documents do not mention a rebate for exporters."
+    assert not answer_declines(side, q)
+    assert not answer_declines("The rate is 24%. There is no change announced in the provided context.", q)
+
+
+def test_apply_support_check_uses_the_query_from_state() -> None:
+    update = apply_support_check({"confidence_score": 0.83, "query": _NON_RESIDENT_Q}, _NON_RESIDENT_A)
+    assert update["answer_declined"] is True and update["confidence_score"] == DECLINE_CONFIDENCE_CEILING
+    assert "citations" not in update  # the opening sentence carries figures, so its chips stay
