@@ -1,5 +1,8 @@
 # One page per line: URL, or URL | phrase1,phrase2 (phrases to locate in the markup).
 # Pushing a change to this file on a claude/* branch runs .github/workflows/inspect-page.yml.
-https://www.hasil.gov.my/en/individu/kadar-cukai/
-https://www.hasil.gov.my/en/syarikat/kadar-cukai-syarikat/
-https://www.hasil.gov.my/en/syarikat/sme/
+https://www.hasil.gov.my/en/individu/pelepasan-cukai/ | RM4,000,EPF,spouse
+https://www.hasil.gov.my/en/ckht/kadar-cukai-keuntungan-harta-tanah/ | 30%,RPGT
+https://www.hasil.gov.my/en/perundangan/cukai-pegangan/ | royalty,10%
+https://www.hasil.gov.my/en/individu/lapor-pendapatan/ | 30 April,Form BE
+https://mysst.customs.gov.my/registering-business/ | RM500,000
+https://mysst.customs.gov.my/faq-business/ | RM500,000

@@ -1067,8 +1067,98 @@ SOURCES: tuple[Source, ...] = (
             "before a live run; if they are missing, do not ingest it."
         ),
         require_host_suffix="hasil.gov.my",
-        extractor="lhdn_accordion",
+        extractor="lhdn_accordion_current",
         title="Individual Income Tax Rates (LHDN)",
+    ),
+
+    # ── Replacements for the old hand-written "Individual Income Tax Rates" chunk ─────────────
+    # That one chunk mixed reliefs, e-filing deadlines, RPGT, stamp duty and SST under a rate-table
+    # title and cited a dead URL, so a question on any of them scored low on relevance even when the
+    # chunk held the answer (live eval 2026-11-16: form-be-deadline correct at confidence 0.37,
+    # sst-registration-threshold correct at 0.55). One official source per topic instead. Page
+    # structures were read with scripts/inspect_page.py on 2026-11-16; the build sandbox cannot reach
+    # these hosts, so read each dry-run's previews before a live run.
+    Source(
+        name="lhdn-tax-reliefs",
+        url="https://www.hasil.gov.my/en/individu/pelepasan-cukai/",
+        kind="html", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN 'Tax Relief' page: one accordion item (table) per year of assessment (11 tables). "
+            "Holds the spouse relief (RM4,000) and the EPF + life insurance combined limit (RM7,000, EPF "
+            "RM4,000 within it) that the old chunk quoted only as 'up to RM7,000'. Only the CURRENT year is "
+            "ingested (lhdn_accordion_current): ten past years of near-identical tables filled the top-5 "
+            "retrieval slots and pushed the current one out; migration 061 removes those already ingested."
+        ),
+        require_host_suffix="hasil.gov.my", extractor="lhdn_accordion_current", title="Individual Tax Reliefs (LHDN)",
+    ),
+    Source(
+        name="lhdn-withholding-tax",
+        url="https://www.hasil.gov.my/en/perundangan/cukai-pegangan/",
+        kind="html", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN 'Withholding Tax' page (accordion with one rate table): section 109 rates on payments "
+            "to non-residents, e.g. royalties 10%. No page told the corpus this before."
+        ),
+        require_host_suffix="hasil.gov.my", extractor="lhdn_accordion", title="Withholding Tax (LHDN)",
+    ),
+    Source(
+        name="lhdn-rpgt-rates",
+        url="https://www.hasil.gov.my/en/ckht/kadar-cukai-keuntungan-harta-tanah/",
+        kind="html", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN 'RPGT Rates' page: three tables (Part I, II and III disposers of Schedule 5 RPGTA), each "
+            "rate by holding period and disposal date. Part I from 1.1.2022: 30% within 2 years and in the "
+            "3rd year, 20% in the 4th, 15% in the 5th, 0% from the 6th. Plain text-editor content, not an "
+            "accordion, hence the lhdn_content extractor."
+        ),
+        require_host_suffix="hasil.gov.my", extractor="lhdn_content", title="Real Property Gains Tax Rates (LHDN)",
+        date_inference="off",
+    ),
+    Source(
+        name="customs-sst-registering-business",
+        url="https://mysst.customs.gov.my/registering-business/",
+        kind="html", domain="tax", ministry="Jabatan Kastam Diraja Malaysia (Royal Malaysian Customs)", language="en",
+        notes=(
+            "MySST 'Registering Business': Essential Addons accordion (10 items, tables of thresholds by "
+            "category: sales tax and service tax RM500,000, higher thresholds for some services). The old "
+            "chunk answered the SST threshold from a rate-table page."
+        ),
+        require_host_suffix="customs.gov.my", extractor="eael_accordion", title="SST: Registering a Business (Customs)",
+    ),
+    Source(
+        name="customs-sst-faq-business",
+        url="https://mysst.customs.gov.my/faq-business/",
+        kind="html", domain="tax", ministry="Jabatan Kastam Diraja Malaysia (Royal Malaysian Customs)", language="en",
+        notes=(
+            "MySST business FAQ (a ~1 MB page: one accordion item per question). Dry-run first and check the "
+            "chunk count before a live run: it adds a lot of text to a corpus where tax chunks are few."
+        ),
+        require_host_suffix="customs.gov.my", extractor="eael_accordion", title="SST: Business FAQ (Customs)",
+    ),
+    Source(
+        name="lhdn-stamp-duty-first-schedule-guideline",
+        url="https://www.hasil.gov.my/wp-content/uploads/garis-panduan-pengenaan-duti-setem-jadual-pertama-as-1949.pdf",
+        kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="bm",
+        notes=(
+            "LHDN guideline on charging stamp duty under the First Schedule of the Stamp Act 1949 (Bahasa "
+            "Malaysia PDF, 47 pages). Section C.2.1 (p. 11) states the item 32(a) transfer tiers (RM1 per RM100 "
+            "on the first RM100,000, RM2 up to RM500,000, RM3 up to RM1 million, RM4 above), and 32(aa)/32(ab) "
+            "the foreign-buyer rates (RM4, and RM8 on residential from 1 January 2026). Checked 2026-11-16. "
+            "(LHDN's 'Stamp Duty FAQ' PDF was dropped: it is about e-Stamp procedure, not rates.)"
+        ),
+        require_host_suffix="hasil.gov.my", identity_terms=("duti setem",), date_inference="off",
+    ),
+    Source(
+        name="lhdn-filing-programme-2026",
+        url="https://www.hasil.gov.my/wp-content/uploads/rf-filing-programme-for-2026.pdf",
+        kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN return form filing programme for 2026 (years of assessment 2025): due dates and e-Filing "
+            "grace periods by form and category, e.g. Form BE 30 April + 15 May e-Filing, Form B 30 June + "
+            "15 July. A table PDF: read the dry-run, text extraction may scramble it. Dated for the 2026 "
+            "filing season, so it needs replacing each year (a candidate for a scheduled check)."
+        ),
+        require_host_suffix="hasil.gov.my", identity_terms=("filing programme",), date_inference="off",
     ),
 )
 

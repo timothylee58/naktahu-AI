@@ -498,3 +498,49 @@ async def test_pending_changes_add_instruction_to_system_prompt() -> None:
     with patch.object(synthesiser_module, "_stream_ilmu", fake_stream):
         _ = [t async for t in stream_synthesis(state)]
     assert "ANNOUNCED CHANGES" in captured["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_synthesiser_caps_confidence_and_drops_citations_when_the_answer_declines() -> None:
+    """An answer saying the context has no answer must not keep the analyst's retrieval-based
+    confidence (a live eval saw 0.81 on exactly this wording), nor source chips."""
+    declining = ["I could not find ", "the spouse relief amount ", "in the provided context documents."]
+
+    async def fake_stream_synthesis(state):
+        async for tok in _fake_stream(declining):
+            yield tok
+
+    async def fake_generate_suggestions(query, domain, language):
+        return ["s1"]
+
+    with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis), \
+         patch.object(synthesiser_module, "_generate_suggestions", fake_generate_suggestions):
+        result = await synthesiser_node({
+            "query": "spouse relief", "language": "en", "session_id": "s", "user_id": None,
+            "retrieved_chunks": [], "confidence_score": 0.81, "needs_clarification": False,
+            "citations": [{"title": "x"}],
+        })
+
+    assert result["answer_declined"] is True
+    assert result["confidence_score"] == 0.35 and result["needs_clarification"] is True
+    assert result["citations"] == []
+
+
+@pytest.mark.asyncio
+async def test_synthesiser_leaves_confidence_alone_for_a_real_answer() -> None:
+    async def fake_stream_synthesis(state):
+        async for tok in _fake_stream(["The Form BE deadline is 30 April each year."]):
+            yield tok
+
+    async def fake_generate_suggestions(query, domain, language):
+        return ["s1"]
+
+    with patch.object(synthesiser_module, "stream_synthesis", fake_stream_synthesis), \
+         patch.object(synthesiser_module, "_generate_suggestions", fake_generate_suggestions):
+        result = await synthesiser_node({
+            "query": "form be deadline", "language": "en", "session_id": "s", "user_id": None,
+            "retrieved_chunks": [], "confidence_score": 0.81,
+        })
+
+    assert result["answer_declined"] is False
+    assert "confidence_score" not in result and "citations" not in result

@@ -64,6 +64,31 @@ def _is_rate_header(header: str) -> bool:
     return bool(re.match(r"\s*rate", header, re.IGNORECASE))
 
 
+def _render_grid_table(rows: list[list[str]]) -> Optional[list[str]]:
+    """A table with a spanning group header over a row of column labels, such as LHDN's RPGT rates:
+
+        Holding Period | Disposal Date                        (spans every column below)
+                       | 1.1.2019 to 31.12.2021 | Starting from the 1.1.2022
+        Within 2 years | 30%                    | 30%
+
+    Read cell by cell against the first-row header, "30%" would be labelled "Disposal Date" and
+    the period it belongs to lost. Returns None when the table is not this shape.
+    """
+    if len(rows) < 3 or len(rows[0]) > 2:
+        return None
+    labels = [c for c in rows[1] if c]
+    body = rows[2:]
+    if len(labels) < 2 or any(len(r) != len(labels) + 1 for r in body):
+        return None
+    row_name = rows[0][0]
+    group = rows[0][1] if len(rows[0]) > 1 else ""
+    lines: list[str] = []
+    for row in body:
+        cells = "; ".join(f"{group} {label}: {value}".strip() for label, value in zip(labels, row[1:]) if value)
+        lines.append(f"{row_name} {row[0]}: {cells}".strip())
+    return lines
+
+
 def render_table(table: Tag) -> list[str]:
     """One line per row, every cell labelled with its column header, so a figure
     is never separated from what it is a figure of. Rate tables (an income
@@ -72,6 +97,9 @@ def render_table(table: Tag) -> list[str]:
     rows = [r for r in rows if any(r)]
     if len(rows) < 2:
         return [" | ".join(r) for r in rows]
+    grid = _render_grid_table(rows)
+    if grid is not None:
+        return grid
     headers, body = rows[0], rows[1:]
     income_i = next((i for i, h in enumerate(headers) if _is_income_header(h)), None)
     rate_i = next((i for i, h in enumerate(headers) if _is_rate_header(h)), None)
@@ -179,4 +207,136 @@ def parse_lhdn_accordion(html: str, fallback_title: str) -> list[ExtractedItem]:
     return items
 
 
-EXTRACTORS = {"lhdn_accordion": parse_lhdn_accordion}
+def parse_lhdn_accordion_current(html: str, fallback_title: str) -> list[ExtractedItem]:
+    """parse_lhdn_accordion, keeping only the items that are still in force.
+
+    A per-year page (reliefs, rates) lists every past year of assessment. The analyst drops an
+    expired chunk, but only AFTER retrieval: eleven near-identical yearly tables fill the top-5
+    slots and push the one current table out (a live eval: child-relief, "no usable chunks"). So
+    the history is not ingested at all: an item is kept when it has no end date (the newest year,
+    and items whose title names no year).
+    """
+    items = [i for i in parse_lhdn_accordion(html, fallback_title) if i.valid_until is None]
+    if not items:
+        raise ExtractionError("every accordion item is a past year: nothing current to ingest")
+    return items
+
+
+_CONTENT_MIN_CHARS = 80
+
+
+_LAST_UPDATED = re.compile(r"^\s*last updated on\b", re.IGNORECASE)
+_LEADING_NUMBER = re.compile(r"^\s*\d+[.)]\s*")
+
+
+def _own_text(el: Tag) -> str:
+    parts = [
+        _cell_text(c) if isinstance(c, Tag) else str(c)
+        for c in el.children
+        if not (isinstance(c, Tag) and c.name in ("ul", "ol", "table"))
+    ]
+    return _clean(" ".join(parts))
+
+
+def _content_flow(widget: Tag) -> list[tuple[str, object]]:
+    """The widget's paragraphs, list items and tables in document order. Elements nested in a table
+    cell or in another list item are skipped: they are rendered with their parent."""
+    flow: list[tuple[str, object]] = []
+    for el in widget.find_all(["p", "li", "table"]):
+        if el.find_parent("table") is not None and el.name != "table":
+            continue
+        if el.name == "table" and el.find_parent("table") is not None:
+            continue
+        if el.name == "li" and el.find_parent("li") is not None:
+            continue
+        if el.name == "table":
+            flow.append(("table", el))
+        else:
+            # An <li> can hold the table it introduces ("5. RPGT rate for ...:" then the table), so its
+            # text is its OWN text: get_text() would fold every table cell into the caption.
+            text = _own_text(el) if el.name == "li" else _clean(el.get_text(" ", strip=True))
+            if text and not _LAST_UPDATED.match(text):
+                flow.append(("text", f"- {text}" if el.name == "li" else text))
+    return flow
+
+
+def parse_lhdn_content(html: str, fallback_title: str) -> list[ExtractedItem]:
+    """An LHDN page whose content is plain text-editor widgets, not accordions (e.g. RPGT rates).
+
+    One ExtractedItem per table, with the sentence just above it kept in the same chunk and named
+    in its title ("... Part I Schedule 5 RPGTA"), so a chunk that is split or retrieved alone still
+    says which disposer its rates are for. Other paragraphs become their own chunks. No dates are read
+    from the text: such a page quotes many past dates and ends in "Last updated on ...", none of
+    which is a validity window.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
+        tag.decompose()
+    widgets = [w for w in soup.select("div.elementor-widget-text-editor") if not w.find_parent(class_="elementor-widget-text-editor")]
+    if not widgets:
+        raise ExtractionError("no text-editor content widgets found: the page structure changed")
+    page = fallback_title if fallback_title and not fallback_title.startswith("http") else _page_heading(soup, fallback_title)
+
+    items: list[ExtractedItem] = []
+
+    def add(title: str, lines: list[str]) -> None:
+        text = "\n".join(lines)
+        if len(text) >= _CONTENT_MIN_CHARS:
+            items.append(ExtractedItem(title=title, text=text))
+
+    for widget in widgets:
+        pending: list[str] = []
+        for kind, value in _content_flow(widget):
+            if kind == "text":
+                pending.append(str(value))
+                continue
+            rows = render_table(value)  # type: ignore[arg-type]
+            caption = pending[-1] if pending else ""
+            if pending[:-1]:
+                add(page, pending[:-1])
+            label = _LEADING_NUMBER.sub("", caption.removeprefix("- ")).rstrip(": ")
+            add(f"{page} — {label}" if label else page, ([caption] if caption else []) + rows)
+            pending = []
+        if pending:
+            add(page, pending)
+    if not items:
+        raise ExtractionError("content widgets found but all were empty")
+    return items
+
+
+def parse_eael_accordion(html: str, fallback_title: str) -> list[ExtractedItem]:
+    """One ExtractedItem per item of an Essential Addons accordion (the Customs MySST pages).
+
+    Title is the item's own heading (a question, or a registration category); content keeps its
+    tables as labelled rows. No dates: these pages state current rules, not validity windows.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
+        tag.decompose()
+    entries = soup.select("div.eael-accordion-list")
+    if not entries:
+        raise ExtractionError("no accordion items (eael-accordion-list) found: the page structure changed")
+    page = fallback_title if fallback_title and not fallback_title.startswith("http") else _page_heading(soup, fallback_title)
+    items: list[ExtractedItem] = []
+    for entry in entries:
+        title_tag = entry.select_one(".eael-accordion-tab-title")
+        content = entry.select_one(".eael-accordion-content")
+        if content is None:
+            continue
+        lines = render_node(content)
+        text = "\n".join(lines)
+        if len(text) < _CONTENT_MIN_CHARS // 2:
+            continue
+        title = _clean(title_tag.get_text(" ", strip=True)) if title_tag else ""
+        items.append(ExtractedItem(title=f"{page} — {title}" if title else page, text=text))
+    if not items:
+        raise ExtractionError("accordion items found but all were empty")
+    return items
+
+
+EXTRACTORS = {
+    "lhdn_accordion": parse_lhdn_accordion,
+    "lhdn_accordion_current": parse_lhdn_accordion_current,
+    "lhdn_content": parse_lhdn_content,
+    "eael_accordion": parse_eael_accordion,
+}

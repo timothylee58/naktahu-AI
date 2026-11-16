@@ -47,6 +47,7 @@ it's tabled) exits cleanly with an UPCOMING notice instead of fetching.
 """
 from __future__ import annotations
 
+import os
 import argparse
 import asyncio
 import hashlib
@@ -709,6 +710,13 @@ def queue_supersede_candidates(
 
 
 
+def _preview_width(default: int = 300) -> int:
+    """Dry-run preview length: INGEST_PREVIEW_CHARS (digits only, 1..4000), else the default.
+    A longer preview is how a human checks a table PDF's text before a live run."""
+    raw = os.environ.get("INGEST_PREVIEW_CHARS", "").strip()
+    return min(int(raw), 4000) if raw.isdigit() and int(raw) > 0 else default
+
+
 def _content_preview(content: str, width: int = 300) -> str:
     """One line for a dry-run: size, digit count and the start of the text."""
     flat = " ".join(content.split())
@@ -848,7 +856,7 @@ async def main_async(args: argparse.Namespace) -> None:
             # stripped, and only reading the stored rows revealed it. Show the
             # size, the digit count (a rate table with 0 digits is broken) and
             # the opening text, so the dry-run is the check it claims to be.
-            print(f"    {_content_preview(entry.content)}")
+            print(f"    {_content_preview(entry.content, _preview_width())}")
             continue
 
         row = {

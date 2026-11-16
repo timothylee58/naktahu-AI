@@ -1392,3 +1392,17 @@ def test_tier_fields_only_for_a_registered_tier():
     # Ad-hoc --feed-url run: tier unknown, never assumed official.
     assert tier_fields(argparse.Namespace()) == {}
     assert tier_fields(argparse.Namespace(source_tier="bogus")) == {}
+
+
+def test_preview_width_comes_from_the_environment_within_bounds(monkeypatch) -> None:
+    from scripts.ingest_feed import _preview_width
+
+    monkeypatch.delenv("INGEST_PREVIEW_CHARS", raising=False)
+    assert _preview_width() == 300
+    monkeypatch.setenv("INGEST_PREVIEW_CHARS", "1500")
+    assert _preview_width() == 1500
+    monkeypatch.setenv("INGEST_PREVIEW_CHARS", "999999")
+    assert _preview_width() == 4000
+    for bad in ("", "abc", "0", "-5"):
+        monkeypatch.setenv("INGEST_PREVIEW_CHARS", bad)
+        assert _preview_width() == 300

@@ -13,6 +13,7 @@ import structlog
 import weave
 from langgraph.config import get_stream_writer
 
+from app.agents.answer_support import apply_support_check
 from app.core.prometheus_metrics import provider_fallback_total, rag_queries_total
 from app.middleware.sanitise import INJECTION_PATTERNS
 from app.models.state import AgentState
@@ -437,7 +438,20 @@ async def synthesiser_node(state: AgentState) -> dict:
         state.get("language", "en")
     )
 
+    # Answer-side support check: an answer that opens by saying the context has no answer must not
+    # go out at the analyst's retrieval-based confidence. Only ever lowers it (answer_support.py).
+    support = apply_support_check(state, full_text)
+    if support.get("answer_declined"):
+        log.warning(
+            "answer_declined",
+            domain=state.get("domain"),
+            confidence_before=state.get("confidence_score"),
+            confidence_after=support["confidence_score"],
+            citations_dropped="citations" in support,
+        )
+
     return {
+        **support,
         "streaming_token_buffer": full_text,
         "output_flagged": output_flagged,
         # Signal to callers (e.g. the SSE endpoint / session-history writer)
