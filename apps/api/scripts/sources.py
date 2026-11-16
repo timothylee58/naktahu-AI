@@ -1070,6 +1070,102 @@ SOURCES: tuple[Source, ...] = (
         extractor="lhdn_accordion",
         title="Individual Income Tax Rates (LHDN)",
     ),
+
+    # ── Replacements for the old hand-written "Individual Income Tax Rates" chunk ─────────────
+    # That one chunk mixed reliefs, e-filing deadlines, RPGT, stamp duty and SST under a rate-table
+    # title and cited a dead URL, so a question on any of them scored low on relevance even when the
+    # chunk held the answer (live eval 2026-11-16: form-be-deadline correct at confidence 0.37,
+    # sst-registration-threshold correct at 0.55). One official source per topic instead. Page
+    # structures were read with scripts/inspect_page.py on 2026-11-16; the build sandbox cannot reach
+    # these hosts, so read each dry-run's previews before a live run.
+    Source(
+        name="lhdn-tax-reliefs",
+        url="https://www.hasil.gov.my/en/individu/pelepasan-cukai/",
+        kind="html", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN 'Tax Relief' page: one accordion item (table) per year of assessment (11 tables). "
+            "Holds the spouse relief (RM4,000) and the EPF + life insurance combined limit (RM7,000, EPF "
+            "RM4,000 within it) that the old chunk quoted only as 'up to RM7,000'."
+        ),
+        require_host_suffix="hasil.gov.my", extractor="lhdn_accordion", title="Individual Tax Reliefs (LHDN)",
+    ),
+    Source(
+        name="lhdn-withholding-tax",
+        url="https://www.hasil.gov.my/en/perundangan/cukai-pegangan/",
+        kind="html", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN 'Withholding Tax' page (accordion with one rate table): section 109 rates on payments "
+            "to non-residents, e.g. royalties 10%. No page told the corpus this before."
+        ),
+        require_host_suffix="hasil.gov.my", extractor="lhdn_accordion", title="Withholding Tax (LHDN)",
+    ),
+    Source(
+        name="lhdn-rpgt-rates",
+        url="https://www.hasil.gov.my/en/ckht/kadar-cukai-keuntungan-harta-tanah/",
+        kind="html", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN 'RPGT Rates' page: three tables (Part I, II and III disposers of Schedule 5 RPGTA), each "
+            "rate by holding period and disposal date. Part I from 1.1.2022: 30% within 2 years and in the "
+            "3rd year, 20% in the 4th, 15% in the 5th, 0% from the 6th. Plain text-editor content, not an "
+            "accordion, hence the lhdn_content extractor."
+        ),
+        require_host_suffix="hasil.gov.my", extractor="lhdn_content", title="Real Property Gains Tax Rates (LHDN)",
+        date_inference="off",
+    ),
+    Source(
+        name="customs-sst-registering-business",
+        url="https://mysst.customs.gov.my/registering-business/",
+        kind="html", domain="tax", ministry="Jabatan Kastam Diraja Malaysia (Royal Malaysian Customs)", language="en",
+        notes=(
+            "MySST 'Registering Business': Essential Addons accordion (10 items, tables of thresholds by "
+            "category: sales tax and service tax RM500,000, higher thresholds for some services). The old "
+            "chunk answered the SST threshold from a rate-table page."
+        ),
+        require_host_suffix="customs.gov.my", extractor="eael_accordion", title="SST: Registering a Business (Customs)",
+    ),
+    Source(
+        name="customs-sst-faq-business",
+        url="https://mysst.customs.gov.my/faq-business/",
+        kind="html", domain="tax", ministry="Jabatan Kastam Diraja Malaysia (Royal Malaysian Customs)", language="en",
+        notes=(
+            "MySST business FAQ (a ~1 MB page: one accordion item per question). Dry-run first and check the "
+            "chunk count before a live run: it adds a lot of text to a corpus where tax chunks are few."
+        ),
+        require_host_suffix="customs.gov.my", extractor="eael_accordion", title="SST: Business FAQ (Customs)",
+    ),
+    Source(
+        name="lhdn-stamp-duty-faq",
+        url="https://www.hasil.gov.my/wp-content/uploads/Stamp_Duty_FAQ.pdf",
+        kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN Stamp Duty FAQ (PDF). UNVERIFIED that it states the tiered transfer rates (1% to RM100,000, "
+            "2% to RM500,000, 3% to RM1 million, 4% above): a search found only the 4% headline rate for land "
+            "transfers. Read the dry-run before a live run, and do not ingest it if the tiers are absent."
+        ),
+        require_host_suffix="hasil.gov.my", identity_terms=("stamp duty",), date_inference="off",
+    ),
+    Source(
+        name="lhdn-stamp-duty-first-schedule-guideline",
+        url="https://www.hasil.gov.my/wp-content/uploads/garis-panduan-pengenaan-duti-setem-jadual-pertama-as-1949.pdf",
+        kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="bm",
+        notes=(
+            "LHDN guideline on charging stamp duty under the First Schedule of the Stamp Act 1949 (Bahasa "
+            "Malaysia PDF): item 32 transfer rates. Read the dry-run for the tiers before a live run."
+        ),
+        require_host_suffix="hasil.gov.my", identity_terms=("duti setem",), date_inference="off",
+    ),
+    Source(
+        name="lhdn-filing-programme-2026",
+        url="https://www.hasil.gov.my/wp-content/uploads/rf-filing-programme-for-2026.pdf",
+        kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
+        notes=(
+            "LHDN return form filing programme for 2026 (years of assessment 2025): due dates and e-Filing "
+            "grace periods by form and category, e.g. Form BE 30 April + 15 May e-Filing, Form B 30 June + "
+            "15 July. A table PDF: read the dry-run, text extraction may scramble it. Dated for the 2026 "
+            "filing season, so it needs replacing each year (a candidate for a scheduled check)."
+        ),
+        require_host_suffix="hasil.gov.my", identity_terms=("filing programme",), date_inference="off",
+    ),
 )
 
 # ── Belanjawan 2026 (Budget 2026) — tabled 10 October 2025 ──────────────
