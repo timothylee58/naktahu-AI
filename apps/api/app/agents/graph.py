@@ -88,7 +88,9 @@ def _route_after_analyst(state: AgentState) -> str:
     clarification-prompt node. See synthesiser_node._partial_confidence_instruction
     for what "hedged" means here; this split is what lets a low-confidence
     answer still share the general rule instead of refusing outright."""
-    if state.get("needs_clarification", False) and not state.get("retrieved_chunks"):
+    if state.get("needs_clarification", False) and (
+        not state.get("retrieved_chunks") or state.get("no_relevant_evidence", False)
+    ):
         return "clarification"
     return "synthesiser"
 
