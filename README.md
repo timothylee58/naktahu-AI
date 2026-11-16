@@ -66,6 +66,36 @@ A standalone crowdsourced "how busy is it right now" tool for Malaysian warungs/
 
 ---
 
+## What's new (November 2026)
+
+**Answer quality and trust**
+- **Retrieval retry** (#285): a weak domain-filtered search is retried once with no domain filter and kept only if confidence improves. Switch it off with `RETRIEVAL_RETRY_ENABLED=false`.
+- **Relevance gate** (#287): an official URL earns authority credit only if the chunk is on-topic (`ANALYST_RELEVANCE_FLOOR`, default 0.4). Off-topic chunks are never cited, and a query with nothing relevant goes to clarification.
+- **Router retry** (#289): a classification ILMU returns in an unparseable form is retried once with a larger token budget and logged as `router_parse_failed`.
+- **Answer-side support check**: an answer that says "I could not find it in the provided context" no longer goes out at the retrieval-based confidence (a live eval saw 0.81). `app/agents/answer_support.py` caps it at 0.35 and drops the source chips when the answer has no figures. It only ever lowers confidence.
+
+**Corpus**
+- **SSM company-incorporation sources** (#290): overview, step-by-step guide in English and Bahasa Malaysia, and the incorporation guidelines PDF.
+- **One official source per tax topic**, replacing a single hand-written chunk that mixed reliefs, e-filing deadlines, RPGT and SST under a rate-table title: LHDN tax reliefs, withholding tax and RPGT rates; Customs MySST registration and business FAQ; the LHDN stamp duty First Schedule guideline (Bahasa Malaysia, with the tiered transfer rates); and the LHDN 2026 filing programme. The filing programme is a table PDF whose extracted text is scrambled but states the Form BE, Form B and company deadlines, and it must be replaced each year.
+- **Source-specific extractors** `lhdn_content` (LHDN pages that are plain content, one chunk per table with its caption) and `eael_accordion` (Customs), and ingest dry-runs can print longer chunk previews (`preview_chars`).
+- **Known gaps**: no official source found yet for the 7-year record-keeping rule, Form B for sole proprietors, or the non-resident individual rate.
+
+**Measuring**
+- **Live tax-accuracy eval** (`live-tax-eval.yml`): runs a 30-case answer key through the real pipeline with the embedding profile and chat model you choose, and prints each wrong answer with its scoring reason.
+- **LLM latency benchmark** (`llm-latency-benchmark.yml`): time to first token and tokens per second, Nemotron on Nebius Token Factory against ILMU (needs the `NEMOTRON_*` settings).
+- **Retrieval probe** (`retrieval-probe.yml`): for a question the eval gets wrong, the rank of the chunk holding the answer with no filter and under each domain filter, and `--find` to list which chunks mention a phrase and under which domain.
+- **Faithfulness and context-precision live run** (#264, #265).
+
+**Product**
+- Landing page redesign with a trust strip and an accessibility statement, a skip link and a main landmark (#280 to #283); a prompt-first homepage, a guest chat shell with a free-limit state and a sourced-answer card with an Official/Community badge (#268 to #270).
+- Warung Watch: responsive phone and desktop UI, accessibility fixes (#274, #277); health triage improvements (#271).
+- Chat understands follow-up questions (#263); the grant finder stops re-asking what the intake form already collected (#261); a free-quota unit is refunded when a question is blocked or fails (#292).
+
+**Platform**
+- `/metrics` reports every uvicorn worker (#286); a Cloud Run deploy script for the API (#288).
+
+---
+
 ## What's new (October 2026)
 - **Budget 2027 from official MOF sources** — documents are fetched only from `*.mof.gov.my` (every redirect hop is checked) and identity-checked against the PDF's own text before anything is stored.
 - **ILMU-native embeddings** — side-by-side `bge-m3` column, v2 search RPCs, and a resumable re-embed of the whole corpus (migration 056).
@@ -132,7 +162,7 @@ steps and branches, described here. State is one `AgentState` dict passed node t
 | `rag_node` | Looks in Redis first, keyed by `sha256(query\|language\|domain)` with a one-hour TTL. On a miss it embeds the query with the active embedding profile and runs a hybrid search (0.7 cosine + 0.3 keyword) over `document_chunks`, filtered to the router's domain. It keeps the top 5 chunks (12 candidates first when `RERANK_ENABLED` is on). | If the domain-filtered search returns nothing it searches again with no filter. A search error returns no chunks. |
 | `analyst_node` | The trust layer. Drops superseded and expired chunks, sets aside announced-but-not-yet-effective ones as *pending changes*, scores the rest, picks up to 3 citations and computes a confidence. | Confidence below **0.6** sets `needs_clarification`. |
 | `retrieval_retry_node` | See below. | Skipped unless its conditions hold. |
-| `synthesiser_node` | Streams the answer from ILMU, in the query's language. | Falls back to Anthropic only when ILMU fails **before** its first token, so a partial answer is never followed by a second one. |
+| `synthesiser_node` | Streams the answer from ILMU, in the query's language. When it finishes it reads its own answer: if the opening sentence says the provided context has no answer, confidence is capped at 0.35 (below the 0.6 bar) and the answer is flagged for follow-up. This check can only lower confidence. | Falls back to Anthropic only when ILMU fails **before** its first token, so a partial answer is never followed by a second one. |
 | `clarification` | Sends a fixed "please rephrase" prompt in the query's language. | |
 
 **Branches the diagram leaves out**
