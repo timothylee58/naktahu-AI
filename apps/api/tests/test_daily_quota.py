@@ -7,6 +7,7 @@ from services.daily_quota import (
     FREE_DAILY_LIMIT,
     check_and_increment_daily_quota,
     is_free_plan,
+    refund_daily_quota,
 )
 
 
@@ -62,3 +63,37 @@ def test_is_free_plan() -> None:
     assert is_free_plan("free") is True
     assert is_free_plan("pro") is False
     assert is_free_plan(None) is True
+
+
+@pytest.mark.asyncio
+async def test_refund_gives_back_one_unit() -> None:
+    redis = FakeRedis()
+    await check_and_increment_daily_quota(redis, identifier="auth:u", plan="free")
+    await check_and_increment_daily_quota(redis, identifier="auth:u", plan="free")
+    await refund_daily_quota(redis, identifier="auth:u", plan="free")
+    _, used, _ = await check_and_increment_daily_quota(redis, identifier="auth:u", plan="free")
+    assert used == 2
+
+
+@pytest.mark.asyncio
+async def test_refund_never_drops_below_zero() -> None:
+    redis = FakeRedis()
+    await refund_daily_quota(redis, identifier="auth:u", plan="free")
+    assert list(redis.store.values()) == [0]
+
+
+@pytest.mark.asyncio
+async def test_refund_is_noop_for_paid_plans_and_missing_redis() -> None:
+    redis = FakeRedis()
+    await refund_daily_quota(redis, identifier="auth:pro", plan="pro")
+    await refund_daily_quota(None, identifier="auth:u", plan="free")
+    assert redis.store == {}
+
+
+@pytest.mark.asyncio
+async def test_refund_swallows_redis_errors() -> None:
+    class BrokenRedis(FakeRedis):
+        async def decr(self, key: str) -> int:
+            raise ConnectionError("down")
+
+    await refund_daily_quota(BrokenRedis(), identifier="auth:u", plan="free")
