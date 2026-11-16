@@ -23,9 +23,13 @@ interface LangToggleProps {
    * (e.g. packed into a compact sidebar footer row) — right-anchoring
    * there pushes the dropdown's left edge off-screen. */
   align?: 'left' | 'right';
+  /** Which way the menu opens. 'down' (default) suits a header; use 'up' when the
+   * button sits at the bottom edge of the viewport (the sidebar footer), where a
+   * downward menu overflows the screen and exposes the page background. */
+  direction?: 'up' | 'down';
 }
 
-export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right' }: LangToggleProps) {
+export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right', direction = 'down' }: LangToggleProps) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -57,11 +61,13 @@ export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right
       ? 'bg-white border-zinc-200 shadow-lg'
       : 'bg-[#141929] border-white/10 shadow-xl';
 
+  const opensUp = isSidebar || direction === 'up';
+  const vertical = opensUp ? 'bottom-full mb-2' : 'mt-2';
   const dropdownPosition = isSidebar
-    ? 'absolute left-0 right-0 bottom-full mb-2'
+    ? `absolute left-0 right-0 ${vertical}`
     : align === 'left'
-      ? 'absolute left-0 mt-2 w-44'
-      : 'absolute right-0 mt-2 w-44';
+      ? `absolute left-0 ${vertical} w-44`
+      : `absolute right-0 ${vertical} w-44`;
 
   const optionHover =
     variant === 'light'
@@ -95,9 +101,9 @@ export function LangToggle({ variant = 'dark', layout = 'inline', align = 'right
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: isSidebar ? 6 : -6, scale: 0.96 }}
+            initial={{ opacity: 0, y: opensUp ? 6 : -6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: isSidebar ? 6 : -6, scale: 0.96 }}
+            exit={{ opacity: 0, y: opensUp ? 6 : -6, scale: 0.96 }}
             transition={{ duration: 0.14 }}
             className={`rounded-2xl border overflow-hidden z-50 ${dropdownPosition} ${dropdownBase}`}
           >
