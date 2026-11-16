@@ -86,7 +86,8 @@ async def retrieval_retry_node(state: AgentState) -> dict:
 
         result = await analyse({**state, "retrieved_chunks": merged}, first_pass=False)
         after = result.get("confidence_score", 0.0)
-        if after <= before:
+        # Epsilon: averaging a different number of equal scores differs in the last float bit.
+        if after <= before + 1e-9:
             outcome = "unchanged"
             return {}
 
