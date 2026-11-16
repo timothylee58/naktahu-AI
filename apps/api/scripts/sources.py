@@ -191,6 +191,49 @@ SOURCES: tuple[Source, ...] = (
         language="en",
         notes="Official page on annual return / annual submission requirements for registered companies.",
     ),
+    Source(
+        name="ssm-starting-company",
+        url="https://www.ssm.com.my/Pages/Register_Business_Company_LLP/Company/Starting_Company.aspx",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes=(
+            "Official overview of incorporating a company under the Companies Act 2016: company types, "
+            "director/promoter requirements for Sdn. Bhd. vs Bhd., direct incorporation vs name reservation. "
+            "Fills the gap behind the 'how do I register a Sdn Bhd' query, which previously matched only ROB (sole proprietor) pages."
+        ),
+    ),
+    Source(
+        name="ssm-submitting-incorporation",
+        url="https://www.ssm.com.my/Pages/Register_Business_Company_LLP/Company/Submitting-Incorporation-Company.aspx",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes="Official step-by-step for submitting incorporation particulars (CRS/MyCoID, Super Form, company secretary within 30 days).",
+    ),
+    Source(
+        name="ssm-submitting-incorporation-bm",
+        url="https://www.ssm.com.my/bm/Pages/Register_Business_Company_LLP/Company/Submitting-Incorporation-Company.aspx",
+        kind="html",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="bm",
+        notes="Bahasa Malaysia version of ssm-submitting-incorporation, so BM queries match BM chunks.",
+    ),
+    Source(
+        name="ssm-incorporation-guidelines",
+        url="https://www.ssm.com.my/Pages/Legal_Framework/GUIDELINES/Guidelines-For-Incorporation-of-A-Local-Company.pdf",
+        kind="pdf",
+        domain="business",
+        ministry="Suruhanjaya Syarikat Malaysia (SSM)",
+        language="en",
+        notes=(
+            "SSM guideline PDF: CRS portal steps for the three incorporation routes and the fees (RM1,000 incorporation, "
+            "RM10 agency data sharing, RM50 name reservation). Confirm fees in the dry-run preview before going live."
+        ),
+    ),
 
     # ── epf (EIS/SOCSO employer registration + contribution facts — migration 030's domain split) ──
     Source(
