@@ -117,30 +117,30 @@ A standalone crowdsourced "how busy is it right now" tool for Malaysian warungs/
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                apps/web  (Next.js 15, Netlify)                  │
-│                                                                   │
-│   Chat UI → useSSEStream hook → CitationChip × 1–3               │
-│   Vertical-agent UIs (grants, compliance, career, …)             │
+│                                                                 │
+│   Chat UI → useSSEStream hook → CitationChip × 1–3              │
+│   Vertical-agent UIs (grants, compliance, career, …)            │
 │   i18n (BM / EN / ZH) ← Navbar language toggle                  │
 └────────────────────────────┬────────────────────────────────────┘
                               │ SSE  /api/v1/query, /api/v1/agents/*
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                apps/api  (FastAPI, Railway)                     │
-│                                                                   │
-│   Core RAG pipeline (LangGraph):                                 │
+│                                                                 │
+│   Core RAG pipeline (LangGraph):                                │
 │   ┌────────┐   ┌───────┐   ┌────────┐   ┌─────────┐   ┌────────┐│
 │   │ router │──▶│ guard │──▶│  rag   │──▶│ analyst │──▶│synth-  ││
 │   │ _node  │   │ _node │   │ _node  │   │ _node   │   │esiser  ││
 │   │ (ILMU) │   │safety │   │pgvector│   │confidence│  │(ILMU + ││
 │   └────────┘   └───────┘   └───┬────┘   └─────────┘   │Claude  ││
-│                                 │                       │fallbk) ││
-│                            Redis cache             SSE stream    ││
-│                                                        └────┬───┘│
-│   Vertical agent graphs (own LangGraph pipelines, share      │    │
-│   the router/RAG/tool layer): grant, compliance, immigration,│    │
-│   health, study, investor, deadline, parliament agents       │    │
+│                                 │                     │fallbk) ││
+│                            Redis cache           SSE stream    ││
+│                                                       └────┬───┘│
+│   Vertical agent graphs (own LangGraph pipelines, share     │   │
+│   the router/RAG/tool layer): grant, compliance, immigration,│  │
+│   health, study, investor, deadline, parliament agents       │  │
 └─────────────────┬──────────────────────────────────────────┼────┘
-                   │                                          │
+                   │                                         │
         ┌──────────▼──────────┐                    ┌──────────▼──────────┐
         │  Supabase + pgvector│                    │   Browser via SSE   │
         │  (document_chunks,  │                    │  event: token/done  │
