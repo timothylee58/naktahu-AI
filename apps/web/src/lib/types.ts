@@ -40,6 +40,10 @@ export interface SSEMetadata {
   confidence?: number;
   domain?: string;
   agency_contact?: AgencyContact;
+  /** The answer was flagged for follow-up (thin evidence, or it said the context lacks the answer). */
+  needs_clarification?: boolean;
+  /** The finished answer said the provided context has no answer; confidence was capped below the bar. */
+  answer_declined?: boolean;
   [key: string]: unknown;
 }
 
@@ -50,6 +54,8 @@ export interface Message {
   tokens: string[];
   citations: Citation[];
   confidence: number | null;
+  /** Backend flagged this answer for follow-up; shows the warning even at a high confidence. */
+  needsClarification?: boolean;
   isStreaming: boolean;
   /** For assistant messages: the user query this answered, plus its resolved domain/language. Used for feedback submission. */
   query?: string;

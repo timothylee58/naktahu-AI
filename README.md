@@ -81,7 +81,7 @@ A standalone crowdsourced "how busy is it right now" tool for Malaysian warungs/
 - **Known gaps**: no official source found yet for the 7-year record-keeping rule, Form B for sole proprietors, or the non-resident individual rate.
 
 **Measuring**
-- **Live tax-accuracy eval** (`live-tax-eval.yml`): runs a 30-case answer key through the real pipeline with the embedding profile and chat model you choose, and prints each wrong answer with its scoring reason.
+- **Live tax-accuracy eval** (`live-tax-eval.yml`): runs a 30-case answer key through the real pipeline with the embedding profile and chat model you choose. Each case is `correct`, `hedged-correct` (right but flagged for follow-up), `flagged-miss` (an honest low-confidence miss) or `confidently-wrong`, and every non-correct answer is printed with its scoring reason. Single runs vary by about ±8 points.
 - **LLM latency benchmark** (`llm-latency-benchmark.yml`): time to first token and tokens per second, Nemotron on Nebius Token Factory against ILMU (needs the `NEMOTRON_*` settings).
 - **Retrieval probe** (`retrieval-probe.yml`): for a question the eval gets wrong, the rank of the chunk holding the answer with no filter and under each domain filter, and `--find` to list which chunks mention a phrase and under which domain.
 - **Faithfulness and context-precision live run** (#264, #265).
@@ -190,7 +190,7 @@ clear a minimum score. When confidence is low the reason is logged as one of `no
 `too_few_supporting` or `no_relevant_evidence`.
 
 **What the browser receives.** The answer streams over SSE (`token`, `citation`, `metadata`, `done`, `error`), at most 3 citation
-chips per answer, each from real chunk metadata and never invented.
+chips per answer, each from real chunk metadata and never invented. The `metadata` event carries `confidence`, `domain`, `language`, and two flags: `needs_clarification` (the answer was flagged for follow-up, possibly at a high confidence) and `answer_declined` (it said the context has no answer, so confidence was capped at 0.35). The chat page shows its "answer may be inaccurate" warning when either confidence is under 0.4 or `needs_clarification` is set.
 
 The vertical agents (grants, compliance, immigration and so on) run their own LangGraph graphs and share the router, retrieval and
 tool layers, but not this graph.

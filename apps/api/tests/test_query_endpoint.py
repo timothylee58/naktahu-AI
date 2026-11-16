@@ -263,6 +263,9 @@ async def test_query_endpoint_metadata_emitted() -> None:
     assert "domain" in meta
     assert "language" in meta
     assert "agency_contact" not in meta  # _fake_astream sets none
+    # Not flagged: the analyst was satisfied and nothing declined.
+    assert meta["needs_clarification"] is False
+    assert meta["answer_declined"] is False
 
 
 async def _fake_astream_with_agency_contact(inputs, stream_mode):  # type: ignore[no-untyped-def]
@@ -463,3 +466,42 @@ def test_extract_user_id_returns_none_for_missing_or_malformed_header() -> None:
     assert _extract_user_id("") is None
     assert _extract_user_id("NotBearer abc") is None
     assert _extract_user_id("Bearer not-a-jwt") is None
+
+
+async def _fake_astream_flagged(inputs, stream_mode):  # type: ignore[no-untyped-def]
+    """High confidence but flagged (thin evidence), then the synthesiser reports a declined answer."""
+    yield ("custom", "I could not find the spouse relief amount in the provided context.")
+    yield (
+        "updates",
+        {
+            "analyst": {
+                "citations": [],
+                "confidence_score": 0.83,
+                "domain": "tax",
+                "language": "en",
+                "needs_clarification": True,
+            }
+        },
+    )
+    yield (
+        "updates",
+        {"synthesiser": {"answer_declined": True, "confidence_score": 0.35, "needs_clarification": True}},
+    )
+
+
+@pytest.mark.asyncio
+async def test_query_endpoint_metadata_carries_the_clarification_and_decline_flags() -> None:
+    """A flagged answer must say so in metadata, and the capped confidence must be the one sent."""
+    with patch("app.routers.query.pipeline") as mock_pipeline:
+        mock_pipeline.astream = _fake_astream_flagged
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.post(
+                "/api/v1/query",
+                json={"query": "How much relief for my spouse?", "session_id": "sess-flagged"},
+            )
+
+    meta = [e for e in _parse_sse(resp.text) if e.get("event") == "metadata"][0]["data"]
+    assert meta["needs_clarification"] is True
+    assert meta["answer_declined"] is True
+    assert meta["confidence"] == 0.35
