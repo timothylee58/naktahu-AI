@@ -86,6 +86,40 @@ def _script_detect(query: str) -> str | None:
     return "zh" if _CJK_RE.search(query) else None
 
 
+_FIRST_PASS_MAX_TOKENS = 128
+_RETRY_MAX_TOKENS = 384
+
+
+async def _classify(query: str) -> dict:
+    parsed: dict = {}
+    for max_tokens in (_FIRST_PASS_MAX_TOKENS, _RETRY_MAX_TOKENS):
+        resp = await ilmu_breaker.call(
+            ilmu_client.chat.completions.create,
+            model=ILMU_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            max_tokens=max_tokens,
+            temperature=0,
+        )
+        choice = resp.choices[0]
+        raw = choice.message.content or ""
+        parsed = extract_json_object(raw)
+        if parsed:
+            return parsed
+        # A 200 with unparseable content previously collapsed silently to domain=None
+        # (unscoped search); the finish_reason tells truncation apart from non-JSON output.
+        log.warning(
+            "router_parse_failed",
+            finish_reason=getattr(choice, "finish_reason", None),
+            content_len=len(raw),
+            preview=raw[:120],
+            max_tokens=max_tokens,
+        )
+    return parsed
+
+
 @weave.op()
 async def router_node(state: AgentState) -> dict:
     """Classify query intent, language, and domain."""
@@ -117,28 +151,7 @@ async def router_node(state: AgentState) -> dict:
         speculative_embedding_task = asyncio.create_task(_embed(query))
 
     try:
-        # Routed through ilmu_breaker so a degraded/hanging ILMU provider
-        # fails fast (CircuitOpenError, same except-Exception fallback
-        # below) instead of every request in the classification hot path
-        # queuing up behind individual timeouts. Was previously called
-        # directly — the breaker existed but wrapped nothing anywhere in
-        # the codebase (found during a full-codebase complexity trace).
-        resp = await ilmu_breaker.call(
-            ilmu_client.chat.completions.create,
-            model=ILMU_CHAT_MODEL,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": query},
-            ],
-            max_tokens=128,
-            temperature=0,
-        )
-        raw = resp.choices[0].message.content or ""
-        # Extract JSON even when the model wraps it in markdown fences or
-        # appends trailing commentary (extract_json_object handles both —
-        # see its docstring for why a greedy regex here silently corrupts
-        # correct classifications).
-        parsed = extract_json_object(raw)
+        parsed = await _classify(query)
     except CircuitOpenError:
         log.warning("router_node_circuit_open", provider="ilmu", query_len=len(query))
         parsed = {}
