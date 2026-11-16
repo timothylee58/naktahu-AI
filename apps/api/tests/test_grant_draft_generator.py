@@ -93,6 +93,39 @@ class TestFetchGrantNode:
         assert "not found" in result["error"].lower()
 
     @pytest.mark.asyncio
+    async def test_hand_typed_name_resolves_via_catalogue(self):
+        from app.agents.grant_draft_generator.nodes import resolve_programme
+
+        rows = [
+            {"programme_name": "Malaysia Digital Acceleration Grant (MDAG)"},
+            {"programme_name": "CIP Sprint"},
+            {"programme_name": "CIP Spark"},
+            {"programme_name": "Cradle Elevate"},
+            {"programme_name": "Cradle Elevate"},
+        ]
+        assert resolve_programme("cip sprint", rows)[0]["programme_name"] == "CIP Sprint"
+        assert resolve_programme("MDAG", rows)[0]["programme_name"].endswith("(MDAG)")
+        assert resolve_programme("  cradle   elevate ", rows)[0]["programme_name"] == "Cradle Elevate"
+        # ambiguous: never silently picks a grant, offers suggestions instead
+        match, hints = resolve_programme("CIP", rows)
+        assert match is None and set(hints) == {"CIP Sprint", "CIP Spark"}
+        match, hints = resolve_programme("MDEC Digital Grant", rows)
+        assert match is None and hints
+
+    @pytest.mark.asyncio
+    async def test_miss_then_tolerant_match(self):
+        state = make_state(programme_name="mdag")
+        mock_supabase = MagicMock()
+        chain = mock_supabase.table.return_value.select.return_value.eq.return_value.limit.return_value
+        chain.execute = AsyncMock(side_effect=[
+            MagicMock(data=[]),
+            MagicMock(data=[{"programme_name": "Malaysia Digital Acceleration Grant (MDAG)"}]),
+        ])
+        result = await fetch_grant_node(state, _config(mock_supabase))
+        assert result["error"] is None
+        assert result["grant_record"]["programme_name"].endswith("(MDAG)")
+
+    @pytest.mark.asyncio
     async def test_supabase_none_degrades_gracefully(self):
         state = make_state()
 

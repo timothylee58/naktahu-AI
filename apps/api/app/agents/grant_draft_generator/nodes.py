@@ -7,7 +7,8 @@ to fill in — never real, verified numbers. Every section and its HTML/JSON
 rendering must make that unambiguous.
 """
 
-from typing import Any
+import re
+from typing import Any, Optional
 
 import structlog
 
@@ -80,6 +81,44 @@ async def intake_node(state: GrantDraftState) -> dict[str, Any]:
     }
 
 
+def _norm_name(name: str) -> str:
+    return " ".join(str(name or "").casefold().split())
+
+
+def resolve_programme(typed: str, rows: list[dict[str, Any]]) -> tuple[Optional[dict[str, Any]], list[str]]:
+    """Match a hand-typed programme name to a catalogue row.
+
+    Order: case/whitespace-insensitive equality, then a name or parenthesised acronym that
+    contains / is contained in the typed text (e.g. "MDAG" -> "...(MDAG)"). A tier only wins
+    when it identifies exactly ONE distinct programme name; an ambiguous typed name never
+    silently picks a grant. Returns (row, []) on a match, else (None, up to 5 suggestions).
+    """
+    target = _norm_name(typed)
+    if not target:
+        return None, []
+
+    def distinct(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        seen: dict[str, dict[str, Any]] = {}
+        for row in matches:
+            seen.setdefault(_norm_name(row.get("programme_name") or ""), row)
+        return list(seen.values())
+
+    equal = distinct([r for r in rows if _norm_name(r.get("programme_name") or "") == target])
+    if len(equal) == 1:
+        return equal[0], []
+
+    def contains(row: dict[str, Any]) -> bool:
+        name = _norm_name(row.get("programme_name") or "")
+        words = set(re.findall(r"[a-z0-9]+", name))
+        return bool(name) and (target in name or name in target or (len(target) >= 3 and target in words))
+
+    partial = distinct([r for r in rows if contains(r)])
+    if len(partial) == 1:
+        return partial[0], []
+    pool = partial or distinct(rows)
+    return None, [str(r.get("programme_name")) for r in pool[:5]]
+
+
 async def fetch_grant_node(state: GrantDraftState, config: RunnableConfig | None = None) -> dict[str, Any]:
     """Look up the selected grant in `grant_database`. Degrades gracefully:
     a missing programme or unavailable Supabase sets `error` and downstream
@@ -107,7 +146,20 @@ async def fetch_grant_node(state: GrantDraftState, config: RunnableConfig | None
         return {"error": "Grant database is temporarily unavailable.", "grant_record": None}
 
     if not rows:
-        return {"error": f"Grant programme not found: {programme_name}", "grant_record": None}
+        # The programme field is free text, so a hand-typed name ("cip sprint", "MDAG") misses
+        # the exact match. Resolve it against the active catalogue before giving up.
+        try:
+            catalogue = await (
+                supabase.table("grant_database").select("*").eq("is_active", True).limit(200).execute()
+            )
+            match, candidates = resolve_programme(programme_name, catalogue.data or [])
+        except Exception as exc:
+            log.warning("grant_database_lookup_failed", error=str(exc), programme=programme_name)
+            return {"error": "Grant database is temporarily unavailable.", "grant_record": None}
+        if match is None:
+            hint = f" Did you mean: {'; '.join(candidates)}?" if candidates else ""
+            return {"error": f"Grant programme not found: {programme_name}.{hint}", "grant_record": None}
+        rows = [match]
 
     tool_calls = list(state.get("tool_calls") or [])
     tool_calls.append({"tool": "fetch_grant", "programme": programme_name, "found": True})

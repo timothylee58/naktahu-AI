@@ -1,0 +1,52 @@
+name: Grant database audit
+
+# Read-only. Lists what grant_database holds (counts, stale deadlines, verification age,
+# missing fields, duplicate names) and tests typed names against the draft generator's
+# exact-match lookup. Manual: dispatch it, or push a change to .github/grant-audit-trigger.txt
+# on a claude/** branch (optional `try=` line: names separated by semicolons).
+
+on:
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "Names to test against the exact-match lookup, separated by semicolons"
+        type: string
+        default: ""
+  push:
+    branches: ["claude/**"]
+    paths: [".github/grant-audit-trigger.txt"]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+      - name: Resolve names
+        working-directory: .
+        env:
+          IN_NAMES: ${{ github.event.inputs.names }}
+        run: |
+          n="$IN_NAMES"
+          if [ -z "$n" ]; then n=$(sed -n 's/^try=//p' .github/grant-audit-trigger.txt 2>/dev/null | head -n1); fi
+          case "$n" in *[!A-Za-z0-9\ \;.\(\)-]*) echo "names may only contain letters, digits, spaces, ';', '.', '(', ')' and '-'" >&2; exit 1;; esac
+          echo "AUDIT_NAMES=$n" >> "$GITHUB_ENV"
+      - name: Audit grant_database
+        env:
+          PYTHONPATH: .
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -o pipefail
+          python -m scripts.grant_audit --try "$AUDIT_NAMES" | tee "$RUNNER_TEMP/audit.txt"
+          { echo '### Grant database audit'; echo '```'; cat "$RUNNER_TEMP/audit.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
