@@ -14,6 +14,7 @@ import { ThinkingIndicator } from './ThinkingIndicator';
 import { ResponseActions } from './ResponseActions';
 import { SuggestionChips } from './SuggestionChips';
 import { TranslateControl } from './TranslateControl';
+import { shouldWarnLowConfidence } from '@/lib/answer-warning';
 
 type TranslateLang = 'bm' | 'en' | 'zh';
 
@@ -28,6 +29,8 @@ interface AssistantBubbleProps {
   tokens: string[];
   citations: Citation[];
   confidence: number | null;
+  /** Flagged for follow-up by the backend (metadata.needs_clarification). */
+  needsClarification?: boolean;
   isStreaming: boolean;
   isThinking?: boolean;
   onRegenerate?: () => void;
@@ -43,7 +46,6 @@ interface AssistantBubbleProps {
 
 type ChatBubbleProps = UserBubbleProps | AssistantBubbleProps;
 
-const LOW_CONFIDENCE_THRESHOLD = 0.4;
 
 const spring = { duration: 0.28, ease: [0.16, 1, 0.3, 1] } as const;
 
@@ -69,8 +71,8 @@ export function ChatBubble(props: ChatBubbleProps) {
     );
   }
 
-  const { content, tokens, citations, confidence, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact, isError = false } = props;
-  const hasLowConfidence = confidence !== null && confidence < LOW_CONFIDENCE_THRESHOLD;
+  const { content, tokens, citations, confidence, needsClarification, isStreaming, isThinking = false, onRegenerate, query, domain, language, accessToken, suggestions = [], onSuggestionSelect, agencyContact, isError = false } = props;
+  const hasLowConfidence = shouldWarnLowConfidence(confidence, needsClarification);
 
   // Translation is a display-only swap on top of the already-finished
   // answer — never re-runs retrieval/synthesis, never mutates `content`

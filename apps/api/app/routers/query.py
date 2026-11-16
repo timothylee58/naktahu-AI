@@ -277,6 +277,14 @@ async def _sse_generator(
             # what actually happened. See app/models/state.py.
             "domain": final_state.get("domain") or "general",
             "language": final_state.get("language", "en"),
+            # The answer was flagged for follow-up: the analyst's evidence was thin (fewer than two
+            # supporting chunks, or nothing relevant) or the answer said the context lacks it. The
+            # synthesiser then hedges the text, so a high `confidence` next to a hedged answer is
+            # not a contradiction the client has to guess at.
+            "needs_clarification": bool(final_state.get("needs_clarification", False)),
+            # The finished answer said the provided context has no answer; confidence was capped
+            # below the 0.6 bar by app/agents/answer_support.py.
+            "answer_declined": bool(final_state.get("answer_declined", False)),
         }
         agency_contact = final_state.get("agency_contact")
         if agency_contact:

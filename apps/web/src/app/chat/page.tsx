@@ -197,6 +197,7 @@ function ChatPageInner() {
                 tokens: [],
                 citations,
                 confidence,
+                needsClarification: metadata?.needs_clarification === true,
                 isStreaming: false,
                 query: lastUserQuery.current,
                 domain: metadata?.domain,
@@ -597,6 +598,7 @@ function ChatPageInner() {
               tokens={msg.tokens ?? []}
               citations={msg.citations ?? []}
               confidence={msg.confidence}
+              needsClarification={msg.needsClarification}
               isStreaming={msg.isStreaming}
               isThinking={msg.isStreaming && (msg.tokens?.length ?? 0) === 0}
               onRegenerate={!msg.isStreaming ? handleRegenerate : undefined}

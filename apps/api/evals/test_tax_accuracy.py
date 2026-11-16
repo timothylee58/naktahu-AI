@@ -127,6 +127,67 @@ def test_the_company_relief_figure_is_never_attributed_to_companies() -> None:
     assert score_answer("Resident companies pay 24%.", case)[0]
 
 
+# ── outcome classification ───────────────────────────────────────────────────
+
+OUTCOME_CORRECT = "correct"                    # answered, matches the key, not flagged
+OUTCOME_HEDGED_CORRECT = "hedged-correct"      # matches the key, but the pipeline flagged it for follow-up
+OUTCOME_FLAGGED_MISS = "flagged-miss"          # no match, and the pipeline itself reported low confidence
+OUTCOME_CONFIDENTLY_WRONG = "confidently-wrong"  # no match (or answered an out-of-corpus case) at confidence >= the bar
+
+
+def classify_outcome(case: dict[str, Any], answer: str, confidence: float, clarified: bool) -> str:
+    """What a user would experience, not just whether the key matched.
+
+    The old scorer counted a correct answer the pipeline flagged for follow-up (needs_clarification,
+    e.g. a single supporting chunk) as wrong, so the eval measured the evidentiary gate, not the
+    answers. A flagged-but-correct answer is reported as its own outcome. Nothing is hidden: strict
+    accuracy still counts only OUTCOME_CORRECT, and a wrong answer at or above the 0.6 bar is
+    confidently wrong whether or not it was flagged.
+    """
+    matches = score_answer(answer, case)[0]
+    if case.get("expect_low_confidence"):
+        declined = clarified or confidence < _CONFIDENCE_THRESHOLD
+        if declined and matches:
+            return OUTCOME_CORRECT
+    elif matches:
+        return OUTCOME_HEDGED_CORRECT if clarified else OUTCOME_CORRECT
+    return OUTCOME_CONFIDENTLY_WRONG if confidence >= _CONFIDENCE_THRESHOLD else OUTCOME_FLAGGED_MISS
+
+
+def _case(case_id: str) -> dict[str, Any]:
+    return next(c for c in _CASES if c["id"] == case_id)
+
+
+_EPF_CORRECT = "EPF contributions are limited to RM4,000 and life insurance to RM3,000, RM7,000 in total."
+
+
+def test_a_correct_answer_that_is_not_flagged_is_correct() -> None:
+    assert classify_outcome(_case("epf-relief"), _EPF_CORRECT, 0.8, False) == OUTCOME_CORRECT
+
+
+def test_a_correct_answer_the_pipeline_flagged_is_hedged_correct_not_wrong() -> None:
+    # The EPF answer came back correct at 0.68 with needs_clarification set (one supporting chunk).
+    assert classify_outcome(_case("epf-relief"), _EPF_CORRECT, 0.68, True) == OUTCOME_HEDGED_CORRECT
+
+
+def test_a_wrong_answer_at_or_above_the_bar_is_confidently_wrong_even_when_flagged() -> None:
+    wrong = "EPF contributions are limited to RM9,000."
+    assert classify_outcome(_case("epf-relief"), wrong, 0.83, False) == OUTCOME_CONFIDENTLY_WRONG
+    assert classify_outcome(_case("epf-relief"), wrong, 0.83, True) == OUTCOME_CONFIDENTLY_WRONG
+
+
+def test_a_miss_the_pipeline_itself_reported_as_low_confidence_is_a_flagged_miss() -> None:
+    assert classify_outcome(_case("epf-relief"), "I could not find that.", 0.35, True) == OUTCOME_FLAGGED_MISS
+
+
+def test_an_out_of_corpus_question_is_correct_only_when_it_is_declined() -> None:
+    case = _case("out-of-corpus-singapore")
+    decline = "I don't have information on Singapore's corporate tax rate."
+    assert classify_outcome(case, decline, 0.35, True) == OUTCOME_CORRECT
+    assert classify_outcome(case, decline, 0.75, False) == OUTCOME_CONFIDENTLY_WRONG  # answered at 0.75
+    assert classify_outcome(case, "Singapore pays 24%.", 0.35, True) == OUTCOME_FLAGGED_MISS  # declined, but quoted a Malaysian figure
+
+
 # ── live run ─────────────────────────────────────────────────────────────────
 
 _LIVE = os.environ.get("RUN_LIVE_EVALS") == "1" and (
@@ -152,45 +213,53 @@ async def test_live_accuracy_and_confidence_calibration(capsys: pytest.CaptureFi
     rows: list[dict[str, Any]] = []
     for case in _CASES:
         answer, confidence, clarified = await _run_pipeline(case["query"])
-        if case.get("expect_low_confidence"):
-            declined = clarified or confidence < _CONFIDENCE_THRESHOLD
-            correct = declined and score_answer(answer, case)[0]
-        else:
-            correct = not clarified and score_answer(answer, case)[0]
         rows.append({
-            "id": case["id"], "status": case["key_status"], "confidence": confidence, "correct": correct,
+            "id": case["id"], "status": case["key_status"], "confidence": confidence,
+            "outcome": classify_outcome(case, answer, confidence, clarified),
             "answerable": not case.get("expect_low_confidence"), "clarified": clarified,
             "answer": answer, "reasons": score_answer(answer, case)[1],
             "query": case["query"], "note": case.get("note", ""),
         })
 
+    def count(outcome: str, subset: list[dict[str, Any]] | None = None) -> int:
+        return sum(1 for r in (rows if subset is None else subset) if r["outcome"] == outcome)
+
     with capsys.disabled():
-        print("\n  id                          key_status                       conf  correct")
+        print("\n  id                          key_status                       conf  outcome")
         for r in rows:
-            print(f"  {r['id']:<27} {r['status']:<32} {r['confidence']:.2f}  {r['correct']}")
+            print(f"  {r['id']:<27} {r['status']:<32} {r['confidence']:.2f}  {r['outcome']}")
         for r in rows:
-            if not r["correct"]:
-                print(f"\n--- WRONG: {r['id']} (confidence {r['confidence']:.2f}, clarified={r['clarified']})")
+            if r["outcome"] != OUTCOME_CORRECT:
+                print(f"\n--- {r['outcome'].upper()}: {r['id']} (confidence {r['confidence']:.2f}, clarified={r['clarified']})")
                 print(f"Q: {r['query']}")
-                print(f"Why scored wrong: {'; '.join(r['reasons']) or 'declined/clarified instead of answering'}")
+                print(f"Why scored: {'; '.join(r['reasons']) or 'matches the key'}")
                 print(f"Key note: {r['note']}")
                 print(f"A: {r['answer'][:1200]!r}")
-        accuracy = sum(r["correct"] for r in rows) / len(rows)
-        print(f"  accuracy: {accuracy:.0%} over {len(rows)} cases")
+        n = len(rows)
+        print(f"  accuracy: {count(OUTCOME_CORRECT) / n:.0%} over {n} cases")  # strict: correct and not flagged
+        print(
+            "  outcomes: "
+            f"{count(OUTCOME_CORRECT)} correct, {count(OUTCOME_HEDGED_CORRECT)} hedged-correct, "
+            f"{count(OUTCOME_FLAGGED_MISS)} flagged-miss, {count(OUTCOME_CONFIDENTLY_WRONG)} confidently-wrong"
+        )
+        print(f"  user-visible accuracy (correct + hedged-correct): {(count(OUTCOME_CORRECT) + count(OUTCOME_HEDGED_CORRECT)) / n:.0%}")
         for lo, hi in ((0.0, 0.6), (0.6, 0.8), (0.8, 1.01)):
             bucket = [r for r in rows if lo <= r["confidence"] < hi]
             if bucket:
-                print(f"  confidence {lo:.1f}-{min(hi, 1.0):.1f}: {sum(r['correct'] for r in bucket)}/{len(bucket)} correct")
+                print(
+                    f"  confidence {lo:.1f}-{min(hi, 1.0):.1f}: {count(OUTCOME_CORRECT, bucket)} correct, "
+                    f"{count(OUTCOME_HEDGED_CORRECT, bucket)} hedged-correct of {len(bucket)}"
+                )
 
     # A broken pipeline (no retrieval, LLM down) answers nothing, so nothing is confidently
     # wrong and the check below would pass vacuously. Require that answerable cases were
     # actually answered before trusting the result.
     answerable = [r for r in rows if r["answerable"]]
-    answered = [r for r in answerable if not r["clarified"]]
+    answered = [r for r in answerable if r["outcome"] != OUTCOME_FLAGGED_MISS]
     assert len(answered) * 2 >= len(answerable), (
         f"only {len(answered)}/{len(answerable)} answerable cases got an answer: "
         "the pipeline did not run properly (check Supabase/LLM credentials), so this run measures nothing"
     )
 
-    confidently_wrong = [r["id"] for r in rows if r["confidence"] >= _CONFIDENCE_THRESHOLD and not r["correct"]]
+    confidently_wrong = [r["id"] for r in rows if r["outcome"] == OUTCOME_CONFIDENTLY_WRONG]
     assert not confidently_wrong, f"wrong answers at confidence >= {_CONFIDENCE_THRESHOLD}: {confidently_wrong}"

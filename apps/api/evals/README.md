@@ -201,10 +201,24 @@ for out-of-corpus questions, and one arithmetic case (stamp duty on RM600,000).
 
 `test_tax_accuracy.py` always runs the key-shape checks and the scorer regression
 (the wrong answer a user saw must score wrong). With `RUN_LIVE_EVALS=1` and live keys
-it runs every case through the real pipeline and prints accuracy plus a
+it runs every case through the real pipeline and prints each outcome, accuracy and a
 confidence-calibration table; it fails if any answer is wrong at confidence >= 0.6,
 because the trust layer's job is to make that count zero. To grow it, add the
 questions your users actually ask.
+
+Every case gets one **outcome** (`classify_outcome`), chosen by what a user would see:
+
+| outcome | meaning |
+|---|---|
+| `correct` | matches the key and the pipeline did not flag it (an out-of-corpus case is correct when declined) |
+| `hedged-correct` | matches the key, but the pipeline flagged it for follow-up (`needs_clarification`, e.g. only one supporting chunk). Not wrong: the user gets the right answer with a hedge |
+| `flagged-miss` | does not match, and the pipeline itself reported confidence below 0.6: an honest "I don't know" |
+| `confidently-wrong` | does not match at confidence >= 0.6 (flagged or not), or an out-of-corpus question was answered: the only outcome that fails the run |
+
+The headline `accuracy` counts only `correct`; the `user-visible accuracy` line adds
+`hedged-correct`, so the evidentiary gate's cost is visible without hiding anything. Single
+runs vary by about +/-8 points (the model's answers differ run to run): compare runs on the
+cases that fail the same way every time, and repeat a run before reading a trend into it.
 
 ### 6. `grant_agent_cases.jsonl` — does the Eligibility Agent decide correctly?
 
