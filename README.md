@@ -119,6 +119,52 @@ A standalone crowdsourced "how busy is it right now" tool for Malaysian warungs/
         └─────────────────────┘
 ```
 
+
+### How a query moves through the core pipeline
+
+The box art above shows the happy path only. The real graph (`apps/api/app/agents/graph.py`) has a few more
+steps and branches, described here. State is one `AgentState` dict passed node to node.
+
+| Node | What it does | When it fails or has nothing |
+|---|---|---|
+| `router_node` | Calls ILMU once to classify the query: **language** (BM or EN, which is also the language of the answer), **domain** (one of 13, e.g. `tax`, `business`, `property`) and a short **intent**. It also flags live-status and structured Parliament queries. If ILMU's reply does not parse as JSON it retries once with a larger token budget. | Two unparseable replies leave `domain=None`, so retrieval later searches every domain. |
+| `guard_node` | Safety check. A harmful-intent keyword list is always on. An optional ILMU intent check (`GUARD_LLM_CHECK_ENABLED`, off by default) fails open. The domain label is never a reason to block. | A blocked query ends the graph after a refusal is streamed. |
+| `rag_node` | Looks in Redis first, keyed by `sha256(query\|language\|domain)` with a one-hour TTL. On a miss it embeds the query with the active embedding profile and runs a hybrid search (0.7 cosine + 0.3 keyword) over `document_chunks`, filtered to the router's domain. It keeps the top 5 chunks (12 candidates first when `RERANK_ENABLED` is on). | If the domain-filtered search returns nothing it searches again with no filter. A search error returns no chunks. |
+| `analyst_node` | The trust layer. Drops superseded and expired chunks, sets aside announced-but-not-yet-effective ones as *pending changes*, scores the rest, picks up to 3 citations and computes a confidence. | Confidence below **0.6** sets `needs_clarification`. |
+| `retrieval_retry_node` | See below. | Skipped unless its conditions hold. |
+| `synthesiser_node` | Streams the answer from ILMU, in the query's language. | Falls back to Anthropic only when ILMU fails **before** its first token, so a partial answer is never followed by a second one. |
+| `clarification` | Sends a fixed "please rephrase" prompt in the query's language. | |
+
+**Branches the diagram leaves out**
+
+- **Blocked** (`guard`): ends the graph.
+- **Live status** (`"Is X packed right now?"`) goes to `warung_watch_node` and **structured Parliament lookups** (a bill's vote
+  record, one MP) go to `parliament_query_node`. Both still pass `guard` first, then answer directly from live or relational
+  data and skip retrieval, analysis and synthesis.
+- **Low confidence** has two outcomes. If some usable material was retrieved, the synthesiser still answers, hedged, with a
+  targeted follow-up question. Only when nothing was retrieved, or nothing retrieved is relevant, does the graph take the bare
+  `clarification` node.
+- **Retry** (`retrieval_retry_node`): when the analyst scores a **domain-filtered, freshly searched** query below 0.6, the graph
+  runs **one** search with no domain filter, reusing the embedding, merges it with the first chunks and re-scores them through the
+  same analyst. The new set is kept only if confidence strictly improves. This catches a misclassified domain, for example a
+  question filed under `property` whose answer lives under `tax`. It never loops and never rewrites the query. It is skipped
+  on a cache hit. Switch it off with `RETRIEVAL_RETRY_ENABLED=false`.
+
+**How the analyst scores a chunk**
+
+Relevance counts for up to half the score. A chunk gets credit for being an official source (+0.3) and for having a title
+(+0.2) **only if its relevance reaches 0.4** (`ANALYST_RELEVANCE_FLOOR`). A government URL on an off-topic document is not
+evidence, and such a chunk is never cited. Keyword overlap ignores common English and Bahasa Malaysia words and the word
+"Malaysia". A stale chunk loses 0.15, so a fresher chunk on the same topic outranks it. An answer needs at least two chunks that
+clear a minimum score. When confidence is low the reason is logged as one of `no_usable_chunks`, `weak_relevance`,
+`too_few_supporting` or `no_relevant_evidence`.
+
+**What the browser receives.** The answer streams over SSE (`token`, `citation`, `metadata`, `done`, `error`), at most 3 citation
+chips per answer, each from real chunk metadata and never invented.
+
+The vertical agents (grants, compliance, immigration and so on) run their own LangGraph graphs and share the router, retrieval and
+tool layers, but not this graph.
+
 ---
 
 ## Monorepo layout
