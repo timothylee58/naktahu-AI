@@ -1,6 +1,7 @@
 """analyst_node — score citations, set confidence, flag clarification."""
 from __future__ import annotations
 
+import os
 import re
 
 import structlog
@@ -26,6 +27,29 @@ _GOV_DOMAIN_RE = re.compile(
 )
 
 _CLARIFICATION_THRESHOLD = 0.6
+# A chunk below this relevance earns no authority credit (gov URL, title) and is
+# never cited. Without it every .gov.my chunk starts at 0.5 whatever it says, so
+# an off-topic official document needs only ~0.2 relevance to clear the 0.6 bar
+# and gets shown as an "Official source". Tune from analyst_low_confidence logs.
+# Calibration (bge-m3 profile): hybrid similarity is 0.7*cosine + 0.3*bm25 rank.
+# Against a company-registration chunk, Budget chunks (95% of the corpus) have a
+# median cosine of 0.44 and a max of 0.60, on-topic chunks 0.67+, so the usable
+# band is narrow and the stopword-free keyword overlap does most of the work.
+# Override with ANALYST_RELEVANCE_FLOOR (the openai profile scores lower).
+_RELEVANCE_FLOOR = float(os.environ.get("ANALYST_RELEVANCE_FLOOR", "0.4"))
+
+# Function words and the country name appear in nearly every chunk, so counting
+# them as keyword overlap makes any English or Bahasa Malaysia chunk look related
+# to any question.
+_STOPWORDS = frozenset(
+    "a an the and or of to in on for with without is are was were be been being am "
+    "what which who whom whose how when where why do does did can could should would will shall may might must "
+    "i me my you your we our us he she it its they them their this that these those at by from as about into "
+    "than then there here if not no so such any some also very more most "
+    "apa yang dan atau di ke dari untuk dengan adalah ialah itu ini saya anda kami kita boleh bagaimana "
+    "macam mana bila siapa berapa pada oleh dalam akan telah sudah juga tidak ada satu "
+    "malaysia malaysian".split()  # noqa: SIM905 - a flat string is easier to scan than a 100-item list
+)
 # Staleness windows and the current/announced/expired/superseded rules live in
 # app.agents.freshness, shared with the Compliance Drafter report builder.
 # Recency penalty applied to a stale chunk's relevance/authority score. Enough
@@ -127,7 +151,10 @@ def _relevance_signal(chunk: ChunkResult, query: str) -> float:
     chunk scores at least as high as lexical overlap alone, so anything that
     answers today keeps answering; only semantic-only matches are lifted.
     """
-    query_tokens = set(re.findall(r"\w+", query.lower()))
+    all_query_tokens = set(re.findall(r"\w+", query.lower()))
+    # A query made only of stopwords falls back to all its tokens rather than
+    # scoring zero.
+    query_tokens = all_query_tokens - _STOPWORDS or all_query_tokens
     content_tokens = set(re.findall(r"\w+", chunk.content.lower()))
     overlap = 0.0
     if query_tokens:
@@ -136,20 +163,34 @@ def _relevance_signal(chunk: ChunkResult, query: str) -> float:
     return min(max(overlap, similarity), 1.0)
 
 
+def _has_authority(chunk: ChunkResult) -> bool:
+    """Official source: a Malaysian government/education domain, or a source the
+    registry tiers as official (e.g. ssm.com.my, which is not on .gov.my)."""
+    if not chunk.source_url:
+        return False
+    return bool(_GOV_DOMAIN_RE.match(chunk.source_url)) or chunk.source_tier == "official"
+
+
+def _is_relevant(chunk: ChunkResult, query: str) -> bool:
+    return _relevance_signal(chunk, query) >= _RELEVANCE_FLOOR
+
+
 def _score_chunk(chunk: ChunkResult, query: str) -> float:
-    score = 0.0
-
-    # URL is a real Malaysian government / education domain (+0.3)
-    if chunk.source_url and _GOV_DOMAIN_RE.match(chunk.source_url):
-        score += 0.3
-
-    # Non-empty source title (+0.2)
-    if chunk.source_title and chunk.source_title.strip():
-        score += 0.2
-
+    relevance = _relevance_signal(chunk, query)
     # Relevance — lexical overlap OR semantic similarity, whichever is stronger
     # (+0.5 max).
-    score += _relevance_signal(chunk, query) * 0.5
+    score = relevance * 0.5
+
+    # Authority credit only counts for a chunk that is about the question: a
+    # government URL on an off-topic document says nothing about the answer.
+    if relevance >= _RELEVANCE_FLOOR:
+        # Official source (+0.3)
+        if _has_authority(chunk):
+            score += 0.3
+
+        # Non-empty source title (+0.2)
+        if chunk.source_title and chunk.source_title.strip():
+            score += 0.2
 
     return round(min(score, 1.0), 4)
 
@@ -239,6 +280,7 @@ async def analyse(state: AgentState, *, first_pass: bool = True) -> dict:
             "citations": [],
             "confidence_score": 0.0,
             "needs_clarification": True,
+            "no_relevant_evidence": False,
             # All-superseded/expired is itself a staleness signal worth surfacing.
             "stale_warning": superseded_count > 0 or bool(expired),
             "answer_as_of": None,
@@ -268,13 +310,19 @@ async def analyse(state: AgentState, *, first_pass: bool = True) -> dict:
     citations: list[Citation] = [
         _build_citation(chunk, score, domain, pending=announced_only)
         for score, _, chunk in top3
-        if chunk.source_url  # omit fabricated / empty URLs per CLAUDE.md
+        # Omit fabricated / empty URLs per CLAUDE.md, and sources that are not
+        # about the question: an irrelevant chip still reads as "Official source".
+        if chunk.source_url and _is_relevant(chunk, query)
     ]
     if pending and not announced_only:
         # The answer will also mention the announced change, so cite it too —
         # keeping the 1-3 chip limit by giving up the weakest current citation.
         best_pending = pending[0]
-        if best_pending.source_url and all(c["url"] != best_pending.source_url for c in citations):
+        if (
+            best_pending.source_url
+            and _is_relevant(best_pending, query)
+            and all(c["url"] != best_pending.source_url for c in citations)
+        ):
             pending_citation = _build_citation(best_pending, pending_scored[0][0], domain, pending=True)
             citations = citations[:2] + [pending_citation]
 
@@ -300,9 +348,17 @@ async def analyse(state: AgentState, *, first_pass: bool = True) -> dict:
         needs_clarification = True
         too_few_supporting = True
 
+    no_relevant_evidence = not any(_is_relevant(chunk, query) for chunk in evidence)
+    if no_relevant_evidence:
+        needs_clarification = True
+
     if first_pass and needs_clarification:
         _record_low_confidence(
-            "too_few_supporting" if too_few_supporting else "weak_relevance",
+            "no_relevant_evidence"
+            if no_relevant_evidence
+            else "too_few_supporting"
+            if too_few_supporting
+            else "weak_relevance",
             domain,
             state,
             retrieved=len(retrieved),
@@ -332,6 +388,7 @@ async def analyse(state: AgentState, *, first_pass: bool = True) -> dict:
         "citations": citations,
         "confidence_score": confidence,
         "needs_clarification": needs_clarification,
+        "no_relevant_evidence": no_relevant_evidence,
         "stale_warning": stale_warning,
         "answer_as_of": answer_as_of,
         "stale_warnings": stale_warnings,

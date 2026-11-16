@@ -657,3 +657,111 @@ async def test_analyst_ignores_unrecognised_source_tier_value() -> None:
     result = await analyst_node({"query": "cukai pendapatan", "retrieved_chunks": [chunk]})
 
     assert "source_tier" not in result["citations"][0]
+
+
+_SSM_QUERY = "What are the steps to register a company with SSM Malaysia?"
+_BUDGET_TEXT = (
+    "The Government will implement the measures that are to be announced in the Budget "
+    "and what the people of Malaysia are asked to do with the allocation for the year"
+)
+
+
+def _budget_chunk(chunk_id: str, similarity: float = 0.2) -> ChunkResult:
+    return _make_chunk(
+        source_url="https://belanjawan.mof.gov.my/pdf/belanjawan2027/ucapan/ub27.pdf",
+        source_title="Ucapan Belanjawan 2027",
+        content=_BUDGET_TEXT,
+        ministry="Kementerian Kewangan Malaysia",
+        similarity=similarity,
+        chunk_id=chunk_id,
+    )
+
+
+def test_stopwords_and_country_name_are_not_relevance() -> None:
+    """Function words and 'Malaysia' appear in every chunk; they must not count
+    as keyword overlap with a question about something else."""
+    assert _relevance_signal(_budget_chunk("b", similarity=0.0), _SSM_QUERY) < 0.3
+
+
+def test_official_but_off_topic_chunk_earns_no_authority_credit() -> None:
+    assert _score_chunk(_budget_chunk("b", similarity=0.1), _SSM_QUERY) < 0.1
+
+
+def test_relevant_official_chunk_keeps_authority_credit() -> None:
+    chunk = _make_chunk(content="steps to register a company with ssm", similarity=0.8)
+    assert _score_chunk(chunk, "register company ssm") > 0.9
+
+
+@pytest.mark.asyncio
+async def test_off_topic_official_sources_are_not_cited_and_force_clarification() -> None:
+    chunks = [_budget_chunk("b1"), _budget_chunk("b2"), _budget_chunk("b3")]
+
+    result = await analyst_node({"query": _SSM_QUERY, "domain": "business", "retrieved_chunks": chunks})
+
+    assert result["needs_clarification"] is True
+    assert result["no_relevant_evidence"] is True
+    assert result["citations"] == []
+    assert result["confidence_score"] < 0.6
+
+
+@pytest.mark.asyncio
+async def test_one_relevant_chunk_among_off_topic_ones_is_the_only_citation() -> None:
+    relevant = _make_chunk(
+        source_url="https://www.ssm.com.my/register",
+        source_title="Company registration",
+        content="steps to register a company with ssm",
+        similarity=0.85,
+        chunk_id="r",
+    )
+    result = await analyst_node({
+        "query": _SSM_QUERY,
+        "domain": "business",
+        "retrieved_chunks": [_budget_chunk("b1"), relevant, _budget_chunk("b2")],
+    })
+
+    assert result["no_relevant_evidence"] is False
+    assert [c["url"] for c in result["citations"]] == ["https://www.ssm.com.my/register"]
+
+
+def test_route_sends_no_relevant_evidence_to_bare_clarification() -> None:
+    from app.agents.graph import _route_after_analyst
+
+    chunks = [_budget_chunk("b1")]
+    assert _route_after_analyst(
+        {"needs_clarification": True, "no_relevant_evidence": True, "retrieved_chunks": chunks}
+    ) == "clarification"
+    assert _route_after_analyst(
+        {"needs_clarification": True, "no_relevant_evidence": False, "retrieved_chunks": chunks}
+    ) == "synthesiser"
+
+
+def test_no_relevant_evidence_still_allows_the_unscoped_retry() -> None:
+    """The retry is the recovery path for a mis-scoped domain, so the flag must
+    not empty retrieved_chunks (which would disable it)."""
+    from app.agents.retrieval_retry_node import should_retry
+
+    state = {
+        "needs_clarification": True,
+        "no_relevant_evidence": True,
+        "domain": "business",
+        "retrieved_chunks": [_budget_chunk("b1")],
+        "_query_embedding": [0.1] * 8,
+    }
+    assert should_retry(state) is True
+
+
+def test_official_tier_source_off_gov_my_gets_authority_credit() -> None:
+    """ssm.com.my is not on .gov.my, but the registry tiers it official."""
+    ssm = _make_chunk(
+        source_url="https://www.ssm.com.my/register", content="register company ssm steps", similarity=0.8,
+        source_tier="official",
+    )
+    community = _make_chunk(
+        source_url="https://example.com/register", content="register company ssm steps", similarity=0.8,
+        source_tier="community",
+    )
+    assert _score_chunk(ssm, "register company ssm") == _score_chunk(
+        _make_chunk(content="register company ssm steps", similarity=0.8), "register company ssm"
+    )
+    gap = _score_chunk(ssm, "register company ssm") - _score_chunk(community, "register company ssm")
+    assert gap == pytest.approx(0.3)

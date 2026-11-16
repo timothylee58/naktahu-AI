@@ -56,6 +56,10 @@ class AgentState(TypedDict, total=False):
     citations: list[Citation]
     confidence_score: float
     needs_clarification: bool
+    # True when retrieval returned chunks but none cleared analyst_node's
+    # relevance floor, i.e. the corpus has nothing on-topic. Routes to the bare
+    # clarification node instead of synthesising from unrelated documents.
+    no_relevant_evidence: bool
     streaming_token_buffer: str
     error: Optional[str]
     output_flagged: bool

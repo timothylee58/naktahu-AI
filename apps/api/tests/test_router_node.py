@@ -479,3 +479,43 @@ async def test_router_node_rejects_scam_check_even_if_llm_outputs_it_anyway() ->
         result = await router_node({"query": "is this LHDN link real?"})
 
     assert result["domain"] is None
+
+
+@pytest.mark.asyncio
+async def test_router_retries_with_larger_budget_when_first_reply_is_unparseable() -> None:
+    truncated = _mock_completion('{"language": "en", "domain": "bus')
+    full = _mock_completion('{"language": "en", "domain": "business", "intent": "register company SSM"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        create = AsyncMock(side_effect=[truncated, full])
+        mock_client.chat.completions.create = create
+        result = await router_node({"query": "How do I register a Sdn Bhd with SSM?"})
+
+    assert result["domain"] == "business"
+    assert result["intent"] == "register company SSM"
+    assert [c.kwargs["max_tokens"] for c in create.await_args_list] == [128, 384]
+
+
+@pytest.mark.asyncio
+async def test_router_makes_one_call_when_first_reply_parses() -> None:
+    ok = _mock_completion('{"language": "en", "domain": "tax", "intent": "income tax rate"}')
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        create = AsyncMock(return_value=ok)
+        mock_client.chat.completions.create = create
+        await router_node({"query": "What is the income tax rate?"})
+
+    assert create.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_router_leaves_domain_unset_when_both_attempts_are_unparseable() -> None:
+    junk = _mock_completion("I cannot classify this.")
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        create = AsyncMock(return_value=junk)
+        mock_client.chat.completions.create = create
+        result = await router_node({"query": "How do I register a Sdn Bhd with SSM?"})
+
+    assert result["domain"] is None
+    assert create.await_count == 2

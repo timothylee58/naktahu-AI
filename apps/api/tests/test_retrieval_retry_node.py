@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.agents import retrieval_retry_node as rr
-from app.agents.analyst_node import analyse, analyst_node
+from app.agents.analyst_node import _RELEVANCE_FLOOR, analyse, analyst_node
 from app.agents.graph import _route_after_analyst_or_retry, build_graph
 from app.agents.rag_node import _cache_key, retrieve_unscoped
 from app.core.prometheus_metrics import (
@@ -38,9 +38,10 @@ def _chunk(chunk_id: str, *, similarity: float, gov: bool = True) -> ChunkResult
     )
 
 
-# Scores 0.2 + 0.5*0.1 = 0.25 each: well under the 0.6 bar.
+# Relevance 0.1 is under the analyst's relevance floor, so no authority credit:
+# 0.5*0.1 = 0.05 each, well under the 0.6 bar.
 _WEAK = [_chunk("w1", similarity=0.1, gov=False), _chunk("w2", similarity=0.1, gov=False)]
-# Score 0.3 + 0.2 + 0.5*0.9 = 0.95 each.
+# Score 0.3 + 0.2 + 0.5*0.9 = 0.95 each (above the relevance floor, so authority counts).
 _STRONG = [_chunk("s1", similarity=0.9), _chunk("s2", similarity=0.9), _chunk("s3", similarity=0.9)]
 
 
@@ -223,9 +224,9 @@ async def test_retry_still_applies_the_same_clarification_bar() -> None:
     that only reaches 0.5 is an improvement but must still ask for
     clarification (the trust layer is not loosened)."""
     state = await _weak_state()
-    middling = [  # 0.3 + 0.2 + 0.5*0.0 = 0.5 each, 3 of them
-        _chunk("m1", similarity=0.0),
-        _chunk("m2", similarity=0.0),
+    middling = [  # two at the relevance floor (0.7 each), one off-topic (0.0): mean ~0.43
+        _chunk("m1", similarity=_RELEVANCE_FLOOR),
+        _chunk("m2", similarity=_RELEVANCE_FLOOR),
         _chunk("m3", similarity=0.0),
     ]
     with (
@@ -235,6 +236,7 @@ async def test_retry_still_applies_the_same_clarification_bar() -> None:
         result = await rr.retrieval_retry_node(state)
     assert 0.25 < result["confidence_score"] < 0.6
     assert result["needs_clarification"] is True
+    assert result["no_relevant_evidence"] is False
 
 
 # ── retrieve_unscoped ───────────────────────────────────────────────────────
@@ -256,8 +258,16 @@ async def test_retrieve_unscoped_searches_all_domains_with_given_embedding() -> 
 @pytest.mark.asyncio
 async def test_first_pass_records_weak_relevance_cause() -> None:
     before = _counter(retrieval_low_confidence_total, cause="weak_relevance", domain_scoped="yes")
-    await analyst_node({"query": _QUERY, "domain": "government", "retrieved_chunks": list(_WEAK)})
+    mixed = [_chunk("r1", similarity=_RELEVANCE_FLOOR), _chunk("o1", similarity=0.1), _chunk("o2", similarity=0.1)]
+    await analyst_node({"query": _QUERY, "domain": "government", "retrieved_chunks": mixed})
     assert _counter(retrieval_low_confidence_total, cause="weak_relevance", domain_scoped="yes") == before + 1
+
+
+@pytest.mark.asyncio
+async def test_first_pass_records_no_relevant_evidence_cause() -> None:
+    before = _counter(retrieval_low_confidence_total, cause="no_relevant_evidence", domain_scoped="yes")
+    await analyst_node({"query": _QUERY, "domain": "government", "retrieved_chunks": list(_WEAK)})
+    assert _counter(retrieval_low_confidence_total, cause="no_relevant_evidence", domain_scoped="yes") == before + 1
 
 
 @pytest.mark.asyncio
