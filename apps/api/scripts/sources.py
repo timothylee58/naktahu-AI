@@ -1134,23 +1134,15 @@ SOURCES: tuple[Source, ...] = (
         require_host_suffix="customs.gov.my", extractor="eael_accordion", title="SST: Business FAQ (Customs)",
     ),
     Source(
-        name="lhdn-stamp-duty-faq",
-        url="https://www.hasil.gov.my/wp-content/uploads/Stamp_Duty_FAQ.pdf",
-        kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="en",
-        notes=(
-            "LHDN Stamp Duty FAQ (PDF). UNVERIFIED that it states the tiered transfer rates (1% to RM100,000, "
-            "2% to RM500,000, 3% to RM1 million, 4% above): a search found only the 4% headline rate for land "
-            "transfers. Read the dry-run before a live run, and do not ingest it if the tiers are absent."
-        ),
-        require_host_suffix="hasil.gov.my", identity_terms=("stamp duty",), date_inference="off",
-    ),
-    Source(
         name="lhdn-stamp-duty-first-schedule-guideline",
         url="https://www.hasil.gov.my/wp-content/uploads/garis-panduan-pengenaan-duti-setem-jadual-pertama-as-1949.pdf",
         kind="pdf", domain="tax", ministry="Lembaga Hasil Dalam Negeri (LHDN)", language="bm",
         notes=(
             "LHDN guideline on charging stamp duty under the First Schedule of the Stamp Act 1949 (Bahasa "
-            "Malaysia PDF): item 32 transfer rates. Read the dry-run for the tiers before a live run."
+            "Malaysia PDF, 47 pages). Section C.2.1 (p. 11) states the item 32(a) transfer tiers (RM1 per RM100 "
+            "on the first RM100,000, RM2 up to RM500,000, RM3 up to RM1 million, RM4 above), and 32(aa)/32(ab) "
+            "the foreign-buyer rates (RM4, and RM8 on residential from 1 January 2026). Checked 2026-11-16. "
+            "(LHDN's 'Stamp Duty FAQ' PDF was dropped: it is about e-Stamp procedure, not rates.)"
         ),
         require_host_suffix="hasil.gov.my", identity_terms=("duti setem",), date_inference="off",
     ),

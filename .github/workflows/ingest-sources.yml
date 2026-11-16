@@ -53,6 +53,12 @@ on:
           use 1000 for those, as ingest-budget-2027.yml does.
         type: string
         required: false
+      preview_chars:
+        description: >-
+          Dry-run: how many characters of each chunk to print (blank = 300, max 4000). Raise it to
+          read a table PDF's extracted text before going live.
+        type: string
+        required: false
 
 jobs:
   ingest:
@@ -97,6 +103,7 @@ jobs:
           ILMU_EMBEDDING_MODEL: ""
           EMBEDDING_WRITE_PROFILES: ${{ github.event.inputs.write_profiles || 'openai' }}
           INGEST_LIMIT: ${{ github.event.inputs.limit }}
+          INGEST_PREVIEW_CHARS: ${{ github.event.inputs.preview_chars }}
         run: |
           WRITE_MODE="${{ github.event.inputs.write_mode || 'dry-run' }}"
           LIMIT_FLAG=""

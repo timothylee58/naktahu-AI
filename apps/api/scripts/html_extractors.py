@@ -214,6 +214,15 @@ _LAST_UPDATED = re.compile(r"^\s*last updated on\b", re.IGNORECASE)
 _LEADING_NUMBER = re.compile(r"^\s*\d+[.)]\s*")
 
 
+def _own_text(el: Tag) -> str:
+    parts = [
+        _cell_text(c) if isinstance(c, Tag) else str(c)
+        for c in el.children
+        if not (isinstance(c, Tag) and c.name in ("ul", "ol", "table"))
+    ]
+    return _clean(" ".join(parts))
+
+
 def _content_flow(widget: Tag) -> list[tuple[str, object]]:
     """The widget's paragraphs, list items and tables in document order. Elements nested in a table
     cell or in another list item are skipped: they are rendered with their parent."""
@@ -228,7 +237,9 @@ def _content_flow(widget: Tag) -> list[tuple[str, object]]:
         if el.name == "table":
             flow.append(("table", el))
         else:
-            text = _clean(el.get_text(" ", strip=True))
+            # An <li> can hold the table it introduces ("5. RPGT rate for ...:" then the table), so its
+            # text is its OWN text: get_text() would fold every table cell into the caption.
+            text = _own_text(el) if el.name == "li" else _clean(el.get_text(" ", strip=True))
             if text and not _LAST_UPDATED.match(text):
                 flow.append(("text", f"- {text}" if el.name == "li" else text))
     return flow
@@ -268,7 +279,7 @@ def parse_lhdn_content(html: str, fallback_title: str) -> list[ExtractedItem]:
             caption = pending[-1] if pending else ""
             if pending[:-1]:
                 add(page, pending[:-1])
-            label = _LEADING_NUMBER.sub("", caption).rstrip(": ")
+            label = _LEADING_NUMBER.sub("", caption.removeprefix("- ")).rstrip(": ")
             add(f"{page} — {label}" if label else page, ([caption] if caption else []) + rows)
             pending = []
         if pending:

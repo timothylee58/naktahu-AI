@@ -114,3 +114,25 @@ def test_both_extractors_are_registered_and_reachable_through_parse_html_page() 
     entries = parse_html_page(RPGT_PAGE.encode("utf-8"), "https://www.hasil.gov.my/en/ckht/kadar-cukai-keuntungan-harta-tanah/", "RPGT", "lhdn_content")
     assert len(entries) == 3 and all(e.valid_from is None and e.valid_until is None for e in entries)
     assert all(e.link == "https://www.hasil.gov.my/en/ckht/kadar-cukai-keuntungan-harta-tanah/" for e in entries)
+
+
+_OL_PAGE = """<html><body><h1>Real Property Gains Tax (RPGT) Rates</h1>
+<div class="elementor-widget elementor-widget-text-editor"><ol>
+<li>RPGT rates differ according to disposer categories and holding period of chargeable asset, as per Schedule 5 RPGTA.</li>
+<li>RPGT rate for a disposer under Part I Schedule 5 RPGTA:
+<table><tr><td>Holding Period</td><td colspan="2">Disposal Date</td></tr>
+<tr><td></td><td>1.1.2019 to 31.12.2021</td><td>Starting from the 1.1.2022</td></tr>
+<tr><td>Within 2 years</td><td>30%</td><td>30%</td></tr>
+<tr><td>In the 6th year and thereafter</td><td>5%</td><td>0%</td></tr></table></li>
+</ol></div></body></html>"""
+
+
+def test_a_table_inside_a_list_item_is_not_folded_into_its_caption() -> None:
+    items = parse_lhdn_content(_OL_PAGE, "RPGT (LHDN)")
+    titled = [i for i in items if "Part I Schedule 5" in i.title]
+    assert len(titled) == 1
+    # The caption is just the sentence, and the title carries no list dash.
+    assert titled[0].title == "RPGT (LHDN) — RPGT rate for a disposer under Part I Schedule 5 RPGTA"
+    first_line = titled[0].text.splitlines()[0]
+    assert first_line.startswith("- RPGT rate for a disposer under Part I Schedule 5 RPGTA") and "30%" not in first_line
+    assert any(line.endswith("Starting from the 1.1.2022: 30%") for line in titled[0].text.splitlines())
