@@ -20,6 +20,7 @@ import structlog
 from app.agents.eligibility_agent.state import EligibilityState
 from app.services.cache import get_cached_result, set_cached_result
 from app.services.embedding_profiles import active_profile
+from app.agents.runtime import execute_query
 
 log = structlog.get_logger(__name__)
 
@@ -64,14 +65,11 @@ async def grant_rag_node(state: EligibilityState, supabase: Any) -> dict[str, An
     log.info("grant_rag_cache_miss", key=key[:24])
 
     try:
-        table_res = await (
-            supabase.table("grant_database")
+        table_res = await execute_query(supabase.table("grant_database")
             .select("*")
             .eq("is_active", True)
             .or_(f"eligible_sectors.cs.{{{sector}}},eligible_sectors.cs.{{all}}")
-            .lte("company_age_min_months", profile.get("registered_months", 0))
-            .execute()
-        )
+            .lte("company_age_min_months", profile.get("registered_months", 0)))
         structured = table_res.data or []
     except Exception as exc:
         log.warning("grant_database_query_failed", error=str(exc))
@@ -85,10 +83,10 @@ async def grant_rag_node(state: EligibilityState, supabase: Any) -> dict[str, An
             # must never be compared against it, so skip rather than search.
             raise RuntimeError(f"match_document_chunks has no {active_profile().name} variant")
         embedding = await _embed_query(query)
-        rpc_res = await supabase.rpc(
+        rpc_res = await execute_query(supabase.rpc(
             "match_document_chunks",
             {"query_embedding": embedding, "match_domain": _DOMAIN, "match_count": 8},
-        ).execute()
+        ))
         chunks = rpc_res.data or []
     except Exception as exc:
         log.warning("grant_chunk_rpc_failed", error=str(exc))

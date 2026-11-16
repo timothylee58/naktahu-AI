@@ -39,6 +39,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import structlog
+from app.agents.runtime import execute_query
 
 log = structlog.get_logger(__name__)
 
@@ -159,13 +160,10 @@ async def _fetch_active_grants(
         conditions = ",".join(
             [f"eligible_sectors.cs.{{{s}}}" for s in sectors] + ["eligible_sectors.cs.{all}"]
         )
-        res = await (
-            supabase.table("grant_database")
+        res = await execute_query(supabase.table("grant_database")
             .select("*")
             .eq("is_active", True)
-            .or_(conditions)
-            .execute()
-        )
+            .or_(conditions))
         return list(res.data or []), False
     except Exception as exc:
         log.warning("investor_grant_database_unavailable", error=str(exc))

@@ -27,6 +27,7 @@ from middleware.plan_gate import require_entitlement
 from middleware.rate_limit import apply_query_rate_limit
 from routers._request_fields import Language, normalise_language
 from services.auth import UserContext
+from app.agents.runtime import execute_query
 
 log = structlog.get_logger(__name__)
 
@@ -170,13 +171,10 @@ async def _load_profile(supabase: Any, user_id: str, profile_id: str) -> dict[st
     """Owner-scoped fetch. 404s rather than 403s on someone else's id so the
     endpoint never confirms that another fund's profile exists."""
     try:
-        res = await (
-            supabase.table("investor_profiles")
+        res = await execute_query(supabase.table("investor_profiles")
             .select("*")
             .eq("id", profile_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
+            .eq("user_id", user_id))
         rows = list(res.data or [])
     except Exception as exc:
         log.warning("investor_profile_lookup_failed", error=str(exc))
@@ -251,11 +249,8 @@ async def upsert_profile(
 
     payload = {**body.model_dump(), "user_id": user.user_id}
     try:
-        res = await (
-            supabase.table("investor_profiles")
-            .upsert(payload, on_conflict="user_id")
-            .execute()
-        )
+        res = await execute_query(supabase.table("investor_profiles")
+            .upsert(payload, on_conflict="user_id"))
         rows = list(res.data or [])
     except Exception as exc:
         log.warning("investor_profile_upsert_failed", error=str(exc))
@@ -274,12 +269,9 @@ async def get_profile(
     """Read the caller's own investor profile."""
     supabase = _supabase_or_503(request)
     try:
-        res = await (
-            supabase.table("investor_profiles")
+        res = await execute_query(supabase.table("investor_profiles")
             .select("*")
-            .eq("user_id", user.user_id)
-            .execute()
-        )
+            .eq("user_id", user.user_id))
         rows = list(res.data or [])
     except Exception as exc:
         log.warning("investor_profile_read_failed", error=str(exc))

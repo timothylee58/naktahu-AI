@@ -16,6 +16,8 @@ the client there; nodes read it back through `supabase_from_config()`.
 """
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import Any
 
 
@@ -48,3 +50,20 @@ def supabase_from_config(config: Any) -> Any:
     if not configurable:
         return None
     return configurable.get("supabase")
+
+
+async def execute_query(builder: Any) -> Any:
+    """Run a supabase-py query builder and return its response, for either client flavour.
+
+    `app.state.supabase` is the SYNCHRONOUS client (`create_client`), whose `execute()` is a
+    plain method: `await builder.execute()` raises `TypeError: object APIResponse can't be
+    used in 'await' expression` AFTER the HTTP request has already succeeded, which nodes'
+    broad `except Exception` then reported as "database unavailable". Sync executes run in a
+    worker thread so they do not block the event loop; an async client's coroutine is
+    awaited directly.
+    """
+    execute = builder.execute
+    if inspect.iscoroutinefunction(execute):
+        return await execute()
+    result = await asyncio.to_thread(execute)
+    return await result if inspect.isawaitable(result) else result

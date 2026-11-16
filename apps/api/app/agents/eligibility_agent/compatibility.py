@@ -31,6 +31,7 @@ from itertools import combinations
 from typing import Any, Optional
 
 import structlog
+from app.agents.runtime import execute_query
 
 log = structlog.get_logger(__name__)
 
@@ -93,19 +94,13 @@ async def _load_rules(supabase: Any, names: list[str]) -> Optional[list[dict[str
     """Return rule rows touching any of `names`, or None if the table is
     unavailable (migration 021 not applied yet, or the query failed)."""
     try:
-        res = await (
-            supabase.table("grant_compatibility_rules")
+        res = await execute_query(supabase.table("grant_compatibility_rules")
             .select("*")
-            .in_("programme_a", names)
-            .execute()
-        )
+            .in_("programme_a", names))
         rows_a = list(res.data or [])
-        res_b = await (
-            supabase.table("grant_compatibility_rules")
+        res_b = await execute_query(supabase.table("grant_compatibility_rules")
             .select("*")
-            .in_("programme_b", names)
-            .execute()
-        )
+            .in_("programme_b", names))
         rows_b = list(res_b.data or [])
     except Exception as exc:
         log.warning("grant_compatibility_rules_unavailable", error=str(exc))
@@ -122,12 +117,9 @@ async def _load_rules(supabase: Any, names: list[str]) -> Optional[list[dict[str
 
 async def _load_grants(supabase: Any, names: list[str]) -> list[dict[str, Any]]:
     try:
-        res = await (
-            supabase.table("grant_database")
+        res = await execute_query(supabase.table("grant_database")
             .select("programme_name,agency,stackable_with,conflicts_with,application_url,source_url")
-            .in_("programme_name", names)
-            .execute()
-        )
+            .in_("programme_name", names))
         return list(res.data or [])
     except Exception as exc:
         log.warning("grant_database_lookup_failed", error=str(exc))

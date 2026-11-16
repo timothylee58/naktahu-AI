@@ -381,3 +381,33 @@ class TestConfirmDispatchBilling:
 
         src = inspect.getsource(start_grant_draft_generator)
         assert "deduct_credits" not in src
+
+
+class TestSyncSupabaseClient:
+    """app.state.supabase is the SYNC client: `execute()` is a plain method returning the
+    response. Awaiting it raised TypeError after the HTTP call succeeded, which the node
+    reported as "Grant database is temporarily unavailable" even for a valid programme."""
+
+    @staticmethod
+    def _sync_client(rows):
+        client = MagicMock()
+        chain = client.table.return_value.select.return_value.eq.return_value.limit.return_value
+        chain.execute = MagicMock(return_value=MagicMock(data=rows))  # plain, not awaitable
+        return client
+
+    @pytest.mark.asyncio
+    async def test_exact_match_with_sync_client(self):
+        result = await fetch_grant_node(make_state(), _config(self._sync_client([SAMPLE_GRANT])))
+        assert result["error"] is None
+        assert result["grant_record"] == SAMPLE_GRANT
+
+    @pytest.mark.asyncio
+    async def test_execute_query_handles_sync_and_async(self):
+        from app.agents.runtime import execute_query
+
+        sync_b = MagicMock()
+        sync_b.execute = MagicMock(return_value="sync-result")
+        async_b = MagicMock()
+        async_b.execute = AsyncMock(return_value="async-result")
+        assert await execute_query(sync_b) == "sync-result"
+        assert await execute_query(async_b) == "async-result"

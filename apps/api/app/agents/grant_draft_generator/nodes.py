@@ -16,6 +16,7 @@ from app.agents.grant_draft_generator.state import GrantDraftState
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.runtime import supabase_from_config
+from app.agents.runtime import execute_query
 from app.agents.tools import llm_complete
 
 log = structlog.get_logger(__name__)
@@ -133,13 +134,10 @@ async def fetch_grant_node(state: GrantDraftState, config: RunnableConfig | None
         return {"error": "Grant database is temporarily unavailable.", "grant_record": None}
 
     try:
-        res = await (
-            supabase.table("grant_database")
+        res = await execute_query(supabase.table("grant_database")
             .select("*")
             .eq("programme_name", programme_name)
-            .limit(1)
-            .execute()
-        )
+            .limit(1))
         rows = res.data or []
     except Exception as exc:
         log.warning("grant_database_lookup_failed", error=str(exc), programme=programme_name)
@@ -149,9 +147,7 @@ async def fetch_grant_node(state: GrantDraftState, config: RunnableConfig | None
         # The programme field is free text, so a hand-typed name ("cip sprint", "MDAG") misses
         # the exact match. Resolve it against the active catalogue before giving up.
         try:
-            catalogue = await (
-                supabase.table("grant_database").select("*").eq("is_active", True).limit(200).execute()
-            )
+            catalogue = await execute_query(supabase.table("grant_database").select("*").eq("is_active", True).limit(200))
             match, candidates = resolve_programme(programme_name, catalogue.data or [])
         except Exception as exc:
             log.warning("grant_database_lookup_failed", error=str(exc), programme=programme_name)
