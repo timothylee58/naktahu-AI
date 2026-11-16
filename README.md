@@ -1,6 +1,6 @@
 # NakTahu AI
 
-> **Ilmu tempatan, jawapan seketika.**
+> **Ilmu tempatan, jawapan seketika.** **Local Knowledge, Instant Answer**
 ----
 
 NakTahu AI is a Malaysian-focused, trilingual AI answer engine (Bahasa Malaysia, English, Mandarin) that delivers cited, government-sourced answers across 13 canonical domains — government, education, legal, finance, healthcare, EPF, tax, business, immigration, culture, parliament, property, and welfare. Beyond chat, it's an agentic platform: a set of vertical AI agents for grant matching, compliance drafting, retrenchment guidance, immigration, welfare eligibility, property, health triage, exam prep, investor due diligence, and parliamentary transparency; a crowdsourced live-status tool for local eateries (Warung Watch); and a metered Developer/Knowledge API for external integrators.
