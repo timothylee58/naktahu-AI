@@ -52,6 +52,27 @@ async def check_and_increment_daily_quota(
     return True, used, FREE_DAILY_LIMIT
 
 
+async def refund_daily_quota(
+    redis_client,
+    *,
+    identifier: str,
+    plan: str | None,
+) -> None:
+    """Give back one unit for a question that produced no answer (blocked or failed).
+
+    Never raises: a Redis hiccup here must not turn a handled failure into another one.
+    """
+    if not is_free_plan(plan) or redis_client is None:
+        return
+    key = _quota_key(identifier)
+    try:
+        remaining = await redis_client.decr(key)
+        if remaining < 0:
+            await redis_client.incr(key)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("daily_quota_refund_failed", error=str(exc))
+
+
 async def get_daily_usage(redis_client, identifier: str) -> int:
     if redis_client is None:
         return 0

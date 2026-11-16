@@ -354,6 +354,68 @@ async def test_query_endpoint_error_on_pipeline_failure() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Daily quota: a question that yields no answer must not use up the free quota
+# ---------------------------------------------------------------------------
+
+class _CountingRedis:
+    def __init__(self) -> None:
+        self.store: dict[str, int] = {}
+
+    async def incr(self, key: str) -> int:
+        self.store[key] = self.store.get(key, 0) + 1
+        return self.store[key]
+
+    async def decr(self, key: str) -> int:
+        self.store[key] = self.store.get(key, 1) - 1
+        return self.store[key]
+
+    async def expire(self, key: str, seconds: int) -> None:
+        return None
+
+    async def get(self, key: str) -> str | None:
+        return str(self.store[key]) if key in self.store else None
+
+
+async def _post_with_redis(astream, query: str) -> _CountingRedis:  # type: ignore[no-untyped-def]
+    redis = _CountingRedis()
+    previous = getattr(app.state, "redis", None)
+    app.state.redis = redis
+    try:
+        with patch("app.routers.query.pipeline") as mock_pipeline:
+            mock_pipeline.astream = astream
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+                await ac.post("/api/v1/query", json={"query": query, "session_id": "sess-quota"})
+    finally:
+        app.state.redis = previous
+    return redis
+
+
+@pytest.mark.asyncio
+async def test_answered_question_uses_one_quota_unit() -> None:
+    redis = await _post_with_redis(_fake_astream, "Berapa kadar cukai?")
+    assert sum(redis.store.values()) == 1
+
+
+@pytest.mark.asyncio
+async def test_blocked_question_does_not_use_quota() -> None:
+    async def _blocked_astream(inputs, stream_mode):  # type: ignore[no-untyped-def]
+        yield ("updates", {"guard": {"error": "blocked", "streaming_token_buffer": "Maaf."}})
+
+    redis = await _post_with_redis(_blocked_astream, "Berapa kadar cukai?")
+    assert sum(redis.store.values()) == 0
+
+
+@pytest.mark.asyncio
+async def test_failed_question_does_not_use_quota() -> None:
+    async def _failing_astream(inputs, stream_mode):  # type: ignore[no-untyped-def]
+        raise RuntimeError("pipeline exploded")
+        yield
+
+    redis = await _post_with_redis(_failing_astream, "Berapa kadar cukai?")
+    assert sum(redis.store.values()) == 0
+
+
+# ---------------------------------------------------------------------------
 # _extract_user_id — must verify JWT signature, never trust an unverified decode
 # ---------------------------------------------------------------------------
 

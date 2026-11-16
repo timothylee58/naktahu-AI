@@ -21,7 +21,7 @@ from app.models.state import AgentState
 from routers._request_fields import Language, normalise_language
 from services.auth import UserContext, _decode_supabase_jwt
 from services.agent_registry import plan_satisfies
-from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota
+from services.daily_quota import FREE_DAILY_LIMIT, check_and_increment_daily_quota, refund_daily_quota
 from services.history import persist_session_entry
 
 log = structlog.get_logger(__name__)
@@ -241,6 +241,7 @@ async def _sse_generator(
     language_hint: Optional[str],
     postcode: Optional[str] = None,
     history: Optional[list[dict]] = None,
+    refund_quota: Callable[[], Awaitable[None]] | None = None,
 ) -> AsyncGenerator[str, None]:
     try:
         tokens: list[str] = []
@@ -257,6 +258,9 @@ async def _sse_generator(
                 yield _sse("token", {"text": payload})
             else:  # kind == "result"
                 final_state = payload["final_state"]
+
+        if final_state.get("error") == "blocked" and refund_quota:
+            await refund_quota()
 
         for citation in final_state.get("citations", []):
             yield _sse("citation", dict(citation))
@@ -313,6 +317,8 @@ async def _sse_generator(
 
     except Exception as exc:
         log.error("sse_pipeline_error", error=str(exc), query_len=len(query))
+        if refund_quota:
+            await refund_quota()
         yield _sse("error", {"message": "An error occurred. Please try again."})
 
 
@@ -339,7 +345,14 @@ async def query_endpoint(
             headers={"Retry-After": "86400", "X-Daily-Limit": str(limit), "X-Daily-Used": str(used)},
         )
 
-    clean_query = sanitise_query(body.query)
+    async def refund_quota() -> None:
+        await refund_daily_quota(redis_client, identifier=quota_id, plan=plan)
+
+    try:
+        clean_query = sanitise_query(body.query)
+    except Exception:
+        await refund_quota()
+        raise
     session_id = body.session_id or str(uuid.uuid4())
 
     log.info("query_received", session_id=session_id, user_id=user_id, query_len=len(clean_query))
@@ -353,6 +366,7 @@ async def query_endpoint(
             body.language,
             body.postcode,
             [t.model_dump() for t in body.history],
+            refund_quota=refund_quota,
         ),
         media_type="text/event-stream",
         headers={
