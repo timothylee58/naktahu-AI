@@ -60,6 +60,9 @@ class AgentState(TypedDict, total=False):
     # relevance floor, i.e. the corpus has nothing on-topic. Routes to the bare
     # clarification node instead of synthesising from unrelated documents.
     no_relevant_evidence: bool
+    # Set by synthesiser_node when the finished answer says the context has no answer
+    # (app/agents/answer_support.py). Confidence is then capped below the 0.6 bar.
+    answer_declined: bool
     streaming_token_buffer: str
     error: Optional[str]
     output_flagged: bool
