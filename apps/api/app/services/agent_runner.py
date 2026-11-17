@@ -59,11 +59,25 @@ def _log_run(
 ) -> None:
     if not supabase_client:
         return
+    # agent_runs.session_id is a foreign key to agent_sessions(id), and nothing else creates
+    # agent_sessions rows, so inserting a fresh session uuid violated the FK on every run
+    # (PostgREST 409 Conflict, swallowed below): agent_runs held 0 rows and History could
+    # never show a run. Create the session row first; if that fails, still log the run
+    # without the link rather than losing it.
+    linked_session: Optional[str] = session_id
+    try:
+        supabase_client.table("agent_sessions").upsert(
+            {"id": session_id, "user_id": user_id, "agent_name": agent_name, "checkpoint": {}},
+            on_conflict="id",
+        ).execute()
+    except Exception as exc:
+        log.warning("agent_session_upsert_failed", error=str(exc))
+        linked_session = None
     try:
         supabase_client.table("agent_runs").insert({
             "user_id": user_id,
             "agent_name": agent_name,
-            "session_id": session_id,
+            "session_id": linked_session,
             "input": input_payload,
             "output": _public_output(output),
             "turns_count": output.get("turns_count", 1),
