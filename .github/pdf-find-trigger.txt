@@ -1,0 +1,3 @@
+run 3
+url=https://www.hasil.gov.my/wp-content/uploads/garis-panduan-pengenaan-duti-setem-jadual-pertama-as-1949.pdf
+find=Butiran 27;RM0.50;RM5.00 bagi setiap RM1,000;RM2,400;perniagaan kecil dan sederhana;pinjaman ringgit

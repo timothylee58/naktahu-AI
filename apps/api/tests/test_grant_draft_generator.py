@@ -411,3 +411,27 @@ class TestSyncSupabaseClient:
         async_b.execute = AsyncMock(return_value="async-result")
         assert await execute_query(sync_b) == "sync-result"
         assert await execute_query(async_b) == "async-result"
+
+
+class TestLogRun:
+    """agent_runs.session_id FKs agent_sessions(id); the runner must create that row first."""
+
+    def test_creates_session_row_before_logging_run(self):
+        from app.services.agent_runner import _log_run
+
+        client = MagicMock()
+        _log_run(client, "u1", "grant-draft-generator", "11111111-1111-1111-1111-111111111111", {}, {}, 5, "completed")
+        tables = [c.args[0] for c in client.table.call_args_list]
+        assert tables == ["agent_sessions", "agent_runs"]
+        client.table.return_value.upsert.assert_called_once()
+        row = client.table.return_value.insert.call_args.args[0]
+        assert row["session_id"] == "11111111-1111-1111-1111-111111111111"
+
+    def test_session_failure_still_logs_run_unlinked(self):
+        from app.services.agent_runner import _log_run
+
+        client = MagicMock()
+        client.table.return_value.upsert.return_value.execute.side_effect = RuntimeError("fk")
+        _log_run(client, "u1", "grant-draft-generator", "11111111-1111-1111-1111-111111111111", {}, {}, 5, "completed")
+        row = client.table.return_value.insert.call_args.args[0]
+        assert row["session_id"] is None

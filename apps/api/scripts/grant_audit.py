@@ -72,6 +72,7 @@ def exact_match(rows: list[dict[str, Any]], typed: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--try", dest="typed", default="", help="semicolon-separated names to test against the exact-match lookup")
+    parser.add_argument("--runs", action="store_true", help="also count agent_sessions / agent_runs rows")
     args = parser.parse_args()
 
     from supabase import create_client
@@ -85,6 +86,18 @@ def main() -> int:
         print(f"grant_database read FAILED: {type(exc).__name__}: {str(exc)[:300]}")
         return 1
     print("\n".join(audit(rows, datetime.now(timezone.utc).date())))
+    if args.runs:
+        for table in ("agent_sessions", "agent_runs"):
+            try:
+                res = client.table(table).select("id", count="exact").limit(1).execute()
+                print(f"\n{table}: {res.count} rows")
+            except Exception as exc:
+                print(f"\n{table}: read FAILED {type(exc).__name__}: {str(exc)[:200]}")
+        try:
+            rows = client.table("agent_runs").select("agent_name").limit(1000).execute().data or []
+            print("agent_runs by agent_name: " + (", ".join(f"{a}={n}" for a, n in sorted(Counter(r['agent_name'] for r in rows).items())) or "(none)"))
+        except Exception as exc:
+            print(f"agent_runs breakdown FAILED {type(exc).__name__}")
     for typed in [t.strip() for t in args.typed.split(";") if t.strip()]:
         print(f"\nexact-match lookup for {typed!r}: {'FOUND' if exact_match(rows, typed) else 'NOT FOUND'}")
     return 0
