@@ -21,12 +21,16 @@ def extract_pages(data: bytes) -> list[str]:
 
 
 def find_hits(pages: list[str], phrase: str, context: int, max_hits: int) -> list[tuple[int, str]]:
+    """Whitespace-insensitive: PDF text breaks lines mid-phrase, so collapse runs of
+    whitespace in the page before matching (and in the phrase, via the regex)."""
     hits: list[tuple[int, str]] = []
-    pattern = re.compile(re.escape(phrase), re.IGNORECASE)
+    words = phrase.split()
+    pattern = re.compile(r"\s+".join(re.escape(w) for w in words), re.IGNORECASE)
     for number, text in enumerate(pages, start=1):
-        for match in pattern.finditer(text):
-            start, end = max(0, match.start() - context // 3), min(len(text), match.end() + context)
-            hits.append((number, " ".join(text[start:end].split())))
+        flat = " ".join(text.split())
+        for match in pattern.finditer(flat):
+            start, end = max(0, match.start() - context // 3), min(len(flat), match.end() + context)
+            hits.append((number, flat[start:end]))
             if len(hits) >= max_hits:
                 return hits
     return hits

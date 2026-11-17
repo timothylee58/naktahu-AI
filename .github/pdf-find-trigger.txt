@@ -1,3 +1,3 @@
-run 1
+run 2
 url=https://www.hasil.gov.my/wp-content/uploads/Stamp-Act-Act-378-online-version-as-at-1-January-2026.pdf
-find=CHARGE OR MORTGAGE, AGREEMENT FOR A CHARGE;Exceeding one year but not exceeding three years;small and medium enterprise, the first
+find=FIRST SCHEDULE;RM250;CHARGE OR MORTGAGE;Item 27;every RM1,000
