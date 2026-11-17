@@ -48,5 +48,5 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -o pipefail
-          python -m scripts.grant_audit --try "$AUDIT_NAMES" | tee "$RUNNER_TEMP/audit.txt"
+          python -m scripts.grant_audit --runs --try "$AUDIT_NAMES" | tee "$RUNNER_TEMP/audit.txt"
           { echo '### Grant database audit'; echo '```'; cat "$RUNNER_TEMP/audit.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
