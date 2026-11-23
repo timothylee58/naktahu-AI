@@ -29,7 +29,18 @@ dependencies = [
     "PyJWT[crypto]>=2.10.0",
     "structlog>=24.4.0",
     "sentry-sdk[fastapi]>=2.19.0",
-    "weave>=0.51.0",
+    # >=0.54.0: pip's resolver, against this project's other pins, was
+    # landing on 0.51.54 under the old ">=0.51.0" floor. That release's
+    # metadata requires plain "wandb>=0.17.1" (no extra gate), which pulls
+    # whatever wandb is newest at install time; wandb's internal module
+    # layout changed and broke weave 0.51.x's own
+    # weave.wandb_interface.project_creator import of
+    # wandb.sdk.internal.internal_api, crashing every `import weave` at
+    # collection time. 0.54.0+ gates wandb behind an opt-in `weave[wandb]`
+    # extra we don't use, so plain `weave` no longer requires or imports it.
+    # This repo has no direct W&B/wandb usage — weave is used standalone for
+    # LLM-call tracing — so the extra is correctly left off here.
+    "weave>=0.54.0",
     "prometheus-client>=0.21.0",
     "httpx>=0.28.0",
     "tavily-python>=0.5.0,<1.0",
