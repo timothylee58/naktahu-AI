@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import { Callout, CalloutContent } from '@govtechmy/myds-react/callout';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen';
@@ -52,6 +52,20 @@ export function LandingClient() {
 
   const reduceMotion = useReducedMotion();
 
+  // ── Scroll-linked depth parallax on the hero's ambient glow. The page's
+  // own scroll container is this component's root <div> (overflow-y-auto),
+  // not window, so useScroll needs that ref — same pattern PromptChips
+  // uses for its own container-scoped useScroll. The two blobs drift down
+  // and apart at different rates as the page scrolls up past them,
+  // reading as a background plane receding behind the content in front of
+  // it rather than a flat sticker. Kept to the hero's own 560px band
+  // (clamped via the input range below) so it never leaks into content.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll({ container: rootRef });
+  const glowYBlue = useTransform(scrollY, [0, 500], [0, 90]);
+  const glowYTerracotta = useTransform(scrollY, [0, 500], [0, 150]);
+  const glowScale = useTransform(scrollY, [0, 500], [1, 1.15]);
+
   // ── Header → sidebar chat-morph. reduceMotion skips straight to
   // navigation — a shape-morphing header is exactly the kind of large
   // moving-object transition apple-design's reduced-motion guidance
@@ -92,7 +106,7 @@ export function LandingClient() {
     : 'flex-1 min-h-0 overflow-y-auto bg-nk-bg-warm text-zinc-900';
 
   return (
-    <div className={`relative flex flex-col font-sans ${pageClass}`}>
+    <div ref={rootRef} className={`relative flex flex-col font-sans ${pageClass}`}>
       {/* The one real navigation this page triggers (hero "Mula Bertanya" →
           /chat) gets a full-screen transition treatment instead of a blank
           frame while the route change lands — see PageLoadingScreen's own
@@ -106,21 +120,26 @@ export function LandingClient() {
           single quiet moment behind the hero (not a saturated per-section
           repaint, which would fight this product's restrained register),
           but it now carries both of NakTahu's identity accents instead of
-          only the functional blue. */}
+          only the functional blue. Each blob now also carries its own
+          scroll-parallax motion value (see glowYBlue/glowYTerracotta/
+          glowScale above) — plain style props, not Tailwind, since they're
+          driven by useTransform rather than a fixed class. */}
       <div
         aria-hidden
         className={`pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden ${
           isDark ? 'opacity-100' : 'opacity-70'
         }`}
       >
-        <div
+        <motion.div
+          style={reduceMotion ? undefined : { y: glowYBlue, scale: glowScale }}
           className={`absolute left-1/2 top-[-180px] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-3xl ${
             isDark
               ? 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.22),transparent)]'
               : 'bg-[radial-gradient(closest-side,rgba(37,99,235,0.12),transparent)]'
           }`}
         />
-        <div
+        <motion.div
+          style={reduceMotion ? undefined : { y: glowYTerracotta }}
           className={`absolute left-[68%] top-[-60px] h-[360px] w-[520px] -translate-x-1/2 rounded-full blur-3xl ${
             isDark
               ? 'bg-[radial-gradient(closest-side,rgba(224,141,91,0.14),transparent)]'

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/lib/i18n';
 import { agentTitleKey, agentDescKey } from '@/lib/agents';
+import { TiltCard } from '@/components/ui/TiltCard';
 
 // Only real, wired agents (apps/web/src/lib/agents.ts's WIRED_AGENTS) — no
 // invented "LHDN Tax Relief Advisor"/"EPF Specialist" agents that don't
@@ -35,18 +36,24 @@ export function AgentSpotlight({ isDark = true }: AgentSpotlightProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: i * 0.06, duration: 0.4 }}
-          whileHover={{ y: -4 }}
-          className={`flex flex-col gap-3 border rounded-2xl p-5 transition-all duration-200 ${cardClass}`}
         >
-          <h3 className={`font-semibold text-sm locale-nowrap ${titleClass}`}>
-            {t(agentTitleKey(slug))}
-          </h3>
-          <p className={`text-xs leading-relaxed flex-1 locale-text-balance ${descClass}`}>
-            {t(agentDescKey(slug))}
-          </p>
-          <Link href={`/agents/${slug}`} className={`text-xs font-semibold locale-nowrap ${linkClass}`}>
-            {t('landing.hero.secondary_cta')} →
-          </Link>
+          {/* Cursor-follow 3D tilt on hover, mouse/pen only — this row is
+              where a visitor compares agents, so a physical "pick this
+              card up" cue fits better than on the auto-playing demo
+              cards above, which already have their own hover state. */}
+          <TiltCard
+            className={`flex flex-col gap-3 border rounded-2xl p-5 transition-colors duration-200 ${cardClass}`}
+          >
+            <h3 className={`font-semibold text-sm locale-nowrap ${titleClass}`}>
+              {t(agentTitleKey(slug))}
+            </h3>
+            <p className={`text-xs leading-relaxed flex-1 locale-text-balance ${descClass}`}>
+              {t(agentDescKey(slug))}
+            </p>
+            <Link href={`/agents/${slug}`} className={`text-xs font-semibold locale-nowrap ${linkClass}`}>
+              {t('landing.hero.secondary_cta')} →
+            </Link>
+          </TiltCard>
         </motion.div>
       ))}
 
@@ -62,27 +69,29 @@ export function AgentSpotlight({ isDark = true }: AgentSpotlightProps) {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: SPOTLIGHT_SLUGS.length * 0.06, duration: 0.4 }}
-        whileHover={{ y: -4 }}
-        className={`flex flex-col gap-3 border-2 border-dashed rounded-2xl p-5 transition-all duration-200 ${
-          isDark ? 'bg-nk-community/5 border-nk-community/30 hover:border-nk-community/50' : 'bg-nk-community/5 border-nk-community/40 hover:border-nk-community/60'
-        }`}
       >
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2 flex-shrink-0" aria-hidden>
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-nk-community opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-nk-community" />
-          </span>
-          <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-nk-community' : 'text-nk-community-dim'}`}>
-            {t('nav.group.community')}
-          </span>
-        </div>
-        <h3 className={`font-semibold text-sm locale-nowrap ${titleClass}`}>{t('nav.warung_watch')}</h3>
-        <p className={`text-xs leading-relaxed flex-1 locale-text-balance ${descClass}`}>
-          {t('landing.spotlight.warung_watch.desc')}
-        </p>
-        <Link href="/warung-watch" className={`text-xs font-semibold locale-nowrap ${linkClass}`}>
-          {t('landing.hero.secondary_cta')} →
-        </Link>
+        <TiltCard
+          className={`flex flex-col gap-3 border-2 border-dashed rounded-2xl p-5 transition-colors duration-200 ${
+            isDark ? 'bg-nk-community/5 border-nk-community/30 hover:border-nk-community/50' : 'bg-nk-community/5 border-nk-community/40 hover:border-nk-community/60'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2 flex-shrink-0" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-nk-community opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-nk-community" />
+            </span>
+            <span className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-nk-community' : 'text-nk-community-dim'}`}>
+              {t('nav.group.community')}
+            </span>
+          </div>
+          <h3 className={`font-semibold text-sm locale-nowrap ${titleClass}`}>{t('nav.warung_watch')}</h3>
+          <p className={`text-xs leading-relaxed flex-1 locale-text-balance ${descClass}`}>
+            {t('landing.spotlight.warung_watch.desc')}
+          </p>
+          <Link href="/warung-watch" className={`text-xs font-semibold locale-nowrap ${linkClass}`}>
+            {t('landing.hero.secondary_cta')} →
+          </Link>
+        </TiltCard>
       </motion.div>
     </div>
   );
