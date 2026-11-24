@@ -109,6 +109,8 @@ export function useSSEStream({
       setIsStreaming(true);
 
       const lang = language ?? defaultLanguage;
+      // A replaced stream's aborted request must not touch state the new stream owns.
+      const isCurrent = (): boolean => abortRef.current === controller;
 
       (async () => {
         try {
@@ -141,6 +143,7 @@ export function useSSEStream({
             response,
             controller.signal,
           )) {
+            if (!isCurrent()) break;
             if (event === 'token') {
               try {
                 const parsed = JSON.parse(data) as { text: string };
@@ -192,9 +195,10 @@ export function useSSEStream({
           }
         } catch (err: unknown) {
           if (err instanceof Error && err.name === 'AbortError') return;
+          if (!isCurrent()) return;
           setError(err instanceof Error ? err.message : String(err));
         } finally {
-          setIsStreaming(false);
+          if (isCurrent()) setIsStreaming(false);
         }
       })();
     },

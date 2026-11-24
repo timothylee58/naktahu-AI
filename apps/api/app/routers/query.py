@@ -10,7 +10,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Literal, Optional
 
 import structlog
 import weave
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from app.agents.followup import condense_followup
@@ -18,6 +18,7 @@ from app.agents.graph import pipeline
 from app.core.prometheus_metrics import time_to_first_token_seconds
 from app.middleware.sanitise import sanitise_query
 from app.models.state import AgentState
+from middleware.rate_limit import apply_query_rate_limit
 from routers._request_fields import Language, normalise_language
 from services.auth import UserContext, _decode_supabase_jwt
 from services.agent_registry import plan_satisfies
@@ -331,9 +332,11 @@ async def _sse_generator(
 
 
 @router.post("/query")
+@apply_query_rate_limit()
 async def query_endpoint(
     body: QueryRequest,
     request: Request,
+    response: Response,
     authorization: Optional[str] = Header(default=None),
 ) -> StreamingResponse:
     user_ctx = _extract_user(authorization)

@@ -1,7 +1,12 @@
 name: Deploy
 
+# Runs only after CI succeeds on a push to main, so failing tests or the eval
+# gate block production. CI also fires on claude/** pushes; the head_branch
+# check keeps those from deploying.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches:
       - main
 
@@ -10,8 +15,14 @@ jobs:
   deploy-web:
     name: Deploy web → Netlify
     runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: actions/setup-node@v4
         with:
