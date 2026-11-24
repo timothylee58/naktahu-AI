@@ -505,3 +505,10 @@ async def test_query_endpoint_metadata_carries_the_clarification_and_decline_fla
     assert meta["needs_clarification"] is True
     assert meta["answer_declined"] is True
     assert meta["confidence"] == 0.35
+
+
+def test_deployed_query_route_is_rate_limited() -> None:
+    from app.routers import query as deployed_query
+
+    route = next(r for r in deployed_query.router.routes if r.path == "/api/v1/query")
+    assert hasattr(route.endpoint, "__wrapped__"), "slowapi decorator missing on deployed /query"
