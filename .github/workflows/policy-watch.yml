@@ -8,6 +8,7 @@ name: Policy Watch
 # Runs on a GitHub runner because the dev sandbox cannot reach *.gov.my.
 #
 # Dry run until a human says otherwise, the same precedent as ingest-sources.yml:
+#   * Pull request runs are always dry runs.
 #   * Manual runs default to dry run (prints what it found, writes nothing).
 #   * Scheduled runs are dry runs too, until the repository variable
 #     POLICY_WATCH_LIVE is set to "true" (Settings -> Secrets and variables ->
@@ -18,6 +19,14 @@ name: Policy Watch
 # so only links that appear AFTER that reach the review queue.
 
 on:
+  # A pull request that touches the watcher or its targets gets a dry run, so a
+  # target is checked against the live page before it can be merged. Dry run
+  # only: the pull_request path can never write to the queue.
+  pull_request:
+    paths:
+      - "apps/api/scripts/policy_watch.py"
+      - "apps/api/scripts/watch_targets.py"
+      - ".github/workflows/policy-watch.yml"
   schedule:
     - cron: "30 21 * * *"  # daily, 21:30 UTC (05:30 MYT)
   workflow_dispatch:
@@ -69,11 +78,12 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           ARGS=()
-          DRY=0
-          if [ "$EVENT" = "schedule" ]; then
-            [ "$LIVE_VAR" = "true" ] || DRY=1
-          else
-            [ "$INPUT_DRY_RUN" = "true" ] && DRY=1
+          # Dry run unless a live run was explicitly asked for.
+          DRY=1
+          if [ "$EVENT" = "schedule" ] && [ "$LIVE_VAR" = "true" ]; then
+            DRY=0
+          elif [ "$EVENT" = "workflow_dispatch" ] && [ "$INPUT_DRY_RUN" = "false" ]; then
+            DRY=0
           fi
           [ "$DRY" = "1" ] && ARGS+=(--dry-run)
           # Inputs reach the script as arguments, never interpolated into the shell line.
