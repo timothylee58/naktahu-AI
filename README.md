@@ -206,8 +206,8 @@ naktahu-AI/
 │   │   └── src/app/            — chat, agents, career, developer, pricing,
 │   │                              history, warung-watch, auth, about, faq, privacy
 │   └── api/                    — FastAPI backend (Railway)
-│       ├── main.py             — root app (imported by the test suite)
-│       ├── app/main.py         — deploy app (what Railway actually runs)
+│       ├── main.py             — the FastAPI app (tests and Railway both use it)
+│       ├── app/main.py         — alias so `uvicorn app.main:app` keeps working
 │       ├── app/agents/         — core RAG pipeline + vertical agent packages
 │       ├── app/orchestration/  — agent registry, routing, circuit breakers
 │       ├── routers/            — shared HTTP routers (query, billing, share,

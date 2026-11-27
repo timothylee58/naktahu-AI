@@ -1,6 +1,6 @@
 ---
 name: new-endpoint
-description: Scaffold a new FastAPI endpoint (router + service + tests + mounting) the NakTahu way. Use whenever adding an API route — encodes the two-mains mounting, slowapi signature, auth-tier choice, Supabase 503 guard, and the required test matrix.
+description: Scaffold a new FastAPI endpoint (router + service + tests + mounting) the NakTahu way. Use whenever adding an API route — encodes the single-app mounting, slowapi signature, auth-tier choice, Supabase 503 guard, and the required test matrix.
 ---
 
 # New API endpoint
@@ -59,12 +59,12 @@ Gotchas:
 - Path params that are UUIDs: pre-validate with a regex and return 404 (not 422) on mismatch — see `routers/share.py`.
 - Never log or store raw query text in Redis keys — hash first.
 
-## 4. Mount in BOTH apps (Trap #1 — the one that ships broken silently)
+## 4. Mount in main.py (one app)
 
 - `apps/api/main.py`: add to the `from routers import ...` line and `app.include_router(<name>.router)`
-- `apps/api/app/main.py`: same two edits.
+- `apps/api/app/main.py` is only a re-export of that app (`uvicorn app.main:app`); do not edit it.
 
-Verify: `grep -n "<name>" apps/api/main.py apps/api/app/main.py` → both files hit.
+Verify: `grep -n "<name>" apps/api/main.py` hits.
 
 ## 5. Migration (if a new table)
 

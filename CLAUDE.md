@@ -12,8 +12,8 @@ This file is the operating manual. Read the **Traps** section before writing any
 ```
 apps/web            Next.js 15 App Router, TypeScript strict, Tailwind, shadcn/ui
 apps/api            FastAPI backend — TWO app trees, see Trap #1
-  main.py           Root app: what the TEST SUITE imports (`import main as api_main`)
-  app/main.py       Nested app: what RAILWAY DEPLOYS (`start.sh` → uvicorn app.main:app)
+  main.py           THE FastAPI app — tests (`import main as api_main`) and Railway both run it
+  app/main.py       Alias that re-exports main.app so `start.sh` → `uvicorn app.main:app` keeps working
   routers/          Shared HTTP routers (query, history, feedback, billing, share, developer, api_v1_public)
   app/routers/      Deploy-only routers (health, query, session, transcribe, agents)
   app/agents/       LangGraph pipeline + vertical agents (graph.py, router/guard/rag/analyst/synthesiser nodes)
@@ -59,9 +59,9 @@ infra/supabase/migrations/   Numbered SQL migrations 001–016 (NOT auto-applied
 
 ## 4. Traps — mistakes a model WILL make here, and the rule that prevents each
 
-**Trap #1 — The two-mains split (highest severity).**
-There are two FastAPI apps. Tests import root `main.py`; Railway runs `app/main.py`. A router mounted in only one passes every test and silently doesn't exist in production (this actually happened to the share router).
-**Rule:** every new router gets `include_router` in **both** `apps/api/main.py` and `apps/api/app/main.py` in the same change. Pre-PR check: `grep -l "your_router" apps/api/main.py apps/api/app/main.py` must print both files.
+**Trap #1 — The two-mains split (RESOLVED; do not reintroduce).**
+There used to be two FastAPI apps — tests imported root `main.py`, Railway ran `app/main.py` — so a router mounted in only one passed every test and silently didn't exist in production (it happened to the share router). `main.py` now defines the one app and `app/main.py` is a re-export.
+**Rule:** mount every new router in `apps/api/main.py` only. Never define a second `FastAPI(...)` or add routes/middleware to `app/main.py`. Pre-PR check: `grep -n "your_router" apps/api/main.py` must hit. Tests share one app object, so reset any `app.state` you set (see `reset_shared_state` in `tests/conftest.py`).
 
 **Trap #2 — slowapi decorator signature.**
 A rate-limited endpoint without an explicit `response: Response` parameter raises `parameter response must be an instance of starlette.responses.Response` at request time, not import time.
@@ -141,7 +141,7 @@ Netlify preview "canceled" on backend-only diffs, CodeRabbit "draft skip", and C
 
 **A backend endpoint is done when ALL of:**
 - [ ] Pydantic request + response models with bounded fields (no unbounded `str`/`list`)
-- [ ] Mounted in BOTH `main.py` and `app/main.py`
+- [ ] Mounted in `main.py` (the single app)
 - [ ] Rate-limit decorator + `request: Request, response: Response` in the signature
 - [ ] Supabase-null → 503 guard; auth dependency matches the intended tier (`get_optional_user` vs `get_current_user` vs `require_plan`/`require_credits`)
 - [ ] `tests/test_<name>.py` covers: happy path, auth boundary (anon vs authed), validation rejection (422), degraded mode (503), and the rate-limit boundary if user-facing

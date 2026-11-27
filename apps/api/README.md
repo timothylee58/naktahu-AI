@@ -152,7 +152,8 @@ Each agent node has a unit test with mocked Supabase and Redis dependencies. Git
 
 | File | Purpose |
 |---|---|
-| `app/main.py` | FastAPI app entry point, route registration, middleware |
+| `main.py` | The FastAPI app: lifespan, middleware, route registration |
+| `app/main.py` | Alias of `main.app` so `uvicorn app.main:app` keeps working |
 | `app/agents/router_node.py` | Intent, language, and domain classifier |
 | `app/agents/rag_node.py` | Hybrid vector search + Redis cache layer |
 | `app/agents/analyst_node.py` | Citation relevance scoring and confidence check |

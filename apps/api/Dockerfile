@@ -55,7 +55,6 @@ COPY core/ ./core/
 COPY middleware/ ./middleware/
 COPY rag/ ./rag/
 COPY routers/ ./routers/
-COPY routes/ ./routes/
 COPY services/ ./services/
 COPY scripts/ ./scripts/
 

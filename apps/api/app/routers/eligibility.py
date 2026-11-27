@@ -15,7 +15,7 @@ GET /api/v1/eligibility/{session_id}/result
 
 SSE event types: question, token, grant, stacking, metadata, done, error.
 
-Mounted in BOTH apps/api/main.py and apps/api/app/main.py per Trap #1.
+Mounted in apps/api/main.py, the single app.
 Supabase-null guards everywhere per Trap #4 — no Depends(get_supabase);
 this repo's Supabase client lives on request.app.state.supabase.
 """
