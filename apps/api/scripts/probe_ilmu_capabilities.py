@@ -102,17 +102,19 @@ async def _chat(**kwargs: Any) -> Any:
     return await ilmu_client.chat.completions.create(model=ILMU_CHAT_MODEL, temperature=0, **kwargs)
 
 
-_FEATURE_TERMS = ("response_format", "json_schema", "json_object", "tool_choice", "tools", "function")
+_TOOL_TERMS = ("tool_choice", "tools", "function")
+_JSON_OBJECT_TERMS = ("response_format", "json_object")
+_JSON_SCHEMA_TERMS = ("response_format", "json_schema", "schema")
 
 
-async def _guard(name: str, probe: Callable[[], Awaitable[Result]]) -> Result:
+async def _guard(name: str, probe: Callable[[], Awaitable[Result]], terms: tuple[str, ...] = ()) -> Result:
     try:
         return await probe()
     except openai.APIStatusError as exc:
         # Only an error that names the tested parameter proves the feature is unsupported; a wrong
         # model, a bad route (404) or unrelated validation says nothing about it.
         message = str(exc)
-        names_feature = exc.status_code in (400, 422) and any(t in message.lower() for t in _FEATURE_TERMS)
+        names_feature = exc.status_code in (400, 422) and any(t in message.lower() for t in terms)
         return Result(name, "REJECTED" if names_feature else "ERROR", f"{exc.status_code}: {message[:160]}")
     except Exception as exc:  # network / auth: inconclusive, never read as "unsupported"
         return Result(name, "ERROR", f"{type(exc).__name__}: {str(exc)[:160]}")
@@ -215,6 +217,8 @@ async def router_validity(queries: list[str]) -> list[Result]:
     """Real router prompt over sample queries, both ways, so the schema's benefit is measured, not assumed."""
 
     async def run(name: str, extra: dict[str, Any]) -> Result:
+        failures: list[str] = []
+
         async def one(query: str) -> str:
             try:
                 resp = await _chat(
@@ -222,14 +226,18 @@ async def router_validity(queries: list[str]) -> list[Result]:
                     max_tokens=384,
                     **extra,
                 )
-            except Exception:  # network/auth/HTTP failures say nothing about schema support
+            except Exception as exc:  # network/auth/HTTP failures say nothing about schema support
+                status = getattr(exc, "status_code", None)
+                failures.append(f"{status or type(exc).__name__}: {str(exc)[:80]}")
                 return "error"
             ok = _schema_valid(extract_json_object(resp.choices[0].message.content or ""))
             return "ok" if ok else "invalid"
 
         outcomes = await asyncio.gather(*(one(q) for q in queries))
         ok, errors = outcomes.count("ok"), outcomes.count("error")
-        detail = f"{ok}/{len(outcomes)} schema-valid" + (f", {errors} request errors" if errors else "")
+        detail = f"{ok}/{len(outcomes)} schema-valid"
+        if errors:
+            detail += f", {errors} request errors (first: {failures[0]})"
         if errors:
             return Result(name, "ERROR", detail)
         return Result(name, "SUPPORTED" if outcomes and ok == len(outcomes) else "IGNORED", detail)
@@ -295,10 +303,10 @@ async def main() -> int:
 
     print(f"ILMU base_url={ilmu_client.base_url}  model={ILMU_CHAT_MODEL}\n")
     results = [
-        await _guard("tools + tool_choice=auto", probe_tools_auto),
-        await _guard("tool_choice=forced function", probe_tools_forced),
-        await _guard("response_format=json_object", probe_json_object),
-        await _guard("response_format=json_schema (strict)", probe_json_schema),
+        await _guard("tools + tool_choice=auto", probe_tools_auto, _TOOL_TERMS),
+        await _guard("tool_choice=forced function", probe_tools_forced, _TOOL_TERMS),
+        await _guard("response_format=json_object", probe_json_object, _JSON_OBJECT_TERMS),
+        await _guard("response_format=json_schema (strict)", probe_json_schema, _JSON_SCHEMA_TERMS),
     ]
     if results[-1].verdict == "SUPPORTED" or results[-1].verdict == "IGNORED":
         results.extend(await router_validity(_SAMPLE_QUERIES[: args.queries]))

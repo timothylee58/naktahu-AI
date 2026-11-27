@@ -85,5 +85,33 @@ async def test_guard_only_rejects_when_the_error_names_the_feature(status: int, 
     async def probe() -> Result:
         raise _status_error(status, message)
 
-    result = await _guard("x", probe)
+    result = await _guard("x", probe, ("response_format", "tools"))
     assert result.verdict == verdict
+
+
+@pytest.mark.asyncio
+async def test_error_naming_an_unrelated_feature_is_not_a_rejection_of_the_tested_one() -> None:
+    """Qodo finding: a 400 mentioning 'tools' during the json_schema probe must not read as a schema rejection."""
+    from scripts.probe_ilmu_capabilities import _JSON_SCHEMA_TERMS, _TOOL_TERMS
+
+    async def probe() -> Result:
+        raise _status_error(400, "unsupported value for tools")
+
+    assert (await _guard("schema", probe, _JSON_SCHEMA_TERMS)).verdict == "ERROR"
+    assert (await _guard("tools", probe, _TOOL_TERMS)).verdict == "REJECTED"
+
+
+@pytest.mark.asyncio
+async def test_router_sample_errors_keep_their_status_and_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scripts.probe_ilmu_capabilities as probe_mod
+
+    async def failing_chat(**kwargs: object) -> None:
+        raise _status_error(401, "invalid api key")
+
+    monkeypatch.setattr(probe_mod, "_chat", failing_chat)
+    plain, schema = await probe_mod.router_validity(["q1", "q2"])
+
+    for result in (plain, schema):
+        assert result.verdict == "ERROR"
+        assert "401" in result.detail and "invalid api key" in result.detail
+        assert "2 request errors" in result.detail
