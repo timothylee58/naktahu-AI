@@ -519,3 +519,140 @@ async def test_router_leaves_domain_unset_when_both_attempts_are_unparseable() -
 
     assert result["domain"] is None
     assert create.await_count == 2
+
+
+# ── ROUTER_STRUCTURED_MODE: structured paths with the prompt-and-parse fallback ──
+
+
+_STRUCTURED_RESULT = {
+    "language": "bm",
+    "domain": "tax",
+    "intent": "kadar cukai pendapatan",
+    "is_live_status_query": False,
+    "place_name": None,
+    "is_structured_parliament_query": False,
+    "parliament_bill_number": None,
+    "parliament_mp_query": None,
+}
+
+
+def _claude_response(tool_input: dict | None) -> MagicMock:
+    block = MagicMock()
+    block.type = "tool_use" if tool_input is not None else "text"
+    block.input = tool_input
+    resp = MagicMock()
+    resp.content = [block]
+    return resp
+
+
+@pytest.mark.asyncio
+async def test_default_mode_sends_no_structured_parameters(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ROUTER_STRUCTURED_MODE", raising=False)
+    create = AsyncMock(return_value=_mock_completion('{"language": "en", "domain": "tax", "intent": "x"}'))
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = create
+        await router_node({"query": "How much is income tax?"})
+
+    assert "response_format" not in create.call_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_ilmu_schema_mode_sends_strict_schema_and_uses_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "ilmu_schema")
+    create = AsyncMock(return_value=_mock_completion(json.dumps(_STRUCTURED_RESULT)))
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = create
+        result = await router_node({"query": "Berapa kadar cukai pendapatan saya?"})
+
+    rf = create.call_args.kwargs["response_format"]
+    assert rf["type"] == "json_schema" and rf["json_schema"]["strict"] is True
+    assert "scam_check" not in rf["json_schema"]["schema"]["properties"]["domain"]["enum"]
+    assert create.await_count == 1
+    assert result["domain"] == "tax"
+
+
+@pytest.mark.asyncio
+async def test_ilmu_schema_rejection_falls_back_to_plain_parser(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ILMU 400s on response_format -> same call without it, parsed by extract_json_object."""
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "ilmu_schema")
+    plain = _mock_completion('{"language": "en", "domain": "finance", "intent": "loan"}')
+    create = AsyncMock(side_effect=[RuntimeError("response_format not supported"), plain])
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = create
+        result = await router_node({"query": "How do I apply for a loan?"})
+
+    assert create.await_count == 2
+    assert "response_format" not in create.call_args_list[1].kwargs
+    assert result["domain"] == "finance"
+
+
+@pytest.mark.asyncio
+async def test_ilmu_schema_empty_output_falls_back_to_plain_parser(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "ilmu_schema")
+    plain = _mock_completion('{"language": "en", "domain": "legal", "intent": "tenancy"}')
+    create = AsyncMock(side_effect=[_mock_completion("not json at all"), plain])
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = create
+        result = await router_node({"query": "Can my landlord evict me?"})
+
+    assert result["domain"] == "legal"
+
+
+@pytest.mark.asyncio
+async def test_claude_tool_mode_forces_tool_and_skips_ilmu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "claude_tool")
+    claude_create = AsyncMock(return_value=_claude_response(_STRUCTURED_RESULT))
+    ilmu_create = AsyncMock()
+
+    with patch("app.agents.router_node.anthropic_client") as mock_claude, patch(
+        "app.agents.router_node.ilmu_client"
+    ) as mock_ilmu:
+        mock_claude.messages.create = claude_create
+        mock_ilmu.chat.completions.create = ilmu_create
+        result = await router_node({"query": "Berapa kadar cukai pendapatan saya?"})
+
+    kwargs = claude_create.call_args.kwargs
+    assert kwargs["tool_choice"] == {"type": "tool", "name": "classify_query"}
+    assert kwargs["tools"][0]["input_schema"]["additionalProperties"] is False
+    ilmu_create.assert_not_awaited()
+    assert result["domain"] == "tax"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("claude_outcome", ["error", "no_tool_block"])
+async def test_claude_tool_failure_falls_back_to_ilmu_plain_parser(
+    monkeypatch: pytest.MonkeyPatch, claude_outcome: str
+) -> None:
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "claude_tool")
+    if claude_outcome == "error":
+        claude_create = AsyncMock(side_effect=RuntimeError("anthropic 529"))
+    else:
+        claude_create = AsyncMock(return_value=_claude_response(None))
+    plain = _mock_completion('{"language": "en", "domain": "government", "intent": "ssm"}')
+
+    with patch("app.agents.router_node.anthropic_client") as mock_claude, patch(
+        "app.agents.router_node.ilmu_client"
+    ) as mock_ilmu:
+        mock_claude.messages.create = claude_create
+        mock_ilmu.chat.completions.create = AsyncMock(return_value=plain)
+        result = await router_node({"query": "How do I register a company with SSM?"})
+
+    assert result["domain"] == "government"
+
+
+@pytest.mark.asyncio
+async def test_unknown_mode_value_behaves_as_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "banana")
+    create = AsyncMock(return_value=_mock_completion('{"language": "en", "domain": "tax", "intent": "x"}'))
+
+    with patch("app.agents.router_node.ilmu_client") as mock_client:
+        mock_client.chat.completions.create = create
+        await router_node({"query": "How much is income tax?"})
+
+    assert "response_format" not in create.call_args.kwargs
