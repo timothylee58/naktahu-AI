@@ -30,6 +30,8 @@ def client(monkeypatch):
     redis_client.ping = AsyncMock(return_value=True)
     redis_client.aclose = AsyncMock(return_value=None)
     redis_client.lrange = AsyncMock(return_value=[])
+    redis_client.incr = AsyncMock(return_value=1)
+    redis_client.expire = AsyncMock(return_value=True)
 
     pipe = MagicMock()
     pipe.lpush.return_value = pipe
@@ -48,6 +50,12 @@ def client(monkeypatch):
 
     anonymous_limiter.reset()
     authenticated_limiter.reset()
+
+    async def fake_astream(inputs, stream_mode):
+        yield ("custom", "ok")
+
+    # /api/v1/query is the deployed pipeline route; these tests are about its rate limit, not the graph.
+    monkeypatch.setattr("app.routers.query.pipeline.astream", fake_astream)
 
     with TestClient(api_main.app) as c:
         yield c

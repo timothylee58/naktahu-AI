@@ -64,6 +64,11 @@ def reset_shared_state(monkeypatch):
 
     monkeypatch.setattr(api_main.redis_ai, "from_url", fake_from_url)
 
+    # One app object serves every test now: a lifespan test would otherwise leave its Redis and
+    # Supabase mocks on app.state for whichever test runs next.
+    monkeypatch.setattr(api_main.app.state, "redis", None, raising=False)
+    monkeypatch.setattr(api_main.app.state, "supabase", None, raising=False)
+
     # Reset Supabase state
     insert_mock = MagicMock()
     insert_mock.execute.return_value = MagicMock(data=[{}])
@@ -224,14 +229,14 @@ def mock_redis():
 
 @pytest.fixture
 def client():
-    """FastAPI TestClient for root main.py."""
+    """FastAPI TestClient for main.app, the single application."""
     from fastapi.testclient import TestClient
     return TestClient(api_main.app)
 
 
 @pytest.fixture
 def app_client():
-    """FastAPI TestClient for app/main.py (deployed version)."""
+    """FastAPI TestClient for the deploy path (app.main, an alias of main.app)."""
     from fastapi.testclient import TestClient
     from app.main import app
     return TestClient(app)

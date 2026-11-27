@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Preflight-verify, commit, push, and PR a change the NakTahu way. Use before any commit/push in this repo — runs the full local gate (pytest, typecheck, two-mains check, i18n check, lockfile hygiene), then applies the branch/PR protocol including the merged-branch restart.
+description: Preflight-verify, commit, push, and PR a change the NakTahu way. Use before any commit/push in this repo — runs the full local gate (pytest, typecheck, mount check, i18n check, lockfile hygiene), then applies the branch/PR protocol including the merged-branch restart.
 ---
 
 # Ship a change
@@ -24,11 +24,11 @@ cd apps/api && python -m pytest -q
 
 - If imports fail on missing deps, run `pip install -e ".[dev]"` once and retry.
 - If ONLY the two known flakes fail (`test_auth.py::test_anonymous_query_rate_limit_31st_returns_429_with_retry_after`, `::test_authenticated_query_uses_user_bucket`) AND the diff doesn't touch auth/rate-limiting: re-run them in isolation, then proceed and name them in your report. Any other failure blocks the ship.
-- **Two-mains check** — if any router was added or its mounting touched:
+- **Mount check** — if any router was added or its mounting touched:
   ```bash
-  grep -n "include_router" apps/api/main.py apps/api/app/main.py
+  grep -n "include_router" apps/api/main.py
   ```
-  Every user-facing router must appear in BOTH lists. A miss here ships a feature that passes tests but doesn't exist in production.
+  Every user-facing router must appear. `app/main.py` only re-exports `main.app`, so one list covers tests and production.
 - New migration file? Confirm it's numbered one above the current max in `infra/supabase/migrations/`, and add "paste `infra/supabase/migrations/NNN_*.sql` into the Supabase SQL editor" to the PR body draft.
 
 ## 3. Frontend gate (skip only if no `apps/web/` files changed)

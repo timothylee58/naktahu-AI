@@ -11,7 +11,7 @@ investor-plan customer does NOT inherit pro/business SME features; they are
 different market segments. Anonymous -> 401 (from get_current_user),
 authenticated-but-not-entitled -> 403, matching require_plan's shape.
 
-Mounted in BOTH apps/api/main.py and apps/api/app/main.py per Trap #1.
+Mounted in apps/api/main.py, the single app.
 Supabase-null -> 503 at the top of every endpoint per Trap #4.
 """
 from __future__ import annotations

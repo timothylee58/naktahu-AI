@@ -42,7 +42,7 @@ def client(monkeypatch):
     def fake_from_url(*args, **kwargs):
         return redis_client
 
-    import app.main as api_main
+    import main as api_main
 
     monkeypatch.setattr(api_main.redis_ai, "from_url", fake_from_url)
 

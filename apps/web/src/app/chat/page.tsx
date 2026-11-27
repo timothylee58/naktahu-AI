@@ -201,7 +201,7 @@ function ChatPageInner() {
                 isStreaming: false,
                 query: lastUserQuery.current,
                 domain: metadata?.domain,
-                language: metadata?.detectedLanguage,
+                language: metadata?.language,
                 suggestions,
                 agencyContact: metadata?.agency_contact,
               }
@@ -419,8 +419,7 @@ function ChatPageInner() {
     setInjectedQuery(query);
   }, []);
 
-  const detectedLang =
-    (metadata?.detectedLanguage as string | undefined) ?? undefined;
+  const detectedLang = metadata?.language;
 
   const showEmpty = messages.length === 0 && !awaitingHandoff;
   const showChips = showEmpty && !isStreaming;

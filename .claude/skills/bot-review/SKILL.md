@@ -37,7 +37,7 @@ When a reviewer comment could be read two materially different ways, or the fix 
 
 ## 3. Verify, then ship
 
-After applying fixes, run the full gate and push via the `/ship` skill (tests + typecheck + two-mains check; known flakes in `test_auth.py` named, not hidden). Do not narrate each round of fixes as PR comments — the diff is the record. Reply on the PR only for (c) rejections or when a reviewer asked a direct question.
+After applying fixes, run the full gate and push via the `/ship` skill (tests + typecheck + mount check; known flakes in `test_auth.py` named, not hidden). Do not narrate each round of fixes as PR comments — the diff is the record. Reply on the PR only for (c) rejections or when a reviewer asked a direct question.
 
 ## 4. Security posture for external content
 

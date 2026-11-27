@@ -55,7 +55,7 @@ CFM's Ez ADU (KPDNKK consumer fraud) and VSP (police reports) show real citizen 
 1. Read `apps/api/app/agents/compliance_drafter/` end-to-end (`nodes.py`, `graph.py`, `state.py`) as the direct template — the `generate_pdf_node`'s `interrupt_before=["generate_pdf"]` HITL pattern is exactly what a complaint draft needs (let the citizen review before a document is generated).
 2. New `apps/api/app/agents/complaint_drafter/` module: state fields for complaint type (consumer fraud / police report / other), incident details, involved party, desired outcome; RAG grounding should query `document_chunks` filtered to `domain in ("legal", "government")` for the correct KPDNKK/PDRM procedural facts (what info a valid complaint needs, where to file it) — never let the LLM invent procedural requirements.
 3. Register in `agent_registry.py`'s fallback dict + a new migration seeding the `agents` table row (follow migration 031's `retrenchment-navigator` seed as the template) — pick a `plan_required`/`credit_cost` deliberately, this is a judgment call, not a default.
-4. Two-mains mount (Trap #1) and full test/i18n checklist per `CLAUDE.md` §6 apply as with any new agent.
+4. Mounting in `main.py` and the full test/i18n checklist per `CLAUDE.md` §6 apply as with any new agent.
 5. Sensitive-content note: complaint drafts describe alleged fraud/incidents involving named third parties — worth an explicit read of how `compliance_drafter` currently handles PII in generated documents before extending the pattern to citizen complaints, since the risk profile (naming a private individual as a fraud suspect) is different from a business compliance report.
 
 ---

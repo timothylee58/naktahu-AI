@@ -54,11 +54,10 @@ python -m pyflakes main.py app/main.py routers app/routers services app/services
 
 A few checks that aren't automated but that reviewers will look for:
 
-- **New backend route?** Mount it in **both** `apps/api/main.py` *and*
-  `apps/api/app/main.py`. Two FastAPI apps exist; the test suite imports one and
-  Railway deploys the other, so a route in only one passes CI and doesn't exist
-  in production. `grep -l "your_router" apps/api/main.py apps/api/app/main.py`
-  must print both files.
+- **New backend route?** Mount it in `apps/api/main.py`. That file defines the
+  one FastAPI app; `app/main.py` only re-exports it for `uvicorn app.main:app`, so
+  the suite and Railway always see the same routes.
+  `grep -n "your_router" apps/api/main.py` must hit.
 - **New user-visible string?** Add it to all three language blocks (`bm`, `en`,
   `zh`) in `apps/web/src/lib/i18n/index.tsx`. Never hardcode UI copy.
 - **New knowledge domain?** The canonical list appears in several places
