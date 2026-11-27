@@ -2,16 +2,26 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
+import time
 
+import anthropic
+import openai
 import structlog
 import weave
 
 from app.models.state import AgentState
-from app.orchestration.circuit_breaker import CircuitOpenError, ilmu_breaker
+from app.orchestration.circuit_breaker import CircuitOpenError, anthropic_breaker, ilmu_breaker
 from app.services import cache as cache_svc
 from app.services.language_detect import detect_latin_language
-from app.services.llm_client import ILMU_CHAT_MODEL, extract_json_object, ilmu_client
+from app.services.llm_client import (
+    FALLBACK_MODEL,
+    ILMU_CHAT_MODEL,
+    anthropic_client,
+    extract_json_object,
+    ilmu_client,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -59,6 +69,32 @@ _SYSTEM_PROMPT = (
 # high-severity finding from an automated review; test_router_node.py
 # asserts scam_check never appears in _SYSTEM_PROMPT as the guard for this.
 _VALID_DOMAINS = {"government", "education", "legal", "finance", "healthcare", "epf", "tax", "business", "immigration", "culture", "parliament", "property", "welfare"}
+
+_ROUTER_TOOL_NAME = "classify_query"
+_CLASSIFY_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "language": {"type": "string", "enum": ["bm", "en", "zh"]},
+        "domain": {"type": ["string", "null"], "enum": [*sorted(_VALID_DOMAINS), None]},
+        "intent": {"type": "string"},
+        "is_live_status_query": {"type": "boolean"},
+        "place_name": {"type": ["string", "null"]},
+        "is_structured_parliament_query": {"type": "boolean"},
+        "parliament_bill_number": {"type": ["string", "null"]},
+        "parliament_mp_query": {"type": ["string", "null"]},
+    },
+    "required": [
+        "language",
+        "domain",
+        "intent",
+        "is_live_status_query",
+        "place_name",
+        "is_structured_parliament_query",
+        "parliament_bill_number",
+        "parliament_mp_query",
+    ],
+    "additionalProperties": False,
+}
 # Map common LLM outputs to stored domain values
 _DOMAIN_ALIASES = {
     "health": "healthcare",
@@ -90,7 +126,8 @@ _FIRST_PASS_MAX_TOKENS = 128
 _RETRY_MAX_TOKENS = 384
 
 
-async def _classify(query: str) -> dict:
+async def _classify_plain(query: str) -> dict:
+    """Prompt-and-parse classification: the original path and the fallback for both structured modes."""
     parsed: dict = {}
     for max_tokens in (_FIRST_PASS_MAX_TOKENS, _RETRY_MAX_TOKENS):
         resp = await ilmu_breaker.call(
@@ -118,6 +155,127 @@ async def _classify(query: str) -> dict:
             max_tokens=max_tokens,
         )
     return parsed
+
+
+def _structured_mode() -> str:
+    """Read per call (not at import) so Railway env changes and tests take effect without a reload.
+
+    off          prompt-and-parse only (default; nothing is sent that ILMU hasn't already accepted)
+    ilmu_schema  ILMU response_format=json_schema; run scripts/probe_ilmu_capabilities.py first
+    claude_tool  Anthropic forced tool_use; routes classification through Anthropic, an
+                 architecture decision (CLAUDE.md provider order) made explicitly by the owner
+    """
+    mode = os.environ.get("ROUTER_STRUCTURED_MODE", "off").strip().lower()
+    return mode if mode in {"ilmu_schema", "claude_tool"} else "off"
+
+
+def router_claude_model() -> str:
+    """Single source for the claude_tool model so the capability probe tests what production calls."""
+    return os.environ.get("ROUTER_CLAUDE_MODEL", FALLBACK_MODEL)
+
+
+# A deterministic 4xx on response_format means ILMU does not take the schema; retrying it on
+# every query would add a wasted round trip per request. Skip the structured call for a while.
+_SCHEMA_REJECTED_COOLDOWN_S = 300.0
+_schema_rejected_until = 0.0
+_claude_rejected_until = 0.0
+_REJECTION_STATUSES = {400, 404, 422}
+_CLAUDE_TIMEOUT_S = 8.0
+
+
+async def _classify_ilmu_schema(query: str) -> dict:
+    if time.monotonic() < _schema_rejected_until:
+        return {}
+
+    async def _create() -> object | None:
+        global _schema_rejected_until
+        # A schema rejection is a property of the request, not an ILMU outage: converting it to a
+        # return value keeps it off ilmu_breaker, which the plain path and guard_node share.
+        try:
+            # Single pass at the larger budget: the schema bounds the output, and a 128-token
+            # truncation would give invalid JSON for no benefit.
+            return await ilmu_client.chat.completions.create(
+                model=ILMU_CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": query},
+                ],
+                max_tokens=_RETRY_MAX_TOKENS,
+                temperature=0,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "router_classification", "strict": True, "schema": _CLASSIFY_SCHEMA},
+                },
+            )
+        except openai.APIStatusError as exc:
+            if exc.status_code not in _REJECTION_STATUSES:
+                raise
+            _schema_rejected_until = time.monotonic() + _SCHEMA_REJECTED_COOLDOWN_S
+            log.warning("router_schema_rejected", status=exc.status_code, cooldown_s=_SCHEMA_REJECTED_COOLDOWN_S)
+            return None
+
+    resp = await ilmu_breaker.call(_create)
+    if resp is None:
+        return {}
+    return extract_json_object(resp.choices[0].message.content or "")
+
+
+async def _classify_claude_tool(query: str) -> dict:
+    if time.monotonic() < _claude_rejected_until:
+        return {}
+
+    async def _create() -> object | None:
+        global _claude_rejected_until
+        # anthropic_breaker also guards the synthesiser fallback, so a rejected request (bad
+        # tool schema, unsupported parameter) must not count toward opening it.
+        try:
+            return await anthropic_client.messages.create(
+                model=router_claude_model(),
+                max_tokens=_RETRY_MAX_TOKENS,
+                system=_SYSTEM_PROMPT,
+                tools=[
+                    {
+                        "name": _ROUTER_TOOL_NAME,
+                        "description": "Record the classification of the user's query.",
+                        "input_schema": _CLASSIFY_SCHEMA,
+                    }
+                ],
+                tool_choice={"type": "tool", "name": _ROUTER_TOOL_NAME},
+                messages=[{"role": "user", "content": query}],
+                timeout=_CLAUDE_TIMEOUT_S,
+            )
+        except anthropic.APIStatusError as exc:
+            if exc.status_code not in _REJECTION_STATUSES:
+                raise
+            _claude_rejected_until = time.monotonic() + _SCHEMA_REJECTED_COOLDOWN_S
+            log.warning("router_claude_rejected", status=exc.status_code, cooldown_s=_SCHEMA_REJECTED_COOLDOWN_S)
+            return None
+
+    resp = await anthropic_breaker.call(_create)
+    if resp is None:
+        return {}
+    for block in resp.content:
+        if getattr(block, "type", None) == "tool_use" and isinstance(block.input, dict):
+            return block.input
+    return {}
+
+
+async def _classify(query: str) -> dict:
+    mode = _structured_mode()
+    if mode != "off":
+        try:
+            parsed = await (_classify_ilmu_schema(query) if mode == "ilmu_schema" else _classify_claude_tool(query))
+            if parsed:
+                return parsed
+            log.warning("router_structured_empty", mode=mode)
+        except CircuitOpenError:
+            if mode == "ilmu_schema":
+                # The plain path shares ilmu_breaker, so falling back would only fail the same way.
+                raise
+            log.warning("router_claude_circuit_open")
+        except Exception as exc:
+            log.warning("router_structured_failed", mode=mode, error=str(exc))
+    return await _classify_plain(query)
 
 
 @weave.op()
