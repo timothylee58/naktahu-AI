@@ -1301,7 +1301,60 @@ BUDGET_2027_SOURCES: tuple[Source, ...] = (
 # fetched by the build sandbox: confirm it with check_sources and read a dry-run before a live
 # ingest. Do not ingest secondary summaries (PwC, Deloitte, news): citations must be official.
 
-SOURCES = SOURCES + BUDGET_2026_SOURCES + BUDGET_2027_SOURCES
+# ── tax: Program Khas Pengakuan Sukarela (PKPS) Duti Setem 2026 ─────────────────────
+# A penalty waiver for late-stamped instruments (executed 1 Jan 2023 - 31 Dec 2025), not a duty
+# exemption: the duty stays payable. Originally 1 Jan - 30 Jun 2026, extended on 26 Jun 2026 to
+# 31 Dec 2026. Official HASiL documents only; secondary summaries (law firms, press) are not
+# ingested because citations must be official.
+# UNVERIFIED: the URLs came from search results, not a direct fetch (this sandbox cannot reach
+# hasil.gov.my). Run check_sources, then a dry-run, and read the preview before a live ingest.
+# The programme ends 31 Dec 2026: after that, review the chunks (scripts.review_supersede) so
+# answers stop describing it as open. date_inference is "off" because the text is full of
+# instrument-date windows (2023-2025) that must not be read as validity dates.
+_LHDN = "Lembaga Hasil Dalam Negeri (LHDN)"
+_HASIL_UPLOADS = "https://www.hasil.gov.my/wp-content/uploads"
+
+PKPS_SOURCES: tuple[Source, ...] = (
+    Source(
+        name="lhdn-pkps-guideline",
+        url=f"{_HASIL_UPLOADS}/garis-panduan-operasi-layanan-khas-penalti-di-bawah-seksyen-47a-akta-setem-1949-bagi-program-khas-pengakuan-sukarela-duti-setem-2026-1.pdf",
+        kind="pdf", domain="tax", ministry=_LHDN, language="bm",
+        notes="Operational guideline for PKPS Duti Setem 2026: s.47A penalty remission, eligibility, period (updated 29 Jun 2026).",
+        title="Garis Panduan Operasi PKPS Duti Setem 2026 (LHDN)",
+        require_host_suffix="hasil.gov.my", identity_terms=("pengakuan sukarela",),
+        date_inference="off",
+    ),
+    Source(
+        name="lhdn-pkps-faq-bm",
+        url=f"{_HASIL_UPLOADS}/soalan-lazim-faq-pengecualian-penalti-program-pengakuan-khas-sukarela-pkps-duti-setem-2026.pdf",
+        kind="pdf", domain="tax", ministry=_LHDN, language="bm",
+        notes="LHDN FAQ (BM) on the PKPS Duti Setem 2026 penalty waiver: who qualifies, how to claim, audit protection.",
+        title="Soalan Lazim PKPS Duti Setem 2026 (LHDN)",
+        require_host_suffix="hasil.gov.my", identity_terms=("pengakuan sukarela",),
+        date_inference="off",
+    ),
+    Source(
+        name="lhdn-pkps-faq-en",
+        url=f"{_HASIL_UPLOADS}/FAQ_Penalty_Exemption_Under_The_Special_Voluntary_Disclosure_Programme_PKPS_For_Stamp_Duty_2026.pdf",
+        kind="pdf", domain="tax", ministry=_LHDN, language="en",
+        notes="LHDN FAQ (EN) on the Special Voluntary Disclosure Programme (PKPS) for stamp duty 2026.",
+        title="FAQ: PKPS Stamp Duty 2026 Penalty Exemption (LHDN)",
+        require_host_suffix="hasil.gov.my", identity_terms=("voluntary disclosure",),
+        date_inference="off",
+    ),
+    Source(
+        name="lhdn-pkps-extension-statement",
+        url=f"{_HASIL_UPLOADS}/20260626-kenyataan-media-hasil-lanjutan-pkps-duti-setem-sehingga-31-dis-2026.pdf",
+        kind="pdf", domain="tax", ministry=_LHDN, language="bm",
+        notes="LHDN media statement of 26 Jun 2026 extending PKPS Duti Setem from 30 Jun to 31 Dec 2026.",
+        title="Kenyataan Media: Lanjutan PKPS Duti Setem hingga 31 Disember 2026 (LHDN)",
+        announced_date=date(2026, 6, 26),
+        require_host_suffix="hasil.gov.my", identity_terms=("pengakuan sukarela",),
+        date_inference="off",
+    ),
+)
+
+SOURCES = SOURCES + BUDGET_2026_SOURCES + BUDGET_2027_SOURCES + PKPS_SOURCES
 
 SOURCES_BY_NAME: dict[str, Source] = {s.name: s for s in SOURCES}
 
