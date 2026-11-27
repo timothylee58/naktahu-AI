@@ -17,6 +17,12 @@ def _mock_completion(content: str) -> MagicMock:
 
 
 @pytest.fixture(autouse=True)
+def _reset_schema_rejection_latch(monkeypatch: pytest.MonkeyPatch):
+    """The rejection cooldown is module state; without a reset one test would silence the next."""
+    monkeypatch.setattr("app.agents.router_node._schema_rejected_until", 0.0)
+
+
+@pytest.fixture(autouse=True)
 def _default_query_already_seen():
     """Every test in this file except the speculative-embed tests below
     (which override this explicitly) shouldn't fire a real background
@@ -656,3 +662,111 @@ async def test_unknown_mode_value_behaves_as_off(monkeypatch: pytest.MonkeyPatch
         await router_node({"query": "How much is income tax?"})
 
     assert "response_format" not in create.call_args.kwargs
+
+
+def _status_error(status: int) -> Exception:
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "https://api.ilmu.ai/v1/chat/completions")
+    return openai.APIStatusError(
+        "response_format unsupported", response=httpx.Response(status, request=request), body=None
+    )
+
+
+@pytest.mark.asyncio
+async def test_schema_rejection_never_trips_the_shared_ilmu_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Qodo finding: five deterministic 400s on response_format used to open ilmu_breaker, which
+    the plain fallback and guard_node share, taking classification down entirely."""
+    from app.orchestration.circuit_breaker import CircuitBreaker, CircuitState
+
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "ilmu_schema")
+    breaker = CircuitBreaker("ilmu-test", failure_threshold=5)
+    plain = _mock_completion('{"language": "en", "domain": "tax", "intent": "x"}')
+
+    async def create(**kwargs: object) -> MagicMock:
+        if "response_format" in kwargs:
+            raise _status_error(400)
+        return plain
+
+    with patch("app.agents.router_node.ilmu_breaker", breaker), patch(
+        "app.agents.router_node.ilmu_client"
+    ) as mock_client:
+        mock_client.chat.completions.create = AsyncMock(side_effect=create)
+        for _ in range(8):
+            result = await router_node({"query": "How much is income tax?"})
+        calls = mock_client.chat.completions.create.call_args_list
+
+    assert breaker.state == CircuitState.closed
+    assert result["domain"] == "tax"
+    structured_calls = [c for c in calls if "response_format" in c.kwargs]
+    assert len(structured_calls) == 1  # cooldown stops re-sending a format ILMU already refused
+
+
+@pytest.mark.asyncio
+async def test_non_rejection_errors_still_count_against_the_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 5xx is a real outage signal; only 400/404/422 are treated as 'format unsupported'."""
+    from app.orchestration.circuit_breaker import CircuitBreaker
+
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "ilmu_schema")
+    breaker = CircuitBreaker("ilmu-test", failure_threshold=5)
+    plain = _mock_completion('{"language": "en", "domain": "tax", "intent": "x"}')
+
+    async def create(**kwargs: object) -> MagicMock:
+        if "response_format" in kwargs:
+            raise _status_error(503)
+        return plain
+
+    with patch("app.agents.router_node.ilmu_breaker", breaker), patch(
+        "app.agents.router_node.ilmu_client"
+    ) as mock_client:
+        mock_client.chat.completions.create = AsyncMock(side_effect=create)
+        await router_node({"query": "How much is income tax?"})
+
+    assert breaker.metrics["total_failures"] == 1
+
+
+@pytest.mark.asyncio
+async def test_open_anthropic_breaker_skips_claude_and_falls_back_to_ilmu(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.orchestration.circuit_breaker import CircuitBreaker
+
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "claude_tool")
+    breaker = CircuitBreaker("anthropic-test", failure_threshold=1)
+    breaker._record_failure()
+    claude_create = AsyncMock()
+    plain = _mock_completion('{"language": "en", "domain": "government", "intent": "ssm"}')
+
+    with patch("app.agents.router_node.anthropic_breaker", breaker), patch(
+        "app.agents.router_node.anthropic_client"
+    ) as mock_claude, patch("app.agents.router_node.ilmu_client") as mock_ilmu:
+        mock_claude.messages.create = claude_create
+        mock_ilmu.chat.completions.create = AsyncMock(return_value=plain)
+        result = await router_node({"query": "How do I register a company with SSM?"})
+
+    claude_create.assert_not_awaited()
+    assert result["domain"] == "government"
+
+
+@pytest.mark.asyncio
+async def test_claude_tool_call_has_a_timeout_and_honours_model_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "claude_tool")
+    monkeypatch.setenv("ROUTER_CLAUDE_MODEL", "claude-test-model")
+    claude_create = AsyncMock(return_value=_claude_response(_STRUCTURED_RESULT))
+
+    with patch("app.agents.router_node.anthropic_client") as mock_claude:
+        mock_claude.messages.create = claude_create
+        await router_node({"query": "Berapa kadar cukai pendapatan saya?"})
+
+    assert claude_create.call_args.kwargs["timeout"] > 0
+    assert claude_create.call_args.kwargs["model"] == "claude-test-model"
+
+
+def test_router_node_keeps_its_weave_trace_and_the_env_lookup_does_not() -> None:
+    """Qodo finding: _structured_mode was inserted between @weave.op() and router_node."""
+    import inspect
+
+    import app.agents.router_node as mod
+
+    source = inspect.getsource(mod)
+    assert "@weave.op()\nasync def router_node" in source
+    assert "@weave.op()\ndef _structured_mode" not in source

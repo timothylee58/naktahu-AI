@@ -4,12 +4,14 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import time
 
+import openai
 import structlog
 import weave
 
 from app.models.state import AgentState
-from app.orchestration.circuit_breaker import CircuitOpenError, ilmu_breaker
+from app.orchestration.circuit_breaker import CircuitOpenError, anthropic_breaker, ilmu_breaker
 from app.services import cache as cache_svc
 from app.services.language_detect import detect_latin_language
 from app.services.llm_client import (
@@ -154,7 +156,6 @@ async def _classify_plain(query: str) -> dict:
     return parsed
 
 
-@weave.op()
 def _structured_mode() -> str:
     """Read per call (not at import) so Railway env changes and tests take effect without a reload.
 
@@ -167,29 +168,60 @@ def _structured_mode() -> str:
     return mode if mode in {"ilmu_schema", "claude_tool"} else "off"
 
 
+def router_claude_model() -> str:
+    """Single source for the claude_tool model so the capability probe tests what production calls."""
+    return os.environ.get("ROUTER_CLAUDE_MODEL", FALLBACK_MODEL)
+
+
+# A deterministic 4xx on response_format means ILMU does not take the schema; retrying it on
+# every query would add a wasted round trip per request. Skip the structured call for a while.
+_SCHEMA_REJECTED_COOLDOWN_S = 300.0
+_schema_rejected_until = 0.0
+_REJECTION_STATUSES = {400, 404, 422}
+_CLAUDE_TIMEOUT_S = 8.0
+
+
 async def _classify_ilmu_schema(query: str) -> dict:
-    # Single pass at the larger budget: the schema bounds the output, and a 128-token
-    # truncation would yield invalid JSON that no retry loop is needed to explain.
-    resp = await ilmu_breaker.call(
-        ilmu_client.chat.completions.create,
-        model=ILMU_CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": query},
-        ],
-        max_tokens=_RETRY_MAX_TOKENS,
-        temperature=0,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "router_classification", "strict": True, "schema": _CLASSIFY_SCHEMA},
-        },
-    )
+    if time.monotonic() < _schema_rejected_until:
+        return {}
+
+    async def _create() -> object | None:
+        global _schema_rejected_until
+        # A schema rejection is a property of the request, not an ILMU outage: converting it to a
+        # return value keeps it off ilmu_breaker, which the plain path and guard_node share.
+        try:
+            # Single pass at the larger budget: the schema bounds the output, and a 128-token
+            # truncation would give invalid JSON for no benefit.
+            return await ilmu_client.chat.completions.create(
+                model=ILMU_CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": query},
+                ],
+                max_tokens=_RETRY_MAX_TOKENS,
+                temperature=0,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "router_classification", "strict": True, "schema": _CLASSIFY_SCHEMA},
+                },
+            )
+        except openai.APIStatusError as exc:
+            if exc.status_code not in _REJECTION_STATUSES:
+                raise
+            _schema_rejected_until = time.monotonic() + _SCHEMA_REJECTED_COOLDOWN_S
+            log.warning("router_schema_rejected", status=exc.status_code, cooldown_s=_SCHEMA_REJECTED_COOLDOWN_S)
+            return None
+
+    resp = await ilmu_breaker.call(_create)
+    if resp is None:
+        return {}
     return extract_json_object(resp.choices[0].message.content or "")
 
 
 async def _classify_claude_tool(query: str) -> dict:
-    resp = await anthropic_client.messages.create(
-        model=os.environ.get("ROUTER_CLAUDE_MODEL", FALLBACK_MODEL),
+    resp = await anthropic_breaker.call(
+        anthropic_client.messages.create,
+        model=router_claude_model(),
         max_tokens=_RETRY_MAX_TOKENS,
         system=_SYSTEM_PROMPT,
         tools=[
@@ -201,6 +233,7 @@ async def _classify_claude_tool(query: str) -> dict:
         ],
         tool_choice={"type": "tool", "name": _ROUTER_TOOL_NAME},
         messages=[{"role": "user", "content": query}],
+        timeout=_CLAUDE_TIMEOUT_S,
     )
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and isinstance(block.input, dict):
@@ -217,13 +250,16 @@ async def _classify(query: str) -> dict:
                 return parsed
             log.warning("router_structured_empty", mode=mode)
         except CircuitOpenError:
-            # The plain path shares ilmu_breaker, so falling back would only fail the same way.
-            raise
+            if mode == "ilmu_schema":
+                # The plain path shares ilmu_breaker, so falling back would only fail the same way.
+                raise
+            log.warning("router_claude_circuit_open")
         except Exception as exc:
             log.warning("router_structured_failed", mode=mode, error=str(exc))
     return await _classify_plain(query)
 
 
+@weave.op()
 async def router_node(state: AgentState) -> dict:
     """Classify query intent, language, and domain."""
     query = state.get("query", "")

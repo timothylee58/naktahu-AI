@@ -43,9 +43,13 @@ if str(_API_ROOT) not in sys.path:
 
 import openai  # noqa: E402
 
-from app.agents.router_node import _CLASSIFY_SCHEMA, _ROUTER_TOOL_NAME, _SYSTEM_PROMPT  # noqa: E402
+from app.agents.router_node import (  # noqa: E402
+    _CLASSIFY_SCHEMA,
+    _ROUTER_TOOL_NAME,
+    _SYSTEM_PROMPT,
+    router_claude_model,
+)
 from app.services.llm_client import (  # noqa: E402
-    FALLBACK_MODEL,
     ILMU_CHAT_MODEL,
     anthropic_client,
     extract_json_object,
@@ -164,24 +168,36 @@ async def probe_json_schema() -> Result:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         return Result("response_format=json_schema (strict)", "IGNORED", f"200 OK but not strict JSON: {raw[:80]!r}")
-    missing = [k for k in _CLASSIFY_SCHEMA["required"] if k not in parsed]
-    extra = [k for k in parsed if k not in _CLASSIFY_SCHEMA["properties"]]
-    if missing or extra:
+    if not _schema_valid(parsed):
         return Result(
             "response_format=json_schema (strict)",
             "IGNORED",
-            f"valid JSON but schema not enforced (missing={missing}, extra={extra})",
+            f"valid JSON but schema not enforced: {str(parsed)[:120]}",
         )
     return Result("response_format=json_schema (strict)", "SUPPORTED", f"parsed={parsed}")
 
 
-def _schema_valid(parsed: dict[str, Any]) -> bool:
-    if set(parsed) != set(_CLASSIFY_SCHEMA["properties"]):
+def _type_ok(value: Any, spec: dict[str, Any]) -> bool:
+    types = spec["type"] if isinstance(spec["type"], list) else [spec["type"]]
+    checks = {
+        "string": lambda v: isinstance(v, str),
+        "boolean": lambda v: isinstance(v, bool),
+        "null": lambda v: v is None,
+    }
+    if not any(checks[t](value) for t in types):
         return False
-    if parsed["language"] not in {"bm", "en", "zh"}:
+    return "enum" not in spec or value in spec["enum"]
+
+
+def _schema_valid(parsed: Any) -> bool:
+    """Exact conformance to _CLASSIFY_SCHEMA: required keys, no extras, types, nullability, enums.
+
+    Hand-rolled because every field is a string/boolean/null; avoids adding a dependency.
+    """
+    props = _CLASSIFY_SCHEMA["properties"]
+    if not isinstance(parsed, dict) or set(parsed) != set(props):
         return False
-    domain_enum = _CLASSIFY_SCHEMA["properties"]["domain"]["enum"]
-    return parsed["domain"] in domain_enum
+    return all(_type_ok(parsed[key], spec) for key, spec in props.items())
 
 
 async def router_validity(queries: list[str]) -> list[Result]:
@@ -201,7 +217,8 @@ async def router_validity(queries: list[str]) -> list[Result]:
 
         flags = await asyncio.gather(*(one(q) for q in queries))
         ok = sum(flags)
-        return Result(name, "SUPPORTED" if ok == len(flags) else "IGNORED", f"{ok}/{len(flags)} schema-valid")
+        verdict = "SUPPORTED" if flags and ok == len(flags) else "IGNORED"
+        return Result(name, verdict, f"{ok}/{len(flags)} schema-valid")
 
     plain = await run("router prompt, plain (current path)", {})
     schema = await run(
@@ -218,7 +235,7 @@ async def router_validity(queries: list[str]) -> list[Result]:
 
 async def probe_claude_tool() -> Result:
     resp = await anthropic_client.messages.create(
-        model=FALLBACK_MODEL,
+        model=router_claude_model(),
         max_tokens=384,
         system=_SYSTEM_PROMPT,
         tools=[{"name": _ROUTER_TOOL_NAME, "description": "Record the classification.", "input_schema": _CLASSIFY_SCHEMA}],
@@ -228,8 +245,8 @@ async def probe_claude_tool() -> Result:
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and isinstance(block.input, dict):
             verdict = "SUPPORTED" if _schema_valid(block.input) else "IGNORED"
-            return Result(f"claude tool_use ({FALLBACK_MODEL})", verdict, f"input={block.input}")
-    return Result(f"claude tool_use ({FALLBACK_MODEL})", "IGNORED", "no tool_use block returned")
+            return Result(f"claude tool_use ({router_claude_model()})", verdict, f"input={block.input}")
+    return Result(f"claude tool_use ({router_claude_model()})", "IGNORED", "no tool_use block returned")
 
 
 def _recommend(results: list[Result]) -> str:
@@ -244,9 +261,21 @@ def _recommend(results: list[Result]) -> str:
     return "leave ROUTER_STRUCTURED_MODE unset (prompt-and-parse stays in force)"
 
 
+def _positive_int(raw: str) -> int:
+    value = int(raw)
+    if value < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return value
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--queries", type=int, default=len(_SAMPLE_QUERIES), help="sample queries for the router run")
+    parser.add_argument(
+        "--queries",
+        type=_positive_int,
+        default=len(_SAMPLE_QUERIES),
+        help="sample queries for the router run (at least 1)",
+    )
     parser.add_argument("--claude", action="store_true", help="also probe Anthropic forced tool_use")
     args = parser.parse_args()
 
