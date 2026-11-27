@@ -32,6 +32,7 @@ from middleware.user_context import UserContextMiddleware
 from routers import billing, calendar as calendar_router, feedback, feedback_attachments, history, leads, parliament, product_feedback, property_listings, quota, referrals, share, translate as translate_router, warung_watch
 from routers.api_v1_public import router as public_api_router
 from routers.developer import router as developer_router
+from routers.user_profile import router as user_profile_router
 from app.routers.metrics import router as metrics_router
 from app.routers.observability import router as observability_router
 from app.orchestration.adapters import ALL_ADAPTERS
@@ -150,6 +151,7 @@ app.include_router(property_listings.router)
 app.include_router(warung_watch.router)
 app.include_router(eligibility_router)
 app.include_router(investor_router)
+app.include_router(user_profile_router)
 app.include_router(public_api_router)
 app.include_router(developer_router)
 app.include_router(metrics_router)
