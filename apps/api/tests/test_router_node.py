@@ -18,8 +18,9 @@ def _mock_completion(content: str) -> MagicMock:
 
 @pytest.fixture(autouse=True)
 def _reset_schema_rejection_latch(monkeypatch: pytest.MonkeyPatch):
-    """The rejection cooldown is module state; without a reset one test would silence the next."""
+    """The rejection cooldowns are module state; without a reset one test would silence the next."""
     monkeypatch.setattr("app.agents.router_node._schema_rejected_until", 0.0)
+    monkeypatch.setattr("app.agents.router_node._claude_rejected_until", 0.0)
 
 
 @pytest.fixture(autouse=True)

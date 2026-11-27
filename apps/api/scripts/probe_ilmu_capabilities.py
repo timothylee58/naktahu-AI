@@ -230,7 +230,10 @@ async def router_validity(queries: list[str]) -> list[Result]:
                 status = getattr(exc, "status_code", None)
                 failures.append(f"{status or type(exc).__name__}: {str(exc)[:80]}")
                 return "error"
-            ok = _schema_valid(extract_json_object(resp.choices[0].message.content or ""))
+            try:
+                ok = _schema_valid(extract_json_object(resp.choices[0].message.content or ""))
+            except (AttributeError, IndexError, TypeError):
+                return "invalid"  # a 200 with a malformed body is an invalid output, not a probe crash
             return "ok" if ok else "invalid"
 
         outcomes = await asyncio.gather(*(one(q) for q in queries))

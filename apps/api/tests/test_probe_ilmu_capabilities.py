@@ -115,3 +115,22 @@ async def test_router_sample_errors_keep_their_status_and_message(monkeypatch: p
         assert result.verdict == "ERROR"
         assert "401" in result.detail and "invalid api key" in result.detail
         assert "2 request errors" in result.detail
+
+
+@pytest.mark.asyncio
+async def test_malformed_200_response_counts_as_invalid_instead_of_crashing_the_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    import scripts.probe_ilmu_capabilities as probe_mod
+
+    async def malformed_chat(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(choices=[])  # a 200 whose body has no choices
+
+    monkeypatch.setattr(probe_mod, "_chat", malformed_chat)
+    plain, schema = await probe_mod.router_validity(["q1", "q2"])
+
+    for result in (plain, schema):
+        assert result.verdict == "IGNORED"
+        assert "0/2 schema-valid" in result.detail
