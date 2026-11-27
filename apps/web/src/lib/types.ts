@@ -1,51 +1,11 @@
-export interface Citation {
-  source_url?: string;
-  source_title?: string;
-  ministry: string;
-  url?: string;
-  title?: string;
-  confidence?: number;
-  stale_disclaimer?: boolean;
-  /** ISO date (YYYY-MM-DD) the cited rule/figure takes effect, from the
-   * backend's analyst_node. Optional and often absent — many chunks carry
-   * no date. Render nothing when it's missing; never substitute today's
-   * date or a fetch timestamp, which would misrepresent how current the
-   * underlying government source actually is. */
-  effective_date?: string | null;
-  /** True when the rule is announced but takes effect after today. */
-  not_yet_effective?: boolean;
-  /** ISO timestamp NakTahu last ingested/verified this specific source
-   * (document_chunks.created_at, via migration 048). Distinct from
-   * effective_date: this says "we checked this on {date}", not "this rule
-   * took effect on {date}". Render nothing when missing. */
-  retrieved_at?: string | null;
-  /** From document_chunks.source_tier (migration 059). Absent when the tier is
-   * unknown (not yet labelled / migration not applied): render NO badge then.
-   * Never infer it from the URL: not every official body is on .gov.my. */
-  source_tier?: 'official' | 'community' | null;
-}
+export type {
+  AgencyContact,
+  Citation,
+  SourceTier,
+  SSEMetadata,
+} from '@naktahu/shared-types';
 
-/** Real government contact for a personal-record query NakTahu can't answer
- * (it has no access to any user's case-specific data) — see
- * apps/api/app/agents/personal_data.py for the curated directory. */
-export interface AgencyContact {
-  agency: string;
-  domain: string;
-  hotline: string;
-  portal: string;
-}
-
-export interface SSEMetadata {
-  detectedLanguage?: string;
-  confidence?: number;
-  domain?: string;
-  agency_contact?: AgencyContact;
-  /** The answer was flagged for follow-up (thin evidence, or it said the context lacks the answer). */
-  needs_clarification?: boolean;
-  /** The finished answer said the provided context has no answer; confidence was capped below the bar. */
-  answer_declined?: boolean;
-  [key: string]: unknown;
-}
+import type { AgencyContact, Citation } from '@naktahu/shared-types';
 
 export interface Message {
   id: string;
