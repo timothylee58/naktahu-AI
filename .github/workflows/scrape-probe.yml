@@ -20,10 +20,14 @@ on:
         description: "Registered source name(s), comma separated (blank = the two DOSM sources)"
         type: string
         required: false
-      url:
-        description: "Extra https URL under *.gov.my (optional)"
+      urls:
+        description: "Extra https URL(s) under *.gov.my, comma separated (optional)"
         type: string
         required: false
+      links:
+        description: "List up to N listing-page candidate links per page (0 = off)"
+        type: string
+        default: "0"
       include_paid:
         description: "Also run the paid options that have secrets configured"
         type: boolean
@@ -56,7 +60,8 @@ jobs:
         env:
           PYTHONPATH: .
           SOURCES: ${{ inputs.source }}
-          EXTRA_URL: ${{ inputs.url }}
+          EXTRA_URLS: ${{ inputs.urls }}
+          LINKS: ${{ inputs.links }}
           INCLUDE_PAID: ${{ inputs.include_paid }}
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
           BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
@@ -68,7 +73,15 @@ jobs:
           for name in "${NAMES[@]}"; do
             [ -n "$name" ] && ARGS+=(--source "$name")
           done
-          [ -n "${EXTRA_URL:-}" ] && ARGS+=(--url "$EXTRA_URL")
+          IFS=',' read -ra URLS <<< "${EXTRA_URLS:-}"
+          for u in "${URLS[@]}"; do
+            u="${u// /}"
+            [ -n "$u" ] && ARGS+=(--url "$u")
+          done
+          case "${LINKS:-0}" in
+            ''|*[!0-9]*) ;;
+            *) [ "$LINKS" -gt 0 ] && ARGS+=(--links "$LINKS") ;;
+          esac
           [ "$INCLUDE_PAID" = "true" ] && ARGS+=(--include-paid)
           python -m scripts.probe_scrape_options "${ARGS[@]}" --json-out "$RUNNER_TEMP/probe.json" | tee "$RUNNER_TEMP/probe.md"
           {

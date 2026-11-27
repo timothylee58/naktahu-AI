@@ -16,6 +16,7 @@ Usage (from apps/api):
     python -m scripts.probe_scrape_options                       # DOSM, free option only
     python -m scripts.probe_scrape_options --source dosm-portal-home
     python -m scripts.probe_scrape_options --url https://www.dosm.gov.my/
+    python -m scripts.probe_scrape_options --url https://www.moh.gov.my/ --links 25   # find listing pages
     EXA_API_KEY=... BRIGHTDATA_API_KEY=... BRIGHTDATA_ZONE=... \\
         python -m scripts.probe_scrape_options --include-paid --json-out probe.json
 
@@ -46,9 +47,10 @@ import re
 import sys
 import time
 from dataclasses import asdict, dataclass, field
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Optional
-from urllib.parse import urlsplit
+from urllib.parse import urldefrag, urljoin, urlsplit
 
 import httpx
 
@@ -75,6 +77,68 @@ _LINK_RE = re.compile(r"<a\s[^>]*href=", re.IGNORECASE)
 _SCRIPT_RE = re.compile(r"<script\b", re.IGNORECASE)
 
 
+# Words that mark a link as a place where new policy material is published.
+_LISTING_HINTS = (
+    "media", "berita", "news", "kenyataan", "statement", "press", "pekeliling", "circular",
+    "pengumuman", "announcement", "terbitan", "penerbitan", "publication", "release",
+    "dasar", "polic", "garis-panduan", "guideline", "arkib", "archive", "notis", "notice",
+)
+_MAX_LINK_TEXT = 120
+
+
+class _LinkParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[tuple[str, str]] = []
+        self._href: Optional[str] = None
+        self._text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        if tag == "a":
+            self._href = dict(attrs).get("href")
+            self._text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._href is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._href is not None:
+            self.links.append((self._href, " ".join("".join(self._text).split())))
+            self._href = None
+
+
+def extract_links(html: str, base_url: str) -> list[dict[str, str]]:
+    """Absolute, de-duplicated links that stay under *.gov.my. Off-domain and
+    non-http links are dropped here so nothing downstream can be pointed at them."""
+    parser = _LinkParser()
+    parser.feed(html)
+    seen: set[str] = set()
+    links: list[dict[str, str]] = []
+    for href, text in parser.links:
+        absolute, _ = urldefrag(urljoin(base_url, href.strip()))
+        parts = urlsplit(absolute)
+        if parts.scheme not in ("http", "https") or not parts.hostname or not _host_in_domain(parts.hostname, ALLOWED_DOMAIN):
+            continue
+        if absolute in seen:
+            continue
+        seen.add(absolute)
+        links.append({"url": absolute, "text": text[:_MAX_LINK_TEXT]})
+    return links
+
+
+def listing_candidates(links: list[dict[str, str]], limit: int) -> list[dict[str, str]]:
+    """Links whose address or label suggests a listing of new material, best first."""
+    scored: list[tuple[int, dict[str, str]]] = []
+    for link in links:
+        haystack = f"{link['url']} {link['text']}".lower()
+        score = sum(1 for hint in _LISTING_HINTS if hint in haystack)
+        if score:
+            scored.append((score, link))
+    scored.sort(key=lambda pair: -pair[0])
+    return [link for _, link in scored[:limit]]
+
+
 @dataclass
 class Fetched:
     status: Optional[int]
@@ -99,6 +163,7 @@ class Result:
     scripts: int = 0
     injection_pattern: Optional[str] = None
     title: str = ""
+    listing_links: list[dict[str, str]] = field(default_factory=list)
 
 
 def validate_target(url: str, domain: str = ALLOWED_DOMAIN) -> str:
@@ -154,7 +219,7 @@ def fetch_brightdata(url: str, client: httpx.Client, api_key: str, zone: str) ->
     return Fetched(resp.status_code, resp.content, time.monotonic() - start)
 
 
-def analyse(option: str, url: str, fetched: Fetched) -> Result:
+def analyse(option: str, url: str, fetched: Fetched, link_limit: int = 0) -> Result:
     base = Result(option=option, url=url, verdict="ERROR", detail="", status=fetched.status, seconds=round(fetched.seconds, 2))
     if fetched.off_domain_hosts:
         base.detail = f"redirected outside *.{ALLOWED_DOMAIN} via {', '.join(fetched.off_domain_hosts)}; refused"
@@ -180,6 +245,8 @@ def analyse(option: str, url: str, fetched: Fetched) -> Result:
     base.scripts = len(_SCRIPT_RE.findall(html))
     base.title = entries[0].title if entries else ""
     base.injection_pattern = _scan_for_injection(text)
+    if link_limit:
+        base.listing_links = listing_candidates(extract_links(html, url), link_limit)
 
     if base.text_chars < _MIN_USABLE_CHARS and any(m in lowered for m in _CHALLENGE_MARKERS):
         base.verdict, base.detail = "BLOCKED", "200 OK but the body is a bot-challenge page"
@@ -212,14 +279,16 @@ def build_options(include_paid: bool, env: dict[str, str]) -> list[tuple[str, Op
     return options
 
 
-def run_probe(urls: list[str], include_paid: bool, env: dict[str, str], client: httpx.Client) -> list[Result]:
+def run_probe(
+    urls: list[str], include_paid: bool, env: dict[str, str], client: httpx.Client, link_limit: int = 0
+) -> list[Result]:
     results: list[Result] = []
     for url in urls:
         for name, fetcher, skip_reason in build_options(include_paid, env):
             if fetcher is None:
                 results.append(Result(option=name, url=url, verdict="SKIPPED", detail=skip_reason))
                 continue
-            results.append(analyse(name, url, fetcher(url, client)))
+            results.append(analyse(name, url, fetcher(url, client), link_limit))
     return results
 
 
@@ -239,13 +308,21 @@ def render(results: list[Result]) -> str:
         )
     notes = [f"- {r.option} {r.url}: {r.detail}" for r in results if r.detail]
     flagged = [f"- {r.option} {r.url}: matched injection pattern {r.injection_pattern!r}" for r in results if r.injection_pattern]
-    return "\n".join(lines + ["", *notes, *(["", "Injection scan hits:", *flagged] if flagged else [])])
+    listings: list[str] = []
+    for r in results:
+        if r.listing_links:
+            listings += ["", f"Listing candidates on {r.url} ({r.option}):"]
+            listings += [f"- {link['text'] or '(no text)'} -> {link['url']}" for link in r.listing_links]
+    return "\n".join(lines + ["", *notes, *(["", "Injection scan hits:", *flagged] if flagged else []), *listings])
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source", action="append", default=[], help="registered source name (repeatable)")
     parser.add_argument("--url", action="append", default=[], help="extra https URL under *.gov.my (repeatable)")
+    parser.add_argument(
+        "--links", type=int, default=0, metavar="N", help="also list up to N links per page that look like listings of new material"
+    )
     parser.add_argument("--include-paid", action="store_true", help="also run the paid options that have keys set")
     parser.add_argument("--json-out", type=Path, help="write the full results as JSON")
     args = parser.parse_args()
@@ -253,7 +330,7 @@ def main() -> int:
     sources = args.source or ([] if args.url else list(DEFAULT_SOURCES))
     urls = resolve_urls(sources, args.url)
     with httpx.Client(timeout=_TIMEOUT) as client:
-        results = run_probe(urls, args.include_paid, dict(os.environ), client)
+        results = run_probe(urls, args.include_paid, dict(os.environ), client, args.links)
 
     print(render(results))
     if args.json_out:
