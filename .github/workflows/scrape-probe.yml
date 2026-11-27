@@ -1,0 +1,86 @@
+name: Scrape Probe
+
+# Sandbox for comparing ways to fetch .gov.my pages (scripts/probe_scrape_options.py).
+# Manual only: no schedule, so it never spends anything on its own.
+#
+# Why a workflow: the dev sandbox blocks outbound HTTPS to *.gov.my at the
+# egress proxy, so the options cannot be judged from there. A GitHub Actions
+# runner has normal internet access.
+#
+# Read-only: it writes no Supabase rows and calls no embedding API. The free
+# option (plain httpx) always runs. The paid options (Exa, Bright Data) run
+# only when include_paid is ticked AND their repository secrets are set, so
+# a default run costs nothing. The result table lands in the job summary and
+# the JSON in the probe-report artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Registered source name(s), comma separated (blank = the two DOSM sources)"
+        type: string
+        required: false
+      url:
+        description: "Extra https URL under *.gov.my (optional)"
+        type: string
+        required: false
+      include_paid:
+        description: "Also run the paid options that have secrets configured"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe fetch options
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Run probe
+        env:
+          PYTHONPATH: .
+          SOURCES: ${{ inputs.source }}
+          EXTRA_URL: ${{ inputs.url }}
+          INCLUDE_PAID: ${{ inputs.include_paid }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          BRIGHTDATA_ZONE: ${{ secrets.BRIGHTDATA_ZONE }}
+        run: |
+          ARGS=()
+          # Inputs reach the script as arguments, never interpolated into the shell line.
+          IFS=',' read -ra NAMES <<< "${SOURCES:-}"
+          for name in "${NAMES[@]}"; do
+            [ -n "$name" ] && ARGS+=(--source "$name")
+          done
+          [ -n "${EXTRA_URL:-}" ] && ARGS+=(--url "$EXTRA_URL")
+          [ "$INCLUDE_PAID" = "true" ] && ARGS+=(--include-paid)
+          python -m scripts.probe_scrape_options "${ARGS[@]}" --json-out "$RUNNER_TEMP/probe.json" | tee "$RUNNER_TEMP/probe.md"
+          {
+            echo "## Scrape probe"
+            echo
+            cat "$RUNNER_TEMP/probe.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-report
+          path: ${{ runner.temp }}/probe.json
+          if-no-files-found: ignore
