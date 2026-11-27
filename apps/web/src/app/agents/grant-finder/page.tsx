@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAgentApi } from '@/lib/hooks/useAgentApi';
+import { useUserProfile } from '@/lib/hooks/useUserProfile';
 import { ChipSelector } from '@/components/agents/ChipSelector';
 import { AgentLoadingSkeleton } from '@/components/agents/AgentLoadingSkeleton';
 import { AgentPageHeader } from '@/components/agents/AgentPageHeader';
@@ -310,6 +311,25 @@ function GrantFinderPageInner() {
   const [isBumiputera, setIsBumiputera] = useState<boolean | null>(null);
   // Optional, comma-separated programme names the business already holds.
   const [existingGrants, setExistingGrants] = useState('');
+
+  // Prefill from the saved profile (profile page → "About you"). Runs once, and
+  // only fills fields the visitor hasn't touched, so it never overwrites a choice.
+  // Signed-out visitors and failed loads have no profile, so nothing changes for them.
+  const { profile: savedProfile } = useUserProfile();
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!savedProfile || prefilled.current) return;
+    prefilled.current = true;
+    if (savedProfile.sector && sectors.some((o) => o.id === savedProfile.sector)) {
+      setSector((cur) => (cur.length ? cur : [savedProfile.sector as string]));
+    }
+    if (savedProfile.business_type && businessTypes.some((o) => o.id === savedProfile.business_type)) {
+      setBusinessType((cur) => (cur.length ? cur : [savedProfile.business_type as string]));
+    }
+    if (savedProfile.is_bumiputera !== null) {
+      setIsBumiputera((cur) => (cur === null ? savedProfile.is_bumiputera : cur));
+    }
+  }, [savedProfile, sectors, businessTypes]);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<'intake' | 'chat' | 'results'>('intake');

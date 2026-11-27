@@ -13,6 +13,7 @@ import { effectivePlan, planBadgeLabel, userRole, ADMIN_ROLES } from '@/lib/auth
 import { fetchUserCredits } from '@/lib/credits';
 import { ProductFeedbackCard } from '@/components/profile/ProductFeedbackCard';
 import { PersonaCard } from '@/components/profile/PersonaCard';
+import { AboutYouCard } from '@/components/profile/AboutYouCard';
 
 function formatMemberSince(iso: string | undefined, locale: string): string | null {
   if (!iso) return null;
@@ -209,6 +210,7 @@ export default function ProfilePage() {
               </section>
 
               <PersonaCard />
+              <AboutYouCard />
 
               <ProductFeedbackCard />
 
