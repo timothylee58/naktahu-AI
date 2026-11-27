@@ -1,0 +1,93 @@
+name: Policy Watch
+
+# Runs scripts/policy_watch.py: reads the listing pages in scripts/watch_targets.py
+# and puts links it has not seen before into the review queue
+# (policy_watch_items, migration 063). It never writes to document_chunks and
+# never calls an embedding API, so nothing here can change a live answer.
+#
+# Runs on a GitHub runner because the dev sandbox cannot reach *.gov.my.
+#
+# Dry run until a human says otherwise, the same precedent as ingest-sources.yml:
+#   * Manual runs default to dry run (prints what it found, writes nothing).
+#   * Scheduled runs are dry runs too, until the repository variable
+#     POLICY_WATCH_LIVE is set to "true" (Settings -> Secrets and variables ->
+#     Actions -> Variables). Set it only after migration 063 is applied and a dry
+#     run's sample lines look like real headlines.
+#
+# The first live scan of each target records its existing links as `baseline`,
+# so only links that appear AFTER that reach the review queue.
+
+on:
+  schedule:
+    - cron: "30 21 * * *"  # daily, 21:30 UTC (05:30 MYT)
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target name(s), comma separated (blank = every registered target)"
+        type: string
+        required: false
+      dry_run:
+        description: "Dry run: print what would be queued, write nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: policy-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Scan listing pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        run: pip install --ignore-installed PyJWT -e "."
+
+      - name: Scan
+        env:
+          PYTHONPATH: .
+          EVENT: ${{ github.event_name }}
+          LIVE_VAR: ${{ vars.POLICY_WATCH_LIVE }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          TARGETS: ${{ inputs.target }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          ARGS=()
+          DRY=0
+          if [ "$EVENT" = "schedule" ]; then
+            [ "$LIVE_VAR" = "true" ] || DRY=1
+          else
+            [ "$INPUT_DRY_RUN" = "true" ] && DRY=1
+          fi
+          [ "$DRY" = "1" ] && ARGS+=(--dry-run)
+          # Inputs reach the script as arguments, never interpolated into the shell line.
+          IFS=',' read -ra NAMES <<< "${TARGETS:-}"
+          for name in "${NAMES[@]}"; do
+            name="${name// /}"
+            [ -n "$name" ] && ARGS+=(--target "$name")
+          done
+          echo "mode: $([ "$DRY" = "1" ] && echo dry-run || echo live)"
+          python -m scripts.policy_watch scan "${ARGS[@]}" | tee "$RUNNER_TEMP/watch.txt"
+          {
+            echo "## Policy watch ($([ "$DRY" = "1" ] && echo dry run || echo live))"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/watch.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
