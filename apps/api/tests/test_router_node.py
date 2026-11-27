@@ -607,6 +607,9 @@ async def test_ilmu_schema_empty_output_falls_back_to_plain_parser(monkeypatch: 
         mock_client.chat.completions.create = create
         result = await router_node({"query": "Can my landlord evict me?"})
 
+    assert create.await_count == 2
+    assert "response_format" in create.call_args_list[0].kwargs
+    assert "response_format" not in create.call_args_list[1].kwargs
     assert result["domain"] == "legal"
 
 
@@ -649,6 +652,10 @@ async def test_claude_tool_failure_falls_back_to_ilmu_plain_parser(
         mock_ilmu.chat.completions.create = AsyncMock(return_value=plain)
         result = await router_node({"query": "How do I register a company with SSM?"})
 
+    claude_create.assert_awaited_once()
+    ilmu_create = mock_ilmu.chat.completions.create
+    ilmu_create.assert_awaited_once()
+    assert "response_format" not in ilmu_create.call_args.kwargs
     assert result["domain"] == "government"
 
 
@@ -770,3 +777,33 @@ def test_router_node_keeps_its_weave_trace_and_the_env_lookup_does_not() -> None
     source = inspect.getsource(mod)
     assert "@weave.op()\nasync def router_node" in source
     assert "@weave.op()\ndef _structured_mode" not in source
+
+
+@pytest.mark.asyncio
+async def test_claude_rejection_never_trips_the_shared_anthropic_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """anthropic_breaker also guards the synthesiser fallback; a rejected router request must not open it."""
+    import anthropic
+    import httpx
+
+    from app.orchestration.circuit_breaker import CircuitBreaker, CircuitState
+
+    monkeypatch.setenv("ROUTER_STRUCTURED_MODE", "claude_tool")
+    breaker = CircuitBreaker("anthropic-test", failure_threshold=3)
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    rejection = anthropic.APIStatusError(
+        "temperature unsupported", response=httpx.Response(400, request=request), body=None
+    )
+    plain = _mock_completion('{"language": "en", "domain": "tax", "intent": "x"}')
+
+    with patch("app.agents.router_node.anthropic_breaker", breaker), patch(
+        "app.agents.router_node.anthropic_client"
+    ) as mock_claude, patch("app.agents.router_node.ilmu_client") as mock_ilmu:
+        mock_claude.messages.create = AsyncMock(side_effect=rejection)
+        mock_ilmu.chat.completions.create = AsyncMock(return_value=plain)
+        for _ in range(6):
+            result = await router_node({"query": "How much is income tax?"})
+        attempts = mock_claude.messages.create.await_count
+
+    assert breaker.state == CircuitState.closed
+    assert attempts == 1  # cooldown stops re-sending a request Anthropic already refused
+    assert result["domain"] == "tax"

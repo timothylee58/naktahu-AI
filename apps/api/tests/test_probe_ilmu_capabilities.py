@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.agents.router_node import _CLASSIFY_SCHEMA, router_claude_model
-from scripts.probe_ilmu_capabilities import _positive_int, _schema_valid
+from scripts.probe_ilmu_capabilities import Result, _guard, _positive_int, _schema_valid
 
 _GOOD = {
     "language": "en",
@@ -60,3 +60,30 @@ def test_zero_or_negative_queries_are_rejected() -> None:
 def test_probe_uses_the_same_claude_model_as_production(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ROUTER_CLAUDE_MODEL", "claude-test-model")
     assert router_claude_model() == "claude-test-model"
+
+
+def _status_error(status: int, message: str) -> Exception:
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "https://api.ilmu.ai/v1/chat/completions")
+    return openai.APIStatusError(message, response=httpx.Response(status, request=request), body=None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "message", "verdict"),
+    [
+        (400, "Unsupported parameter: response_format", "REJECTED"),
+        (400, "model 'ilmu-chat' does not exist", "ERROR"),  # wrong model, not a feature verdict
+        (404, "route not found", "ERROR"),
+        (422, "tools: extra fields not permitted", "REJECTED"),
+        (503, "overloaded", "ERROR"),
+    ],
+)
+async def test_guard_only_rejects_when_the_error_names_the_feature(status: int, message: str, verdict: str) -> None:
+    async def probe() -> Result:
+        raise _status_error(status, message)
+
+    result = await _guard("x", probe)
+    assert result.verdict == verdict

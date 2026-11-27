@@ -6,6 +6,7 @@ import os
 import re
 import time
 
+import anthropic
 import openai
 import structlog
 import weave
@@ -177,6 +178,7 @@ def router_claude_model() -> str:
 # every query would add a wasted round trip per request. Skip the structured call for a while.
 _SCHEMA_REJECTED_COOLDOWN_S = 300.0
 _schema_rejected_until = 0.0
+_claude_rejected_until = 0.0
 _REJECTION_STATUSES = {400, 404, 422}
 _CLAUDE_TIMEOUT_S = 8.0
 
@@ -219,22 +221,39 @@ async def _classify_ilmu_schema(query: str) -> dict:
 
 
 async def _classify_claude_tool(query: str) -> dict:
-    resp = await anthropic_breaker.call(
-        anthropic_client.messages.create,
-        model=router_claude_model(),
-        max_tokens=_RETRY_MAX_TOKENS,
-        system=_SYSTEM_PROMPT,
-        tools=[
-            {
-                "name": _ROUTER_TOOL_NAME,
-                "description": "Record the classification of the user's query.",
-                "input_schema": _CLASSIFY_SCHEMA,
-            }
-        ],
-        tool_choice={"type": "tool", "name": _ROUTER_TOOL_NAME},
-        messages=[{"role": "user", "content": query}],
-        timeout=_CLAUDE_TIMEOUT_S,
-    )
+    if time.monotonic() < _claude_rejected_until:
+        return {}
+
+    async def _create() -> object | None:
+        global _claude_rejected_until
+        # anthropic_breaker also guards the synthesiser fallback, so a rejected request (bad
+        # tool schema, unsupported parameter) must not count toward opening it.
+        try:
+            return await anthropic_client.messages.create(
+                model=router_claude_model(),
+                max_tokens=_RETRY_MAX_TOKENS,
+                system=_SYSTEM_PROMPT,
+                tools=[
+                    {
+                        "name": _ROUTER_TOOL_NAME,
+                        "description": "Record the classification of the user's query.",
+                        "input_schema": _CLASSIFY_SCHEMA,
+                    }
+                ],
+                tool_choice={"type": "tool", "name": _ROUTER_TOOL_NAME},
+                messages=[{"role": "user", "content": query}],
+                timeout=_CLAUDE_TIMEOUT_S,
+            )
+        except anthropic.APIStatusError as exc:
+            if exc.status_code not in _REJECTION_STATUSES:
+                raise
+            _claude_rejected_until = time.monotonic() + _SCHEMA_REJECTED_COOLDOWN_S
+            log.warning("router_claude_rejected", status=exc.status_code, cooldown_s=_SCHEMA_REJECTED_COOLDOWN_S)
+            return None
+
+    resp = await anthropic_breaker.call(_create)
+    if resp is None:
+        return {}
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and isinstance(block.input, dict):
             return block.input

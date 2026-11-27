@@ -15,9 +15,10 @@ Env: ILMU_API_KEY, ILMU_BASE_URL, ILMU_CHAT_MODEL (all read by llm_client);
 
 Verdicts per probe:
   SUPPORTED    the feature came back in the shape the API contract promises
+  INCONCLUSIVE a model-dependent outcome (e.g. tool_choice=auto answered in text)
   IGNORED      HTTP 200 but the parameter had no effect (the dangerous case:
                it looks like support until you inspect the output)
-  REJECTED     the endpoint returned an error naming the parameter
+  REJECTED     a 400/422 whose message names the tested parameter
   ERROR        network/auth failure; says nothing about the feature
 
 The final section runs router_node's real prompt and schema over sample queries
@@ -101,14 +102,18 @@ async def _chat(**kwargs: Any) -> Any:
     return await ilmu_client.chat.completions.create(model=ILMU_CHAT_MODEL, temperature=0, **kwargs)
 
 
+_FEATURE_TERMS = ("response_format", "json_schema", "json_object", "tool_choice", "tools", "function")
+
+
 async def _guard(name: str, probe: Callable[[], Awaitable[Result]]) -> Result:
     try:
         return await probe()
-    except openai.BadRequestError as exc:
-        return Result(name, "REJECTED", f"400: {str(exc)[:160]}")
     except openai.APIStatusError as exc:
-        verdict = "REJECTED" if exc.status_code in (404, 422) else "ERROR"
-        return Result(name, verdict, f"{exc.status_code}: {str(exc)[:160]}")
+        # Only an error that names the tested parameter proves the feature is unsupported; a wrong
+        # model, a bad route (404) or unrelated validation says nothing about it.
+        message = str(exc)
+        names_feature = exc.status_code in (400, 422) and any(t in message.lower() for t in _FEATURE_TERMS)
+        return Result(name, "REJECTED" if names_feature else "ERROR", f"{exc.status_code}: {message[:160]}")
     except Exception as exc:  # network / auth: inconclusive, never read as "unsupported"
         return Result(name, "ERROR", f"{type(exc).__name__}: {str(exc)[:160]}")
 
@@ -123,7 +128,11 @@ async def probe_tools_auto() -> Result:
     calls = resp.choices[0].message.tool_calls or []
     if calls and calls[0].function.name == "get_weather":
         return Result("tools + tool_choice=auto", "SUPPORTED", f"args={calls[0].function.arguments[:80]}")
-    return Result("tools + tool_choice=auto", "IGNORED", "200 OK but no tool_calls (model answered in text)")
+    return Result(
+        "tools + tool_choice=auto",
+        "INCONCLUSIVE",
+        "200 OK but the model chose to answer in text; the forced probe below is the decisive one",
+    )
 
 
 async def probe_tools_forced() -> Result:
@@ -150,6 +159,8 @@ async def probe_json_object() -> Result:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         return Result("response_format=json_object", "IGNORED", f"200 OK but not strict JSON: {raw[:80]!r}")
+    if not isinstance(parsed, dict):
+        return Result("response_format=json_object", "IGNORED", f"valid JSON but not an object: {raw[:80]!r}")
     return Result("response_format=json_object", "SUPPORTED", f"parsed={parsed}")
 
 
@@ -204,21 +215,24 @@ async def router_validity(queries: list[str]) -> list[Result]:
     """Real router prompt over sample queries, both ways, so the schema's benefit is measured, not assumed."""
 
     async def run(name: str, extra: dict[str, Any]) -> Result:
-        async def one(query: str) -> bool:
+        async def one(query: str) -> str:
             try:
                 resp = await _chat(
                     messages=[{"role": "system", "content": _SYSTEM_PROMPT}, {"role": "user", "content": query}],
                     max_tokens=384,
                     **extra,
                 )
-                return _schema_valid(extract_json_object(resp.choices[0].message.content or ""))
-            except Exception:
-                return False
+            except Exception:  # network/auth/HTTP failures say nothing about schema support
+                return "error"
+            ok = _schema_valid(extract_json_object(resp.choices[0].message.content or ""))
+            return "ok" if ok else "invalid"
 
-        flags = await asyncio.gather(*(one(q) for q in queries))
-        ok = sum(flags)
-        verdict = "SUPPORTED" if flags and ok == len(flags) else "IGNORED"
-        return Result(name, verdict, f"{ok}/{len(flags)} schema-valid")
+        outcomes = await asyncio.gather(*(one(q) for q in queries))
+        ok, errors = outcomes.count("ok"), outcomes.count("error")
+        detail = f"{ok}/{len(outcomes)} schema-valid" + (f", {errors} request errors" if errors else "")
+        if errors:
+            return Result(name, "ERROR", detail)
+        return Result(name, "SUPPORTED" if outcomes and ok == len(outcomes) else "IGNORED", detail)
 
     plain = await run("router prompt, plain (current path)", {})
     schema = await run(
