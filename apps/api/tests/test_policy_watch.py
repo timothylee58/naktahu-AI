@@ -410,3 +410,26 @@ def test_a_different_link_stops_the_headline_search() -> None:
     )
     items = extract_items(html, _mida_like(title_from_preceding_text=True))
     assert [i.url.rsplit("/", 2)[1] for i in items] == ["one"]
+
+
+_MOF_ARCHIVE_HTML = """
+<table><tr><td><a href="#" data-path="https://ppp.treasury.gov.my/storage/pindaan/1738047584_SURAT MOF BERTARIKH 3 OKTOBER 2022 (1).pdf">Muat turun</a></td></tr>
+<tr><td><a href="#" data-path="https://ppp.treasury.gov.my/storage/pindaan/7c4d72e3fb2d7d3411cf1a5e650b451b.pdf"
+ data-title="PK 2.15 PERATURAN PEROLEHAN BAGI JABATAN/ AGENSI KERAJAAN YANG BERTEMPAT DI LUAR NEGERI">x</a></td></tr>
+<tr><td><a href="#" data-path="https://evil.example.com/a-very-long-document-name.pdf" data-title="Off host document title here">x</a></td></tr>
+<tr><td><a href="#" data-path="https://ppp.treasury.gov.my/storage/pindaan/short.pdf">x</a></td></tr>
+<tr><td><a href="#">no address at all</a></td></tr></table>
+"""
+
+
+def test_data_attr_target_reads_document_addresses_titles_and_dates() -> None:
+    from scripts.watch_targets import TARGETS_BY_NAME
+
+    items = pw.extract_items(_MOF_ARCHIVE_HTML, TARGETS_BY_NAME["mof-treasury-pekeliling"])
+    assert [i.url for i in items] == [
+        "https://ppp.treasury.gov.my/storage/pindaan/1738047584_SURAT%20MOF%20BERTARIKH%203%20OKTOBER%202022%20%281%29.pdf",
+        "https://ppp.treasury.gov.my/storage/pindaan/7c4d72e3fb2d7d3411cf1a5e650b451b.pdf",
+    ]
+    assert items[0].title.startswith("SURAT MOF BERTARIKH 3 OKTOBER 2022")
+    assert items[0].published_on is not None and items[0].published_on.month == 10
+    assert items[1].title.startswith("PK 2.15") and items[1].published_on is None

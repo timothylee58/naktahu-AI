@@ -40,7 +40,7 @@ from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
-from urllib.parse import urldefrag, urljoin, urlsplit
+from urllib.parse import quote, unquote, urldefrag, urljoin, urlsplit
 
 import httpx
 
@@ -186,7 +186,76 @@ def _preceding_title(tokens: list[tuple[str, str, str]], index: int, absolute: s
     return ""
 
 
+class _DataAttrAnchors(HTMLParser):
+    """Anchors that keep their address in a data-* attribute: (address, data-title, text)."""
+
+    def __init__(self, attr: str) -> None:
+        super().__init__()
+        self._attr = attr
+        self.found: list[tuple[str, str, str]] = []
+        self._open: Optional[list[str]] = None
+        self._text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        if tag != "a":
+            return
+        values = dict(attrs)
+        address = (values.get(self._attr) or "").strip()
+        if address:
+            self._open = [address, (values.get("data-title") or "").strip()]
+            self._text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._open is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._open is not None:
+            self.found.append((self._open[0], self._open[1], " ".join("".join(self._text).split())))
+            self._open = None
+
+
+def _title_from_filename(path: str) -> str:
+    stem = unquote(urlsplit(path).path.rsplit("/", 1)[-1]).rsplit(".", 1)[0]
+    stem = re.sub(r"^\d{6,}_", "", stem)
+    return " ".join(stem.replace("_", " ").split())
+
+
+def _extract_data_attr_items(html: str, target: WatchTarget) -> list[Item]:
+    parser = _DataAttrAnchors(target.document_attr)
+    parser.feed(html)
+    suffix = target.host_suffix
+    seen: set[str] = set()
+    items: list[Item] = []
+    for address, data_title, text in parser.found:
+        absolute = urldefrag(urljoin(target.url, address))[0]
+        parts = urlsplit(absolute)
+        if parts.scheme not in ("http", "https") or not parts.hostname or not _host_in_domain(parts.hostname, suffix):
+            continue
+        # Spaces in file names are legal on this site but not in a stored URL.
+        absolute = quote(absolute, safe=":/%?=&")
+        if absolute in seen:
+            continue
+        title = " ".join((data_title or text or "").split())
+        if len(title) < target.min_title_chars:
+            title = _title_from_filename(absolute)
+        if len(title) < target.min_title_chars:
+            continue
+        published = parse_date(title)
+        if target.require_date and published is None:
+            continue
+        seen.add(absolute)
+        items.append(Item(url=absolute, title=title[:_MAX_TITLE], published_on=published))
+    return items
+
+
 def extract_items(html: str, target: WatchTarget) -> list[Item]:
+    if target.document_attr:
+        return _extract_data_attr_items(html, target)
+    return _extract_link_items(html, target)
+
+
+def _extract_link_items(html: str, target: WatchTarget) -> list[Item]:
     """Items on a listing page: links that stay on the agency's own host, carry a
     real title, and (when the target says so) live under an item path prefix.
     The date comes from the link text, else the text right after or before it."""

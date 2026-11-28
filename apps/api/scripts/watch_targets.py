@@ -49,6 +49,11 @@ class WatchTarget:
     # The agency's own domain. Links to any other host are ignored. Defaults to
     # the listing page's host without a leading "www.".
     host_suffix_override: str = ""
+    # For listings whose <a href> is a dead "#" and whose document address sits in
+    # a data-* attribute (MOF Treasury circulars). Items are read from that
+    # attribute instead of href; the title comes from data-title, else the link
+    # text, else the file name.
+    document_attr: str = ""
 
     @property
     def host_suffix(self) -> str:
@@ -96,6 +101,16 @@ TARGETS: tuple[WatchTarget, ...] = (
         verified="Scrape Probe run 46016532521 (2026-11-27): USABLE, 296 links, 2 dated items.",
         notes="State policies and circulars; menu-heavy, so only dated links count.",
         require_date=True,
+    ),
+    WatchTarget(
+        name="mof-treasury-pekeliling",
+        url="https://ppp.treasury.gov.my/arkib/frontend",
+        agency="Kementerian Kewangan (Perbendaharaan) - Pekeliling Perbendaharaan",
+        level="federal",
+        verified="Diagnostics run 46123043077 (2026-11-28): plain HTTP returns 2.7 MB; 822 <a data-path=https://ppp.treasury.gov.my/storage/pindaan/...pdf> hold the document addresses (href is '#'). A rendered browser is WAF-blocked, so do not render.",
+        notes="Archive of circulars; the first scan only records a baseline of about 800 documents. Dates are read from titles where they contain one.",
+        host_suffix_override="treasury.gov.my",
+        document_attr="data-path",
     ),
 )
 

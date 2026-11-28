@@ -241,7 +241,7 @@ def summarise_requests(requests: list[tuple[str, int, str, str]], limit: int = 1
     return [f"{kind} {status} {ctype.split(';')[0] or '-'} {url[:130]}" for kind, status, url, ctype in ordered[:limit]]
 
 
-def render_page(url: str, timeout_ms: int = 35000) -> list[str]:
+def render_page(url: str, timeout_ms: int = 35000, wait_until: str = "networkidle", settle_ms: int = 0) -> list[str]:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -258,7 +258,10 @@ def render_page(url: str, timeout_ms: int = 35000) -> list[str]:
                 if r.request.resource_type in ("xhr", "fetch")
                 else None,
             )
-            page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+            page.goto(url, wait_until=wait_until, timeout=timeout_ms)
+            if settle_ms:
+                # Sites with long-polling or analytics never go network-idle; give scripts a fixed window instead.
+                page.wait_for_timeout(settle_ms)
             html = page.content()
             text = page.inner_text("body")
             links = extract_links(html, url)
@@ -296,7 +299,7 @@ def run_check(name: str, client: httpx.Client) -> list[str]:
     if name == "sabah-retry":
         return check_sabah(client)
     if name == "selangor-render":
-        return render_page(SELANGOR_URL)
+        return render_page(SELANGOR_URL, timeout_ms=60000, wait_until="domcontentloaded", settle_ms=8000)
     if name == "moh-robots":
         return check_moh_robots(client)
     raise ValueError(f"unknown check {name!r}")
