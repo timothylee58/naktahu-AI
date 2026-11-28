@@ -15,12 +15,16 @@ main.py (the single app). Needs migration 064; 503 until it is applied.
 """
 from __future__ import annotations
 
+import io
+import json
 import re
-from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+import zipfile
+from datetime import date, datetime, timezone
+from typing import Annotated, Any, Literal, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import Response as RawResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app.agents.runtime import execute_query
@@ -214,6 +218,207 @@ async def list_notes(
     builder = builder.order("updated_at", desc=True).range(offset, offset + limit - 1)
     res = await _run(builder, "list")
     return NoteList(notes=[_to_summary(r) for r in (getattr(res, "data", None) or [])])
+
+
+# ── Links, export and staleness ──────────────────────────────────────────────
+# Registered BEFORE "/{note_id}": FastAPI matches in order, so a later
+# "/export" would be captured as note_id="export" and 404.
+
+_WIKILINK_RE = re.compile(r"\[\[([^\[\]\n|]{1,200})(?:\|[^\[\]\n]{0,200})?\]\]")
+_MAX_URLS_CHECKED = 50
+
+
+def _wikilinks(body: str) -> list[str]:
+    seen: list[str] = []
+    for m in _WIKILINK_RE.finditer(body or ""):
+        title = " ".join(m.group(1).split())
+        if title and title.lower() not in [x.lower() for x in seen]:
+            seen.append(title)
+    return seen
+
+
+class LinkedNote(BaseModel):
+    id: Optional[str] = None  # None = a [[link]] to a note that doesn't exist yet
+    title: str
+
+
+class NoteLinks(BaseModel):
+    outgoing: list[LinkedNote]
+    backlinks: list[LinkedNote]
+
+
+def _compute_links(target: dict[str, Any], rows: list[dict[str, Any]]) -> NoteLinks:
+    by_title = {(r.get("title") or "").strip().lower(): r for r in rows}
+    outgoing = []
+    for title in _wikilinks(target.get("body") or ""):
+        hit = by_title.get(title.lower())
+        outgoing.append(LinkedNote(id=str(hit["id"]) if hit else None, title=hit["title"] if hit else title))
+    me = (target.get("title") or "").strip().lower()
+    backlinks = [
+        LinkedNote(id=str(r["id"]), title=r.get("title") or "")
+        for r in rows
+        if str(r["id"]) != str(target["id"])
+        and me in [t.lower() for t in _wikilinks(r.get("body") or "")]
+    ]
+    return NoteLinks(outgoing=outgoing, backlinks=backlinks)
+
+
+def _safe_filename(title: str, used: set[str]) -> str:
+    # Letters, digits, space, dash, underscore only; no path separators or dots
+    # can survive, so an exported name can never escape the zip's root.
+    base = re.sub(r"[^\w\- ]+", "", title, flags=re.UNICODE).strip()[:80] or "note"
+    name, n = base, 2
+    while name.lower() in used:
+        name = f"{base} {n}"
+        n += 1
+    used.add(name.lower())
+    return f"{name}.md"
+
+
+def _to_markdown(row: dict[str, Any]) -> str:
+    """Obsidian-compatible: YAML front matter, then the body unchanged (so
+    [[wikilinks]] keep working). json.dumps gives valid, safely quoted YAML strings."""
+    fm = ["---", f"title: {json.dumps(row.get('title') or '', ensure_ascii=False)}"]
+    tags = list(row.get("tags") or [])
+    fm.append("tags: " + json.dumps(tags, ensure_ascii=False))
+    fm.append(f"created: {json.dumps(str(row.get('created_at') or ''))}")
+    fm.append(f"updated: {json.dumps(str(row.get('updated_at') or ''))}")
+    src = row.get("source") or {}
+    if src.get("query"):
+        fm.append(f"source_query: {json.dumps(src['query'], ensure_ascii=False)}")
+    cites = [c for c in (src.get("citations") or []) if c.get("url")]
+    if cites:
+        fm.append("sources:")
+        for c in cites:
+            label = " ".join(x for x in (c.get("ministry"), c.get("title")) if x)
+            fm.append(f"  - {json.dumps(label + ' ' + c['url'], ensure_ascii=False)}")
+    fm.append("---\n")
+    return "\n".join(fm) + (row.get("body") or "") + "\n"
+
+
+@router.get("/export")
+@apply_query_rate_limit()
+async def export_notes(
+    request: Request,
+    response: Response,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> RawResponse:
+    """All of the caller's notes as a zip of markdown files (Obsidian-ready)."""
+    sb = _supabase_or_503(request)
+    res = await _run(
+        sb.table("user_notes").select("*").eq("user_id", user.user_id).order("created_at"), "export"
+    )
+    rows = getattr(res, "data", None) or []
+    buf = io.BytesIO()
+    used: set[str] = set()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for row in rows:
+            zf.writestr(_safe_filename(row.get("title") or "", used), _to_markdown(row))
+    log.info("notes_exported", user_id=user.user_id, count=len(rows))
+    return RawResponse(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="naktahu-notes.zip"'},
+    )
+
+
+StaleReason = Literal["superseded", "expired", "newer_version"]
+
+
+class StaleNote(BaseModel):
+    id: str
+    title: str
+    reasons: list[StaleReason]
+
+
+class StaleNotes(BaseModel):
+    stale: list[StaleNote]
+
+
+def _parse_date(v: Any) -> Optional[date]:
+    try:
+        return date.fromisoformat(str(v)[:10]) if v else None
+    except ValueError:
+        return None
+
+
+def _reasons_for(citations: list[dict[str, Any]], chunks_by_url: dict[str, list[dict[str, Any]]], today: date) -> list[str]:
+    """Why the sources behind a saved answer may have moved on. Never says the
+    note is wrong, only that its source has changed since it was saved."""
+    reasons: list[str] = []
+    for c in citations:
+        chunks = chunks_by_url.get(c.get("url") or "")
+        if not chunks:
+            continue  # unknown source: say nothing rather than guess
+        if all(ch.get("superseded_by") for ch in chunks):
+            reasons.append("superseded")
+            continue
+        if all((u := _parse_date(ch.get("effective_until"))) is not None and u < today for ch in chunks):
+            reasons.append("expired")
+            continue
+        cited = _parse_date(c.get("effective_date"))
+        newest = max((d for d in (_parse_date(ch.get("effective_date")) for ch in chunks) if d), default=None)
+        if cited and newest and newest > cited:
+            reasons.append("newer_version")
+    return [r for r in dict.fromkeys(reasons)]  # unique, order kept
+
+
+@router.get("/stale", response_model=StaleNotes)
+@apply_query_rate_limit()
+async def stale_notes(
+    request: Request,
+    response: Response,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> StaleNotes:
+    """Notes saved from an answer whose cited source has since been superseded,
+    has expired, or has a newer version in our corpus."""
+    sb = _supabase_or_503(request)
+    res = await _run(
+        sb.table("user_notes").select("id,title,source").eq("user_id", user.user_id),
+        "stale-notes",
+    )
+    # Filtered here, not in PostgREST: the 200-note cap keeps this small.
+    notes = [n for n in (getattr(res, "data", None) or []) if n.get("source")]
+    urls: list[str] = []
+    for n in notes:
+        for c in (n.get("source") or {}).get("citations") or []:
+            u = c.get("url")
+            if u and u not in urls and len(urls) < _MAX_URLS_CHECKED:
+                urls.append(u)
+    chunks_by_url: dict[str, list[dict[str, Any]]] = {}
+    if urls:
+        cres = await _run(
+            sb.table("document_chunks").select("source_url,effective_date,effective_until,superseded_by").in_("source_url", urls),
+            "stale-chunks",
+        )
+        for ch in getattr(cres, "data", None) or []:
+            chunks_by_url.setdefault(ch.get("source_url") or "", []).append(ch)
+    today = datetime.now(timezone.utc).date()
+    out: list[StaleNote] = []
+    for n in notes:
+        reasons = _reasons_for((n.get("source") or {}).get("citations") or [], chunks_by_url, today)
+        if reasons:
+            out.append(StaleNote(id=str(n["id"]), title=n.get("title") or "", reasons=reasons))  # type: ignore[arg-type]
+    return StaleNotes(stale=out)
+
+
+@router.get("/{note_id}/links", response_model=NoteLinks)
+@apply_query_rate_limit()
+async def note_links(
+    request: Request,
+    response: Response,
+    note_id: str,
+    user: Annotated[UserContext, Depends(get_current_user)],
+) -> NoteLinks:
+    """[[Wikilinks]] out of this note, and the notes that link back to it."""
+    sb = _supabase_or_503(request)
+    res = await _run(sb.table("user_notes").select("id,title,body").eq("user_id", user.user_id), "links")
+    rows = getattr(res, "data", None) or []
+    wanted = _check_id(note_id).lower()
+    target = next((r for r in rows if str(r["id"]).lower() == wanted), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return _compute_links(target, rows)
 
 
 @router.get("/{note_id}", response_model=Note)

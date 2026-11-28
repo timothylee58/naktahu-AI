@@ -15,13 +15,18 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   createNote,
   deleteNote,
+  exportNotes,
   getNote,
+  getNoteLinks,
   listNotes,
+  listStaleNotes,
   NotesError,
   parseTags,
   updateNote,
   type Note,
+  type NoteLinks,
   type NoteSummary,
+  type StaleNote,
 } from '@/lib/notes';
 
 type Editing = { id: string | null; title: string; body: string; tags: string; source: Note['source'] };
@@ -44,6 +49,9 @@ export default function NotesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [links, setLinks] = useState<NoteLinks | null>(null);
+  const [stale, setStale] = useState<Record<string, StaleNote>>({});
+  const [exporting, setExporting] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -66,12 +74,52 @@ export default function NotesPage() {
     return () => window.clearTimeout(handle);
   }, [ready, user, reload]);
 
+  // Which saved answers cite a source that has since changed. Best effort: if
+  // it fails the notes still work, there just are no badges.
+  useEffect(() => {
+    if (!ready || !user) return;
+    let active = true;
+    void listStaleNotes(supabase)
+      .then((items) => {
+        if (active) setStale(Object.fromEntries(items.map((n) => [n.id, n])));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [ready, user, supabase]);
+
+  const loadLinks = useCallback(
+    async (id: string) => {
+      try {
+        setLinks(await getNoteLinks(supabase, id));
+      } catch {
+        setLinks(null);
+      }
+    },
+    [supabase],
+  );
+
+  const onExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      await exportNotes(supabase);
+    } catch {
+      setError(t('notes.error_export'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const open = async (id: string) => {
     setError(null);
     setConfirmDelete(false);
     try {
       const n = await getNote(supabase, id);
       setEditing({ id: n.id, title: n.title, body: n.body, tags: n.tags.join(', '), source: n.source });
+      void loadLinks(n.id);
     } catch {
       setError(t('notes.error_load'));
     }
@@ -88,6 +136,7 @@ export default function NotesPage() {
         : await createNote(supabase, { title: editing.title.trim(), body: editing.body, tags });
       setEditing({ id: saved.id, title: saved.title, body: saved.body, tags: saved.tags.join(', '), source: saved.source });
       await reload();
+      void loadLinks(saved.id);
     } catch (e) {
       // Keep what the user typed; just say what went wrong.
       setError(e instanceof NotesError && e.status === 409 ? e.message : t('notes.error_save'));
@@ -106,6 +155,7 @@ export default function NotesPage() {
     try {
       await deleteNote(supabase, editing.id);
       setEditing(null);
+      setLinks(null);
       setConfirmDelete(false);
       await reload();
     } catch {
@@ -151,9 +201,14 @@ export default function NotesPage() {
           <div className="flex items-center justify-between gap-2">
             <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-zinc-900'}`}>{t('notes.title')}</h1>
             {user && (
-              <Button type="button" size="sm" onClick={() => { setEditing(BLANK); setConfirmDelete(false); setError(null); }}>
-                {t('notes.new')}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => void onExport()} disabled={exporting || notes.length === 0}>
+                  {exporting ? t('notes.exporting') : t('notes.export')}
+                </Button>
+                <Button type="button" size="sm" onClick={() => { setEditing(BLANK); setLinks(null); setConfirmDelete(false); setError(null); }}>
+                  {t('notes.new')}
+                </Button>
+              </div>
             )}
           </div>
 
@@ -200,6 +255,11 @@ export default function NotesPage() {
                           <span className="block text-sm font-medium line-clamp-1">{n.title}</span>
                           {n.snippet && <span className={`block text-xs line-clamp-2 ${muted}`}>{n.snippet}</span>}
                           <span className="mt-1 flex flex-wrap gap-1">
+                            {stale[n.id] && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                                {t('notes.stale_badge')}
+                              </span>
+                            )}
                             {n.from_answer && (
                               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-nk-official/10 text-nk-official-dim dark:text-nk-official">
                                 {t('notes.from_answer')}
@@ -249,6 +309,11 @@ export default function NotesPage() {
                       placeholder={t('notes.tags_hint')}
                       aria-label={t('notes.tags_label')}
                     />
+                    {editing.id && stale[editing.id] && (
+                      <p role="status" className="text-xs rounded-lg bg-amber-500/10 px-3 py-2 text-amber-800 dark:text-amber-300">
+                        {t('notes.stale_banner')} {stale[editing.id].reasons.map((r) => t(`notes.stale.${r}`)).join(' ')}
+                      </p>
+                    )}
                     {editing.source && (
                       <div className={`text-xs ${muted}`}>
                         <p className="font-semibold">{t('notes.saved_from')}: {editing.source.query}</p>
@@ -267,6 +332,38 @@ export default function NotesPage() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                    {links && (links.outgoing.length > 0 || links.backlinks.length > 0) && (
+                      <div className={`grid gap-2 text-xs sm:grid-cols-2 ${muted}`}>
+                        <div>
+                          <p className="font-semibold">{t('notes.links_out')}</p>
+                          <ul className="mt-1 flex flex-col gap-0.5">
+                            {links.outgoing.map((l) => (
+                              <li key={`o-${l.title}`}>
+                                {l.id ? (
+                                  <Button type="button" variant="ghost" size="sm" className="h-auto px-1 py-0.5 underline" onClick={() => void open(l.id as string)}>
+                                    {l.title}
+                                  </Button>
+                                ) : (
+                                  <span title={t('notes.link_missing')}>{l.title} ?</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-semibold">{t('notes.links_in')}</p>
+                          <ul className="mt-1 flex flex-col gap-0.5">
+                            {links.backlinks.map((l) => (
+                              <li key={`b-${l.id}`}>
+                                <Button type="button" variant="ghost" size="sm" className="h-auto px-1 py-0.5 underline" onClick={() => void open(l.id as string)}>
+                                  {l.title}
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     )}
                     <div className="flex flex-wrap items-center gap-2">

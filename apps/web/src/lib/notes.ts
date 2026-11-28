@@ -110,3 +110,47 @@ export function parseTags(raw: string): string[] {
     .filter(Boolean)
     .slice(0, 10);
 }
+
+export interface LinkedNote {
+  id: string | null; // null = a [[link]] to a note that doesn't exist yet
+  title: string;
+}
+
+export interface NoteLinks {
+  outgoing: LinkedNote[];
+  backlinks: LinkedNote[];
+}
+
+export type StaleReason = 'superseded' | 'expired' | 'newer_version';
+
+export interface StaleNote {
+  id: string;
+  title: string;
+  reasons: StaleReason[];
+}
+
+export async function getNoteLinks(supabase: SupabaseClient, id: string): Promise<NoteLinks> {
+  const res = await check(await fetchWithAuth(supabase, `${NOTES_URL}/${encodeURIComponent(id)}/links`));
+  return (await res.json()) as NoteLinks;
+}
+
+export async function listStaleNotes(supabase: SupabaseClient): Promise<StaleNote[]> {
+  const res = await check(await fetchWithAuth(supabase, `${NOTES_URL}/stale`));
+  return ((await res.json()) as { stale: StaleNote[] }).stale;
+}
+
+/** Downloads every note as a zip of markdown files (opens in Obsidian as-is). */
+export async function exportNotes(supabase: SupabaseClient): Promise<void> {
+  const res = await check(await fetchWithAuth(supabase, `${NOTES_URL}/export`));
+  const url = URL.createObjectURL(await res.blob());
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'naktahu-notes.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
