@@ -248,6 +248,10 @@ def diagnose(html: str, target: WatchTarget, limit: int = 10) -> list[str]:
     for index, (kind, _href, text) in enumerate(tokens):
         if kind == "t" and parse_date(text) and shown < 5:
             lines.append(f"dated text: {text[:50]!r} before={neighbour(index - 1, -1)} after={neighbour(index + 1, 1)}")
+            around = []
+            for tok_kind, tok_href, tok_text in tokens[index + 1 : index + 5]:
+                around.append(f"a[{tok_text[:40]!r} -> {tok_href[-48:]}]" if tok_kind == "a" else f"t[{tok_text[:60]!r}]")
+            lines.append(f"    next tokens: {' '.join(around)}")
             shown += 1
     return lines
 

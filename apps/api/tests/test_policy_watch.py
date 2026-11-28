@@ -340,6 +340,7 @@ def test_diagnostics_show_links_under_the_listing_path_and_where_dates_sit() -> 
     assert "1 links sit under the listing path" in joined
     assert "under listing: 'A story headline that is long enough' -> https://www.example.gov.my/media/story-1" in joined
     assert "dated text: '12 Nov 2026' before=https://www.example.gov.my/media/story-1" in joined
+    assert "next tokens: t['no date here']" in joined
 
 
 def test_date_before_an_image_link_to_the_same_address_still_dates_the_title_link() -> None:
