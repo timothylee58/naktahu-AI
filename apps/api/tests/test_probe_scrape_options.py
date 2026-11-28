@@ -10,6 +10,8 @@ from scripts.probe_scrape_options import (
     Fetched,
     analyse,
     build_options,
+    extract_links,
+    listing_candidates,
     fetch_brightdata,
     fetch_exa,
     fetch_httpx,
@@ -172,3 +174,50 @@ def test_render_lists_every_option_and_the_secrets_never_appear() -> None:
     output = render(results)
     assert "httpx" in output and "exa" in output and "brightdata" in output
     assert "SECRET" not in output
+
+
+_HOME_WITH_LINKS = """
+<html><body>
+<a href="/siaran-media">Siaran Media</a>
+<a href="/siaran-media#top">Siaran Media again</a>
+<a href="https://www.dosm.gov.my/pekeliling/2026">Pekeliling 2026</a>
+<a href="/tentang-kami">Tentang Kami</a>
+<a href="https://evil.example/news">News elsewhere</a>
+<a href="mailto:info@dosm.gov.my">Email</a>
+<a href="javascript:void(0)">Menu</a>
+<a href="https://sub.moh.gov.my/kenyataan-akhbar">Kenyataan Akhbar</a>
+</body></html>
+"""
+
+
+def test_extract_links_keeps_only_deduplicated_gov_my_http_links() -> None:
+    links = extract_links(_HOME_WITH_LINKS, _URL)
+    urls = [link["url"] for link in links]
+    assert urls == [
+        "https://www.dosm.gov.my/siaran-media",
+        "https://www.dosm.gov.my/pekeliling/2026",
+        "https://www.dosm.gov.my/tentang-kami",
+        "https://sub.moh.gov.my/kenyataan-akhbar",
+    ]
+
+
+def test_listing_candidates_rank_by_hints_and_skip_unrelated_links() -> None:
+    candidates = listing_candidates(extract_links(_HOME_WITH_LINKS, _URL), 10)
+    urls = [link["url"] for link in candidates]
+    assert "https://www.dosm.gov.my/tentang-kami" not in urls
+    assert set(urls) == {
+        "https://www.dosm.gov.my/siaran-media",
+        "https://www.dosm.gov.my/pekeliling/2026",
+        "https://sub.moh.gov.my/kenyataan-akhbar",
+    }
+    assert len(listing_candidates(extract_links(_HOME_WITH_LINKS, _URL), 2)) == 2
+
+
+def test_analyse_and_render_include_listing_candidates_only_when_asked() -> None:
+    body = _RICH_HTML.replace(b"</body>", _HOME_WITH_LINKS.encode().replace(b"<html><body>", b"").replace(b"</body></html>", b"") + b"</body>")
+    without = analyse("httpx", _URL, Fetched(200, body, 0.1))
+    with_links = analyse("httpx", _URL, Fetched(200, body, 0.1), link_limit=5)
+    assert without.listing_links == []
+    assert any("siaran-media" in link["url"] for link in with_links.listing_links)
+    assert "Listing candidates on" in render([with_links])
+    assert "Listing candidates on" not in render([without])
