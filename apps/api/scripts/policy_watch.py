@@ -186,6 +186,31 @@ def extract_items(html: str, target: WatchTarget) -> list[Item]:
     return items
 
 
+def diagnose(html: str, target: WatchTarget, limit: int = 12) -> list[str]:
+    """Why a page produced no items: counts at each filter, plus the first few
+    same-host links as the parser saw them. Printed only for a target that came
+    back empty, so a layout change can be understood from the log alone."""
+    parser = _AnchorTokens()
+    parser.feed(html)
+    anchors = [(href, text) for kind, href, text in parser.tokens if kind == "a" and href.strip()]
+    on_host = []
+    for href, text in anchors:
+        absolute = urldefrag(urljoin(target.url, href.strip()))[0]
+        host = urlsplit(absolute).hostname
+        if host and _host_in_domain(host, target.host_suffix):
+            on_host.append((absolute, text))
+    with_prefix = [a for a in on_host if not target.item_url_prefixes or a[0].startswith(target.item_url_prefixes)]
+    dated = [a for a in with_prefix if parse_date(a[1])]
+    titled = [a for a in with_prefix if len(_strip_trailing_date(a[1])) >= target.min_title_chars]
+    lines = [
+        f"{len(anchors)} anchors, {len(on_host)} on {target.host_suffix}, {len(with_prefix)} under the item prefix, "
+        f"{len(titled)} with a title of {target.min_title_chars}+ chars, {len(dated)} with a date in the link text",
+        f"{len(html)} bytes of HTML, {html.lower().count('<script')} script tags, {html.lower().count('<table')} tables",
+    ]
+    lines += [f"link: {text[:70]!r} -> {url}" for url, text in on_host[:limit]]
+    return lines
+
+
 def drop_flagged(items: Iterable[Item]) -> tuple[list[Item], int]:
     """Third-party link text ends up in front of reviewers and, once approved,
     possibly in answers: apply the same injection scan every ingestion path uses."""
@@ -297,7 +322,11 @@ def scan_target(target: WatchTarget, client: Optional[Any], dry_run: bool, fetch
     items, flagged = drop_flagged(extract_items(html, target))
     result.update(found=len(items), flagged=flagged, dated=sum(1 for i in items if i.published_on), sample=items[:5])
     if not items:
-        result.update(state="no_items", detail="page parsed but no item links matched; the layout may have changed")
+        result.update(
+            state="no_items",
+            detail="page parsed but no item links matched; the layout may have changed",
+            diagnostics=diagnose(html, target),
+        )
         return result
 
     existing: Optional[dict[str, str]] = None
@@ -340,6 +369,8 @@ def run_scan(names: Sequence[str], dry_run: bool, client: Optional[Any]) -> int:
         if r.get("detail"):
             line += f" ({r['detail']})"
         print(line)
+        for note in r.get("diagnostics", []):
+            print(f"    {note}")
         for item in r.get("sample", []):
             print(f"    {item.published_on or '----------'}  {item.title[:90]}  {item.url}")
     if any(r["state"] == "queue_unavailable" for r in results):

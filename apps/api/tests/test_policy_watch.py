@@ -306,3 +306,24 @@ def test_registered_targets_are_https_gov_my_and_unique() -> None:
         assert target.verified, f"{target.name} must record how it was verified"
         for prefix in target.item_url_prefixes:
             assert prefix.startswith("https://")
+
+
+def test_empty_page_reports_diagnostics_that_show_where_links_were_lost() -> None:
+    page = (
+        '<html><body><a href="/about">About</a><a href="/media/2026/x">Short</a>'
+        '<a href="https://other.example/y">A long headline on another host entirely</a></body></html>'
+    )
+    result = scan_target(_TARGET, FakeClient(), dry_run=True, fetch=_fetch_of(page))
+    assert result["state"] == "no_items"
+    joined = "\n".join(result["diagnostics"])
+    assert "3 anchors, 2 on example.gov.my, 0 under the item prefix" in joined
+    assert "link: 'About' -> https://www.example.gov.my/about" in joined
+
+
+def test_run_scan_prints_diagnostics_for_an_empty_target(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr(
+        pw, "scan_target",
+        lambda t, c, d: {"target": t.name, "url": t.url, "state": "no_items", "found": 0, "flagged": 0, "diagnostics": ["5 anchors, 0 on x"]},
+    )
+    pw.run_scan([TARGETS[0].name], True, None)
+    assert "5 anchors, 0 on x" in capsys.readouterr().out
