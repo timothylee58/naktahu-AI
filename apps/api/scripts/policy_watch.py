@@ -147,6 +147,29 @@ class _AnchorTokens(HTMLParser):
             self.tokens.append(("t", "", " ".join(data.split())))
 
 
+_DATE_REACH = 3  # tokens to look past on each side of a link
+
+
+def _nearby_date(tokens: list[tuple[str, str, str]], index: int, absolute: str, target: WatchTarget) -> Optional[date]:
+    """A date printed beside a link, not inside it. Looks up to _DATE_REACH tokens
+    either way and steps over other links to the SAME address, because a card
+    usually links its image and its title separately with the date next to one
+    of them. Any other link ends the search: that date belongs to a different item."""
+    for step in (-1, 1):
+        for j in range(index + step, index + step * (_DATE_REACH + 1), step):
+            if not 0 <= j < len(tokens):
+                break
+            kind, href, text = tokens[j]
+            if kind == "t":
+                found = parse_date(text)
+                if found:
+                    return found
+                continue
+            if urldefrag(urljoin(target.url, href.strip()))[0] != absolute:
+                break
+    return None
+
+
 def extract_items(html: str, target: WatchTarget) -> list[Item]:
     """Items on a listing page: links that stay on the agency's own host, carry a
     real title, and (when the target says so) live under an item path prefix.
@@ -171,11 +194,7 @@ def extract_items(html: str, target: WatchTarget) -> list[Item]:
             continue
         if target.item_url_prefixes and not absolute.startswith(target.item_url_prefixes):
             continue
-        published = parse_date(text)
-        if published is None and index + 1 < len(tokens) and tokens[index + 1][0] == "t":
-            published = parse_date(tokens[index + 1][2])
-        if published is None and index > 0 and tokens[index - 1][0] == "t":
-            published = parse_date(tokens[index - 1][2])
+        published = parse_date(text) or _nearby_date(tokens, index, absolute, target)
         if target.require_date and published is None:
             continue
         title = _strip_trailing_date(text)

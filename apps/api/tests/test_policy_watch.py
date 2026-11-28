@@ -340,3 +340,27 @@ def test_diagnostics_show_links_under_the_listing_path_and_where_dates_sit() -> 
     assert "1 links sit under the listing path" in joined
     assert "under listing: 'A story headline that is long enough' -> https://www.example.gov.my/media/story-1" in joined
     assert "dated text: '12 Nov 2026' before=https://www.example.gov.my/media/story-1" in joined
+
+
+def test_date_before_an_image_link_to_the_same_address_still_dates_the_title_link() -> None:
+    """MIDA's cards: date text, then an image link, then the title link, both to one URL."""
+    target = WatchTarget(
+        name="card", url="https://www.example.gov.my/media/", agency="A", level="federal", verified="t",
+        item_url_prefixes=("https://www.example.gov.my/media-release/",), require_date=True,
+    )
+    html = (
+        '<div><span>24 Nov 2026</span><a href="/media-release/notice-one/"><img src="x.png"></a>'
+        '<a href="/media-release/notice-one/">Important notice: temporary counter closure</a></div>'
+        '<div><span>17 Nov 2026</span><a href="/media-release/notice-two/">Malaysia records strong investment growth</a></div>'
+    )
+    items = extract_items(html, target)
+    assert [(i.url.rsplit("/", 2)[1], i.published_on) for i in items] == [
+        ("notice-one", date(2026, 11, 24)),
+        ("notice-two", date(2026, 11, 17)),
+    ]
+
+
+def test_a_date_belonging_to_a_different_item_is_not_borrowed() -> None:
+    target = WatchTarget(name="c", url="https://www.example.gov.my/m/", agency="A", level="federal", verified="t", require_date=True)
+    html = '<span>24 Nov 2026</span><a href="/a">The first headline, dated above</a><a href="/b">The second headline, undated here</a>'
+    assert [i.url.rsplit("/", 1)[1] for i in extract_items(html, target)] == ["a"]
