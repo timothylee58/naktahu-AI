@@ -66,8 +66,12 @@ def reset_shared_state(monkeypatch):
 
     # One app object serves every test now: a lifespan test would otherwise leave its Redis and
     # Supabase mocks on app.state for whichever test runs next.
-    monkeypatch.setattr(api_main.app.state, "redis", None, raising=False)
-    monkeypatch.setattr(api_main.app.state, "supabase", None, raising=False)
+    # Plain assignment, not monkeypatch: pytest 9 records every attribute on a Starlette State as
+    # "absent" (it lives in State._state, not __dict__), so undo is delattr. A test that patches the
+    # same name again (the many "503 when supabase unavailable" tests) then deletes it twice and
+    # errors at teardown with KeyError. Every test re-runs this assignment first, so nothing leaks.
+    api_main.app.state.redis = None
+    api_main.app.state.supabase = None
 
     # Reset Supabase state
     insert_mock = MagicMock()
