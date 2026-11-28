@@ -317,7 +317,7 @@ def test_empty_page_reports_diagnostics_that_show_where_links_were_lost() -> Non
     assert result["state"] == "no_items"
     joined = "\n".join(result["diagnostics"])
     assert "3 anchors, 2 on example.gov.my, 0 under the item prefix" in joined
-    assert "link: 'About' -> https://www.example.gov.my/about" in joined
+    assert "first link: 'About' -> https://www.example.gov.my/about" in joined
 
 
 def test_run_scan_prints_diagnostics_for_an_empty_target(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -327,3 +327,16 @@ def test_run_scan_prints_diagnostics_for_an_empty_target(monkeypatch: pytest.Mon
     )
     pw.run_scan([TARGETS[0].name], True, None)
     assert "5 anchors, 0 on x" in capsys.readouterr().out
+
+
+def test_diagnostics_show_links_under_the_listing_path_and_where_dates_sit() -> None:
+    page = (
+        '<nav><a href="/menu1">Menu one entry</a><a href="/menu2">Menu two entry</a></nav>'
+        '<div><a href="/media/story-1">A story headline that is long enough</a><span>12 Nov 2026</span></div>'
+        '<p>no date here</p>'
+    )
+    result = scan_target(_TARGET, FakeClient(), dry_run=True, fetch=_fetch_of(page))
+    joined = "\n".join(result["diagnostics"])
+    assert "1 links sit under the listing path" in joined
+    assert "under listing: 'A story headline that is long enough' -> https://www.example.gov.my/media/story-1" in joined
+    assert "dated text: '12 Nov 2026' before=https://www.example.gov.my/media/story-1" in joined

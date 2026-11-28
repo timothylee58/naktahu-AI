@@ -74,12 +74,12 @@ TARGETS: tuple[WatchTarget, ...] = (
         require_date=True,
     ),
     WatchTarget(
-        name="mof-treasury-circulars",
-        url="https://ppp.treasury.gov.my/",
-        agency="Perbendaharaan Malaysia (Ministry of Finance): Portal Pekeliling Perbendaharaan",
+        name="mof-treasury-arkib",
+        url="https://ppp.treasury.gov.my/arkib/frontend",
+        agency="Perbendaharaan Malaysia (Ministry of Finance): Portal Pekeliling Perbendaharaan, arkib",
         level="federal",
-        verified="Scrape Probe run 46016532521 (2026-11-27): USABLE, 19 dated items. Linked from www.mof.gov.my.",
-        notes="Treasury circulars portal.",
+        verified="CANDIDATE: link 'Arkib' seen on https://ppp.treasury.gov.my/ (Scrape Probe run 46016532521). The portal's home page lists circulars as links back to the root, so they have no per-item URL; the archive page is untested.",
+        notes="Treasury circulars archive. Drop this target if the dry run shows no per-item links.",
         host_suffix_override="treasury.gov.my",
     ),
     WatchTarget(

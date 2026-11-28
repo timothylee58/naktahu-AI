@@ -186,13 +186,19 @@ def extract_items(html: str, target: WatchTarget) -> list[Item]:
     return items
 
 
-def diagnose(html: str, target: WatchTarget, limit: int = 12) -> list[str]:
-    """Why a page produced no items: counts at each filter, plus the first few
-    same-host links as the parser saw them. Printed only for a target that came
-    back empty, so a layout change can be understood from the log alone."""
+def diagnose(html: str, target: WatchTarget, limit: int = 10) -> list[str]:
+    """Why a page produced no items: counts at each filter, then the evidence a
+    person needs to fix the target. Printed only for a target that came back
+    empty, so a layout the extractor does not understand can be read from the log.
+
+    Three views, because navigation menus bury the real list at the top of the
+    link order: the first same-host links, links that live under the listing's own
+    path (where items usually are), and dates found in plain text with the links
+    on either side of them (shows whether a date sits next to its link at all)."""
     parser = _AnchorTokens()
     parser.feed(html)
-    anchors = [(href, text) for kind, href, text in parser.tokens if kind == "a" and href.strip()]
+    tokens = parser.tokens
+    anchors = [(href, text) for kind, href, text in tokens if kind == "a" and href.strip()]
     on_host = []
     for href, text in anchors:
         absolute = urldefrag(urljoin(target.url, href.strip()))[0]
@@ -202,12 +208,28 @@ def diagnose(html: str, target: WatchTarget, limit: int = 12) -> list[str]:
     with_prefix = [a for a in on_host if not target.item_url_prefixes or a[0].startswith(target.item_url_prefixes)]
     dated = [a for a in with_prefix if parse_date(a[1])]
     titled = [a for a in with_prefix if len(_strip_trailing_date(a[1])) >= target.min_title_chars]
+    listing = urldefrag(target.url)[0]
+    below = [a for a in on_host if a[0].startswith(listing) and a[0] != listing]
     lines = [
         f"{len(anchors)} anchors, {len(on_host)} on {target.host_suffix}, {len(with_prefix)} under the item prefix, "
         f"{len(titled)} with a title of {target.min_title_chars}+ chars, {len(dated)} with a date in the link text",
         f"{len(html)} bytes of HTML, {html.lower().count('<script')} script tags, {html.lower().count('<table')} tables",
     ]
-    lines += [f"link: {text[:70]!r} -> {url}" for url, text in on_host[:limit]]
+    lines += [f"first link: {text[:60]!r} -> {url}" for url, text in on_host[:limit]]
+    lines.append(f"{len(below)} links sit under the listing path")
+    lines += [f"under listing: {text[:60]!r} -> {url}" for url, text in below[:limit]]
+
+    def neighbour(start: int, step: int) -> str:
+        for j in range(start, start + 4 * step, step):
+            if 0 <= j < len(tokens) and tokens[j][0] == "a" and tokens[j][1].strip():
+                return urldefrag(urljoin(target.url, tokens[j][1].strip()))[0]
+        return "-"
+
+    shown = 0
+    for index, (kind, _href, text) in enumerate(tokens):
+        if kind == "t" and parse_date(text) and shown < 5:
+            lines.append(f"dated text: {text[:50]!r} before={neighbour(index - 1, -1)} after={neighbour(index + 1, 1)}")
+            shown += 1
     return lines
 
 
