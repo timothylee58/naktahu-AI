@@ -433,3 +433,8 @@ def test_data_attr_target_reads_document_addresses_titles_and_dates() -> None:
     assert items[0].title.startswith("SURAT MOF BERTARIKH 3 OKTOBER 2022")
     assert items[0].published_on is not None and items[0].published_on.month == 10
     assert items[1].title.startswith("PK 2.15") and items[1].published_on is None
+
+
+def test_data_attr_target_drops_documents_whose_only_title_is_an_upload_hash() -> None:
+    html = '<a href="#" data-path="https://ppp.treasury.gov.my/storage/pindaan/7c4d72e3fb2d7d3411cf1a5e650b451b.pdf">x</a>'
+    assert pw.extract_items(html, TARGETS_BY_NAME["mof-treasury-pekeliling"]) == []

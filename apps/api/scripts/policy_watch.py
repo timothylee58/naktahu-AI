@@ -215,6 +215,9 @@ class _DataAttrAnchors(HTMLParser):
             self._open = None
 
 
+_HASH_TITLE_RE = re.compile(r"[0-9a-f]{16,}", re.IGNORECASE)
+
+
 def _title_from_filename(path: str) -> str:
     stem = unquote(urlsplit(path).path.rsplit("/", 1)[-1]).rsplit(".", 1)[0]
     stem = re.sub(r"^\d{6,}_", "", stem)
@@ -239,7 +242,8 @@ def _extract_data_attr_items(html: str, target: WatchTarget) -> list[Item]:
         title = " ".join((data_title or text or "").split())
         if len(title) < target.min_title_chars:
             title = _title_from_filename(absolute)
-        if len(title) < target.min_title_chars:
+        # An upload hash is not a headline; a reviewer cannot judge it.
+        if len(title) < target.min_title_chars or _HASH_TITLE_RE.fullmatch(title):
             continue
         published = parse_date(title)
         if target.require_date and published is None:
