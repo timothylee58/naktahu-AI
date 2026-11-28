@@ -66,8 +66,10 @@ def reset_shared_state(monkeypatch):
 
     # One app object serves every test now: a lifespan test would otherwise leave its Redis and
     # Supabase mocks on app.state for whichever test runs next.
-    monkeypatch.setattr(api_main.app.state, "redis", None, raising=False)
-    monkeypatch.setattr(api_main.app.state, "supabase", None, raising=False)
+    # Plain assignment, not monkeypatch: undoing a monkeypatch of an attribute that did not exist
+    # yet means delattr, which raises KeyError in teardown when a test or lifespan got there first.
+    api_main.app.state.redis = None
+    api_main.app.state.supabase = None
 
     # Reset Supabase state
     insert_mock = MagicMock()
