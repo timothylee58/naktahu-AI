@@ -185,3 +185,104 @@ def test_503_without_supabase_and_until_migration_applied(client):
     api_main.app.state.supabase = None
     assert c.get("/api/v1/notes", headers=_auth()).status_code == 503
     assert c.post("/api/v1/notes", headers=_auth(), json={"title": "x"}).status_code == 503
+
+
+# ── step 5: links, export, stale ─────────────────────────────────────────────
+import io
+import zipfile
+from datetime import date, timedelta
+
+from routers.notes import _compute_links, _reasons_for, _safe_filename, _to_markdown, _wikilinks
+
+A = {"id": "a", "title": "Spouse relief", "body": "See [[EPF basics]] and [[Missing note]] and [[epf basics|alias]]"}
+B = {"id": "b", "title": "EPF basics", "body": "Related: [[Spouse relief]]"}
+C = {"id": "c", "title": "Other", "body": "nothing here"}
+
+
+def test_wikilinks_parse_dedupe_case_insensitively():
+    assert _wikilinks(A["body"]) == ["EPF basics", "Missing note"]
+    assert _wikilinks("[[ ]] [[a\nb]] [[x]]") == ["x"]
+
+
+def test_links_resolve_outgoing_and_backlinks():
+    links = _compute_links(A, [A, B, C])
+    assert [(n.title, n.id) for n in links.outgoing] == [("EPF basics", "b"), ("Missing note", None)]
+    assert [n.id for n in links.backlinks] == ["b"]
+    assert _compute_links(C, [A, B, C]).backlinks == []
+
+
+def test_export_filenames_cannot_escape_the_zip():
+    used: set[str] = set()
+    names = [_safe_filename(t, used) for t in ["../../etc/passwd", "a/b\\c", "", "Same", "same"]]
+    assert all("/" not in n and "\\" not in n and ".." not in n for n in names)
+    assert len({n.lower() for n in names}) == len(names)  # duplicates get distinct names
+
+
+def test_markdown_has_front_matter_and_keeps_wikilinks():
+    md = _to_markdown({
+        "title": 'Quote "me": colon', "tags": ["tax"], "created_at": "c", "updated_at": "u",
+        "body": "Link [[B]]",
+        "source": {"query": "q?", "citations": [{"title": "T", "ministry": "LHDN", "url": "https://x.gov.my"}]},
+    })
+    assert md.startswith("---\ntitle: \"Quote \\\"me\\\": colon\"\n")
+    assert 'tags: ["tax"]' in md and "Link [[B]]" in md and "https://x.gov.my" in md
+
+
+def test_export_endpoint_returns_a_zip_of_only_the_callers_notes(client):
+    c, table = client
+    table.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(
+        data=[{**ROW, "title": "One"}, {**ROW, "id": "x2", "title": "Two"}])
+    r = c.get("/api/v1/notes/export", headers=_auth("user-a"))
+    assert r.status_code == 200 and r.headers["content-type"] == "application/zip"
+    assert "attachment" in r.headers["content-disposition"]
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert sorted(z.namelist()) == ["One.md", "Two.md"]
+    table.select.return_value.eq.assert_called_with("user_id", "user-a")
+
+
+def test_export_route_is_not_swallowed_by_note_id(client):
+    c, table = client
+    table.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(data=[])
+    assert c.get("/api/v1/notes/export", headers=_auth()).status_code == 200
+
+
+def test_links_endpoint_404_for_other_users_note(client):
+    c, table = client
+    table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[A, B])
+    assert c.get(f"/api/v1/notes/{NOTE_ID}/links", headers=_auth("user-b")).status_code == 404
+    assert c.get("/api/v1/notes/nope/links", headers=_auth()).status_code == 404
+
+
+TODAY = date(2026, 11, 28)
+URL = "https://www.hasil.gov.my/x"
+
+
+def test_stale_superseded_expired_newer_and_fresh():
+    cite = [{"url": URL, "effective_date": "2025-01-01"}]
+    assert _reasons_for(cite, {URL: [{"superseded_by": "z"}]}, TODAY) == ["superseded"]
+    assert _reasons_for(cite, {URL: [{"effective_until": "2026-01-01"}]}, TODAY) == ["expired"]
+    assert _reasons_for(cite, {URL: [{"effective_date": "2025-01-01"}, {"effective_date": "2026-01-01"}]}, TODAY) == ["newer_version"]
+    assert _reasons_for(cite, {URL: [{"effective_date": "2025-01-01"}]}, TODAY) == []
+
+
+def test_stale_is_silent_when_unsure():
+    # no chunks for the URL, no cited date, or one live chunk among superseded ones
+    assert _reasons_for([{"url": URL}], {}, TODAY) == []
+    assert _reasons_for([{"url": URL}], {URL: [{"effective_date": "2026-01-01"}]}, TODAY) == []
+    assert _reasons_for([{"url": URL}], {URL: [{"superseded_by": "z"}, {}]}, TODAY) == []
+    future = (TODAY + timedelta(days=5)).isoformat()
+    assert _reasons_for([{"url": URL}], {URL: [{"effective_until": future}]}, TODAY) == []
+
+
+def test_stale_endpoint_flags_only_affected_notes(client):
+    c, table = client
+    notes = [
+        {"id": "n1", "title": "Old rule", "source": {"citations": [{"url": URL, "effective_date": "2024-01-01"}]}},
+        {"id": "n2", "title": "Fine", "source": {"citations": [{"url": "https://ok.gov.my"}]}},
+    ]
+    table.select.return_value.eq.return_value.execute.return_value = MagicMock(data=notes + [{"id": "n3", "title": "Manual", "source": None}])
+    table.select.return_value.in_.return_value.execute.return_value = MagicMock(data=[
+        {"source_url": URL, "effective_date": "2025-06-01", "effective_until": None, "superseded_by": None}])
+    r = c.get("/api/v1/notes/stale", headers=_auth())
+    assert r.status_code == 200
+    assert r.json()["stale"] == [{"id": "n1", "title": "Old rule", "reasons": ["newer_version"]}]
