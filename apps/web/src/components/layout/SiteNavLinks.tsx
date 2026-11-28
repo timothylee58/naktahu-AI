@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { Home, Info, HelpCircle, CreditCard, Plug, Bot, Soup, type LucideIcon } from 'lucide-react';
+import { Home, Info, HelpCircle, CreditCard, Plug, Bot, Soup, NotebookPen, type LucideIcon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 interface SiteNavLinksProps {
@@ -33,6 +33,7 @@ const LINKS: { href: string; key: string; Icon: LucideIcon; group: 'ai' | 'commu
   { href: '/pricing', key: 'nav.pricing', Icon: CreditCard, group: 'ai' },
   { href: '/developer', key: 'nav.developer', Icon: Plug, group: 'ai' },
   { href: '/agents', key: 'nav.agents', Icon: Bot, group: 'ai' },
+  { href: '/notes', key: 'nav.notes', Icon: NotebookPen, group: 'ai' },
   { href: '/warung-watch', key: 'nav.warung_watch', Icon: Soup, group: 'community' },
 ];
 
