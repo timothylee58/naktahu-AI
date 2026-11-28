@@ -365,3 +365,48 @@ def test_a_date_belonging_to_a_different_item_is_not_borrowed() -> None:
     target = WatchTarget(name="c", url="https://www.example.gov.my/m/", agency="A", level="federal", verified="t", require_date=True)
     html = '<span>24 Nov 2026</span><a href="/a">The first headline, dated above</a><a href="/b">The second headline, undated here</a>'
     assert [i.url.rsplit("/", 1)[1] for i in extract_items(html, target)] == ["a"]
+
+
+_MIDA_CARDS = (
+    '<div><span>24 Nov 2026</span><h3>IMPORTANT NOTICE: TEMPORARY CLOSURE OF JIM MIDA COUNTER</h3>'
+    '<a href="/media-release/closure-notice/">Read More</a><a href="/media-release/closure-notice/"></a></div>'
+    '<div><span>17 Nov 2026</span><h3>Malaysia Records RM350.4 Billion in Approved Investments</h3>'
+    '<a href="/media-release/investments/">Read More</a></div>'
+    '<div><span>01 Nov 2026</span><a href="/media-release/orphan/">Read More</a></div>'
+)
+
+
+def _mida_like(**overrides: Any) -> WatchTarget:
+    base = dict(
+        name="cards", url="https://www.example.gov.my/media/", agency="A", level="federal", verified="t",
+        item_url_prefixes=("https://www.example.gov.my/media-release/",), require_date=True,
+    )
+    base.update(overrides)
+    return WatchTarget(**base)
+
+
+def test_read_more_cards_take_the_headline_from_the_text_before_the_link() -> None:
+    items = extract_items(_MIDA_CARDS, _mida_like(title_from_preceding_text=True))
+    assert [(i.title, i.published_on) for i in items][:2] == [
+        ("IMPORTANT NOTICE: TEMPORARY CLOSURE OF JIM MIDA COUNTER", date(2026, 11, 24)),
+        ("Malaysia Records RM350.4 Billion in Approved Investments", date(2026, 11, 17)),
+    ]
+
+
+def test_a_read_more_link_with_no_headline_before_it_is_skipped_not_titled_read_more() -> None:
+    items = extract_items(_MIDA_CARDS, _mida_like(title_from_preceding_text=True))
+    assert all("orphan" not in i.url for i in items) and len(items) == 2
+
+
+def test_without_the_option_read_more_links_are_ignored() -> None:
+    assert extract_items(_MIDA_CARDS, _mida_like()) == []
+
+
+def test_a_different_link_stops_the_headline_search() -> None:
+    html = (
+        '<span>24 Nov 2026</span><h3>A headline belonging to the first card above</h3>'
+        '<a href="/media-release/one/">Read More</a>'
+        '<a href="/media-release/two/">Read More</a>'
+    )
+    items = extract_items(html, _mida_like(title_from_preceding_text=True))
+    assert [i.url.rsplit("/", 2)[1] for i in items] == ["one"]

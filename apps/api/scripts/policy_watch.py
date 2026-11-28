@@ -170,6 +170,22 @@ def _nearby_date(tokens: list[tuple[str, str, str]], index: int, absolute: str, 
     return None
 
 
+def _preceding_title(tokens: list[tuple[str, str, str]], index: int, absolute: str, target: WatchTarget) -> str:
+    """The headline of a card whose link only says "Read More": the closest plain
+    text before the link that is long enough to be a title and is not just a date.
+    Links to the same address are stepped over; any other link ends the search."""
+    for j in range(index - 1, max(index - 1 - _DATE_REACH, -1), -1):
+        kind, href, text = tokens[j]
+        if kind == "t":
+            candidate = _strip_trailing_date(text)
+            if len(candidate) >= target.min_title_chars and not parse_date(candidate):
+                return text
+            continue
+        if urldefrag(urljoin(target.url, href.strip()))[0] != absolute:
+            break
+    return ""
+
+
 def extract_items(html: str, target: WatchTarget) -> list[Item]:
     """Items on a listing page: links that stay on the agency's own host, carry a
     real title, and (when the target says so) live under an item path prefix.
@@ -198,6 +214,8 @@ def extract_items(html: str, target: WatchTarget) -> list[Item]:
         if target.require_date and published is None:
             continue
         title = _strip_trailing_date(text)
+        if target.title_from_preceding_text and len(title) < target.min_title_chars:
+            title = _strip_trailing_date(_preceding_title(tokens, index, absolute, target))
         if len(title) < target.min_title_chars:
             continue
         seen.add(absolute)

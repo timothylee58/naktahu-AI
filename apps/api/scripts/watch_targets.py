@@ -42,6 +42,10 @@ class WatchTarget:
     # Only count links that carry a date. For listing pages whose navigation
     # menu is full of undated links, this is what separates items from chrome.
     require_date: bool = False
+    # For card layouts where the link says only "Read More" and the headline is
+    # plain text just before it: use that text as the title when the link's own
+    # text is too short to be one.
+    title_from_preceding_text: bool = False
     # The agency's own domain. Links to any other host are ignored. Defaults to
     # the listing page's host without a leading "www.".
     host_suffix_override: str = ""
@@ -70,9 +74,10 @@ TARGETS: tuple[WatchTarget, ...] = (
         agency="Malaysian Investment Development Authority (MIDA)",
         level="federal",
         verified="Scrape Probe run 46016532521 and the Policy Watch dry run on PR 306 (2026-11-28): item links of the form /media-release/<slug>/ with the date printed just before the link (e.g. 24 Nov 2026).",
-        notes="The page is a 1.5 MB mega-menu, so only /media-release/ links that carry a date count.",
+        notes="The page is a 1.5 MB mega-menu, so only /media-release/ links that carry a date count. Each card is: date text, headline text, a 'Read More' link, so the headline is taken from the text before the link.",
         item_url_prefixes=("https://www.mida.gov.my/media-release/",),
         require_date=True,
+        title_from_preceding_text=True,
     ),
     WatchTarget(
         name="penang-pengumuman",
