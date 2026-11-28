@@ -7,6 +7,7 @@ import { getAnonSessionId } from '@/lib/anon-session';
 import { useI18n } from '@/lib/i18n';
 import { API_BASE } from '@/lib/api-base';
 import { ShareMenu } from './ShareMenu';
+import { SaveToNotesButton } from './SaveToNotesButton';
 import { WrongAnswerPanel } from './WrongAnswerPanel';
 
 interface FeedbackDetails {
@@ -129,6 +130,11 @@ export function ResponseActions({
           confidence={confidence}
           accessToken={accessToken}
         />
+      )}
+
+      {/* Save to the user's own notes — signed-in only. */}
+      {query && accessToken && (
+        <SaveToNotesButton content={content} query={query} domain={domain} citations={citations} />
       )}
 
       {/* Regenerate */}

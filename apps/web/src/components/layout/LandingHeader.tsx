@@ -11,7 +11,7 @@ import { SiteNavLinks } from '@/components/layout/SiteNavLinks';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 
-const LANDING_NAV_OMIT = ['/agents'] as const;
+const LANDING_NAV_OMIT = ['/agents', '/notes'] as const;
 
 interface LandingHeaderProps {
   /** True mid-transition into /chat — morphs the header's own box from a
